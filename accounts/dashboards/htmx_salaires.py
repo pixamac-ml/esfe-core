@@ -12,6 +12,7 @@ from accounts.models import BranchCashMovement, PayrollEntry, SensitiveActionReq
 from accounts.services.accounting_documents import create_cash_movement
 from accounts.services.manager_intelligence import (
     get_branch_cash_balance,
+    lock_branch_cash_balance,
     mark_ready_payroll_entries_available,
     notify_salary_available,
     payroll_cash_reference,
@@ -265,11 +266,6 @@ def salary_correct_confirm_otp(request: HttpRequest, pk: int) -> HttpResponse:
 @manager_required
 @require_POST
 def salary_pay(request: HttpRequest, pk: int) -> HttpResponse:
-    payroll_entry = get_object_or_404(
-        PayrollEntry.objects.select_related("employee", "employee__profile", "branch"),
-        pk=pk,
-        branch=request.branch,
-    )
     raw_amount = (request.POST.get("payment_amount") or "").strip()
     try:
         payment_amount = int(raw_amount)
@@ -280,36 +276,44 @@ def salary_pay(request: HttpRequest, pk: int) -> HttpResponse:
             "<div class='rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>Montant de paiement invalide.</div>",
             status=400,
         )
-    if payment_amount > payroll_entry.remaining_salary:
-        return HttpResponse(
-            "<div class='rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>Le montant depasse le reste a payer sur cette paie.</div>",
-            status=400,
-        )
-    available_cash = get_branch_cash_balance(request.branch)
-    if payment_amount > available_cash:
-        return HttpResponse(
-            (
-                "<div class='rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700'>"
-                f"Caisse insuffisante pour ce paiement. Disponible: {available_cash} FCFA."
-                "</div>"
+    with transaction.atomic():
+        _locked_branch, available_cash = lock_branch_cash_balance(request.branch)
+        payroll_entry = get_object_or_404(
+            PayrollEntry.objects.select_for_update().select_related(
+                "employee", "employee__profile", "branch"
             ),
-            status=400,
+            pk=pk,
+            branch=request.branch,
         )
+        if payment_amount > payroll_entry.remaining_salary:
+            return HttpResponse(
+                "<div class='rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>Le montant depasse le reste a payer sur cette paie.</div>",
+                status=400,
+            )
+        if payment_amount > available_cash:
+            return HttpResponse(
+                (
+                    "<div class='rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700'>"
+                    f"Caisse insuffisante pour ce paiement. Disponible: {available_cash} FCFA."
+                    "</div>"
+                ),
+                status=400,
+            )
 
-    payroll_entry.paid_amount += payment_amount
-    payroll_entry.updated_by = request.user
-    payroll_entry.save()
-    create_cash_movement(
-        branch=request.branch,
-        movement_type=BranchCashMovement.TYPE_OUT,
-        source=BranchCashMovement.SOURCE_PAYROLL,
-        amount=payment_amount,
-        label=f"Salaire - {payroll_entry.employee.get_full_name() or payroll_entry.employee.username}",
-        movement_date=timezone.localdate(),
-        source_reference=payroll_cash_reference(payroll_entry, payment_amount),
-        notes=f"Paiement salaire {payroll_entry.period_month:%Y-%m}.",
-        created_by=request.user,
-    )
+        payroll_entry.paid_amount += payment_amount
+        payroll_entry.updated_by = request.user
+        payroll_entry.save()
+        create_cash_movement(
+            branch=request.branch,
+            movement_type=BranchCashMovement.TYPE_OUT,
+            source=BranchCashMovement.SOURCE_PAYROLL,
+            amount=payment_amount,
+            label=f"Salaire - {payroll_entry.employee.get_full_name() or payroll_entry.employee.username}",
+            movement_date=timezone.localdate(),
+            source_reference=payroll_cash_reference(payroll_entry, payroll_entry.paid_amount),
+            notes=f"Paiement salaire {payroll_entry.period_month:%Y-%m}.",
+            created_by=request.user,
+        )
 
     return manager_salary_redirect_response(payroll_entry.period_month)
 
@@ -338,18 +342,26 @@ def salary_advance(request: HttpRequest, pk: int) -> HttpResponse:
             "<div class='rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>Montant d'avance invalide.</div>",
             status=400,
         )
-    available_cash = get_branch_cash_balance(request.branch)
-    if advance_amount > available_cash:
-        return HttpResponse(
-            (
-                "<div class='rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700'>"
-                f"Caisse insuffisante pour cette avance. Disponible: {available_cash} FCFA."
-                "</div>"
-            ),
-            status=400,
-        )
-
     with transaction.atomic():
+        _locked_branch, available_cash = lock_branch_cash_balance(request.branch)
+        if advance_amount > available_cash:
+            return HttpResponse(
+                (
+                    "<div class='rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700'>"
+                    f"Caisse insuffisante pour cette avance. Disponible: {available_cash} FCFA."
+                    "</div>"
+                ),
+                status=400,
+            )
+        payroll_entry = (
+            PayrollEntry.objects.select_for_update()
+            .filter(
+                branch=request.branch,
+                employee=profile.user,
+                period_month=payroll_month,
+            )
+            .first()
+        )
         if payroll_entry is None:
             payroll_entry = PayrollEntry.objects.create(
                 branch=request.branch,
@@ -380,7 +392,7 @@ def salary_advance(request: HttpRequest, pk: int) -> HttpResponse:
             amount=advance_amount,
             label=f"Avance salaire - {profile.user.get_full_name() or profile.user.username}",
             movement_date=timezone.localdate(),
-            source_reference=payroll_cash_reference(payroll_entry, f"ADV-{advance_amount}"),
+            source_reference=payroll_cash_reference(payroll_entry, f"ADV-{payroll_entry.advances}"),
             notes=f"Avance sur salaire avant disponibilite pour {payroll_entry.period_month:%Y-%m}.",
             created_by=request.user,
         )

@@ -5,6 +5,9 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "test_db.sqlite3",
+        # Sans nom TEST explicite Django remplace SQLite par une base mémoire à
+        # chaque processus ; --keepdb ne conservait donc pas les ~150 migrations.
+        "TEST": {"NAME": BASE_DIR / "test_db.sqlite3"},
     }
 }
 

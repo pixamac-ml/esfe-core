@@ -93,6 +93,7 @@ INSTALLED_APPS = [
     "portal.apps.PortalConfig",
     "secretary",
     "memoires.apps.MemoiresConfig",
+    "coupons.apps.CouponsConfig",
 ]
 
 if ENABLE_BROWSER_RELOAD and importlib.util.find_spec("django_browser_reload"):
@@ -118,6 +119,9 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "accounts.middleware.AccessContextMiddleware",
+    "accounts.middleware.SystemSessionSecurityMiddleware",
+    "accounts.middleware.MandatoryPasswordChangeMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
 ]
@@ -260,6 +264,11 @@ if ENABLE_WEBSOCKETS and REDIS_URL and HAS_CHANNELS_REDIS:
         }
     }
 else:
+    if ENABLE_WEBSOCKETS and not REDIS_URL and not DEBUG:
+        raise ImproperlyConfigured(
+            "REDIS_URL is required when WebSockets are enabled in production; "
+            "an in-memory channel layer cannot propagate session revocations across workers."
+        )
     if ENABLE_WEBSOCKETS and REDIS_URL and not HAS_CHANNELS_REDIS and not DEBUG:
         raise ImproperlyConfigured(
             "REDIS_URL is configured but channels_redis is not installed. "
@@ -372,6 +381,42 @@ NOTIFIER_EMAIL_PROVIDER_MODE = os.getenv("NOTIFIER_EMAIL_PROVIDER_MODE", "smtp")
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "accounts_portal:portal_dashboard"
 LOGOUT_REDIRECT_URL = "community:topic_list"
+
+# Migration progressive du système d'accès. Ces flags restent inactifs tant que
+# les décisions V2 n'ont pas été comparées et validées en mode shadow.
+AUTH_ACCESS_CONTEXT_V2_ENABLED = env_bool("AUTH_ACCESS_CONTEXT_V2_ENABLED", False)
+AUTH_POLICY_V2_ENABLED = env_bool("AUTH_POLICY_V2_ENABLED", False)
+AUTH_POLICY_V2_SHADOW_ENABLED = env_bool("AUTH_POLICY_V2_SHADOW_ENABLED", False)
+AUTH_PORTAL_ROUTING_V2_ENABLED = env_bool("AUTH_PORTAL_ROUTING_V2_ENABLED", False)
+
+# Sessions institutionnelles. Les valeurs sont en secondes et restent
+# centralisees afin qu'aucun dashboard ne porte son propre nombre magique.
+SYSTEM_SESSION_IDLE_TIMEOUTS = {
+    "student": 30 * 60,
+    "teacher": 30 * 60,
+    "secretary": 15 * 60,
+    "admissions": 15 * 60,
+    "academic_supervisor": 15 * 60,
+    "director_of_studies": 15 * 60,
+    "annex_manager": 10 * 60,
+    "branch_manager": 10 * 60,
+    "it_support": 10 * 60,
+    "marketing_manager": 15 * 60,
+    "executive_director": 10 * 60,
+    "deputy_executive_director": 10 * 60,
+    "super_admin": 10 * 60,
+    "payment_agent": 10 * 60,
+    "finance_manager": 10 * 60,
+}
+SYSTEM_SESSION_DEFAULT_IDLE_TIMEOUT = int(os.getenv("SYSTEM_SESSION_DEFAULT_IDLE_TIMEOUT", "900"))
+SYSTEM_SESSION_WARNING_SECONDS = int(os.getenv("SYSTEM_SESSION_WARNING_SECONDS", "120"))
+SYSTEM_SESSION_ABSOLUTE_TIMEOUT = int(os.getenv("SYSTEM_SESSION_ABSOLUTE_TIMEOUT", str(12 * 60 * 60)))
+SYSTEM_SESSION_ACTIVITY_THROTTLE_SECONDS = int(os.getenv("SYSTEM_SESSION_ACTIVITY_THROTTLE_SECONDS", "30"))
+SYSTEM_SESSION_MANUAL_TEST_MODE = env_bool("SYSTEM_SESSION_MANUAL_TEST_MODE", False)
+if SYSTEM_SESSION_MANUAL_TEST_MODE:
+    SYSTEM_SESSION_IDLE_TIMEOUTS = {key: 3 * 60 for key in SYSTEM_SESSION_IDLE_TIMEOUTS}
+    SYSTEM_SESSION_DEFAULT_IDLE_TIMEOUT = 3 * 60
+    SYSTEM_SESSION_WARNING_SECONDS = 60
 
 # ==================================================
 # CKEDITOR 5 CONFIG

@@ -1,0 +1,193 @@
+{% load humanize component_tags %}
+{# ================================================================
+   portal_salary_section
+   Section salaire/honoraires universelle.
+   salary_type = "salaire" → fiche de paie staff
+   salary_type = "honoraire" → bordereau enseignant
+   ================================================================ #}
+<div id="{{ panel_id }}" class="space-y-5">
+
+  {% component "page_header"
+    title=salary_type|capfirst
+    subtitle="Suivi de la rémunération mensuelle"
+  %}
+    {% fill "actions" %}
+      <span class="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--success-soft)] px-3 py-1 text-xs font-bold font-mono text-[color:var(--success)]">
+        Base&nbsp;: {{ salary_base|default:0|intcomma }} FCFA
+      </span>
+    {% endfill %}
+  {% endcomponent %}
+
+  {# ── KPI ── #}
+  <div class="grid gap-4 sm:grid-cols-3">
+    {% component "widget_card"
+      label="Base mensuelle"
+      value=salary_base|default:"0"|intcomma
+      icon="wallet"
+      tone="success"
+      size="md"
+    %}{% endcomponent %}
+
+    {% component "widget_card"
+      label="Net dernier mois"
+      value=latest_entry.net_salary|default:"0"|intcomma
+      icon="check-circle"
+      tone="primary"
+      size="md"
+    %}{% endcomponent %}
+
+    {% if salary_type == "salaire" %}
+      {% component "widget_card"
+        label="Reste à retirer"
+        value=latest_entry.remaining_salary|default:"0"|intcomma
+        icon="clock"
+        tone="warning"
+        size="md"
+      %}{% endcomponent %}
+    {% else %}
+      {% component "widget_card"
+        label="Paiements en attente"
+        value=latest_entry.pending_count|default:"0"
+        icon="hourglass"
+        tone="warning"
+        size="md"
+      %}{% endcomponent %}
+    {% endif %}
+  </div>
+
+  {# ── Tableau historique ── #}
+  {% component "dashboard_card" padding="none" elevated=True %}
+    {% fill "default" %}
+      <div class="flex items-center gap-2 px-4 pt-4 pb-3 border-b border-[color:var(--line)]">
+        <i data-lucide="file-text" style="width:15px;height:15px;" class="text-[color:var(--muted)]" aria-hidden="true"></i>
+        <span class="text-xs font-bold uppercase tracking-wide text-[color:var(--muted)]">
+          {% if salary_type == "honoraire" %}Détail des heures{% else %}Historique des fiches de paie{% endif %}
+        </span>
+      </div>
+
+      {% if entries %}
+        {% if salary_type == "honoraire" %}
+          {# ── Vue enseignant : tableau heures ── #}
+          <div class="sg-table-wrap overflow-x-auto">
+            <table class="sg-table w-full text-sm">
+              <thead>
+                <tr>
+                  <th class="px-4 py-2 text-left text-xs font-bold text-[color:var(--muted)]">Mois</th>
+                  <th class="px-4 py-2 text-left text-xs font-bold text-[color:var(--muted)]">Heures</th>
+                  <th class="px-4 py-2 text-left text-xs font-bold text-[color:var(--muted)]">Tarif horaire</th>
+                  <th class="px-4 py-2 text-left text-xs font-bold text-[color:var(--muted)]">Montant brut</th>
+                  <th class="px-4 py-2 text-left text-xs font-bold text-[color:var(--muted)]">Statut</th>
+                  {% if download_url_name %}<th class="px-4 py-2 text-left text-xs font-bold text-[color:var(--muted)]">PDF</th>{% endif %}
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-[color:var(--line)]">
+                {% for row in entries %}
+                <tr class="hover:bg-[color:var(--card-soft)] transition">
+                  <td class="px-4 py-3 font-black text-[color:var(--text)]">{{ row.month_label }}</td>
+                  <td class="px-4 py-3 text-[color:var(--text)]">{{ row.hours|floatformat:1 }} h</td>
+                  <td class="px-4 py-3 text-[color:var(--text)]">{{ row.tarif|floatformat:0|intcomma }} FCFA</td>
+                  <td class="px-4 py-3 font-mono font-bold text-[color:var(--text)]">{{ row.gross_amount|floatformat:0|intcomma }} FCFA</td>
+                  <td class="px-4 py-3">
+                    {% if row.status == "paid" %}
+                      {% component "badge" label=row.status_display tone="success" size="sm" %}{% endcomponent %}
+                    {% elif row.status == "pending" or row.status == "partial" %}
+                      {% component "badge" label=row.status_display tone="warning" size="sm" %}{% endcomponent %}
+                    {% else %}
+                      {% component "badge" label=row.status_display tone="neutral" size="sm" %}{% endcomponent %}
+                    {% endif %}
+                  </td>
+                  {% if download_url_name %}
+                  <td class="px-4 py-3">
+                    <a href="{% url download_url_name row.entry_id %}" target="_blank"
+                       class="inline-flex items-center gap-1 rounded-lg border border-[color:var(--line)] p-1.5 text-[color:var(--muted)] hover:border-[color:var(--school-primary-soft)] transition"
+                       title="Télécharger le bordereau">
+                      <i data-lucide="file-down" style="width:14px;height:14px;" aria-hidden="true"></i>
+                    </a>
+                  </td>
+                  {% endif %}
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+        {% else %}
+          {# ── Vue staff : liste fiches de paie ── #}
+          <div class="divide-y divide-[color:var(--line)]">
+            {% for entry in entries %}
+              <div class="flex items-center justify-between px-4 py-3">
+                <div class="min-w-0">
+                  <div class="text-sm font-black text-[color:var(--text)]">{{ entry.period_month|date:"F Y" }}</div>
+                  <div class="mt-0.5 text-xs text-[color:var(--muted-2)]">
+                    Base&nbsp;: {{ entry.base_salary|intcomma }}
+                    &middot; Primes&nbsp;: {{ entry.allowances|intcomma }}
+                    &middot; Retenues&nbsp;: {{ entry.deductions|add:entry.advances|intcomma }}
+                  </div>
+                </div>
+                <div class="text-right ml-4 shrink-0">
+                  <div class="text-sm font-black font-mono text-[color:var(--text)]">{{ entry.net_salary|intcomma }} FCFA</div>
+                  {% if entry.status == "paid" %}
+                    {% component "badge" label="Payé" tone="success" size="sm" %}{% endcomponent %}
+                  {% elif entry.status == "partial" %}
+                    {% component "badge" label="Partiel" tone="warning" size="sm" %}{% endcomponent %}
+                  {% elif entry.status == "ready" %}
+                    {% component "badge" label="Prêt" tone="info" size="sm" %}{% endcomponent %}
+                  {% elif entry.status == "validated" %}
+                    {% component "badge" label="Validé" tone="neutral" size="sm" %}{% endcomponent %}
+                  {% else %}
+                    {% component "badge" label=entry.get_status_display tone="neutral" size="sm" %}{% endcomponent %}
+                  {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        {% if entries_page and entries_page.has_other_pages %}
+          <div class="border-t border-[color:var(--line)] px-4 py-3">
+            {% component "pagination"
+              total=entries_page.paginator.count
+              page=entries_page.number
+              per_page=8
+              hx_target=hx_target|default:"#"|add:panel_id
+            %}{% endcomponent %}
+          </div>
+        {% endif %}
+
+      {% else %}
+        <div class="p-5">
+          {% component "empty_state"
+            title="Aucune fiche disponible"
+            message="Aucune donnée de rémunération pour le moment."
+            icon="file-text"
+          %}{% endcomponent %}
+        </div>
+      {% endif %}
+    {% endfill %}
+  {% endcomponent %}
+
+  {# ── Paiements récents (enseignant seulement) ── #}
+  {% if salary_type == "honoraire" and recent_payments %}
+  <div>
+    {% component "dashboard_card" %}
+      {% fill "default" %}
+        <span class="block text-xs font-bold text-[color:var(--text)] mb-3">Paiements récents</span>
+        <div class="space-y-2">
+          {% for p in recent_payments %}
+          <div class="flex items-center justify-between gap-3 rounded-lg border border-[color:var(--line)] p-3">
+            <div class="min-w-0">
+              <div class="text-xs font-bold text-[color:var(--text)]">{{ p.label }}</div>
+              <div class="text-[11px] font-semibold text-[color:var(--muted-2)]">
+                {{ p.date|date:"d/m/Y" }} &middot; {{ p.montant|floatformat:0|intcomma }} FCFA
+              </div>
+            </div>
+            {% component "badge" label="Payé" tone="success" size="sm" %}{% endcomponent %}
+          </div>
+          {% endfor %}
+        </div>
+      {% endfill %}
+    {% endcomponent %}
+  </div>
+  {% endif %}
+
+</div>

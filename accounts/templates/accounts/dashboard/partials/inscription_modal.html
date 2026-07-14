@@ -47,6 +47,69 @@
                 </div>
             </div>
 
+            {% if coupon_error %}
+            <div class="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{{ coupon_error }}</div>
+            {% endif %}
+
+            {% if can_apply_coupon %}
+            <div class="rounded-2xl border border-blue-100 bg-blue-50 p-5">
+                <h3 class="text-sm font-semibold uppercase tracking-wide text-blue-800 mb-3">Appliquer un coupon</h3>
+                <form
+                    hx-post="{% url 'accounts:htmx_inscription_apply_coupon' inscription.id %}"
+                    hx-target="#modal-content"
+                    hx-swap="innerHTML"
+                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                    class="flex flex-col gap-3 sm:flex-row sm:items-end"
+                >
+                    {% csrf_token %}
+                    <div class="flex-1">
+                        <label class="text-xs font-semibold text-slate-500" for="coupon-code-input-{{ inscription.id }}">Code coupon</label>
+                        <input
+                            type="text"
+                            id="coupon-code-input-{{ inscription.id }}"
+                            name="coupon_code"
+                            class="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-uppercase"
+                            placeholder="Ex: MASTER-DG-2026"
+                            autocomplete="off"
+                            hx-get="{% url 'accounts:htmx_coupon_preview' %}"
+                            hx-vals='{"inscription_id": "{{ inscription.id }}"}'
+                            hx-target="#coupon-preview-{{ inscription.id }}"
+                            hx-swap="innerHTML"
+                            hx-trigger="keyup changed delay:400ms"
+                        >
+                        <div id="coupon-preview-{{ inscription.id }}" class="mt-2"></div>
+                    </div>
+                    <button
+                        type="submit"
+                        id="coupon-apply-btn-{{ inscription.id }}"
+                        class="rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled
+                    >
+                        Appliquer
+                    </button>
+                </form>
+            </div>
+            <script>
+            (function() {
+                var previewDiv = document.getElementById('coupon-preview-{{ inscription.id }}');
+                var applyBtn = document.getElementById('coupon-apply-btn-{{ inscription.id }}');
+                if (!previewDiv || !applyBtn) return;
+                previewDiv.addEventListener('htmx:afterSwap', function() {
+                    applyBtn.disabled = !previewDiv.querySelector('[data-coupon-valid="1"]');
+                });
+            })();
+            </script>
+            {% elif existing_coupon_redemption %}
+            <div class="rounded-2xl border border-emerald-100 bg-emerald-50 p-5">
+                <h3 class="text-sm font-semibold uppercase tracking-wide text-emerald-800 mb-2">Coupon applique</h3>
+                <p class="text-sm text-slate-700">
+                    <span class="font-mono font-bold">{{ existing_coupon_redemption.coupon.code }}</span>
+                    — reduction de {{ existing_coupon_redemption.discount_amount|floatformat:0 }} FCFA
+                    (applique le {{ existing_coupon_redemption.applied_at|date:"d/m/Y" }}{% if existing_coupon_redemption.applied_by %} par {{ existing_coupon_redemption.applied_by.get_full_name|default:existing_coupon_redemption.applied_by.username }}{% endif %})
+                </p>
+            </div>
+            {% endif %}
+
             <div class="rounded-2xl border border-violet-100 bg-violet-50 p-5 space-y-4">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>

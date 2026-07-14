@@ -1,0 +1,72 @@
+SPRINT 1 — BACKEND CALENDRIER ACADEMIQUE
+COMPTE RENDU D'IMPLEMENTATION
+Date : 07/07/2026
+
+1. RESUME DES MODIFICATIONS
+
+- Ajout de AcademicCalendar, versionne par annexe et annee academique.
+- Ajout de AcademicCalendarEntry avec les 15 types metier demandes.
+- Ajout des portees annexe, programme, classe et semestre.
+- Ajout des validations de dates, timezone, annee academique et coherence des cibles.
+- Ajout d'une contrainte garantissant une seule version publiee par annexe et annee.
+- Ajout d'une contrainte garantissant l'unicite du numero de version par annexe et annee.
+- Ajout des services de creation, modification, publication et archivage.
+- Lors de la publication d'une nouvelle version, l'ancienne version publiee est archivee transactionnellement.
+- Ajout des selecteurs par calendrier actif, annee, annexe, periode, programme et classe.
+- Ajout des permissions : Directeur des Etudes limite a son annexe ; DG, DGA, Super Admin et superuser en acces global.
+- Ajout d'une relation optionnelle AcademicScheduleEvent.calendar_entry, sans implementer la logique complete de liaison.
+- Aucun changement de frontend, template, HTMX ou UI.
+- WeeklyScheduleSlot, LessonLog, ECGrade et AcademicBulletin n'ont pas ete modifies.
+
+2. FICHIERS CREES
+
+- academics/migrations/0023_academiccalendar_academiccalendarentry_and_more.py
+- academics/permissions/__init__.py
+- academics/permissions/calendar_permissions.py
+- academics/selectors/__init__.py
+- academics/selectors/calendar_selectors.py
+- academics/services/calendar_service.py
+- academics/test_calendar.py
+- sprint1_calendrier_academique.txt
+
+3. FICHIERS MODIFIES
+
+- academics/models.py
+  - AcademicCalendar
+  - AcademicCalendarEntry
+  - relation optionnelle AcademicScheduleEvent.calendar_entry
+
+- academics/permissions.py a ete converti en package academics/permissions/.
+  Son API existante est conservee dans academics/permissions/__init__.py afin de ne pas casser les imports actuels.
+
+4. MIGRATION
+
+- Migration generee : academics.0023_academiccalendar_academiccalendarentry_and_more
+- Contenu : creation des deux modeles, index, contraintes d'unicite et cle etrangere optionnelle sur AcademicScheduleEvent.
+- Verification : python manage.py makemigrations --check --dry-run academics
+- Resultat : No changes detected in app 'academics'.
+
+5. RESULTAT DES TESTS
+
+Django check :
+- Commande : python manage.py check
+- Resultat : 0 erreur.
+
+Tests Sprint 1 :
+- Commande : python manage.py test --settings=config.settings_test_local academics.test_calendar --keepdb
+- Resultat : 7 tests executes, 7 reussis, code de sortie 0.
+- Cas couverts : creation calendrier, creation entree, dates invalides/hors annee/naives, controle annexe, unicite publiee, recuperation par annee, recuperation par periode.
+
+Non-regression academics :
+- Commande : python manage.py test --settings=config.settings_test_local academics --keepdb
+- Resultat : 50 tests executes, 50 reussis, code de sortie 0.
+
+6. POINTS DU SPRINT 2
+
+- Ajouter les endpoints/vues backend de consultation et de gestion du calendrier.
+- Construire l'interface Directeur des Etudes et les vues globales DG/Super Admin.
+- Definir le workflow de publication des entrees avec notifications et audit detaille.
+- Integrer les entrees bloquantes au moteur d'emploi du temps avant creation et materialisation des cours.
+- Definir la logique de liaison entre une periode d'examens et les AcademicScheduleEvent de type examen.
+- Ajouter une lecture unifiee calendrier academique + emploi du temps sans fusionner les tables.
+- Ajouter les tests d'integration des conflits vacances/jours feries/examens et les tests d'autorisation HTTP.

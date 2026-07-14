@@ -19,6 +19,7 @@ from django.http import HttpRequest
 from accounts.access import (
     get_user_annexe,
     get_user_groups,
+    get_user_position,
     get_user_scope,
 )
 from branches.models import Branch
@@ -39,7 +40,7 @@ def is_manager(user: AbstractBaseUser) -> bool:
     """
     Verifie si l'utilisateur est gestionnaire.
     """
-    return user_has_group(user, "gestionnaire")
+    return get_user_position(user) in {"annex_manager", "branch_manager"} or user_has_group(user, "gestionnaire")
 
 
 def is_finance(user: AbstractBaseUser) -> bool:

@@ -2,6 +2,7 @@ import json
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
@@ -12,6 +13,7 @@ from accounts.models import BranchCashMovement, SensitiveActionRequest, TeacherH
 from accounts.services.accounting_documents import create_cash_movement
 from accounts.services.manager_intelligence import (
     get_branch_cash_balance,
+    lock_branch_cash_balance,
     mark_ready_teacher_honorarium_entries_available,
     notify_teacher_honorarium_available,
     prepare_missing_teacher_honorarium_entries,
@@ -278,11 +280,6 @@ def teacher_honorarium_correct_confirm_otp(request: HttpRequest, pk: int) -> Htt
 @manager_required
 @require_POST
 def teacher_honorarium_pay(request: HttpRequest, pk: int) -> HttpResponse:
-    honorarium_entry = get_object_or_404(
-        TeacherHonorariumEntry.objects.select_related("teacher", "teacher__profile", "branch"),
-        pk=pk,
-        branch=request.branch,
-    )
     raw_amount = (request.POST.get("payment_amount") or "").strip()
     try:
         payment_amount = int(raw_amount)
@@ -293,36 +290,44 @@ def teacher_honorarium_pay(request: HttpRequest, pk: int) -> HttpResponse:
             "<div class='rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>Montant de paiement invalide.</div>",
             status=400,
         )
-    if payment_amount > honorarium_entry.remaining_amount:
-        return HttpResponse(
-            "<div class='rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>Le montant depasse le reste a payer sur cet honoraire.</div>",
-            status=400,
-        )
-    available_cash = get_branch_cash_balance(request.branch)
-    if payment_amount > available_cash:
-        return HttpResponse(
-            (
-                "<div class='rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700'>"
-                f"Caisse insuffisante pour ce paiement. Disponible: {available_cash} FCFA."
-                "</div>"
+    with transaction.atomic():
+        _locked_branch, available_cash = lock_branch_cash_balance(request.branch)
+        honorarium_entry = get_object_or_404(
+            TeacherHonorariumEntry.objects.select_for_update().select_related(
+                "teacher", "teacher__profile", "branch"
             ),
-            status=400,
+            pk=pk,
+            branch=request.branch,
         )
+        if payment_amount > honorarium_entry.remaining_amount:
+            return HttpResponse(
+                "<div class='rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>Le montant depasse le reste a payer sur cet honoraire.</div>",
+                status=400,
+            )
+        if payment_amount > available_cash:
+            return HttpResponse(
+                (
+                    "<div class='rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700'>"
+                    f"Caisse insuffisante pour ce paiement. Disponible: {available_cash} FCFA."
+                    "</div>"
+                ),
+                status=400,
+            )
 
-    honorarium_entry.paid_amount += payment_amount
-    honorarium_entry.updated_by = request.user
-    honorarium_entry.save()
-    create_cash_movement(
-        branch=request.branch,
-        movement_type=BranchCashMovement.TYPE_OUT,
-        source=BranchCashMovement.SOURCE_HONORARIUM,
-        amount=payment_amount,
-        label=f"Honoraire - {honorarium_entry.teacher.get_full_name() or honorarium_entry.teacher.username}",
-        movement_date=timezone.localdate(),
-        source_reference=f"HON-{honorarium_entry.pk}-{payment_amount}",
-        notes=f"Paiement honoraire {honorarium_entry.period_month:%Y-%m}.",
-        created_by=request.user,
-    )
+        honorarium_entry.paid_amount += payment_amount
+        honorarium_entry.updated_by = request.user
+        honorarium_entry.save()
+        create_cash_movement(
+            branch=request.branch,
+            movement_type=BranchCashMovement.TYPE_OUT,
+            source=BranchCashMovement.SOURCE_HONORARIUM,
+            amount=payment_amount,
+            label=f"Honoraire - {honorarium_entry.teacher.get_full_name() or honorarium_entry.teacher.username}",
+            movement_date=timezone.localdate(),
+            source_reference=f"HON-{honorarium_entry.pk}-{honorarium_entry.paid_amount}",
+            notes=f"Paiement honoraire {honorarium_entry.period_month:%Y-%m}.",
+            created_by=request.user,
+        )
 
     response = manager_closure_redirect_response(honorarium_entry.period_month)
     response["HX-Trigger"] = json.dumps({"cashBalanceUpdated": True, "dashboardStatsUpdated": True})

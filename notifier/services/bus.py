@@ -3,7 +3,12 @@ from django.db import transaction
 from notifier.models import NotificationEvent, NotificationMessage
 from notifier.services.dispatcher import Dispatcher, finalize_event_status
 from notifier.services.json_utils import make_json_safe
-from notifier.services.notifications import create_message, mark_message_read
+from notifier.services.notifications import (
+    archive_message,
+    create_message,
+    mark_message_read,
+    unarchive_message,
+)
 from notifier.services.policy import resolve_channel_policy
 from notifier.services.template_registry import resolve_email_configuration
 
@@ -201,3 +206,11 @@ class NotificationBus:
     @staticmethod
     def mark_as_read(message):
         return mark_message_read(message)
+
+    @staticmethod
+    def archive(message):
+        return archive_message(message)
+
+    @staticmethod
+    def unarchive(message):
+        return unarchive_message(message)

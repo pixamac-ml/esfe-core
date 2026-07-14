@@ -127,6 +127,38 @@ class ShopWorkflowTests(TestCase):
             ).exists()
         )
 
+    def test_staff_manager_cannot_download_other_branch_shop_receipt(self):
+        order = ShopOrder.objects.create(
+            branch=self.branch,
+            student=self.student_user,
+            buyer_type=ShopOrder.BUYER_STUDENT,
+            customer_name="Shop Student",
+            reference="CMD-SEC-001",
+            status=ShopOrder.STATUS_PENDING_PAYMENT,
+            created_by=self.manager,
+            total_amount=15000,
+        )
+        payment = ShopPayment.objects.create(
+            order=order,
+            amount=15000,
+            method=ShopPayment.METHOD_CASH,
+            status=ShopPayment.STATUS_VALIDATED,
+            reference="RVS-SEC-001",
+        )
+        other_branch = Branch.objects.create(name="Autre Shop", code="AUS", slug="autre-shop")
+        other_manager = User.objects.create_user(
+            username="other_manager_shop",
+            password="pass1234",
+            is_staff=True,
+        )
+        other_manager.groups.add(Group.objects.get(name="gestionnaire"))
+        other_manager.profile.branch = other_branch
+        other_manager.profile.save(update_fields=["branch", "updated_at"])
+        self.client.force_login(other_manager)
+
+        response = self.client.get(reverse("shop:payment_receipt", args=[payment.pk]))
+        self.assertEqual(response.status_code, 403)
+
     def test_manager_can_create_counter_order_for_walk_in_customer(self):
         ShopStockMovement.objects.create(
             branch=self.branch,
@@ -145,6 +177,7 @@ class ShopWorkflowTests(TestCase):
             customer_name="Client Comptoir",
             customer_email="client@example.com",
             customer_phone="77000000",
+            immediate_settlement=True,
         )
 
         self.assertEqual(order.branch, self.branch)
@@ -247,8 +280,7 @@ class ShopWorkflowTests(TestCase):
             },
         )
 
-        self.assertEqual(response.status_code, 400)
-        self.assertContains(response, "Stock insuffisant")
+        self.assertContains(response, "Stock insuffisant", status_code=400)
 
     def test_stock_is_not_decremented_twice_on_delivery(self):
         ShopStockMovement.objects.create(

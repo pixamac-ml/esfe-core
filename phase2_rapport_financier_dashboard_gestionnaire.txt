@@ -1,0 +1,80 @@
+Phase 2 - Rapport financier gestionnaire
+
+Objectif applique
+- Enrichir la section rapport du dashboard gestionnaire pour afficher une situation financiere mensuelle lisible.
+
+Fichiers modifies
+- `accounts/services/financial_reports.py`
+- `accounts/dashboards/manager_dashboard.py`
+- `accounts/dashboards/htmx_global.py`
+- `accounts/services/excel_reports.py`
+- `accounts/urls.py`
+- `accounts/templates/accounts/dashboard/manager_dashboard.html`
+- `accounts/test_manager_workflows.py`
+
+Sections ajoutees
+- Filtres de rapport:
+  - mois
+  - annee
+  - annexe verrouillee sur l'utilisateur
+  - type d'operation
+  - source
+- Synthese:
+  - total recettes
+  - total depenses
+  - resultat net
+  - montant deja verse en banque
+  - reste reel en caisse
+  - solde avant cloture
+  - solde apres versement bancaire
+- Detail:
+  - recettes par source
+  - depenses par source
+  - regroupement par source comptable
+  - apercu des mouvements du mois
+- Alertes:
+  - operations orphelines
+  - caisse negative
+  - versement bancaire superieur au solde disponible
+  - cloture impossible
+- Export:
+  - Excel conserve
+  - PDF ajoute
+
+Calculs utilises
+- `BranchCashMovement` filtre par annexe et periode.
+- `total_receipts = somme des mouvements TYPE_IN`
+- `total_expenses = somme des mouvements TYPE_OUT`
+- `student_receipts = SOURCE_STUDENT_PAYMENT`
+- `shop_receipts = SOURCE_SHOP`
+- `donation_receipts = SOURCE_DONATION`
+- `adjustment_positive = SOURCE_ADJUSTMENT en entree`
+- `salary_expenses = SOURCE_PAYROLL`
+- `honorarium_expenses = SOURCE_HONORARIUM`
+- `branch_expenses = SOURCE_EXPENSE`
+- `bank_transfers = SOURCE_BANK_TRANSFER`
+- `adjustment_negative = SOURCE_ADJUSTMENT en sortie`
+- `balance_before_closure = caisse_reelle + versements_bancaires`
+- `balance_after_bank_transfer = caisse_reelle`
+- `recommended_bank_transfer = solde avant cloture - reserve`
+
+Sources BranchCashMovement utilisees
+- `student_payment`
+- `shop`
+- `donation`
+- `expense`
+- `payroll`
+- `honorarium`
+- `bank_transfer`
+- `adjustment`
+- `manual` si present dans l'historique
+
+Tests effectues
+- `python manage.py check --settings=config.settings_test_local` : OK
+- `python -m py_compile` sur les modules Python touches : OK
+- `accounts.test_manager_workflows.ManagerFinancialReportViewTests` : OK
+
+Limites restantes
+- Les exports Excel restent basees sur la logique existante, mais ils prennent deja les filtres periode / type / source les plus utiles.
+- Les rapports restent limites a l'annexe de l'utilisateur gestionnaire.
+- La vue rapport permet les filtres mensuels, mais la granularite reste volontairement concentree sur la situation de caisse du dashboard gestionnaire.

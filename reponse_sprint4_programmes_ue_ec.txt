@@ -1,0 +1,63 @@
+SPRINT 4 - REPONSE FINALE
+
+Sprint 4 backend Programmes / UE / EC execute.
+
+Fichier d'instructions lu :
+- mockups/SPRINT_04_BACKEND_PROGRAMMES_UE_EC_ESFE.txt
+
+Livrable principal cree :
+- sprint4_programmes_ue_ec.txt
+
+Changements principaux :
+- Service metier central ajoute :
+  academics/services/programme_structure_service.py
+- Selectors ajoutes :
+  academics/selectors/programme_structure_selectors.py
+- Permissions annexe ajoutees :
+  academics/permissions/programme_structure_permissions.py
+- Statut pedagogique minimal ajoute sur UE et EC :
+  draft, complete, validated, published, archived
+- Suppression EC remplacee par archivage logique.
+- Refus d'archivage/suppression si l'EC est deja utilise.
+- Mutations UE/EC du portail deleguees au service metier academics.
+- Directeur des etudes limite a son annexe.
+- DG / DGA / Super Admin autorises globalement.
+
+Migration ajoutee :
+- academics/migrations/0025_ec_archived_at_ec_structure_status_ue_archived_at_and_more.py
+
+Tests ajoutes :
+- academics/test_programme_structure.py
+
+Commandes executees :
+- python manage.py check
+  Resultat : OK
+- python manage.py makemigrations --check --dry-run academics
+  Resultat : OK
+- python manage.py test --settings=config.settings_test_local academics.test_programme_structure --keepdb
+  Resultat : OK, 8 tests
+- python manage.py test --settings=config.settings_test_local academics --keepdb
+  Resultat : OK, 62 tests
+- Tests cibles accounts/directeur/programmes
+  Resultat : OK
+
+Note :
+- Le test complet accounts.tests echoue encore sur des problemes hors perimetre Sprint 4 :
+  - payroll_entry non defini dans accounts/dashboards/htmx_salaires.py
+  - contrainte "Une seule annee academique peut etre active" dans un test portail
+  - assertion rapport gestionnaire "Recettes annee"
+
+Fichiers crees :
+- academics/services/programme_structure_service.py
+- academics/selectors/programme_structure_selectors.py
+- academics/permissions/programme_structure_permissions.py
+- academics/test_programme_structure.py
+- academics/migrations/0025_ec_archived_at_ec_structure_status_ue_archived_at_and_more.py
+- sprint4_programmes_ue_ec.txt
+- reponse_sprint4_programmes_ue_ec.txt
+
+Fichiers modifies :
+- academics/models.py
+- portal/services/academic_structure_service.py
+- portal/views/views.py
+- portal/views/it_workflows.py

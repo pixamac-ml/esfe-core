@@ -766,7 +766,61 @@ def get_secretary_dashboard_data(user):
         "messages_count": get_secretary_unread_messages(user),
         "recent_messages": get_secretary_recent_messages(user, limit=5),
         "notifications": get_secretary_notifications(user, limit=5),
+        "today": timezone.localdate(),
+        # ── KPI cards pour kpi_row (widget_card) ──
+        "kpi_cards": _build_secretary_kpi_cards(
+            pending_registry_count=get_registry_queryset(
+                {"status": RegistryEntry.STATUS_PENDING, "archived": False, "active_only": True},
+                user=user, branch=branch,
+            ).count(),
+            active_visits=active_visits.count(),
+            appointments_today=today_appointments.count(),
+            pending_documents_count=get_documents_queryset(
+                {"status": DocumentReceipt.STATUS_PENDING, "archived": False, "active_only": True},
+                user=user, branch=branch,
+            ).count(),
+        ),
+        # ── Mini calendrier pour la section overview ──
+        "mini_calendar_cells": _build_mini_calendar_cells(
+            today=timezone.localdate(),
+            meetings=get_upcoming_meetings(branch=branch, limit=31),
+        ),
     }
+
+
+def _build_secretary_kpi_cards(*, pending_registry_count, active_visits, appointments_today, pending_documents_count):
+    return [
+        {"label": "Registre", "value": pending_registry_count, "icon": "book-open", "tone": "primary", "hint": "Entrées en attente"},
+        {"label": "Visiteurs", "value": active_visits, "icon": "user-clock", "tone": "info", "hint": "Passages aujourd'hui"},
+        {"label": "Rendez-vous", "value": appointments_today, "icon": "calendar-days", "tone": "success", "hint": "Agenda du jour"},
+        {"label": "Dépôts", "value": pending_documents_count, "icon": "archive", "tone": "warning", "hint": "En attente de remise"},
+    ]
+
+
+def _build_mini_calendar_cells(*, today, meetings):
+    import calendar as cal_module
+    year, month = today.year, today.month
+    first_weekday, num_days = cal_module.monthrange(year, month)
+    # Lundi=0, Sunday=6 — ISO: lundi est jour 0
+    meeting_days = set()
+    meeting_labels = {}
+    for m in meetings:
+        d = m.scheduled_at.date()
+        if d.year == year and d.month == month:
+            meeting_days.add(d.day)
+            meeting_labels[d.day] = m.title
+    cells = []
+    # Décalage: first_weekday = 0 (lundi) → pas de case vide
+    for _ in range(first_weekday):
+        cells.append({"day": None, "is_today": False, "has_event": False, "event_label": ""})
+    for day in range(1, num_days + 1):
+        cells.append({
+            "day": day,
+            "is_today": day == today.day,
+            "has_event": day in meeting_days,
+            "event_label": meeting_labels.get(day, ""),
+        })
+    return cells
 
 
 def get_secretary_unread_messages(user):
@@ -779,3 +833,170 @@ def get_secretary_recent_messages(user, limit=10):
 
 def get_secretary_notifications(user, limit=10):
     return selector_notifications(user, limit=limit)
+
+
+def get_meetings_queryset(*, branch, status=None):
+    from .models import Meeting
+    qs = Meeting.objects.filter(branch=branch).select_related("created_by").prefetch_related()
+    if status:
+        qs = qs.filter(status=status)
+    return qs.order_by("-scheduled_at")
+
+
+def get_upcoming_meetings(*, branch, limit=5):
+    from .models import Meeting
+    now = timezone.now()
+    return Meeting.objects.filter(
+        branch=branch,
+        scheduled_at__gte=now,
+        status__in=[Meeting.STATUS_SCHEDULED, Meeting.STATUS_IN_PROGRESS],
+    ).order_by("scheduled_at")[:limit]
+
+
+def create_meeting(*, user, branch, form_data):
+    from .models import Meeting
+    meeting = Meeting(created_by=user, branch=branch)
+    for k, v in form_data.items():
+        setattr(meeting, k, v)
+    meeting.save()
+    return meeting
+
+
+def update_meeting(*, meeting, form_data):
+    for k, v in form_data.items():
+        setattr(meeting, k, v)
+    meeting.save()
+    return meeting
+
+
+def update_meeting_status(*, meeting, status):
+    from .models import Meeting
+    allowed = {
+        Meeting.STATUS_SCHEDULED: {Meeting.STATUS_IN_PROGRESS, Meeting.STATUS_CANCELLED},
+        Meeting.STATUS_IN_PROGRESS: {Meeting.STATUS_DONE, Meeting.STATUS_CANCELLED},
+        Meeting.STATUS_DONE: set(),
+        Meeting.STATUS_CANCELLED: set(),
+    }
+    if status not in allowed.get(meeting.status, set()):
+        raise ValueError(f"Transition non autorisée : {meeting.status} → {status}")
+    meeting.status = status
+    meeting.save()
+    return meeting
+
+
+def save_meeting_minutes(*, user, meeting, content, decisions="", next_steps=""):
+    from .models import MeetingMinutes
+    minutes, _ = MeetingMinutes.objects.update_or_create(
+        meeting=meeting,
+        defaults={
+            "content": content,
+            "decisions": decisions,
+            "next_steps": next_steps,
+            "redacted_by": user,
+        },
+    )
+    return minutes
+
+
+def get_daily_report_stats(*, user, branch, report_date):
+    from django.db.models import Count as _Count
+    from .models import VisitorLog, Appointment, DocumentReceipt
+
+    entries = get_registry_queryset(
+        {"archived": False, "active_only": True},
+        user=user,
+        branch=branch,
+    ).filter(created_at__date=report_date)
+
+    type_counts = {
+        item["entry_type"]: item["count"]
+        for item in entries.values("entry_type").annotate(count=_Count("id"))
+    }
+    status_counts = {
+        item["status"]: item["count"]
+        for item in entries.values("status").annotate(count=_Count("id"))
+    }
+    type_labels = dict(RegistryEntry.ENTRY_TYPE_CHOICES)
+
+    visitors_qs = VisitorLog.objects.filter(
+        branch=branch,
+        arrived_at__date=report_date,
+    ) if hasattr(VisitorLog, "branch") else VisitorLog.objects.filter(
+        created_by__profile__branch=branch,
+        arrived_at__date=report_date,
+    )
+    visitors_total = visitors_qs.count()
+    visitors_completed = visitors_qs.filter(status=VisitorLog.STATUS_COMPLETED).count()
+
+    appointments_qs = Appointment.objects.filter(
+        created_by__profile__branch=branch,
+        scheduled_at__date=report_date,
+    )
+    appointments_total = appointments_qs.count()
+    appointments_done = appointments_qs.filter(status=Appointment.STATUS_COMPLETED).count()
+
+    documents_qs = get_documents_queryset(
+        {"archived": False, "active_only": True},
+        user=user,
+        branch=branch,
+    ).filter(received_at__date=report_date)
+    documents_total = documents_qs.count()
+    documents_done = documents_qs.filter(status=DocumentReceipt.STATUS_COMPLETED).count()
+
+    return {
+        "total": entries.count(),
+        "completed": status_counts.get(RegistryEntry.STATUS_COMPLETED, 0),
+        "pending": status_counts.get(RegistryEntry.STATUS_PENDING, 0),
+        "in_progress": status_counts.get(RegistryEntry.STATUS_IN_PROGRESS, 0),
+        "transferred": status_counts.get(RegistryEntry.STATUS_TRANSFERRED, 0),
+        "by_type": [
+            {"label": type_labels.get(t, t), "count": c}
+            for t, c in type_counts.items()
+        ],
+        "entries": entries.order_by("created_at"),
+        "report_date": report_date,
+        "visitors_total": visitors_total,
+        "visitors_completed": visitors_completed,
+        "appointments_total": appointments_total,
+        "appointments_done": appointments_done,
+        "documents_total": documents_total,
+        "documents_done": documents_done,
+    }
+
+
+def transmit_daily_report_to_dg(*, user, branch, report_date, note=""):
+    from django.contrib.auth import get_user_model as _get_user_model
+    _User = _get_user_model()
+    stats = get_daily_report_stats(user=user, branch=branch, report_date=report_date)
+    dg_recipients = _User.objects.filter(
+        profile__position="dg",
+        profile__branch_id=getattr(branch, "id", None),
+    ).distinct()
+    if not dg_recipients.exists():
+        dg_recipients = _User.objects.filter(profile__position="dg").distinct()
+    branch_name = getattr(branch, "name", "—")
+    body_parts = [
+        f"Rapport journalier du {report_date} — Annexe {branch_name}.",
+        f"Total entrées : {stats['total']} | Traitées : {stats['completed']} | En attente : {stats['pending']} | En cours : {stats['in_progress']}.",
+    ]
+    if note:
+        body_parts.append(f"Note secrétaire : {note}")
+    body = " ".join(body_parts)
+    for recipient in dg_recipients:
+        _notify_recipient(
+            recipient=recipient,
+            actor=user,
+            event_type="secretary_daily_report",
+            title=f"Rapport journalier registre — {report_date}",
+            body=body,
+            metadata={
+                "report_date": str(report_date),
+                "branch_id": getattr(branch, "id", None),
+                "stats_total": stats["total"],
+                "stats_completed": stats["completed"],
+                "stats_pending": stats["pending"],
+            },
+            legacy_source="secretary_report",
+            legacy_object_id=str(report_date),
+        )
+    return {"recipients_count": dg_recipients.count(), "stats": stats}

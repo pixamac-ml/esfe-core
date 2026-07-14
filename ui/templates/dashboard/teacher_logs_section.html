@@ -1,33 +1,64 @@
-{% load humanize component_tags %}
+{% load humanize component_tags extra_filters %}
         <!-- =========== LOGS =========== -->
         <div id="teacher-panel-logs" class="sg-section-panel {% if active_section == 'logs' %}is-active{% endif %}" data-sg-panel="logs" {% if active_section != 'logs' %}hidden{% endif %}>
-          {% component "section_header" title="Cahier de texte" subtitle="Suivi et completion de votre cahier de texte." icon="book-open" %}
-            {% fill "action" %}<span class="sg-scope-chip">{{ pending_lesson_logs_count }} en attente</span>{% endfill %}
+          {% component "section_header" title="Cahier de texte" subtitle="Suivi de mes seances et de mon volume horaire." icon="book-open" %}
+            {% fill "action" %}
+              {% if pending_lesson_logs_count > 0 %}
+                <span class="sg-scope-chip">{{ pending_lesson_logs_count }} a completer</span>
+              {% endif %}
+            {% endfill %}
           {% endcomponent %}
 
-          <div class="mb-4">{% component "kpi_row" cards=section_kpi_cards columns=4 %}{% endcomponent %}</div>
+          <!-- Volume horaire & honoraires -->
+          <div class="mb-4 grid gap-4 md:grid-cols-4">
+            {% component "dashboard_card" %}
+              {% fill "default" %}
+                <div class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Volume prévu</div>
+                <div class="mt-2 text-2xl font-black text-[color:var(--text)]">{{ teacher_volume.planned_hours|floatformat:1 }} <span class="text-sm font-semibold">h</span></div>
+                <div class="mt-1 text-[11px] text-[color:var(--muted-2)]">{{ teacher_volume.assignment_count }} affectation(s)</div>
+              {% endfill %}
+            {% endcomponent %}
+            {% component "dashboard_card" %}
+              {% fill "default" %}
+                <div class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Heures validées</div>
+                <div class="mt-2 text-2xl font-black text-[color:var(--success)]">{{ teacher_volume.total.validated_hours|floatformat:1 }} <span class="text-sm font-semibold">h</span></div>
+                <div class="mt-1 text-[11px] text-[color:var(--muted-2)]">Ce mois : {{ teacher_volume.month.validated_hours|floatformat:1 }} h</div>
+              {% endfill %}
+            {% endcomponent %}
+            {% component "dashboard_card" %}
+              {% fill "default" %}
+                <div class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">En attente de validation</div>
+                <div class="mt-2 text-2xl font-black text-[color:var(--warning)]">{{ teacher_volume.total.submitted_hours|floatformat:1 }} <span class="text-sm font-semibold">h</span></div>
+                <div class="mt-1 text-[11px] text-[color:var(--muted-2)]">Ce mois : {{ teacher_volume.month.submitted_hours|floatformat:1 }} h</div>
+              {% endfill %}
+            {% endcomponent %}
+            {% component "dashboard_card" %}
+              {% fill "default" %}
+                <div class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Restant à effectuer</div>
+                <div class="mt-2 text-2xl font-black text-[color:var(--school-primary)]">{{ teacher_volume.remaining_hours|floatformat:1 }} <span class="text-sm font-semibold">h</span></div>
+                <div class="mt-1 text-[11px] text-[color:var(--muted-2)]">Après validation gestionnaire</div>
+              {% endfill %}
+            {% endcomponent %}
+          </div>
 
           {% if pending_lesson_log_rows %}
           <div class="mb-4">
             {% component "dashboard_card" %}
               {% fill "default" %}
-                <div class="flex items-center gap-2 mb-3" style="color:var(--danger);">
-                  <i data-lucide="alert-triangle" style="width:15px;height:15px;"></i>
-                  <span class="text-[11px] font-bold uppercase tracking-wide">Cours a completer</span>
-                  <span class="ml-auto sg-badge-sm sg-badge-red">{{ pending_lesson_logs_count }} urgent</span>
+                <div class="flex items-center gap-2 mb-3">
+                  <i data-lucide="alert-triangle" style="width:16px;height:16px;" class="text-[color:var(--danger)]"></i>
+                  <span class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--danger)]">Séances à compléter</span>
+                  <span class="ml-auto">{% component "badge" label=pending_lesson_logs_count tone="danger" size="sm" %}{% endcomponent %}</span>
                 </div>
                 <div class="space-y-2">
                   {% for event in pending_lesson_log_rows %}
                   <div class="flex items-center justify-between gap-3 rounded-lg border border-[color:var(--line)] p-3">
                     <div class="min-w-0">
-                      <div class="text-xs font-bold text-[color:var(--text)]">{{ event.ec.title }}</div>
-                      <div class="text-[11px] font-semibold text-[color:var(--muted-2)]">{{ event.academic_class.display_name }} &middot; {{ event.start_datetime|date:"d/m/Y H:i" }}</div>
+                      <div class="text-sm font-bold text-[color:var(--text)]">{{ event.ec.title }}</div>
+                      <div class="text-[11px] font-semibold text-[color:var(--muted-2)]">{{ event.academic_class.display_name }} &middot; {{ event.start_datetime|date:"d/m/Y H:i" }} &middot; {{ event.location|default:"Salle non precisee" }}</div>
+                      <div class="mt-1 text-[11px] text-[color:var(--warning)]">Durée prévue : {{ event.duration_minutes|default:"?" }} min</div>
                     </div>
-                    <button type="button" class="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-[color:var(--danger)] px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:opacity-90"
-                            hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' event.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML"
-                            >
-                      <i data-lucide="pen" style="width:12px;height:12px;"></i>Saisir
-                    </button>
+                    {% component "button" label="Saisir" icon="pen" variant="danger" size="sm" hx_get="{% url 'accounts_portal:teacher_lesson_log_panel' event.id %}" hx_target="#sg-drawer-content" hx_swap="innerHTML" aria_label="Saisir le cahier de cette seance" %}{% endcomponent %}
                   </div>
                   {% endfor %}
                 </div>
@@ -38,29 +69,41 @@
 
           {% component "dashboard_card" %}
             {% fill "default" %}
-              <span class="block text-xs font-bold text-[color:var(--text)] mb-3">Derniers cahiers saisis</span>
+              <div class="flex items-center justify-between mb-3">
+                <span class="text-xs font-bold text-[color:var(--text)]">Derniers cahiers saisis</span>
+                <span class="text-[11px] text-[color:var(--muted-2)]">Statut visible par la gestionnaire</span>
+              </div>
               <div class="sg-table-wrap">
                 <table class="sg-table">
-                  <thead><tr><th>Cours</th><th>Classe</th><th>Date</th><th>Statut</th><th style="text-align:right;">Actions</th></tr></thead>
+                  <thead><tr><th>Cours</th><th>Classe</th><th>Date</th><th>Durée</th><th>Statut</th><th style="text-align:right;">Actions</th></tr></thead>
                   <tbody>
                     {% for log in recent_lesson_logs %}
                     <tr>
-                      <td style="font-weight:900;">{{ log.ec.title }}</td>
-                      <td>{{ log.academic_class.display_name }}</td>
-                      <td>{{ log.date|date:"d/m/Y" }} &middot; {{ log.start_time|time:"H:i" }}</td>
-                      <td><span class="sg-badge-sm {% if log.status == 'done' %}sg-badge-green{% elif log.status == 'absent_teacher' %}sg-badge-red{% else %}sg-badge-gray{% endif %}">{{ log.get_status_display }}</span></td>
+                      <td class="font-bold text-xs">{{ log.ec.title }}</td>
+                      <td class="text-xs">{{ log.academic_class.display_name }}</td>
+                      <td class="text-xs">{{ log.date|date:"d/m/Y" }} &middot; {{ log.start_time|time:"H:i" }}</td>
+                      <td class="text-xs">{{ log|duration_minutes|default:"?" }} min</td>
+                      <td>
+                        {% if log.status == 'done' and log.validated_by_id %}
+                          {% component "badge" label="Validé" tone="success" size="sm" %}{% endcomponent %}
+                        {% elif log.status == 'done' %}
+                          {% component "badge" label="Soumis" tone="warning" size="sm" %}{% endcomponent %}
+                        {% elif log.status == 'absent_teacher' %}
+                          {% component "badge" label="Absence" tone="danger" size="sm" %}{% endcomponent %}
+                        {% else %}
+                          {% component "badge" label=log.get_status_display tone="neutral" size="sm" %}{% endcomponent %}
+                        {% endif %}
+                      </td>
                       <td style="text-align:right;">
                         {% if log.schedule_event_id %}
-                        <button type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-2.5 py-1.5 text-[11px] font-bold text-[color:var(--muted)] transition hover:border-[color:var(--school-primary-soft)]"
-                                hx-get="{% url 'accounts_portal:teacher_lesson_log_panel' log.schedule_event_id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML"
-                                >
-                          <i data-lucide="eye" style="width:12px;height:12px;"></i>
-                        </button>
+                          {% component "button" label="" icon="eye" variant="outline" size="sm" hx_get="{% url 'accounts_portal:teacher_lesson_log_panel' log.schedule_event_id %}" hx_target="#sg-drawer-content" hx_swap="innerHTML" aria_label="Voir le cahier" %}{% endcomponent %}
                         {% endif %}
                       </td>
                     </tr>
                     {% empty %}
-                    <tr><td colspan="5"><div class="sg-empty"><div class="sg-empty-icon"><i data-lucide="book-open"></i></div><div class="sg-empty-text">Aucun cahier recent.</div></div></td></tr>
+                    <tr><td colspan="6">
+                      {% component "empty_state" title="Aucun cahier recent" message="Vos saisies apparaitront ici une fois que vous aurez rempli un cahier de texte." icon="book-open" compact=True %}{% endcomponent %}
+                    </td></tr>
                     {% endfor %}
                   </tbody>
                 </table>

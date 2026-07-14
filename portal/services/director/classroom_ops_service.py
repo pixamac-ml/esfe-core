@@ -30,11 +30,16 @@ def build_director_classroom_ops_context(
     selected_operation_class = None
     if selected_class is not None:
         schedule_summary = (selected_class_schedule or {}).get("summary", {}) if selected_class_schedule else {}
+        selected_card = next((item for item in class_cards if item["class"].id == selected_class.id), {})
         selected_operation_class = {
             "class": selected_class,
             "label": selected_class.display_name,
             "student_count": selected_class_student_count,
             "semester_count": len(selected_class_rows),
+            "progress": selected_card.get("progress", 0),
+            "ready_to_validate_count": selected_card.get("ready_to_validate_count", 0),
+            "ready_to_publish_count": selected_card.get("ready_to_publish_count", 0),
+            "published_count": selected_card.get("published_count", 0),
             "planned_count": schedule_summary.get("planned", 0),
             "completed_count": schedule_summary.get("completed", 0),
             "cancelled_count": schedule_summary.get("cancelled", 0),

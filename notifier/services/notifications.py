@@ -44,3 +44,28 @@ def mark_message_read(message):
     message.status = NotificationMessage.STATUS_READ
     message.save(update_fields=["read_at", "status", "updated_at"])
     return message
+
+
+def archive_message(message):
+    """Archive une notification dans la boîte du destinataire.
+
+    L'archivage est un état de classement utilisateur distinct de l'état de
+    livraison. Une notification archivée est aussi considérée comme lue.
+    """
+    now = timezone.now()
+    update_fields = ["archived_at", "updated_at"]
+    message.archived_at = now
+    if message.read_at is None:
+        message.read_at = now
+        message.status = NotificationMessage.STATUS_READ
+        update_fields.extend(["read_at", "status"])
+    message.save(update_fields=update_fields)
+    return message
+
+
+def unarchive_message(message):
+    if message.archived_at is None:
+        return message
+    message.archived_at = None
+    message.save(update_fields=["archived_at", "updated_at"])
+    return message

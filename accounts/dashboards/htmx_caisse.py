@@ -14,8 +14,9 @@ from accounts.services.accounting_documents import (
     finalize_cash_movement_document,
 )
 from accounts.services.manager_intelligence import (
+    lock_branch_cash_balance,
+    reconcile_branch_financial_movements,
     payment_cash_reference,
-    sync_student_payment_cash_movements,
 )
 from inscriptions.models import Inscription
 from payments.models import CashPaymentSession, FinancialLog, Payment, PaymentAgent
@@ -67,6 +68,22 @@ def cash_session_create(request: HttpRequest, pk: int) -> HttpResponse:
         )
 
     with transaction.atomic():
+        inscription = get_object_or_404(
+            Inscription.objects.select_for_update(),
+            pk=inscription.pk,
+            candidature__branch=request.branch,
+        )
+        existing_session = get_active_cash_session(inscription)
+        if existing_session:
+            return render(
+                request,
+                "accounts/dashboard/partials/manager_cash_session_card.html",
+                {
+                    "session": existing_session,
+                    "manager_agent": manager_agent,
+                    "show_existing_notice": True,
+                },
+            )
         session = CashPaymentSession.objects.create(
             inscription=inscription,
             agent=manager_agent,
@@ -156,8 +173,35 @@ def cash_session_complete(request: HttpRequest, pk: int) -> HttpResponse:
         )
 
     with transaction.atomic():
+        session = get_object_or_404(
+            CashPaymentSession.objects.select_for_update().select_related(
+                "inscription",
+                "inscription__candidature",
+                "inscription__candidature__programme",
+            ),
+            pk=pk,
+            agent=manager_agent,
+            is_used=False,
+        )
+        inscription = get_object_or_404(
+            Inscription.objects.select_for_update(),
+            pk=session.inscription_id,
+            candidature__branch=request.branch,
+        )
+        if timezone.now() > session.expires_at:
+            session.is_used = True
+            session.save(update_fields=["is_used"])
+            return HttpResponse(
+                "<div class='rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>Le code a expire. Regenerer une nouvelle session.</div>",
+                status=400,
+            )
+        if amount > inscription.balance:
+            return HttpResponse(
+                "<div class='rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>Le montant depasse le solde restant de l'inscription.</div>",
+                status=400,
+            )
         payment = Payment.objects.create(
-            inscription=session.inscription,
+            inscription=inscription,
             amount=amount,
             method=Payment.METHOD_CASH,
             status=Payment.STATUS_VALIDATED,
@@ -236,11 +280,27 @@ def cash_movement_create(request: HttpRequest) -> HttpResponse:
         response.status_code = 400
         return response
 
-    movement = form.save(commit=False)
-    movement.branch = request.branch
-    movement.created_by = request.user
-    movement.save()
-    finalize_cash_movement_document(movement)
+    with transaction.atomic():
+        _locked_branch, available_cash = lock_branch_cash_balance(request.branch)
+        movement = form.save(commit=False)
+        if movement.movement_type == BranchCashMovement.TYPE_OUT and movement.amount > available_cash:
+            response = render(
+                request,
+                "accounts/dashboard/partials/manager_cash_movement_form.html",
+                {
+                    "cash_form": form,
+                    "cash_error": (
+                        "Sortie impossible: le montant depasse la caisse disponible "
+                        f"({available_cash} FCFA)."
+                    ),
+                },
+            )
+            response.status_code = 400
+            return response
+        movement.branch = request.branch
+        movement.created_by = request.user
+        movement.save()
+        finalize_cash_movement_document(movement)
     response = manager_section_redirect_response("caisse")
     response["HX-Trigger"] = json.dumps({"cashBalanceUpdated": True, "dashboardStatsUpdated": True})
     return response
@@ -249,7 +309,7 @@ def cash_movement_create(request: HttpRequest) -> HttpResponse:
 @manager_required
 @require_POST
 def cash_sync(request: HttpRequest) -> HttpResponse:
-    result = sync_student_payment_cash_movements(request.branch, request.user)
+    result = reconcile_branch_financial_movements(request.branch, request.user, repair=True)
     response = manager_section_notice_redirect_response(
         "caisse",
         f"caisse_sync_{result['created']}",

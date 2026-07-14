@@ -1,0 +1,30 @@
+{% load component_tags %}
+<div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
+  <div class="mb-3 grid grid-cols-7 gap-1 text-center">
+    {% for day in day_headers %}
+      <span class="text-[10px] font-bold uppercase tracking-wide text-[color:var(--muted-2)]">{{ day }}</span>
+    {% endfor %}
+  </div>
+  <div class="grid grid-cols-7 gap-1">
+    {% for day in days %}
+      <div class="min-h-[80px] rounded-lg border border-[color:var(--line)]/40 p-1.5 transition hover:bg-[color:var(--surface)]">
+        <span class="text-[10px] font-bold text-[color:var(--muted)]">{{ day.number }}</span>
+        <div class="mt-1 space-y-1">
+          {% for entry in day.entries %}
+            <button
+              type="button"
+              @click="$dispatch('calendar-entry-open', {{ entry.id }})"
+              class="block w-full truncate rounded px-1 py-0.5 text-[10px] font-bold text-left"
+              style="background: {{ entry.color|default:'var(--school-primary-soft)' }}; color: var(--text);"
+              title="{{ entry.title }}"
+            >
+              {{ entry.title }}
+            </button>
+          {% endfor %}
+        </div>
+      </div>
+    {% empty %}
+      <div class="col-span-7 py-8 text-center text-xs text-[color:var(--muted)]">{{ empty_message }}</div>
+    {% endfor %}
+  </div>
+</div>

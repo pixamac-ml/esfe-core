@@ -1,0 +1,141 @@
+{% load component_tags %}
+{# ================================================================
+   portal_notifications_section
+   Section notifications universelle — centre de notifications intégré.
+   ================================================================ #}
+<div id="{{ panel_id }}" class="space-y-5">
+
+  {% component "page_header" title="Notifications" subtitle="Messages et alertes du système" %}
+    {% fill "actions" %}
+      {% if unread_count %}
+        <span class="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--danger-soft)] px-3 py-1 text-xs font-bold text-[color:var(--danger)]">
+          {{ unread_count }} non lue{{ unread_count|pluralize }}
+        </span>
+      {% endif %}
+    {% endfill %}
+  {% endcomponent %}
+
+  <div class="grid gap-5 lg:grid-cols-2">
+
+    {# ── Liste ── #}
+    {% component "dashboard_card" padding="none" elevated=True %}
+      {% fill "default" %}
+        <div class="flex items-center gap-2 px-4 pt-4 pb-3 border-b border-[color:var(--line)]">
+          <i data-lucide="bell" style="width:15px;height:15px;" class="text-[color:var(--school-primary)]" aria-hidden="true"></i>
+          <span class="text-xs font-bold uppercase tracking-wide text-[color:var(--muted)]">Notifications récentes</span>
+        </div>
+
+        {% if notifications_rows %}
+          <div class="divide-y divide-[color:var(--line)]">
+            {% for notification in notifications_rows %}
+              <a href="?section=notifications&notification_id={{ notification.id }}"
+                 class="flex items-start gap-3 px-4 py-3 transition hover:bg-[color:var(--card-soft)] {% if not notification.read_at %}bg-[color:var(--school-primary-soft)]/30{% endif %}">
+                <div class="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg
+                  {% if not notification.read_at %}bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]
+                  {% else %}bg-[color:var(--card-soft)] text-[color:var(--muted)]{% endif %}">
+                  <i data-lucide="{% if not notification.read_at %}bell-ring{% else %}bell{% endif %}" style="width:14px;height:14px;" aria-hidden="true"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="text-xs font-black text-[color:var(--text)] truncate">{{ notification.title }}</div>
+                  <div class="mt-0.5 text-[10px] text-[color:var(--muted-2)] truncate">
+                    {{ notification.body|default:"Notification centralisée"|truncatechars:80 }}
+                  </div>
+                  <div class="mt-0.5 text-[10px] text-[color:var(--muted-2)]">
+                    {{ notification.created_at|date:"d/m/Y H:i" }}
+                  </div>
+                </div>
+                {% if not notification.read_at %}
+                  {% component "badge" label="Nouveau" tone="primary" size="sm" %}{% endcomponent %}
+                {% endif %}
+              </a>
+            {% endfor %}
+          </div>
+
+          {% if notifications_page and notifications_page.has_other_pages %}
+            <div class="border-t border-[color:var(--line)] px-4 py-3">
+              {% component "pagination"
+                total=notifications_page.paginator.count
+                page=notifications_page.number
+                per_page=10
+                hx_target=hx_target|default:"#"|add:panel_id
+              %}{% endcomponent %}
+            </div>
+          {% endif %}
+
+        {% else %}
+          <div class="p-5">
+            {% component "empty_state"
+              title="Aucune notification"
+              message="Aucune notification pour le moment."
+              icon="bell-off"
+            %}{% endcomponent %}
+          </div>
+        {% endif %}
+      {% endfill %}
+    {% endcomponent %}
+
+    {# ── Détail notification sélectionnée ── #}
+    {% component "dashboard_card" padding="none" elevated=True %}
+      {% fill "default" %}
+        {% if selected_notification %}
+
+          {# En-tête : priorité + titre #}
+          <div class="px-5 pt-5 pb-0">
+            {% if selected_notification.priority == "critical" %}
+            <span class="mb-3 inline-flex items-center gap-1.5 rounded-full bg-[color:var(--danger-soft)] px-2.5 py-1 text-[10px] font-black text-[color:var(--danger)]">
+              <i data-lucide="alert-triangle" style="width:10px;height:10px;" aria-hidden="true"></i>Urgent
+            </span>
+            {% elif selected_notification.priority == "high" %}
+            <span class="mb-3 inline-flex items-center gap-1.5 rounded-full bg-[color:var(--warning-soft)] px-2.5 py-1 text-[10px] font-black text-[color:var(--warning)]">
+              <i data-lucide="info" style="width:10px;height:10px;" aria-hidden="true"></i>Important
+            </span>
+            {% endif %}
+            <h3 class="text-[15px] font-black leading-snug text-[color:var(--text)]">
+              {{ selected_notification.title }}
+            </h3>
+          </div>
+
+          {# Corps du message — zone de lecture #}
+          <div class="mx-5 my-4 rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] px-4 py-4 text-[13.5px] font-[500] leading-[1.75] text-[color:var(--text)] break-words" style="white-space:pre-wrap;max-height:280px;overflow-y:auto">
+            {% if selected_notification.body %}
+              {{ selected_notification.body|linebreaksbr }}
+            {% else %}
+              <span class="italic text-[color:var(--muted-2)]">Aucun contenu pour cette notification.</span>
+            {% endif %}
+          </div>
+
+          {# Métadonnées discrètes #}
+          <div class="border-t border-[color:var(--line)] px-5 py-3 flex flex-col gap-2">
+            <div class="flex items-center gap-2 text-[11px] font-semibold text-[color:var(--muted-2)]">
+              <i data-lucide="clock" style="width:12px;height:12px;" aria-hidden="true"></i>
+              Reçu le <span class="font-black text-[color:var(--text)]">{{ selected_notification.created_at|date:"d/m/Y à H:i" }}</span>
+            </div>
+            {% if selected_notification.read_at %}
+            <div class="flex items-center gap-2 text-[11px] font-semibold text-[color:var(--success)]">
+              <i data-lucide="check-circle" style="width:12px;height:12px;" aria-hidden="true"></i>
+              Lu le <span class="font-black">{{ selected_notification.read_at|date:"d/m/Y à H:i" }}</span>
+            </div>
+            {% else %}
+            <div class="flex items-center gap-2 text-[11px] font-semibold text-[color:var(--warning)]">
+              <i data-lucide="circle" style="width:12px;height:12px;" aria-hidden="true"></i>
+              Non lue
+            </div>
+            {% endif %}
+          </div>
+
+        {% else %}
+          <div class="flex flex-col items-center justify-center gap-3 py-12 text-center">
+            <div class="grid h-12 w-12 place-items-center rounded-full bg-[color:var(--card-soft)] text-[color:var(--muted-2)]">
+              <i data-lucide="message-square" style="width:22px;height:22px;" aria-hidden="true"></i>
+            </div>
+            <div>
+              <div class="text-sm font-black text-[color:var(--text)]">Sélectionnez une notification</div>
+              <div class="mt-1 text-xs text-[color:var(--muted-2)]">Cliquez sur un message pour le lire ici.</div>
+            </div>
+          </div>
+        {% endif %}
+      {% endfill %}
+    {% endcomponent %}
+
+  </div>
+</div>

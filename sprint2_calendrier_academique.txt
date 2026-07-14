@@ -1,0 +1,73 @@
+SPRINT 2 - BACKEND WORKFLOW CALENDRIER ACADEMIQUE
+=================================================
+
+1. RESUME
+
+Le backend JSON du calendrier academique est implemente sans frontend, template ou HTMX.
+
+- CRUD des calendriers et de leurs entrees.
+- Workflow strict : brouillon -> valide -> publie -> archive.
+- Une seule version publiee par annee academique et annexe ; une nouvelle publication archive l'ancienne.
+- Directeur des etudes limite a son annexe ; DG, DG adjoint et Super Admin ont une portee globale.
+- Filtres de liste par annexe et annee academique.
+- Validation des dates, de la portee programme/classe/semestre et de l'appartenance a l'annexe/annee.
+- Refus de publication des periodes qui se chevauchent.
+- Les entrees sont publiees/archivees avec leur calendrier.
+- Le service de creation des cours verifie les periodes publiees et bloquantes, sans modifier le moteur d'emploi du temps.
+
+2. FICHIERS CREES/MODIFIES
+
+Crees :
+- academics/calendar_views.py
+- academics/migrations/0024_academiccalendar_validated_status.py
+- academics/test_calendar_workflow.py
+- sprint2_calendrier_academique.txt
+
+Modifies :
+- academics/models.py
+- academics/permissions/calendar_permissions.py
+- academics/services/calendar_service.py
+- academics/services/schedule_service.py
+- academics/urls.py
+- academics/test_calendar.py
+
+3. TESTS ET VERIFICATIONS
+
+- python manage.py check --settings=config.settings_test_local : OK, aucune erreur.
+- python manage.py makemigrations --check --dry-run : OK, aucun changement manquant.
+- python -m py_compile sur les fichiers Sprint 2 : OK.
+- Tests ajoutes : CRUD JSON et workflow complet, chevauchement, filtres annexe/annee.
+- Les tests Sprint 1 couvrent aussi creation, dates, portees, permissions par annexe, unicite de publication et selecteurs.
+- Le runner Django cible avec settings_test_local est reste bloque sans sortie pendant l'initialisation de la base SQLite ; deux executions ont ete arretees apres delai. Les tests n'ont donc pas produit de resultat final dans cet environnement.
+- git diff --check global remonte des espaces deja presents dans d'autres modifications du worktree ; aucun de ces avertissements ne concerne les fichiers Sprint 2 crees.
+
+4. API/VUES DISPONIBLES
+
+Toutes les reponses sont en JSON sous le prefixe /academics/calendar/.
+
+- GET  /academics/calendar/ : liste ; filtres ?branch=<id>&academic_year=<id>
+- POST /academics/calendar/ : creation
+- GET  /academics/calendar/<id>/ : detail avec entrees
+- PATCH /academics/calendar/<id>/ : modification de version en brouillon
+- POST /academics/calendar/<id>/validate/ : validation
+- POST /academics/calendar/<id>/publish/ : publication
+- POST /academics/calendar/<id>/archive/ : archivage
+- POST /academics/calendar/<id>/entries/ : creation d'une entree
+- PATCH /academics/calendar/<id>/entries/<entry_id>/ : modification d'une entree
+- DELETE /academics/calendar/<id>/entries/<entry_id>/ : suppression d'une entree
+
+Champs de creation calendrier : branch_id, academic_year_id, version (optionnel).
+Champs d'entree : title, description, event_type, start_datetime, end_datetime, all_day,
+target_scope, programme_id, academic_class_id, semester_id, color, icon, is_blocking, status.
+Les dates utilisent ISO 8601 avec timezone.
+
+5. POINTS POUR LE SPRINT 3
+
+- Construire l'interface sur ces endpoints JSON.
+- Ajouter la gestion CSRF explicite dans le client frontend.
+- Prevoir une interface de comparaison des versions et d'historique des publications.
+- Ajouter une presentation claire des conflits de periodes avant validation/publication.
+- Diagnostiquer le blocage du runner SQLite global avant la recette complete.
+
+Commande de migration : python manage.py migrate
+Commande de recette ciblee : python manage.py test --settings=config.settings_test_local academics.test_calendar academics.test_calendar_workflow

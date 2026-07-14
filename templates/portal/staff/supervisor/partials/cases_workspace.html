@@ -1,97 +1,57 @@
-{% comment %}Workspace : liste fusionnée des cas de surveillance (étudiants + enseignants){% endcomment %}
+{% load component_tags %}
 {% include "portal/staff/supervisor/partials/_sidebar_nav_inner.html" %}
 {% include "portal/staff/supervisor/partials/_work_head_inner.html" %}
-<div class="panel">
 
-  <div class="toolbar">
-    <span class="chip mute">{{ cases|length }} cas affiché{{ cases|length|pluralize }}</span>
-    <span class="chip warn">{{ open_count }} ouvert{{ open_count|pluralize }}</span>
-    <form method="get" style="margin-left:auto"
-          hx-get="{% url 'accounts_portal:supervisor_cases_workspace' %}"
-          hx-target="#supervisor-workspace" hx-trigger="change">
-      <select name="status" class="f-i" style="padding:8px 12px;font-size:12.5px">
-        <option value="open" {% if status_filter == "open" %}selected{% endif %}>Ouverts</option>
-        <option value="all" {% if status_filter == "all" %}selected{% endif %}>Tous</option>
-      </select>
-    </form>
-    <button type="button" class="btn primary" onclick="document.getElementById('modal-new-case').classList.remove('hide')">
-      + Nouveau cas
-    </button>
-  </div>
+<div class="panel space-y-4" x-data="{ newCaseOpen: false }">
+  {% component "toolbar" %}
+    {% fill "left" %}
+      {% component "status_badge" label=cases|length tone="neutral" icon="files" %}{% endcomponent %}
+      {% component "status_badge" label=open_count tone="warning" icon="folder-clock" %}{% endcomponent %}
+    {% endfill %}
+    {% fill "right" %}
+      <form method="get" hx-get="{% url 'accounts_portal:supervisor_cases_workspace' %}" hx-target="#supervisor-workspace" hx-trigger="change">
+        <label class="sr-only" for="sg-case-status">Filtrer les dossiers</label>
+        <select id="sg-case-status" name="status" class="f-i py-2 text-sm"><option value="open" {% if status_filter == "open" %}selected{% endif %}>Dossiers ouverts</option><option value="all" {% if status_filter == "all" %}selected{% endif %}>Tous les dossiers</option></select>
+      </form>
+      <button type="button" class="btn primary" @click="newCaseOpen = true"><i data-lucide="plus" class="i"></i>Nouveau cas</button>
+    {% endfill %}
+  {% endcomponent %}
 
-  <div class="card">
-    <div class="card-h"><h3>Dossiers disciplinaires</h3><span class="hint">{{ cases|length }} au total</span></div>
-    <div class="card-b">
-      {% for kind, case in cases %}
-      <div class="row clickable"
-           hx-get="{% url 'accounts_portal:supervisor_case_detail' kind case.id %}"
-           hx-target="#supervisor-drawer-content">
-        <span class="dot" style="background:{% if case.priority == 'critique' or case.priority == 'urgente' %}var(--bad){% elif case.priority == 'normale' %}var(--info){% else %}var(--ink-3){% endif %}"></span>
-        <div class="main">
-          <b>{{ case.title }}</b>
-          <span>{% if kind == 'teacher' %}{{ case.teacher.get_full_name|default:case.teacher.username }}{% else %}{{ case.student.full_name }}{% endif %}</span>
-        </div>
-        <span class="tail">
-          <span class="chip {% if kind == 'teacher' %}info{% else %}mute{% endif %}">{% if kind == 'teacher' %}Enseignant{% else %}Étudiant{% endif %}</span>
-          <span class="chip mute">{{ case.get_status_display }}</span>
-          <svg class="i" style="color:var(--ink-3)" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
-        </span>
-      </div>
-      {% empty %}
-      <div class="empty">
-        <p style="font-weight:800;font-size:14px">Aucun cas à traiter 🎉</p>
-        <p style="margin-top:4px">Créez un cas depuis le bouton « Nouveau cas ».</p>
-      </div>
-      {% endfor %}
-    </div>
-  </div>
-</div>
-
-{# ── Modal : Nouveau cas (étudiant) ── #}
-<div id="modal-new-case" class="hide" style="position:fixed;inset:0;z-index:150;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.5);padding:16px">
-  <div style="width:100%;max-width:520px;background:var(--card);border-radius:20px;padding:24px;box-shadow:0 24px 60px -16px rgba(15,23,42,.4)">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <h3 style="font-size:17px;font-weight:800">Nouveau cas (étudiant)</h3>
-      <button type="button" onclick="document.getElementById('modal-new-case').classList.add('hide')" class="drawer-h x" style="border-radius:10px">✕</button>
-    </div>
-    <form hx-post="{% url 'accounts_portal:supervisor_case_create' %}"
-          hx-target="#supervisor-workspace"
-          hx-on::after-request="document.getElementById('modal-new-case').classList.add('hide')">
-      {% csrf_token %}
-      <label class="f-l" style="margin-top:0">Étudiant *</label>
-      <select name="student_id" required class="f-i">
-        <option value="">— Sélectionner —</option>
-        {% for s in students %}
-        <option value="{{ s.id }}">{{ s.full_name }} ({{ s.matricule }})</option>
+  {% component "dashboard_card" padding="none" %}
+    {% fill "default" %}
+      <div class="card-h"><h3>Dossiers disciplinaires</h3><span class="hint">{{ cases|length }} résultat{{ cases|length|pluralize }}</span></div>
+      <div class="card-b">
+        {% for kind, case in cases %}
+          <button type="button" class="row clickable w-full text-left" hx-get="{% url 'accounts_portal:supervisor_case_detail' kind case.id %}" hx-target="#supervisor-drawer-content">
+            <span class="dot" style="background:{% if case.priority == 'critique' or case.priority == 'urgente' %}var(--bad){% elif case.priority == 'normale' %}var(--info){% else %}var(--ink-3){% endif %}"></span>
+            <span class="main"><b>{{ case.title }}</b><span>{% if kind == 'teacher' %}{{ case.teacher.get_full_name|default:case.teacher.username }}{% else %}{{ case.student.full_name }}{% endif %}</span></span>
+            <span class="tail">
+              {% if kind == 'teacher' %}{% component "status_badge" label="Enseignant" tone="info" %}{% endcomponent %}{% else %}{% component "status_badge" label="Étudiant" tone="neutral" %}{% endcomponent %}{% endif %}
+              {% component "status_badge" label=case.get_status_display tone="neutral" %}{% endcomponent %}
+              <i data-lucide="chevron-right" class="i" aria-hidden="true"></i>
+            </span>
+          </button>
+        {% empty %}
+          {% component "empty_state" icon="shield-check" title="Aucun cas à traiter" message="Aucun dossier ne correspond au filtre sélectionné." %}{% endcomponent %}
         {% endfor %}
-      </select>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div>
-          <label class="f-l">Type *</label>
-          <select name="case_type" required class="f-i">
-            {% for val, label in case_type_choices %}
-            <option value="{{ val }}">{{ label }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div>
-          <label class="f-l">Priorité</label>
-          <select name="priority" class="f-i">
-            <option value="faible">Faible</option>
-            <option value="normale" selected>Normale</option>
-            <option value="urgente">Urgente</option>
-            <option value="critique">Critique</option>
-          </select>
-        </div>
       </div>
-      <label class="f-l">Titre *</label>
-      <input type="text" name="title" required maxlength="200" placeholder="Résumé du cas..." class="f-i">
-      <label class="f-l">Description</label>
-      <textarea name="description" rows="3" placeholder="Détails..." class="f-i"></textarea>
-      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px">
-        <button type="button" onclick="document.getElementById('modal-new-case').classList.add('hide')" class="btn">Annuler</button>
-        <button type="submit" class="btn primary">Créer le cas</button>
-      </div>
-    </form>
+    {% endfill %}
+  {% endcomponent %}
+
+  <div x-show="newCaseOpen" x-cloak @keydown.escape.window="newCaseOpen = false" class="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="new-case-title">
+    <div class="w-full max-w-xl rounded-2xl bg-[color:var(--card)] p-6 shadow-2xl" @click.outside="newCaseOpen = false">
+      <div class="mb-4 flex items-center justify-between"><h3 id="new-case-title" class="text-lg font-bold">Nouveau cas étudiant</h3><button type="button" class="btn" @click="newCaseOpen = false" aria-label="Fermer"><i data-lucide="x" class="i"></i></button></div>
+      <form class="space-y-3" hx-post="{% url 'accounts_portal:supervisor_case_create' %}" hx-target="#supervisor-workspace" @htmx:after-request="if ($event.detail.successful) newCaseOpen = false">
+        {% csrf_token %}
+        <label class="block"><span class="f-l mt-0">Étudiant *</span><select name="student_id" required class="f-i"><option value="">Sélectionner</option>{% for s in students %}<option value="{{ s.id }}">{{ s.full_name }} ({{ s.matricule }})</option>{% endfor %}</select></label>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <label><span class="f-l mt-0">Type *</span><select name="case_type" required class="f-i">{% for val, label in case_type_choices %}<option value="{{ val }}">{{ label }}</option>{% endfor %}</select></label>
+          <label><span class="f-l mt-0">Priorité</span><select name="priority" class="f-i"><option value="faible">Faible</option><option value="normale" selected>Normale</option><option value="urgente">Urgente</option><option value="critique">Critique</option></select></label>
+        </div>
+        <label class="block"><span class="f-l mt-0">Titre *</span><input type="text" name="title" required maxlength="200" placeholder="Résumé du cas" class="f-i"></label>
+        <label class="block"><span class="f-l mt-0">Description</span><textarea name="description" rows="3" placeholder="Détails du dossier" class="f-i"></textarea></label>
+        <div class="flex justify-end gap-2 pt-2"><button type="button" @click="newCaseOpen = false" class="btn">Annuler</button><button type="submit" class="btn primary">Créer le cas</button></div>
+      </form>
+    </div>
   </div>
 </div>

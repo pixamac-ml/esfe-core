@@ -1,0 +1,18 @@
+{% extends "portal/system_account_base.html" %}
+{% load custom_filters %}
+{% block title %}Mon compte | ESFE Portal{% endblock %}
+{% block system_workspace %}
+<div class="mb-6"><p class="text-sm font-semibold uppercase tracking-wide text-slate-500">Portal / Mon compte</p><h1 class="text-2xl font-bold text-slate-900">Informations de compte</h1><p class="mt-1 text-slate-600">Les donnees institutionnelles sont gerees par les workflows autorises.</p></div>
+<form method="post" enctype="multipart/form-data" class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+  {% csrf_token %}
+  <div class="p-6 grid gap-5 md:grid-cols-2">
+    <div><label class="block text-sm font-medium mb-2">Prenom</label>{{ form.first_name }}{{ form.first_name.errors }}</div>
+    <div><label class="block text-sm font-medium mb-2">Nom</label>{{ form.last_name }}{{ form.last_name.errors }}</div>
+    <div><label class="block text-sm font-medium mb-2">Email de connexion</label><input class="w-full border border-slate-200 rounded-xl px-4 py-3 bg-slate-100 text-slate-600" value="{{ request.user.email }}" readonly><p class="mt-1 text-xs text-slate-500">La modification d'email exige un workflow de securite distinct.</p></div>
+    <div><label class="block text-sm font-medium mb-2">Telephone</label>{{ form.phone }}{{ form.phone.errors }}</div>
+    <div class="md:col-span-2"><label class="block text-sm font-medium mb-2">Adresse</label>{{ form.address }}{{ form.address.errors }}</div>
+    <div class="md:col-span-2"><label class="block text-sm font-medium mb-2">Photo</label>{{ form.avatar }}{{ form.avatar.errors }}</div>
+  </div>
+  <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-between gap-3"><a href="{{ dashboard_url }}" class="px-4 py-2 rounded-lg border border-slate-300">Retour au dashboard</a><button class="px-5 py-2 rounded-lg bg-slate-900 text-white font-medium">Enregistrer</button></div>
+</form>
+{% endblock %}

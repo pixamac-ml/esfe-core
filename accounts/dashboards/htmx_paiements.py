@@ -206,41 +206,44 @@ def payment_correct_confirm_otp(request: HttpRequest, pk: int) -> HttpResponse:
 @manager_required
 @require_POST
 def payment_validate(request: HttpRequest, pk: int) -> HttpResponse:
-    payment = get_object_or_404(
-        Payment,
-        pk=pk,
-        inscription__candidature__branch=request.branch,
-        status=Payment.STATUS_PENDING,
-    )
-    payment.status = Payment.STATUS_VALIDATED
-    payment.paid_at = timezone.now()
-    payment.save()
-    existing_movement = BranchCashMovement.objects.filter(
-        branch=request.branch,
-        source=BranchCashMovement.SOURCE_STUDENT_PAYMENT,
-        source_reference=payment_cash_reference(payment),
-    ).first()
-    if not existing_movement:
-        create_cash_movement(
+    with transaction.atomic():
+        payment = get_object_or_404(
+            Payment.objects.select_for_update().select_related(
+                "inscription__candidature"
+            ),
+            pk=pk,
+            inscription__candidature__branch=request.branch,
+            status=Payment.STATUS_PENDING,
+        )
+        payment.status = Payment.STATUS_VALIDATED
+        payment.paid_at = timezone.now()
+        payment.save()
+        existing_movement = BranchCashMovement.objects.filter(
             branch=request.branch,
             source=BranchCashMovement.SOURCE_STUDENT_PAYMENT,
             source_reference=payment_cash_reference(payment),
-            movement_type=BranchCashMovement.TYPE_IN,
-            amount=payment.amount,
-            label=f"Paiement etudiant - {payment.inscription.candidature.full_name}",
-            movement_date=payment.paid_at.date(),
-            notes=f"Synchronisation automatique paiement #{payment.pk}.",
-            created_by=request.user,
+        ).first()
+        if not existing_movement:
+            create_cash_movement(
+                branch=request.branch,
+                source=BranchCashMovement.SOURCE_STUDENT_PAYMENT,
+                source_reference=payment_cash_reference(payment),
+                movement_type=BranchCashMovement.TYPE_IN,
+                amount=payment.amount,
+                label=f"Paiement etudiant - {payment.inscription.candidature.full_name}",
+                movement_date=payment.paid_at.date(),
+                notes=f"Synchronisation automatique paiement #{payment.pk}.",
+                created_by=request.user,
+            )
+        FinancialLog.objects.create(
+            branch=request.branch,
+            payment=payment,
+            action=FinancialLog.ACTION_PAYMENT_VALIDATED,
+            new_amount=payment.amount,
+            reason="Validation du paiement par la gestionnaire.",
+            actor=request.user,
+            metadata={"payment_reference": payment.reference, "inscription_id": payment.inscription_id},
         )
-    FinancialLog.objects.create(
-        branch=request.branch,
-        payment=payment,
-        action=FinancialLog.ACTION_PAYMENT_VALIDATED,
-        new_amount=payment.amount,
-        reason="Validation du paiement par la gestionnaire.",
-        actor=request.user,
-        metadata={"payment_reference": payment.reference, "inscription_id": payment.inscription_id},
-    )
     payment.refresh_from_db()
     response = render(
         request,

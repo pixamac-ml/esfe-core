@@ -114,7 +114,7 @@ def create_lesson_log(
         observations=observations or "",
         branch=branch,
         created_by=created_by,
-        validated_by=validated_by if final_status != LessonLog.STATUS_ABSENT_TEACHER else None,
+        validated_by=validated_by,
     )
     return lesson_log
 
@@ -144,8 +144,6 @@ def update_lesson_log(lesson_log: LessonLog, *, updated_by: User | None = None, 
         requested_status=lesson_log.status,
         teacher_attendance=teacher_attendance,
     )
-    if updated_by and lesson_log.status == LessonLog.STATUS_DONE and not lesson_log.validated_by:
-        lesson_log.validated_by = updated_by
     if lesson_log.status == LessonLog.STATUS_ABSENT_TEACHER:
         lesson_log.validated_by = None
 

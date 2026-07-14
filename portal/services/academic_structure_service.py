@@ -9,6 +9,11 @@ from django.db.models import Q
 from django.utils import timezone
 
 from academics.models import AcademicClass, AcademicEnrollment, AcademicYear, EC, Semester, UE
+from academics.services.programme_structure_service import (
+    archive_ec_for_branch,
+    save_ec_for_branch,
+    save_ue_for_branch,
+)
 from formations.models import Programme
 from inscriptions.models import Inscription
 from students.models import Student
@@ -185,79 +190,45 @@ def archive_academic_class(*, branch, class_id):
     return academic_class
 
 
-def save_ue(*, branch, ue_id=None, semester_id=None, code="", title=""):
-    code = (code or "").strip().upper()
-    title = (title or "").strip()
-    if not semester_id:
-        raise ValidationError("Semestre obligatoire.")
-    if not code or not title:
-        raise ValidationError("Code UE et intitule obligatoires.")
+@transaction.atomic
+def save_semester(*, branch, class_id, number):
+    academic_class = AcademicClass.objects.filter(pk=class_id, branch=branch, is_active=True).first()
+    if academic_class is None:
+        raise ValidationError("Classe introuvable ou inactive.")
+    number = int(number)
+    if number < 1 or number > 8:
+        raise ValidationError("Le numero de semestre doit etre entre 1 et 8.")
+    if Semester.objects.filter(academic_class=academic_class, number=number).exists():
+        raise ValidationError(f"Le semestre {number} existe deja pour cette classe.")
+    semester = Semester.objects.create(academic_class=academic_class, number=number)
+    return semester
 
-    semester = Semester.objects.select_related("academic_class").filter(
-        pk=semester_id,
-        academic_class__branch=branch,
-    ).first()
-    if semester is None:
-        raise ValidationError("Semestre invalide.")
 
-    ue = (
-        UE.objects.filter(pk=ue_id, semester__academic_class__branch=branch).first()
-        if ue_id
-        else UE(semester=semester)
+def save_ue(*, branch, actor=None, ue_id=None, semester_id=None, code="", title=""):
+    return save_ue_for_branch(
+        branch=branch,
+        actor=actor,
+        ue_id=ue_id,
+        semester_id=semester_id,
+        code=code,
+        title=title,
     )
-    if ue is None:
-        raise ValidationError("UE introuvable.")
-    ue.semester = semester
-    ue.code = code
-    ue.title = title
-    ue.save()
-    return ue
 
 
-def save_ec(*, branch, ec_id=None, ue_id=None, title="", coefficient="", credit_required=""):
-    title = (title or "").strip()
-    if not ue_id:
-        raise ValidationError("UE obligatoire.")
-    if not title:
-        raise ValidationError("Intitule EC obligatoire.")
-    try:
-        coefficient_value = Decimal(str(coefficient).replace(",", "."))
-        credit_value = Decimal(str(credit_required).replace(",", "."))
-    except (InvalidOperation, TypeError):
-        raise ValidationError("Coefficient ou credit invalide.")
-
-    ue = UE.objects.select_related("semester", "semester__academic_class").filter(
-        pk=ue_id,
-        semester__academic_class__branch=branch,
-    ).first()
-    if ue is None:
-        raise ValidationError("UE invalide.")
-
-    ec = (
-        EC.objects.filter(pk=ec_id, ue__semester__academic_class__branch=branch).first()
-        if ec_id
-        else EC(ue=ue)
+def save_ec(*, branch, actor=None, ec_id=None, ue_id=None, title="", coefficient="", credit_required=""):
+    return save_ec_for_branch(
+        branch=branch,
+        actor=actor,
+        ec_id=ec_id,
+        ue_id=ue_id,
+        title=title,
+        coefficient=coefficient,
+        credit_required=credit_required,
     )
-    if ec is None:
-        raise ValidationError("EC introuvable.")
-    ec.ue = ue
-    ec.title = title
-    ec.coefficient = coefficient_value
-    ec.credit_required = credit_value
-    ec.save()
-    return ec
 
 
-def delete_ec(*, branch, ec_id):
-    ec = EC.objects.select_related("ue", "ue__semester", "ue__semester__academic_class").filter(
-        pk=ec_id,
-        ue__semester__academic_class__branch=branch,
-    ).first()
-    if ec is None:
-        raise ValidationError("EC introuvable.")
-    if ec.grades.exists() or ec.schedule_events.exists() or ec.weekly_schedule_slots.exists() or ec.lesson_logs.exists() or ec.chapters.exists():
-        raise ValidationError("Suppression impossible: cet EC est deja utilise dans le systeme.")
-    ec.delete()
+def delete_ec(*, branch, actor=None, ec_id):
+    return archive_ec_for_branch(branch=branch, actor=actor, ec_id=ec_id)
 
 
 @transaction.atomic

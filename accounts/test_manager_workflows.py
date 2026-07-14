@@ -1,22 +1,28 @@
 """Tests critiques pour le dashboard gestionnaire — workflows métier."""
 
+from html import unescape
 from datetime import date, timedelta
 from decimal import Decimal
+from io import BytesIO
+import re
 from typing import Any, cast
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
+from openpyxl import load_workbook
 
 from branches.models import Branch
-from admissions.models import Candidature
+from admissions.models import Candidature, CandidatureDocument
 from academics.models import AcademicClass, AcademicYear
 from inscriptions.models import Inscription
-from formations.models import Programme, Cycle, Diploma, Filiere
+from formations.models import Programme, Cycle, Diploma, Filiere, RequiredDocument
 from accounts.models import (
     BranchCashMovement,
+    BranchBankTransfer,
     BranchExpense,
     BranchMonthlyClosure,
     Donation,
@@ -25,6 +31,7 @@ from accounts.models import (
     Profile,
 )
 from payments.models import CashPaymentSession, Payment, PaymentAgent
+from accounts.services.manager_intelligence import reconcile_branch_financial_movements
 
 
 User = get_user_model()
@@ -229,7 +236,18 @@ class ManagerExpenseWorkflowTests(TestCase):
         self.expense.refresh_from_db()
         self.assertEqual(self.expense.status, "approved")
 
+    def _seed_cash(self, amount=100000):
+        BranchCashMovement.objects.create(
+            branch=self.branch,
+            movement_type=BranchCashMovement.TYPE_IN,
+            source=BranchCashMovement.SOURCE_MANUAL,
+            amount=amount,
+            label="Solde initial",
+            created_by=self.manager,
+        )
+
     def test_expense_pay_creates_cash_movement(self):
+        self._seed_cash()
         self.expense.status = BranchExpense.STATUS_APPROVED
         self.expense.save()
         url = reverse("accounts:htmx_manager_expense_pay", args=[self.expense.id])
@@ -242,6 +260,23 @@ class ManagerExpenseWorkflowTests(TestCase):
         )
         self.assertEqual(movements.count(), 1)
         self.assertEqual(movements.first().amount, 50000)
+
+    def test_expense_pay_rejected_when_caisse_insufficient(self):
+        self.expense.status = BranchExpense.STATUS_APPROVED
+        self.expense.save(update_fields=["status", "updated_at"])
+        response = self.client.post(
+            reverse("accounts:htmx_manager_expense_pay", args=[self.expense.id]),
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.expense.refresh_from_db()
+        self.assertEqual(self.expense.status, BranchExpense.STATUS_APPROVED)
+        self.assertFalse(
+            BranchCashMovement.objects.filter(
+                branch=self.branch,
+                source=BranchCashMovement.SOURCE_EXPENSE,
+            ).exists()
+        )
 
 
 @override_settings(
@@ -266,10 +301,14 @@ class ManagerDonationWorkflowTests(TestCase):
             "payment_method": "cash",
         }, HTTP_HX_REQUEST="true")
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(Donation.objects.filter(branch=self.branch, amount=100000).exists())
+        donation = Donation.objects.get(branch=self.branch, amount=100000)
+        self.assertIsNotNone(donation.cash_movement_id)
         self.assertTrue(
             BranchCashMovement.objects.filter(
-                branch=self.branch, source=BranchCashMovement.SOURCE_DONATION, amount=100000,
+                pk=donation.cash_movement_id,
+                branch=self.branch,
+                source=BranchCashMovement.SOURCE_DONATION,
+                amount=100000,
             ).exists(),
         )
         self.assertIn("showToast", response.headers["HX-Trigger"])
@@ -338,6 +377,74 @@ class ManagerAccessControlTests(TestCase):
         url = reverse("accounts:htmx_candidature_detail", args=[self.cand_b.id])
         response = self.client.get(url, HTTP_HX_REQUEST="true")
         self.assertEqual(response.status_code, 404)
+
+    def test_manager_a_cannot_approve_branch_b_expense(self):
+        expense = BranchExpense.objects.create(
+            branch=self.branch_b,
+            title="Depense annexe B",
+            amount=10000,
+        )
+        _login(self.client, self.manager_a)
+        response = self.client.post(
+            reverse("accounts:htmx_manager_expense_approve", args=[expense.id]),
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_manager_a_cannot_download_branch_b_candidature_document(self):
+        document_type = RequiredDocument.objects.create(name="Piece securisee")
+        document = CandidatureDocument.objects.create(
+            candidature=self.cand_b,
+            document_type=document_type,
+            file="candidatures/documents/piece-securisee.pdf",
+        )
+        _login(self.client, self.manager_a)
+        response = self.client.get(
+            reverse("accounts:manager_candidature_document_download", args=[document.id])
+        )
+        self.assertEqual(response.status_code, 404)
+
+
+@override_settings(PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"])
+class ManagerPostOnlySecurityTests(TestCase):
+    def setUp(self):
+        self.branch = _create_branch("PST", "Annexe POST")
+        self.manager = _create_user("mgr_post", groups=["gestionnaire"], branch=self.branch)
+        self.expense = BranchExpense.objects.create(
+            branch=self.branch,
+            title="Depense test POST",
+            amount=10000,
+        )
+        _login(self.client, self.manager)
+
+    def test_sensitive_manager_actions_reject_get(self):
+        urls = [
+            reverse("accounts:htmx_manager_expense_approve", args=[self.expense.id]),
+            reverse("accounts:htmx_manager_expense_pay", args=[self.expense.id]),
+            reverse("accounts:htmx_manager_monthly_closure_create"),
+            reverse("accounts:htmx_manager_donation_create"),
+            reverse("accounts:htmx_manager_cash_sync"),
+            reverse("accounts:htmx_manager_salary_prepare_all"),
+            reverse("accounts:htmx_manager_teacher_honorarium_prepare_all"),
+        ]
+        for url in urls:
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 405)
+
+    def test_manual_cash_entry_cannot_impersonate_automatic_source(self):
+        response = self.client.post(
+            reverse("accounts:htmx_manager_cash_movement_create"),
+            {
+                "movement_type": BranchCashMovement.TYPE_IN,
+                "source": BranchCashMovement.SOURCE_STUDENT_PAYMENT,
+                "amount": "10000",
+                "label": "Faux paiement manuel",
+                "movement_date": date.today().isoformat(),
+            },
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(BranchCashMovement.objects.filter(branch=self.branch).exists())
 
 
 @override_settings(
@@ -409,6 +516,15 @@ class ManagerExportReportTests(TestCase):
             response["Content-Type"],
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
+        workbook = load_workbook(BytesIO(response.content), read_only=True)
+        values = {
+            str(cell.value)
+            for row in workbook["Rapport"].iter_rows()
+            for cell in row
+            if cell.value is not None
+        }
+        self.assertIn("Versements bancaires", values)
+        self.assertIn("Coupons appliques", values)
 
 
 @override_settings(
@@ -573,6 +689,22 @@ class ManagerHonorariumWorkflowTests(TestCase):
             ).exists()
         )
 
+    def test_teacher_honorarium_pay_rejected_when_caisse_insufficient(self):
+        entry = TeacherHonorariumEntry.objects.get(
+            branch=self.branch, teacher=self.teacher, period_month=self.period_month,
+        )
+        entry.validated_hours = Decimal("40")
+        entry.status = TeacherHonorariumEntry.STATUS_READY
+        entry.save()
+        response = self.client.post(
+            reverse("accounts:htmx_manager_teacher_honorarium_pay", args=[entry.id]),
+            {"payment_amount": "100000"},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 400)
+        entry.refresh_from_db()
+        self.assertEqual(entry.paid_amount, 0)
+
 
 @override_settings(
     CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}},
@@ -644,6 +776,86 @@ class ManagerMonthlyClosureWorkflowTests(TestCase):
         closure.refresh_from_db()
         self.assertEqual(closure.status, BranchMonthlyClosure.STATUS_DRAFT)
 
+    def test_closure_validate_blocks_orphan_donation(self):
+        closure = self._create_closure()
+        Donation.objects.create(
+            branch=self.branch,
+            donor_name="Don orphelin",
+            amount=25000,
+            date=self.period_month,
+            created_by=self.manager,
+        )
+        url = reverse("accounts:htmx_manager_monthly_closure_validate", args=[closure.id])
+        response = self.client.post(url, HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Cloture bloquee", response.content.decode())
+        closure.refresh_from_db()
+        self.assertEqual(closure.status, BranchMonthlyClosure.STATUS_DRAFT)
+
+    def test_closure_create_blocks_orphan_operation(self):
+        Donation.objects.create(
+            branch=self.branch,
+            donor_name="Don orphelin avant cloture",
+            amount=15000,
+            date=self.period_month,
+            created_by=self.manager,
+        )
+        response = self.client.post(
+            reverse("accounts:htmx_manager_monthly_closure_create"),
+            {"period_month": self.period_month.isoformat(), "notes": ""},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(
+            BranchMonthlyClosure.objects.filter(
+                branch=self.branch, period_month=self.period_month,
+            ).exists()
+        )
+
+    def test_bank_transfer_above_available_cash_is_rejected(self):
+        BranchCashMovement.objects.create(
+            branch=self.branch,
+            movement_type=BranchCashMovement.TYPE_IN,
+            source=BranchCashMovement.SOURCE_MANUAL,
+            amount=10000,
+            label="Petite caisse",
+            movement_date=self.period_month,
+            created_by=self.manager,
+        )
+        response = self.client.post(
+            reverse("accounts:htmx_manager_monthly_closure_create"),
+            {
+                "period_month": self.period_month.isoformat(),
+                "bank_transfer_amount": "20000",
+                "bank_name": "Banque Test",
+                "reference": "VIR-EXCESSIF",
+                "transfer_date": self.period_month.isoformat(),
+                "amount": "20000",
+            },
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "depasse la caisse disponible", status_code=400)
+        self.assertFalse(BranchBankTransfer.objects.filter(branch=self.branch).exists())
+
+    def test_closure_validate_rejects_negative_cash(self):
+        closure = self._create_closure()
+        BranchCashMovement.objects.create(
+            branch=self.branch,
+            movement_type=BranchCashMovement.TYPE_OUT,
+            source=BranchCashMovement.SOURCE_ADJUSTMENT,
+            amount=10000,
+            label="Anomalie historique",
+            movement_date=self.period_month,
+            created_by=self.manager,
+        )
+        response = self.client.post(
+            reverse("accounts:htmx_manager_monthly_closure_validate", args=[closure.id]),
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "caisse de l'annexe est negative", status_code=400)
+
     def test_closure_recreate_fails_if_not_draft(self):
         closure = self._create_closure()
         closure.status = BranchMonthlyClosure.STATUS_VALIDATED
@@ -655,6 +867,221 @@ class ManagerMonthlyClosureWorkflowTests(TestCase):
             HTTP_HX_REQUEST="true",
         )
         self.assertEqual(response.status_code, 400)
+
+
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}},
+    PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"],
+)
+class ManagerFinancialReconciliationTests(TestCase):
+    """Reconciliation des orphelins financiers."""
+
+    def setUp(self):
+        self.branch = _create_branch()
+        self.manager = _create_user("mgr_rec", groups=["gestionnaire"], branch=self.branch)
+        self.period_month = date.today().replace(day=1)
+
+    def test_reconciliation_repairs_donation_and_bank_transfer_movements(self):
+        donation = Donation.objects.create(
+            branch=self.branch,
+            donor_name="Donateur Reprise",
+            amount=75000,
+            date=self.period_month,
+            created_by=self.manager,
+        )
+        closure = BranchMonthlyClosure.objects.create(
+            branch=self.branch,
+            period_month=self.period_month,
+            created_by=self.manager,
+        )
+        transfer = BranchBankTransfer.objects.create(
+            branch=self.branch,
+            closure=closure,
+            bank_name="Bank X",
+            reference="BT-2026-0001",
+            transfer_date=self.period_month,
+            amount=50000,
+            created_by=self.manager,
+        )
+
+        result = reconcile_branch_financial_movements(self.branch, self.manager, repair=True)
+
+        donation.refresh_from_db()
+        transfer.refresh_from_db()
+        self.assertGreaterEqual(result["created"], 2)
+        self.assertIsNotNone(donation.cash_movement_id)
+        self.assertTrue(
+            BranchCashMovement.objects.filter(
+                branch=self.branch,
+                source=BranchCashMovement.SOURCE_DONATION,
+                source_reference=f"donation:{donation.pk}",
+                amount=75000,
+            ).exists()
+        )
+        self.assertTrue(
+            BranchCashMovement.objects.filter(
+                branch=self.branch,
+                source=BranchCashMovement.SOURCE_BANK_TRANSFER,
+                source_reference=f"bank_transfer:{transfer.pk}",
+                amount=50000,
+                movement_type=BranchCashMovement.TYPE_OUT,
+            ).exists()
+        )
+
+
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}},
+    PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"],
+)
+class ManagerFinancialReportViewTests(TestCase):
+    """Rendu de la page rapport financier et export PDF."""
+
+    def setUp(self):
+        self.branch = _create_branch()
+        self.manager = _create_user("mgr_report", groups=["gestionnaire"], branch=self.branch)
+        self.period_month = date.today().replace(day=1)
+        _login(self.client, self.manager)
+        BranchCashMovement.objects.create(
+            branch=self.branch,
+            movement_type=BranchCashMovement.TYPE_IN,
+            source=BranchCashMovement.SOURCE_STUDENT_PAYMENT,
+            amount=180000,
+            label="Paiement etudiant - Test",
+            movement_date=self.period_month,
+            created_by=self.manager,
+        )
+        BranchCashMovement.objects.create(
+            branch=self.branch,
+            movement_type=BranchCashMovement.TYPE_IN,
+            source=BranchCashMovement.SOURCE_DONATION,
+            amount=25000,
+            label="Don de test",
+            movement_date=self.period_month,
+            created_by=self.manager,
+        )
+        BranchCashMovement.objects.create(
+            branch=self.branch,
+            movement_type=BranchCashMovement.TYPE_OUT,
+            source=BranchCashMovement.SOURCE_PAYROLL,
+            amount=50000,
+            label="Salaire test",
+            movement_date=self.period_month,
+            created_by=self.manager,
+        )
+        BranchCashMovement.objects.create(
+            branch=self.branch,
+            movement_type=BranchCashMovement.TYPE_OUT,
+            source=BranchCashMovement.SOURCE_BANK_TRANSFER,
+            amount=30000,
+            label="Versement bancaire test",
+            movement_date=self.period_month,
+            created_by=self.manager,
+        )
+
+    def test_report_section_renders_financial_summary(self):
+        url = reverse("accounts:manager_dashboard")
+        response = self.client.get(
+            url,
+            {
+                "section": "rapport",
+                "report_month": str(self.period_month.month),
+                "report_year": str(self.period_month.year),
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Recettes totales")
+        self.assertContains(response, "Versement bancaire recommande")
+        self.assertContains(response, "Paiements etudiants")
+
+    def test_report_pdf_export_returns_pdf(self):
+        url = reverse("accounts:manager_export_report_pdf")
+        response = self.client.get(
+            url,
+            {
+                "section": "rapport",
+                "report_month": str(self.period_month.month),
+                "report_year": str(self.period_month.year),
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertTrue(response.content.startswith(b"%PDF"))
+
+    def test_report_period_controls_preserve_non_month_preset(self):
+        response = self.client.get(
+            reverse("accounts:manager_dashboard"),
+            {"section": "rapport", "report_period": "week"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["report_period"]["preset"], "week")
+        self.assertContains(response, 'id="manager-report-month" aria-label="Mois du rapport" disabled')
+        html = response.content.decode()
+        pdf_link = re.search(r'href="([^"]*manager/export/report/pdf/[^"]*)"', html)
+        self.assertIsNotNone(pdf_link)
+        self.assertNotIn("report_month=", unescape(pdf_link.group(1)))
+
+    def test_custom_period_exposes_date_inputs(self):
+        response = self.client.get(
+            reverse("accounts:manager_dashboard"),
+            {
+                "section": "rapport",
+                "report_period": "custom",
+                "report_start": "2026-06-01",
+                "report_end": "2026-06-15",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="manager-report-start" value="2026-06-01"')
+        self.assertContains(response, 'id="manager-report-end" value="2026-06-15"')
+
+    def test_caisse_identifies_bank_transfers_as_outflows(self):
+        response = self.client.get(reverse("accounts:manager_dashboard"), {"section": "caisse"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Versements bancaires comptabilisés comme sorties de caisse")
+        self.assertEqual(response.context["report_bank_transfer_total"], 30000)
+
+    def test_closure_form_is_visibly_blocked_on_financial_anomaly(self):
+        Donation.objects.create(
+            branch=self.branch,
+            donor_name="Don sans mouvement",
+            amount=10000,
+            date=self.period_month,
+        )
+        response = self.client.get(
+            reverse("accounts:manager_dashboard"),
+            {
+                "section": "cloture",
+                "report_month": self.period_month.month,
+                "report_year": self.period_month.year,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Clôture bloquée : anomalies financières à corriger")
+        self.assertContains(response, 'disabled aria-disabled="true"')
+
+    def test_negative_cash_is_reported_as_danger(self):
+        BranchCashMovement.objects.create(
+            branch=self.branch,
+            movement_type=BranchCashMovement.TYPE_OUT,
+            source=BranchCashMovement.SOURCE_ADJUSTMENT,
+            amount=500000,
+            label="Anomalie caisse negative",
+            movement_date=self.period_month,
+            created_by=self.manager,
+        )
+        response = self.client.get(
+            reverse("accounts:manager_dashboard"),
+            {
+                "section": "rapport",
+                "report_month": self.period_month.month,
+                "report_year": self.period_month.year,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertLess(response.context["report_available_cash_balance"], 0)
+        self.assertTrue(
+            any(alert["title"] == "Caisse negative" for alert in response.context["report_alerts"])
+        )
 
 
 @override_settings(
@@ -724,3 +1151,241 @@ class ManagerCashSessionWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         session.refresh_from_db()
         self.assertTrue(session.is_used)
+
+
+def _create_positioning_fee(programme, level="L1", amount=100000):
+    from formations.models import Fee, ProgrammeYear
+
+    year_number = int(level[1:]) if len(level) > 1 and level[1:].isdigit() else 1
+    programme_year = ProgrammeYear.objects.create(programme=programme, year_number=year_number)
+    Fee.objects.create(programme_year=programme_year, label="Frais inscription", amount=amount, due_month="octobre")
+    return programme_year
+
+
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}},
+    PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"],
+)
+class ManagerCouponWorkflowTests(TestCase):
+    """Workflow coupons cote gestionnaire : application a la creation et sur inscription existante."""
+
+    def setUp(self):
+        from coupons.models import Coupon
+
+        self.Coupon = Coupon
+        self.branch = _create_branch()
+        self.manager = _create_user("mgr_coupon", groups=["gestionnaire"], branch=self.branch)
+        self.programme = _create_programme()
+        _create_positioning_fee(self.programme, level="L1", amount=100000)
+        _login(self.client, self.manager)
+
+    def _create_coupon(self, **kw):
+        defaults = dict(
+            code="MASTER-DG-2026",
+            label="Coupon test",
+            discount_type=self.Coupon.DISCOUNT_PERCENTAGE,
+            value=20,
+            valid_from=timezone.now() - timedelta(days=1),
+            valid_until=timezone.now() + timedelta(days=30),
+            max_redemptions=1,
+        )
+        defaults.update(kw)
+        return self.Coupon.objects.create(**defaults)
+
+    def test_inscription_create_with_valid_coupon_reduces_amount(self):
+        coupon = self._create_coupon()
+        candidature = _create_candidature(self.programme, self.branch, status="accepted")
+        academic_class = _create_academic_class(self.programme, self.branch, level="L1")
+        url = reverse("accounts:htmx_inscription_create", args=[candidature.id])
+        response = self.client.post(
+            url,
+            {"academic_level": "L1", "academic_class": str(academic_class.pk), "coupon_code": coupon.code},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 200)
+        inscription = Inscription.objects.get(candidature=candidature)
+        self.assertEqual(inscription.amount_due, 80000)
+        self.assertIn("Montant apres reduction", response.headers["HX-Trigger"])
+
+    def test_inscription_create_with_invalid_coupon_still_creates_inscription(self):
+        candidature = _create_candidature(self.programme, self.branch, status="accepted")
+        academic_class = _create_academic_class(self.programme, self.branch, level="L1")
+        url = reverse("accounts:htmx_inscription_create", args=[candidature.id])
+        response = self.client.post(
+            url,
+            {"academic_level": "L1", "academic_class": str(academic_class.pk), "coupon_code": "DOESNOTEXIST"},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 200)
+        inscription = Inscription.objects.get(candidature=candidature)
+        self.assertEqual(inscription.amount_due, 100000)
+        self.assertIn('"type": "warning"', response.headers["HX-Trigger"])
+
+    def test_apply_coupon_on_existing_inscription(self):
+        candidature = _create_candidature(self.programme, self.branch, status="accepted")
+        inscription = Inscription.objects.create(candidature=candidature, amount_due=100000, amount_paid=0)
+        inscription.status = Inscription.STATUS_AWAITING_PAYMENT
+        inscription.save(update_fields=["status"])
+        coupon = self._create_coupon(discount_type=self.Coupon.DISCOUNT_FIXED, value=25000)
+
+        url = reverse("accounts:htmx_inscription_apply_coupon", args=[inscription.id])
+        response = self.client.post(url, {"coupon_code": coupon.code}, HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 200)
+        inscription.refresh_from_db()
+        self.assertEqual(inscription.amount_due, 75000)
+
+    def test_apply_coupon_rejected_after_full_payment(self):
+        candidature = _create_candidature(self.programme, self.branch, status="accepted")
+        inscription = Inscription.objects.create(candidature=candidature, amount_due=100000, amount_paid=0)
+        inscription.status = Inscription.STATUS_AWAITING_PAYMENT
+        inscription.save(update_fields=["status"])
+        Payment.objects.create(inscription=inscription, amount=100000, method=Payment.METHOD_CASH, status=Payment.STATUS_VALIDATED)
+        inscription.update_financial_state()
+        coupon = self._create_coupon()
+
+        url = reverse("accounts:htmx_inscription_apply_coupon", args=[inscription.id])
+        response = self.client.post(url, {"coupon_code": coupon.code}, HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 200)
+        inscription.refresh_from_db()
+        self.assertEqual(inscription.amount_due, 100000)
+        self.assertContains(response, "entièrement payée")
+
+    def test_coupon_preview_valid_code(self):
+        candidature = _create_candidature(self.programme, self.branch, status="accepted")
+        inscription = Inscription.objects.create(candidature=candidature, amount_due=100000, amount_paid=0)
+        inscription.status = Inscription.STATUS_AWAITING_PAYMENT
+        inscription.save(update_fields=["status"])
+        coupon = self._create_coupon()
+
+        url = reverse("accounts:htmx_coupon_preview")
+        response = self.client.get(
+            url, {"inscription_id": inscription.id, "code": coupon.code}, HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-coupon-valid="1"')
+
+    def test_coupon_preview_invalid_code(self):
+        candidature = _create_candidature(self.programme, self.branch, status="accepted")
+        inscription = Inscription.objects.create(candidature=candidature, amount_due=100000, amount_paid=0)
+        inscription.status = Inscription.STATUS_AWAITING_PAYMENT
+        inscription.save(update_fields=["status"])
+
+        url = reverse("accounts:htmx_coupon_preview")
+        response = self.client.get(
+            url, {"inscription_id": inscription.id, "code": "DOESNOTEXIST"}, HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-coupon-valid="0"')
+
+    def test_expired_coupon_message_is_clear(self):
+        candidature = _create_candidature(self.programme, self.branch, status="accepted")
+        inscription = Inscription.objects.create(candidature=candidature, amount_due=100000)
+        coupon = self._create_coupon(
+            valid_from=timezone.now() - timedelta(days=10),
+            valid_until=timezone.now() - timedelta(days=1),
+        )
+        response = self.client.get(
+            reverse("accounts:htmx_coupon_preview"),
+            {"inscription_id": inscription.id, "code": coupon.code},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ce coupon a expiré")
+
+    def test_coupon_apply_is_post_only(self):
+        candidature = _create_candidature(self.programme, self.branch, status="accepted")
+        inscription = Inscription.objects.create(candidature=candidature, amount_due=100000)
+        response = self.client.get(
+            reverse("accounts:htmx_inscription_apply_coupon", args=[inscription.id])
+        )
+        self.assertEqual(response.status_code, 405)
+
+
+@override_settings(
+    CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}},
+    PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"],
+)
+class ManagerContextualDocumentTests(TestCase):
+    """Phase 3 : documents proteges par role et annexe."""
+
+    def setUp(self):
+        self.branch = _create_branch("DOC", "Annexe Documents")
+        self.other_branch = _create_branch("OTH", "Autre Annexe")
+        self.manager = _create_user("mgr_docs", groups=["gestionnaire"], branch=self.branch)
+        self.programme = _create_programme()
+        candidature = _create_candidature(self.programme, self.branch, status="accepted")
+        self.inscription = Inscription.objects.create(candidature=candidature, amount_due=100000)
+        other_candidature = _create_candidature(
+            self.programme,
+            self.other_branch,
+            status="accepted",
+            email="autre@test.com",
+        )
+        self.other_inscription = Inscription.objects.create(
+            candidature=other_candidature,
+            amount_due=100000,
+        )
+        self.employee = _create_user("employee_docs", branch=self.branch, position="secretary")
+        self.payroll = PayrollEntry.objects.create(
+            branch=self.branch,
+            employee=self.employee,
+            period_month=date(2026, 7, 1),
+            base_salary=150000,
+        )
+        self.donation = Donation.objects.create(
+            branch=self.branch,
+            donor_name="Partenaire Test",
+            amount=50000,
+            receipt_number="DON-DOC-001",
+        )
+        self.expense = BranchExpense.objects.create(
+            branch=self.branch,
+            title="Depense sans justificatif",
+            amount=25000,
+        )
+        _login(self.client, self.manager)
+
+    @patch("accounts.dashboards.htmx_global.generate_esfe_pdf", return_value=b"%PDF fiche")
+    def test_inscription_sheet_is_generated_for_manager_branch(self, _generate_pdf):
+        response = self.client.get(
+            reverse("accounts:manager_inscription_sheet_pdf", args=[self.inscription.pk])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertIn("fiche-inscription-", response["Content-Disposition"])
+
+    def test_cross_branch_document_is_not_visible(self):
+        response = self.client.get(
+            reverse("accounts:manager_inscription_sheet_pdf", args=[self.other_inscription.pk])
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_non_manager_cannot_download_document(self):
+        outsider = _create_user("docs_outsider", branch=self.branch, position="secretary")
+        _login(self.client, outsider)
+        response = self.client.get(
+            reverse("accounts:manager_inscription_sheet_pdf", args=[self.inscription.pk])
+        )
+        self.assertEqual(response.status_code, 403)
+
+    @patch("accounts.dashboards.htmx_global.build_payroll_pdf", return_value=b"%PDF paie")
+    def test_payroll_sheet_uses_existing_pdf_service(self, _build_pdf):
+        response = self.client.get(
+            reverse("accounts:manager_payroll_sheet_pdf", args=[self.payroll.pk])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("fiche-paie-2026-07", response["Content-Disposition"])
+
+    @patch("accounts.dashboards.htmx_global.build_donation_receipt", return_value=b"%PDF don")
+    def test_donation_receipt_uses_existing_pdf_service(self, _build_pdf):
+        response = self.client.get(
+            reverse("accounts:manager_donation_receipt_pdf", args=[self.donation.pk])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("recu-don-don-doc-001.pdf", response["Content-Disposition"])
+
+    def test_missing_expense_pdf_is_not_downloadable(self):
+        response = self.client.get(
+            reverse("accounts:manager_expense_supporting_document_pdf", args=[self.expense.pk])
+        )
+        self.assertEqual(response.status_code, 404)

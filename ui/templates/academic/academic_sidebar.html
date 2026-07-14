@@ -1,0 +1,84 @@
+{% load component_tags %}
+{% with active_key=active_key|default:"" %}
+<aside
+  :class="sidebarOpen ? 'w-72' : 'w-20'"
+  class="flex shrink-0 flex-col overflow-y-auto border-r border-[color:var(--line)] bg-[color:var(--esfe-dark)] text-white transition-all duration-300"
+  x-data="{ expanded: { {% for key in active_parent_keys %}'{{ key }}': true{% if not forloop.last %}, {% endif %}{% endfor %} } }"
+>
+  <div class="flex h-20 items-center gap-3 border-b border-white/10 px-5">
+    <div class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[color:var(--school-primary)]">
+      <i data-lucide="graduation-cap" class="h-7 w-7"></i>
+    </div>
+    <div x-show="sidebarOpen" x-transition class="min-w-0">
+      <h1 class="text-lg font-bold leading-tight">{{ brand_title }}</h1>
+      {% if brand_subtitle %}<p class="text-xs text-white/70">{{ brand_subtitle }}</p>{% endif %}
+    </div>
+  </div>
+
+  <nav class="flex-1 space-y-1 px-3 py-5">
+    <p x-show="sidebarOpen" x-transition class="mb-3 px-3 text-[10px] font-bold uppercase tracking-widest text-white/50">Menu</p>
+    {% for item in items %}
+      {% if item.children %}
+        <div>
+          <button
+            type="button"
+            @click="expanded['{{ item.key }}'] = !expanded['{{ item.key }}']"
+            class="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all
+              {% if item.key == active_key or item.key in active_parent_keys %}bg-[color:var(--school-primary)] text-white shadow-lg{% else %}text-white/80 hover:bg-white/10{% endif %}"
+          >
+            <i data-lucide="{{ item.icon|default:'circle' }}" class="h-5 w-5 shrink-0"></i>
+            <div x-show="sidebarOpen" x-transition class="min-w-0 flex-1">
+              <p class="text-sm font-bold leading-tight">{{ item.label }}</p>
+            </div>
+            <i x-show="sidebarOpen" data-lucide="chevron-down" class="h-4 w-4 shrink-0 transition" :class="expanded['{{ item.key }}'] ? 'rotate-180' : ''"></i>
+          </button>
+          <div
+            x-show="sidebarOpen && expanded['{{ item.key }}']"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 -translate-y-1"
+            x-transition:enter-end="opacity-100 translate-y-0"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100 translate-y-0"
+            x-transition:leave-end="opacity-0 -translate-y-1"
+            class="space-y-1 pl-10 pr-2 pt-1"
+          >
+            {% for child in item.children %}
+              <button
+                type="button"
+                @click="openModule('{{ child.key }}')"
+                class="block w-full rounded-lg px-3 py-2 text-left text-xs font-semibold transition
+                  {% if child.key == active_key %}bg-white/10 text-white{% else %}text-white/70 hover:bg-white/10 hover:text-white{% endif %}"
+              >{{ child.label }}</button>
+            {% endfor %}
+          </div>
+        </div>
+      {% else %}
+        <button
+          type="button"
+          @click="openModule('{{ item.key }}')"
+          class="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all
+            {% if item.key == active_key %}bg-[color:var(--school-primary)] text-white shadow-lg{% else %}text-white/80 hover:bg-white/10{% endif %}"
+        >
+          <i data-lucide="{{ item.icon|default:'circle' }}" class="h-5 w-5 shrink-0"></i>
+          <div x-show="sidebarOpen" x-transition class="min-w-0">
+            <p class="text-sm font-bold leading-tight">{{ item.label }}</p>
+            {% if item.sub %}<p class="mt-0.5 text-[10px] leading-tight text-white/60" x-show="active_key === '{{ item.key }}'">{{ item.sub }}</p>{% endif %}
+          </div>
+        </button>
+      {% endif %}
+    {% endfor %}
+  </nav>
+
+  <div class="border-t border-white/10 p-4">
+    <div class="flex items-center gap-3">
+      <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[color:var(--success)] text-sm font-bold text-white">
+        {{ user_initial|upper }}
+      </div>
+      <div x-show="sidebarOpen" x-transition class="min-w-0">
+        <p class="text-sm font-bold truncate">{{ user_name }}</p>
+        {% if user_role %}<p class="text-xs text-white/60">{{ user_role }}</p>{% endif %}
+      </div>
+    </div>
+  </div>
+</aside>
+{% endwith %}

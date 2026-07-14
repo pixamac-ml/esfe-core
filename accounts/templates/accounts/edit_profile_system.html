@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% load custom_filters %}
+{% block content %}
+
+<section class="relative pt-24 pb-16 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 text-white">
+    <div class="max-w-4xl mx-auto px-4">
+        <a href="{% url 'accounts:profile' %}"
+           class="inline-flex items-center gap-2 text-sm text-slate-300 hover:text-white transition group mb-8">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            Retour au compte
+        </a>
+
+        <h1 class="text-3xl font-bold">Mon compte système</h1>
+        <p class="text-slate-300 mt-2 text-sm max-w-2xl">
+            Seules les informations de compte et de contact sont modifiables ici.
+            Les champs institutionnels restent contrôlés par les workflows administratifs.
+        </p>
+    </div>
+</section>
+
+<section class="bg-slate-50 py-16">
+    <div class="max-w-4xl mx-auto px-4">
+        <div class="bg-white shadow-xl rounded-2xl border border-slate-100 overflow-hidden">
+            <form method="post" enctype="multipart/form-data" class="[&_input:not(#avatar-input)]:w-full [&_input:not(#avatar-input)]:rounded-xl [&_input:not(#avatar-input)]:border [&_input:not(#avatar-input)]:border-slate-300 [&_input:not(#avatar-input)]:bg-white [&_input:not(#avatar-input)]:px-4 [&_input:not(#avatar-input)]:py-3 [&_input:not(#avatar-input)]:text-sm [&_input:not(#avatar-input)]:focus:outline-none [&_input:not(#avatar-input)]:focus:ring-2 [&_input:not(#avatar-input)]:focus:ring-slate-200 [&_input:not(#avatar-input)]:focus:border-slate-500 [&_textarea]:w-full [&_textarea]:rounded-xl [&_textarea]:border [&_textarea]:border-slate-300 [&_textarea]:bg-white [&_textarea]:px-4 [&_textarea]:py-3 [&_textarea]:text-sm">
+                {% csrf_token %}
+
+                <div class="p-8 border-b border-slate-100">
+                    <div class="flex flex-col gap-6 md:flex-row md:items-center">
+                        <div class="relative group">
+                            {% if request.user.profile.avatar %}
+                                <img id="avatar-preview" src="{{ request.user.profile.avatar.url }}" class="w-28 h-28 rounded-full object-cover border-4 border-slate-100 shadow-lg">
+                            {% else %}
+                                <div id="avatar-preview" class="w-28 h-28 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center text-3xl font-bold border-4 border-slate-100 shadow-lg">
+                                    {{ request.user.username|first|upper }}
+                                </div>
+                            {% endif %}
+                            <label for="avatar-input" class="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                <span class="text-xs font-black uppercase tracking-wide">Photo</span>
+                            </label>
+                        </div>
+
+                        <div class="flex-1 space-y-3">
+                            <div class="grid gap-4 md:grid-cols-3">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Prenom</label>
+                                    {{ form.first_name }}
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Nom</label>
+                                    {{ form.last_name }}
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Email</label>
+                                    {{ form.email }}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Changer la photo</label>
+                                {{ form.avatar }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-8 border-b border-slate-100">
+                    <div class="grid gap-5 md:grid-cols-2">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Telephone principal</label>
+                            {{ form.phone }}
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Adresse</label>
+                            {{ form.address }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-8 border-b border-slate-100 bg-slate-50">
+                    <h2 class="text-lg font-semibold text-slate-800 mb-4">Informations verrouillees</h2>
+                    <div class="grid gap-3 md:grid-cols-2 text-sm text-slate-700">
+                        <div class="rounded-xl border border-slate-200 bg-white px-4 py-3">Position: {{ profile_position|default:"-" }}</div>
+                        <div class="rounded-xl border border-slate-200 bg-white px-4 py-3">Annexe: {{ request.user.profile.branch.name|default:"-" }}</div>
+                        <div class="rounded-xl border border-slate-200 bg-white px-4 py-3">Role: {{ request.user.profile.role|default:"-" }}</div>
+                        <div class="rounded-xl border border-slate-200 bg-white px-4 py-3">Type utilisateur: {{ request.user.profile.user_type|default:"-" }}</div>
+                        <div class="rounded-xl border border-slate-200 bg-white px-4 py-3">Statut institutionnel: {{ request.user.profile.get_employment_status_display|default:"-" }}</div>
+                        <div class="rounded-xl border border-slate-200 bg-white px-4 py-3">Code employe: {{ request.user.profile.employee_code|default:"-" }}</div>
+                    </div>
+                </div>
+
+                <div class="p-6 md:p-8 bg-slate-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <a href="{% url 'accounts:profile' %}" class="w-full sm:w-auto text-center px-6 py-3 rounded-xl border border-slate-200 text-slate-700 font-medium hover:bg-slate-100 transition">
+                        Annuler
+                    </a>
+                    <button type="submit" class="w-full sm:w-auto px-8 py-3 bg-slate-900 text-white rounded-xl font-semibold hover:bg-slate-800 transition shadow-lg hover:shadow-xl">
+                        Enregistrer les modifications
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</section>
+
+{% endblock %}

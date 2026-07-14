@@ -1,23 +1,92 @@
-{% load humanize %}
-<article id="notification-{{ notification.id }}" class="comm-row {% if not notification.read_at %}is-unread{% endif %}">
-  <style>
-    .comm-row{display:grid;grid-template-columns:1fr auto;gap:12px;padding:14px 16px;border-bottom:1px solid #eef2f7;background:#fff}.comm-row:hover{background:#f8fbff}.comm-row.is-unread{background:#eff6ff}.comm-row-title{font-size:13px;font-weight:950;color:#0f172a}.comm-row-body{font-size:12px;color:#64748b;font-weight:700;line-height:1.4;margin-top:4px}.comm-row-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.comm-pill{display:inline-flex;border-radius:999px;padding:3px 7px;font-size:10px;font-weight:950;background:#f1f5f9;color:#475569}.comm-pill.red{background:#fee2e2;color:#b91c1c}.comm-pill.amber{background:#fef3c7;color:#b45309}.comm-pill.green{background:#dcfce7;color:#15803d}.comm-row-actions{display:flex;align-items:flex-start;gap:6px}.comm-mini-btn{border:1px solid #dbe3ef;background:#fff;color:#475569;border-radius:9px;padding:7px 9px;font-size:11px;font-weight:900;cursor:pointer;text-decoration:none;white-space:nowrap}
-  </style>
-  <div>
-    <div class="comm-row-title">{{ notification.title }}</div>
-    <div class="comm-row-body">{{ notification.body|default:"Notification centralisee"|truncatechars:180 }}</div>
-    <div class="comm-row-meta">
-      <span class="comm-pill {% if notification.priority == 'critical' %}red{% elif notification.priority == 'high' %}amber{% endif %}">{{ notification.get_priority_display }}</span>
-      <span class="comm-pill">{{ notification.get_channel_display }}</span>
-      <span class="comm-pill {% if notification.status == 'failed' %}red{% elif notification.status == 'read' %}green{% endif %}">{{ notification.get_status_display }}</span>
-      <span class="comm-pill">{{ notification.created_at|date:"d/m/Y H:i" }}</span>
-      {% if notification.event %}<span class="comm-pill">{{ notification.event.source_app }}</span>{% endif %}
+{% load humanize notification_center_tags %}
+{% notification_action_url notification as action_url %}
+<article
+  id="notification-{{ notification.id }}"
+  class="nc-item {% if not notification.read_at %}nc-item--unread{% endif %}"
+>
+  {# Indicateur non lu #}
+  <div class="nc-item__dot" aria-hidden="true"></div>
+
+  {# Icône priorité #}
+  <div class="nc-item__icon
+    {% if notification.priority == 'critical' %}nc-item__icon--danger
+    {% elif notification.priority == 'high' %}nc-item__icon--warning
+    {% else %}nc-item__icon--neutral{% endif %}">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      {% if notification.priority == 'critical' %}
+        <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      {% elif notification.priority == 'high' %}
+        <path d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      {% else %}
+        <path d="M15 17H9m9-2V11a6 6 0 0 0-12 0v4l-2 2h16l-2-2Zm-6 6a2.5 2.5 0 0 0 2.35-1.65h-4.7A2.5 2.5 0 0 0 12 21Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      {% endif %}
+    </svg>
+  </div>
+
+  {# Contenu #}
+  <div class="nc-item__body">
+    <div class="nc-item__title">{{ notification.title }}</div>
+    <div class="nc-item__excerpt">{{ notification.body|default:""|truncatechars:120 }}</div>
+    <div class="nc-item__meta">
+      <span>{{ notification.created_at|date:"d/m/Y à H:i" }}</span>
+      {% if not notification.read_at %}<span class="nc-item__unread-label">Non lue</span>{% endif %}
     </div>
   </div>
-  <div class="comm-row-actions">
-    <button class="comm-mini-btn" type="button" hx-get="{% url 'notification_center:notification_detail' notification.id %}" hx-target="#comm-detail" hx-swap="innerHTML">Ouvrir</button>
-    {% if not notification.read_at %}
-      <button class="comm-mini-btn" type="button" hx-post="{% url 'notification_center:mark_notification_read' notification.id %}" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-swap="outerHTML" hx-target="#notification-{{ notification.id }}">Lu</button>
+
+  {# Actions #}
+  <div class="nc-item__actions">
+    {% if action_url %}
+    <a class="nc-btn" href="{{ action_url }}">Accéder</a>
+    {% endif %}
+    <button
+      type="button"
+      class="nc-btn"
+      hx-get="{% url 'notification_center:notification_detail' notification.id %}"
+      hx-target="#comm-detail"
+      hx-swap="innerHTML"
+      aria-label="Lire : {{ notification.title }}"
+    >Lire</button>
+    {% if notification.archived_at %}
+    <button
+      type="button"
+      class="nc-btn"
+      hx-post="{% url 'notification_center:unarchive_notification' notification.id %}"
+      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+      hx-swap="outerHTML"
+      hx-target="#notification-{{ notification.id }}"
+    >Restaurer</button>
+    {% else %}
+      {% if not notification.read_at %}
+    <button
+      type="button"
+      class="nc-btn nc-btn--ghost"
+      hx-post="{% url 'notification_center:mark_notification_read' notification.id %}"
+      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+      hx-swap="outerHTML"
+      hx-target="#notification-{{ notification.id }}"
+      aria-label="Marquer comme lue"
+      title="Marquer comme lue"
+    >✓</button>
+      {% else %}
+    <button
+      type="button"
+      class="nc-btn nc-btn--ghost"
+      hx-post="{% url 'notification_center:mark_notification_unread' notification.id %}"
+      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+      hx-swap="outerHTML"
+      hx-target="#notification-{{ notification.id }}"
+      aria-label="Marquer comme non lue"
+      title="Marquer comme non lue"
+    >○</button>
+      {% endif %}
+    <button
+      type="button"
+      class="nc-btn"
+      hx-post="{% url 'notification_center:archive_notification' notification.id %}"
+      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+      hx-swap="outerHTML"
+      hx-target="#notification-{{ notification.id }}"
+    >Archiver</button>
     {% endif %}
   </div>
 </article>

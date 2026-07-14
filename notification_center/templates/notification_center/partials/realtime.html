@@ -20,6 +20,11 @@
     state.socket = new WebSocket(protocol + '://' + window.location.host + '/ws/notifications/');
     state.socket.onmessage = function (event) {
       const data = JSON.parse(event.data || '{}');
+      if (data.type === 'session.expired') {
+        state.sessionExpired = true;
+        document.body.dispatchEvent(new CustomEvent('notifier.notification', {detail: data}));
+        return;
+      }
       if (typeof data.unread_count === 'number') state.updateUnreadCount(data.unread_count);
       document.querySelectorAll('.notification-widget-btn').forEach(function (button) {
         button.classList.add('has-new');
@@ -28,8 +33,13 @@
       if (window.esfeToast) window.esfeToast({message: data.body || data.title || 'Nouvelle notification', type: 'info'});
       document.body.dispatchEvent(new CustomEvent('notifier.notification', {detail: data}));
     };
-    state.socket.onclose = function () {
+    state.socket.onclose = function (event) {
       state.socket = null;
+      if (state.sessionExpired || event.code === 4401 || event.code === 4403) {
+        state.sessionExpired = true;
+        document.body.dispatchEvent(new CustomEvent('notifier.notification', {detail: {type: 'session.expired', reason: event.code === 4403 ? 'ACCOUNT_RESTRICTED' : 'IDLE_TIMEOUT'}}));
+        return;
+      }
       window.clearTimeout(state.reconnectTimer);
       state.reconnectTimer = window.setTimeout(state.connect, 5000);
     };

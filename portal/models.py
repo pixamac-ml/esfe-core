@@ -4,7 +4,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
-from academics.models import AcademicClass, AcademicYear, EC
+from academics.models import AcademicClass, AcademicYear, EC, Semester, UE
 from branches.models import Branch
 
 
@@ -435,6 +435,26 @@ class TeacherDashboardPreference(models.Model):
 
 
 class DirectorTeacherAssignment(models.Model):
+    SCOPE_CLASS = "class"
+    SCOPE_SEMESTER = "semester"
+    SCOPE_UE = "ue"
+    SCOPE_EC = "ec"
+    SCOPE_CHOICES = [
+        (SCOPE_CLASS, "Classe"),
+        (SCOPE_SEMESTER, "Semestre"),
+        (SCOPE_UE, "UE"),
+        (SCOPE_EC, "EC"),
+    ]
+
+    STATUS_ACTIVE = "active"
+    STATUS_SUSPENDED = "suspended"
+    STATUS_ARCHIVED = "archived"
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE, "Active"),
+        (STATUS_SUSPENDED, "Suspendue"),
+        (STATUS_ARCHIVED, "Archivee"),
+    ]
+
     branch = models.ForeignKey(
         Branch,
         on_delete=models.PROTECT,
@@ -447,8 +467,23 @@ class DirectorTeacherAssignment(models.Model):
         related_name="director_teacher_assignments",
         db_index=True,
     )
+    scope_type = models.CharField(max_length=20, choices=SCOPE_CHOICES, default=SCOPE_CLASS, db_index=True)
     academic_class = models.ForeignKey(
         AcademicClass,
+        on_delete=models.CASCADE,
+        related_name="director_teacher_assignments",
+        null=True,
+        blank=True,
+    )
+    semester = models.ForeignKey(
+        Semester,
+        on_delete=models.CASCADE,
+        related_name="director_teacher_assignments",
+        null=True,
+        blank=True,
+    )
+    ue = models.ForeignKey(
+        UE,
         on_delete=models.CASCADE,
         related_name="director_teacher_assignments",
         null=True,
@@ -463,6 +498,9 @@ class DirectorTeacherAssignment(models.Model):
     )
     room_label = models.CharField(max_length=120, blank=True)
     planned_hours = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    starts_on = models.DateField(null=True, blank=True, db_index=True)
+    ends_on = models.DateField(null=True, blank=True, db_index=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ACTIVE, db_index=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -470,7 +508,16 @@ class DirectorTeacherAssignment(models.Model):
         blank=True,
         related_name="created_director_teacher_assignments",
     )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="updated_director_teacher_assignments",
+    )
     is_active = models.BooleanField(default=True, db_index=True)
+    suspended_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -480,7 +527,7 @@ class DirectorTeacherAssignment(models.Model):
         verbose_name_plural = "Affectations enseignants direction"
         constraints = [
             models.UniqueConstraint(
-                fields=["teacher", "academic_class", "ec"],
+                fields=["teacher", "scope_type", "academic_class", "semester", "ue", "ec", "starts_on", "ends_on"],
                 name="portal_unique_director_teacher_assignment",
             )
         ]
@@ -492,17 +539,49 @@ class DirectorTeacherAssignment(models.Model):
 
     def __str__(self):
         class_label = self.academic_class.display_name if self.academic_class_id else "Sans classe"
+        semester_label = f"S{self.semester.number}" if self.semester_id else ""
+        ue_label = self.ue.code if self.ue_id else ""
         ec_label = self.ec.title if self.ec_id else "Sans matiere"
         room_label = self.room_label or "Salle non precisee"
         hours_label = f"{self.planned_hours} h prevues" if self.planned_hours is not None else "Volume non precise"
-        return f"{self.teacher} - {class_label} - {ec_label} - {room_label} - {hours_label}"
+        scope_bits = " / ".join(bit for bit in [class_label, semester_label, ue_label, ec_label] if bit)
+        return f"{self.teacher} - {scope_bits or 'Affectation'} - {room_label} - {hours_label}"
 
     def clean(self):
         errors = {}
         if self.planned_hours is not None and self.planned_hours <= 0:
             errors["planned_hours"] = "Le volume horaire doit etre superieur a 0."
-        if self.ec_id and self.academic_class_id and self.ec.ue.semester.academic_class_id != self.academic_class_id:
+        if self.status == self.STATUS_ARCHIVED and not self.archived_at:
+            errors["archived_at"] = "La date d'archivage est obligatoire pour une affectation archivee."
+        if self.status == self.STATUS_SUSPENDED and not self.suspended_at:
+            errors["suspended_at"] = "La date de suspension est obligatoire pour une affectation suspendue."
+        if self.starts_on and self.ends_on and self.starts_on > self.ends_on:
+            errors["ends_on"] = "La date de fin doit etre posterieure a la date de debut."
+        if self.scope_type == self.SCOPE_CLASS:
+            if self.academic_class_id is None:
+                errors["academic_class"] = "La classe est obligatoire."
+        elif self.scope_type == self.SCOPE_SEMESTER:
+            if self.semester_id is None:
+                errors["semester"] = "Le semestre est obligatoire."
+            elif self.academic_class_id and self.semester.academic_class_id != self.academic_class_id:
+                errors["semester"] = "Le semestre selectionne n'appartient pas a la classe choisie."
+        elif self.scope_type == self.SCOPE_UE:
+            if self.ue_id is None:
+                errors["ue"] = "L'UE est obligatoire."
+            elif self.semester_id and self.ue.semester_id != self.semester_id:
+                errors["ue"] = "L'UE selectionnee n'appartient pas au semestre choisi."
+        elif self.scope_type == self.SCOPE_EC:
+            if self.ec_id is None:
+                errors["ec"] = "L'EC est obligatoire."
+            elif self.ue_id and self.ec.ue_id != self.ue_id:
+                errors["ec"] = "L'EC selectionnee n'appartient pas a l'UE choisie."
+        else:
+            errors["scope_type"] = "La portee selectionnee est invalide."
+
+        if self.academic_class_id and self.ec_id and self.ec.ue.semester.academic_class_id != self.academic_class_id:
             errors["ec"] = "La matiere selectionnee n'appartient pas a la classe choisie."
+        if self.ue_id and self.academic_class_id and self.ue.semester.academic_class_id != self.academic_class_id:
+            errors["ue"] = "L'UE selectionnee n'appartient pas a la classe choisie."
         if self.academic_class_id and not self.room_label.strip():
             errors["room_label"] = "La salle de reference est obligatoire pour une affectation de classe."
         if self.academic_class_id and self.planned_hours is None:
@@ -511,6 +590,19 @@ class DirectorTeacherAssignment(models.Model):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        if self.status == self.STATUS_ACTIVE:
+            self.is_active = True
+            self.suspended_at = None
+            self.archived_at = None
+        elif self.status == self.STATUS_SUSPENDED:
+            self.is_active = False
+            if not self.suspended_at:
+                self.suspended_at = timezone.now()
+            self.archived_at = None
+        elif self.status == self.STATUS_ARCHIVED:
+            self.is_active = False
+            if not self.archived_at:
+                self.archived_at = timezone.now()
         self.full_clean()
         return super().save(*args, **kwargs)
 

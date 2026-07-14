@@ -1,0 +1,46 @@
+{% load component_tags %}
+<div
+  x-data="{ open: false }"
+  :class="open ? 'block' : 'hidden'"
+  @{{ open_event }}.window="open = true; document.body.classList.add('sg-overlay-open')"
+  @{{ close_event }}.window="open = false; document.body.classList.remove('sg-overlay-open')"
+  @click="$dispatch('{{ close_event }}')"
+  class="fixed inset-0 z-40 bg-black/40 transition-opacity"
+  x-cloak
+  :aria-hidden="!open"
+></div>
+<aside
+  id="{{ id }}"
+  x-data="{ open: false }"
+  :class="open ? 'translate-x-0' : '{% if position == 'left' %}-translate-x-full{% else %}translate-x-full{% endif %}'"
+  @{{ open_event }}.window="open = true"
+  @{{ close_event }}.window="open = false"
+  @keydown.escape.window="$dispatch('{{ close_event }}')"
+  x-cloak
+  :aria-hidden="!open"
+  role="dialog"
+  aria-modal="true"
+  aria-label="{{ kicker }}{% if title %} — {{ title }}{% endif %}"
+  tabindex="-1"
+  class="fixed {% if position == 'left' %}left-0{% else %}right-0{% endif %} top-0 z-50 flex h-full w-full max-w-lg flex-col border-l border-[color:var(--line)] bg-[color:var(--card)] shadow-2xl transition-transform duration-300"
+>
+  <div class="flex items-center justify-between border-b border-[color:var(--line)] px-5 py-4">
+    <div class="flex min-w-0 items-center gap-3">
+      <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]">
+        <i data-lucide="{{ icon }}" style="width:16px;height:16px;"></i>
+      </span>
+      <div class="min-w-0">
+        <span class="block text-[11px] font-bold uppercase tracking-[.05em] text-[color:var(--muted-2)]">{{ kicker }}</span>
+        {% if title %}<h3 class="mt-0.5 truncate text-[17px] font-extrabold text-[color:var(--text)]">{{ title }}</h3>{% endif %}
+      </div>
+    </div>
+    <button type="button" @click="$dispatch('{{ close_event }}')" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[color:var(--muted)] transition hover:bg-[color:var(--card-soft)] hover:text-[color:var(--text)]" aria-label="Fermer">
+      <i data-lucide="x" style="width:18px;height:18px;"></i>
+    </button>
+  </div>
+  <div class="relative flex-1 overflow-hidden p-5">
+    <div class="h-full overflow-y-auto" id="{{ content_id }}">
+      <p class="text-sm text-[color:var(--muted)]">{{ placeholder }}</p>
+    </div>
+  </div>
+</aside>

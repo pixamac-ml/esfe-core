@@ -9,16 +9,24 @@ from django.utils import timezone
 
 from academics.models import AcademicEnrollment, ECGrade, Semester
 from accounts.access import get_user_annexe
+from accounts.models import Profile
 from inscriptions.models import Inscription
 from payments.models import Payment, PaymentAgent
 from portal.models import AccountSupportState, SupportAuditLog, SupportTicket, SupportTicketComment
 from students.models import Student
 
 
+REAL_STAFF_POSITIONS = {
+    choice[0]
+    for choice in Profile.POSITION_CHOICES
+    if choice[0] and choice[0] != "student"
+}
+
+
 def get_scoped_staff_queryset(*, branch):
     user_model = get_user_model()
     queryset = user_model.objects.select_related("profile").filter(
-        Q(is_staff=True) | Q(profile__user_type="staff")
+        Q(is_staff=True) | Q(profile__position__in=REAL_STAFF_POSITIONS)
     ).distinct()
     if branch:
         queryset = queryset.filter(

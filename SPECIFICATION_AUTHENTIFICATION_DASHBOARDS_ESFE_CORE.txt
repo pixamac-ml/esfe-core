@@ -1,0 +1,529 @@
+SPECIFICATION DEFINITIVE — AUTHENTIFICATION, UTILISATEURS ET DASHBOARDS ESFE CORE
+Date : 12 juillet 2026
+Projet : ESFE Core — Django 6 / Python 3.14 — plateforme scolaire multi-annexes
+
+===============================================================================
+0. MISSION CONFIEE A CODEX
+===============================================================================
+
+Analyser le projet complet avant toute modification, puis consolider le système
+d'identité, d'autorisation et de redirection vers les dashboards conformément
+à cette spécification.
+
+Le but immédiat n'est pas d'ajouter le suivi avancé des appareils ou des
+connexions. Il faut d'abord rendre les catégories d'utilisateurs, les profils,
+les postes, les annexes, les permissions et les dashboards cohérents, uniques,
+prévisibles et testables.
+
+Ne pas effectuer une réécriture totale. Préserver les données et les dashboards
+existants, migrer progressivement et fournir des tests anti-régression.
+
+===============================================================================
+1. PROBLÈME ACTUEL
+===============================================================================
+
+Le projet mélange actuellement plusieurs notions :
+
+- utilisateur du site public et utilisateur du logiciel ;
+- profil communautaire et profil professionnel ;
+- Profile.role, Profile.position et Profile.user_type ;
+- User.is_staff et User.is_superuser ;
+- groupes Django et alias historiques de groupes ;
+- relations métier comme Branch.manager et PaymentAgent ;
+- helpers, décorateurs et mixins propres à plusieurs applications ;
+- redirections déterminées par des sources différentes.
+
+Conséquence observée : une gestionnaire peut accéder à plusieurs dashboards ou
+être redirigée différemment selon le helper appelé. Un utilisateur système peut
+aussi être envoyé vers la page de profil du site public pendant qu'il travaille
+dans son dashboard.
+
+Ce comportement doit disparaître définitivement.
+
+===============================================================================
+2. SÉPARATION OBLIGATOIRE DES DEUX UNIVERS
+===============================================================================
+
+Il existe deux univers fonctionnels totalement distincts.
+
+A. UTILISATEUR DU SITE PUBLIC
+
+- utilise le site public et la communauté ;
+- peut s'inscrire par le workflow public autorisé ;
+- possède son profil communautaire ;
+- consulte et modifie ses données communautaires ;
+- n'accède à aucune ressource institutionnelle du logiciel ;
+- ne possède aucun dashboard métier du système scolaire.
+
+B. UTILISATEUR DU LOGICIEL / UTILISATEUR SYSTÈME
+
+- appartient officiellement au système scolaire ESFE ;
+- est créé, invité ou activé par un workflow institutionnel contrôlé ;
+- possède un profil professionnel distinct ;
+- reçoit une catégorie, un poste, une portée et éventuellement une annexe ;
+- accède uniquement au dashboard correspondant à son poste principal ;
+- ne doit jamais être redirigé vers le profil communautaire pendant son travail.
+
+RÈGLE NON NÉGOCIABLE : posséder un compte public ne donne jamais accès au
+logiciel. L'authentification Django peut rester techniquement commune, mais les
+données métier, profils, routes, vues, formulaires, templates, redirections et
+permissions des deux univers doivent être séparés.
+
+===============================================================================
+3. MODÈLE D'IDENTITÉ CIBLE
+===============================================================================
+
+Conserver le User Django actuel comme noyau technique :
+
+- identifiant ;
+- mot de passe ;
+- email technique ;
+- session ;
+- is_active ;
+- is_staff uniquement pour l'accès à l'administration Django ;
+- is_superuser uniquement pour le superutilisateur Django.
+
+Créer ou formaliser deux profils métier distincts :
+
+1. PublicProfile
+
+- avatar public ;
+- biographie ;
+- préférences communautaires ;
+- données utiles exclusivement au site public.
+
+2. SystemProfile ou InstitutionalProfile
+
+- catégorie système ;
+- poste principal ;
+- portée organisationnelle ;
+- annexe ;
+- matricule ou code employé/étudiant selon le métier ;
+- statut professionnel/institutionnel ;
+- photo professionnelle et coordonnées autorisées ;
+- données nécessaires aux dashboards.
+
+Définir explicitement le type de compte : PUBLIC ou SYSTEM. Ne pas introduire
+HYBRID sans besoin métier validé. Si le code existant impose temporairement un
+seul Profile, proposer une migration progressive vers deux profils réels sans
+perte de données et sans laisser l'ancien Profile comme source permanente
+d'autorisation.
+
+===============================================================================
+4. CLASSIFICATION DES UTILISATEURS SYSTÈME
+===============================================================================
+
+Chaque utilisateur système possède quatre dimensions différentes. Elles ne
+doivent jamais être confondues.
+
+1. CATÉGORIE PRINCIPALE
+
+- STUDENT : étudiant ;
+- TEACHING_STAFF : enseignant/personnel pédagogique ;
+- ADMIN_STAFF : personnel administratif ;
+
+L'enseignant est un utilisateur professionnel du logiciel, mais il n'est pas
+du staff administratif. Cette séparation empêche l'octroi accidentel de
+permissions administratives.
+
+2. POSTE PRINCIPAL
+
+Le poste est l'unique fonction métier autoritative. Enumération cible à vérifier
+et adapter aux fonctions réellement présentes dans le projet :
+
+- STUDENT ;
+- TEACHER ;
+- FINANCE_MANAGER / gestionnaire ;
+- PAYMENT_AGENT / agent de paiement si ce dashboard existe réellement ;
+- SECRETARY ;
+- ADMISSIONS_OFFICER ;
+- DIRECTOR_OF_STUDIES ;
+- ACADEMIC_SUPERVISOR / surveillant général ;
+- IT_SUPPORT / informaticien ;
+- BRANCH_MANAGER / directeur d'annexe si distinct ;
+- MARKETING_MANAGER ;
+- EXECUTIVE_DIRECTOR / DG ;
+- DEPUTY_EXECUTIVE_DIRECTOR / DGA ;
+- SUPER_ADMIN.
+
+Ne pas créer deux noms pour la même fonction. Produire d'abord la liste exacte
+des positions actuellement utilisées, de leurs alias, de leurs groupes et des
+dashboards réels, puis proposer une table de normalisation.
+
+3. PORTÉE ORGANISATIONNELLE
+
+- BRANCH : utilisateur limité à une annexe ;
+- GLOBAL : utilisateur autorisé à travailler sur plusieurs/toutes les annexes ;
+- PUBLIC n'est pas une portée d'un utilisateur système, mais l'univers public.
+
+Être GLOBAL ne signifie pas avoir toutes les permissions. Cela signifie exercer
+ses permissions autorisées sur un périmètre global.
+
+4. ANNEXE
+
+- obligatoire pour toute position à portée BRANCH ;
+- nulle pour une position strictement GLOBAL ;
+- les querysets ET les policies doivent vérifier l'annexe ;
+- aucune simple valeur de groupe ne peut rendre un utilisateur global.
+
+Matrice de départ à confirmer avec le code et le propriétaire du projet :
+
+- étudiants : STUDENT, position STUDENT, portée BRANCH, annexe obligatoire ;
+- enseignants : TEACHING_STAFF, position TEACHER, portée BRANCH par défaut ;
+- gestionnaires : ADMIN_STAFF, FINANCE_MANAGER, BRANCH ;
+- secrétaires : ADMIN_STAFF, SECRETARY, BRANCH ;
+- surveillants : ADMIN_STAFF, ACADEMIC_SUPERVISOR, BRANCH ;
+- informaticiens : ADMIN_STAFF, IT_SUPPORT, BRANCH ;
+- directeurs des études : ADMIN_STAFF, DIRECTOR_OF_STUDIES, portée à confirmer ;
+- directeurs d'annexe : ADMIN_STAFF, BRANCH_MANAGER, BRANCH ;
+- DG/DGA/super administrateur : ADMIN_STAFF, portée GLOBAL.
+
+Ne pas inventer la portée du Directeur des études si le code ou les règles
+métier restent ambigus : signaler cette seule décision pour validation.
+
+===============================================================================
+5. RÈGLE UNIQUE DES DASHBOARDS
+===============================================================================
+
+Un utilisateur système possède un seul poste principal actif et un seul
+dashboard principal.
+
+La redirection post-login doit être déterminée uniquement par la position
+officielle du profil système, via un registre central fermé.
+
+Exemple de registre :
+
+- STUDENT -> dashboard étudiant ;
+- TEACHER -> dashboard enseignant ;
+- FINANCE_MANAGER -> dashboard gestionnaire ;
+- SECRETARY -> dashboard secrétaire ;
+- ACADEMIC_SUPERVISOR -> dashboard surveillant ;
+- IT_SUPPORT -> dashboard informaticien ;
+- DIRECTOR_OF_STUDIES -> dashboard directeur des études ;
+- BRANCH_MANAGER -> dashboard directeur d'annexe ;
+- EXECUTIVE_DIRECTOR -> dashboard DG ;
+- DEPUTY_EXECUTIVE_DIRECTOR -> dashboard DGA ou dashboard direction validé ;
+- SUPER_ADMIN -> dashboard super administrateur.
+
+Règles :
+
+- Profile.role ne choisit plus un dashboard ;
+- Profile.user_type ne choisit plus un dashboard ;
+- les groupes Django ne choisissent plus un dashboard ;
+- is_staff ne choisit plus un dashboard ;
+- Branch.manager ou PaymentAgent ne choisissent plus implicitement un dashboard ;
+- le username ne choisit jamais un dashboard ;
+- une permission supplémentaire ne crée jamais un deuxième dashboard ;
+- une position absente, inconnue ou contradictoire produit un refus contrôlé et
+  une page de compte à régulariser, jamais une redirection approximative ;
+- aucune boucle de redirection entre accounts et portal n'est acceptable.
+
+Un utilisateur peut avoir accès à des fonctions transversales dans son propre
+dashboard grâce aux permissions, mais cela ne lui donne pas le dashboard d'une
+autre fonction.
+
+===============================================================================
+6. PROFIL ET PARAMÈTRES DANS LES DASHBOARDS
+===============================================================================
+
+L'utilisateur système doit rester dans l'interface du logiciel pour :
+
+- consulter son profil professionnel ;
+- modifier les coordonnées dont il est propriétaire ;
+- modifier sa photo professionnelle ;
+- gérer ses préférences de dashboard ;
+- changer son mot de passe ;
+- consulter son poste, son annexe et son statut sans pouvoir les auto-modifier.
+
+Ces opérations doivent utiliser des routes, vues, formulaires et templates
+institutionnels. Elles peuvent être présentées en page interne, workspace HTMX
+ou modal du dashboard, mais ne doivent jamais rediriger vers le profil public.
+
+Le profil public conserve ses propres routes, vues, formulaires et templates.
+Les champs institutionnels (poste, catégorie, portée, annexe, permissions,
+matricule, statut) ne sont jamais modifiables depuis l'espace public ni depuis
+le formulaire personnel ordinaire de l'utilisateur système.
+
+Créer un service commun sécurisé pour le changement de son propre mot de passe,
+réutilisé par tous les dashboards, avec validate_password et
+update_session_auth_hash.
+
+===============================================================================
+7. RÔLE EXACT DES GROUPES ET PERMISSIONS DJANGO
+===============================================================================
+
+Les groupes Django sont des bundles de permissions, pas des identités métier.
+
+Exemple : le groupe de capacités FINANCE_MANAGER peut recevoir :
+
+- voir les paiements ;
+- valider un encaissement ;
+- enregistrer une dépense ;
+- consulter la caisse ;
+- produire les rapports autorisés.
+
+Mais l'appartenance à ce groupe ne doit pas transformer un utilisateur en
+gestionnaire ni déterminer sa redirection. La position est attribuée par le
+workflow institutionnel ; le groupe officiel correspondant fournit ensuite les
+capacités par défaut.
+
+Créer :
+
+- un registre fermé et versionné des groupes officiels ;
+- une commande idempotente de synchronisation des groupes et permissions ;
+- des codenames métier clairs ;
+- une migration des groupes historiques, variantes de casse et alias français/
+  anglais ;
+- une interdiction ou un contrôle strict de la création libre de groupes métier.
+
+Une permission exceptionnelle ajoutée à un compte ne change pas sa position,
+sa catégorie, sa portée ou son dashboard.
+
+===============================================================================
+8. POLICY CENTRALE D'AUTORISATION
+===============================================================================
+
+Créer une seule façade d'autorisation, par exemple :
+
+AccessContext
+- user ;
+- account_type ;
+- category ;
+- position ;
+- scope ;
+- branch ;
+- account_status ;
+- capabilities.
+
+Policy
+- can(user, action, obj=None, branch=None) -> Decision ;
+- require(...) lève un refus contrôlé ;
+- deny by default pour toute règle inconnue.
+
+Decision
+- allowed ;
+- reason_code ;
+- effective_branch.
+
+AccessContext est calculé une seule fois par requête et réutilisé. Les pages,
+endpoints HTMX/AJAX/JSON, exports Excel/PDF et WebSockets doivent appliquer les
+mêmes règles. Le filtrage d'annexe se fait dans le queryset puis dans la policy
+pour empêcher les accès inter-annexes et les IDOR.
+
+Centraliser et réduire les décorateurs/mixins autour de :
+
+- public_account_required ;
+- institutional_login_required ;
+- position_required ;
+- capability_required ;
+- branch_object_required ;
+- PolicyRequiredMixin.
+
+Déprécier progressivement les helpers locaux, tests directs de group.name et
+alias historiques. accounts/access.py doit servir de façade de transition, pas
+être supprimé brutalement.
+
+===============================================================================
+9. GESTION ADMINISTRATIVE DES COMPTES — PRÉPARATION
+===============================================================================
+
+Préparer l'architecture pour une future page de gestion séparée :
+
+GESTION DES UTILISATEURS
+
+- Utilisateurs du système
+  - étudiants ;
+  - enseignants ;
+  - staff administratif ;
+  - comptes suspendus/inactifs ;
+  - filtres par catégorie, poste, portée, annexe et statut.
+
+- Utilisateurs du site public
+  - membres de la communauté ;
+  - comptes actifs ;
+  - comptes suspendus/inactifs.
+
+Cette page complète n'est pas nécessairement à développer dans la mission
+immédiate. En revanche, le modèle et les selectors doivent permettre ces listes
+sans ambiguïté et sans déductions fragiles.
+
+===============================================================================
+10. ORDRE D'EXÉCUTION OBLIGATOIRE
+===============================================================================
+
+PHASE A — AUDIT FACTUEL AVANT MODIFICATION
+
+1. Extraire le projet dans un répertoire de travail propre.
+2. Lire les éventuels AGENTS.md et instructions du dépôt.
+3. Cartographier modèles, migrations, signaux, formulaires, vues, routes,
+   templates, middleware, backends, helpers, décorateurs, mixins et tests.
+4. Inventorier tous les dashboards et leurs URLs réelles.
+5. Inventorier toutes les valeurs de role, position, user_type, groupes et alias.
+6. Identifier chaque source actuelle de redirection et d'autorisation.
+7. Reproduire le cas de la gestionnaire ayant accès à deux dashboards.
+8. Produire une matrice « position -> catégorie -> portée -> annexe -> dashboard
+   -> groupe de capacités » avant de modifier le code.
+
+PHASE B — CORRECTIFS DE SÉCURITÉ URGENTS DÉJÀ IDENTIFIÉS
+
+1. Valider strictement le paramètre next de l'inscription publique.
+2. Faire appliquer les mêmes états de compte au login classique et au login
+   carte.
+3. Remplacer le carte_id brut par un challenge signé, court, lié à la session et
+   à usage unique.
+4. Forcer must_change_password après un reset IT.
+5. Révoquer les sessions lors des suspensions et resets sensibles.
+6. Réparer le changement de mot de passe enseignant via le service commun.
+7. Capturer les exceptions Profile précises au lieu de Exception.
+
+PHASE C — INTRODUCTION DE LA NOUVELLE STRUCTURE EN COMPATIBILITÉ
+
+1. Introduire account_type et le profil institutionnel séparé, selon le meilleur
+   plan de migration compatible avec les données actuelles.
+2. Introduire catégorie, position autoritative, scope et branch.
+3. Créer AccessContext et le registre central des dashboards.
+4. Garder temporairement les anciens champs en lecture de compatibilité avec
+   journalisation de toute contradiction.
+5. Ne jamais laisser un fallback historique accorder davantage de droits que la
+   nouvelle identité officielle.
+
+PHASE D — NETTOYAGE DES DONNÉES
+
+1. Fournir une commande audit_access_state avec mode dry-run et sortie JSON.
+2. Ne corriger automatiquement que les correspondances non ambiguës.
+3. Produire une liste des comptes ambigus nécessitant validation humaine.
+4. Normaliser groupes et casse.
+5. Régulariser les comptes actifs sans position, type ou annexe requise.
+6. Dédupliquer/normaliser les emails institutionnels selon une stratégie sûre.
+
+PHASE E — MIGRATION DASHBOARD PAR DASHBOARD
+
+1. Migrer la redirection post-login vers le registre central.
+2. Migrer chaque dashboard vers la policy centrale.
+3. Migrer profil et paramètres système vers les routes internes.
+4. Vérifier les pages complètes, modals, HTMX, AJAX, exports et PDF.
+5. Ajouter les tests d'isolation inter-annexes à chaque migration.
+6. Ne considérer un dashboard terminé qu'après tests de son poste et refus des
+   autres postes.
+
+PHASE F — SUPPRESSION DU LEGACY
+
+Après migration complète et vérification des données :
+
+1. retirer role et user_type de toutes les décisions d'accès ;
+2. retirer les alias historiques et tests directs de groupes ;
+3. imposer les contraintes position/scope/branch ;
+4. retirer les champs obsolètes de l'administration puis, si sûr, de la base ;
+5. mettre à jour ACCESS_MAPPING.md comme spécification normative.
+
+===============================================================================
+11. TESTS D'ACCEPTATION OBLIGATOIRES
+===============================================================================
+
+Séparation public/système :
+
+- un compte PUBLIC ne peut atteindre aucun dashboard système ;
+- un compte SYSTEM n'est jamais redirigé vers le profil public depuis son
+  dashboard ;
+- les formulaires publics ne modifient aucune donnée institutionnelle ;
+- une simple inscription publique ne crée aucune position système.
+
+Redirections :
+
+- chaque position connue arrive sur un seul dashboard officiel ;
+- une gestionnaire n'accède pas automatiquement à deux dashboards ;
+- une permission supplémentaire ne change pas le dashboard ;
+- position absente/inconnue = refus contrôlé ;
+- aucune boucle de redirection ;
+- next externe, //evil.example et schémas dangereux sont refusés.
+
+Catégories et postes :
+
+- STUDENT n'obtient aucune capacité administrative ;
+- TEACHER reste TEACHING_STAFF et non ADMIN_STAFF ;
+- is_staff seul n'accorde aucun dashboard métier ;
+- un groupe seul ne transforme pas la position ;
+- une contradiction legacy est détectée et journalisée.
+
+Multi-annexes :
+
+- tout utilisateur BRANCH possède une annexe ;
+- un utilisateur d'une annexe ne voit, modifie, exporte ou publie aucune donnée
+  d'une autre annexe ;
+- tester GET, POST, HTMX, AJAX/JSON, PDF, Excel et WebSocket ;
+- les IDs d'objets d'une autre annexe produisent 403/404 selon la policy ;
+- un GLOBAL peut traverser les annexes seulement pour les actions permises.
+
+Profils :
+
+- profil public et profil professionnel ont des routes et formulaires séparés ;
+- l'édition du profil professionnel reste dans le dashboard ;
+- position, scope, annexe et permissions ne sont pas auto-modifiables ;
+- le changement de mot de passe fonctionne pour tous les dashboards.
+
+Sécurité urgente :
+
+- login valide, invalide, inactif et suspendu ;
+- parité des contrôles entre mot de passe et carte ;
+- challenge carte falsifié, expiré, rejoué ou lié à une autre session refusé ;
+- reset IT impose le changement et révoque les sessions ;
+- toute action inconnue est refusée par défaut.
+
+===============================================================================
+12. CONTRAINTES DE RÉALISATION
+===============================================================================
+
+- Ne pas casser les dashboards ni supprimer les données existantes.
+- Ne pas modifier en masse sans audit dry-run et sauvegarde préalable.
+- Utiliser les migrations Django pour toute évolution de schéma.
+- Écrire du code commenté lorsque la règle métier n'est pas évidente.
+- Éviter les duplications de logique entre applications.
+- Préserver les changements utilisateur non liés présents dans le dépôt.
+- Exécuter les tests existants avant et après modification.
+- Ajouter des tests ciblés pour chaque régression corrigée.
+- Signaler toute décision métier réellement ambiguë au lieu de l'inventer.
+- Fournir à chaque phase : fichiers modifiés, migrations, tests lancés, résultats,
+  risques résiduels et prochaine étape.
+
+===============================================================================
+13. HORS PÉRIMÈTRE IMMÉDIAT, MAIS À PRÉPARER
+===============================================================================
+
+Après solidification des utilisateurs et dashboards, une phase de sécurité des
+connexions sera développée :
+
+- expiration de session après inactivité ;
+- historique des connexions ;
+- liste et révocation des sessions/appareils ;
+- collecte raisonnable du navigateur, système et adresse IP ;
+- empreinte d'appareil prudente, sans prétendre disposer d'un identifiant
+  matériel inaccessible au navigateur ;
+- alertes de nouvelle connexion ;
+- MFA pour comptes privilégiés ;
+- fermeture/revalidation WebSocket après suspension ;
+- audit des changements de privilèges et revues périodiques.
+
+Ne pas mélanger cette phase avancée avec la correction actuelle des identités et
+dashboards, mais concevoir AccessContext et l'état de compte pour permettre son
+ajout propre ultérieurement.
+
+===============================================================================
+14. DÉFINITION DE TERMINÉ
+===============================================================================
+
+La mission est terminée seulement si :
+
+1. PUBLIC et SYSTEM sont séparés fonctionnellement et techniquement ;
+2. profils public et professionnel ne se mélangent plus ;
+3. chaque utilisateur système possède une classification cohérente ;
+4. un poste principal donne exactement un dashboard principal ;
+5. groupes et permissions ne déterminent plus l'identité ;
+6. les utilisateurs BRANCH sont isolés par annexe ;
+7. les anciens fallbacks n'accordent plus d'accès contradictoires ;
+8. le cas de la gestionnaire à deux dashboards est reproduit puis corrigé ;
+9. les migrations de données sont sûres et auditées ;
+10. tous les tests d'acceptation pertinents passent ;
+11. une documentation finale explique clairement comment créer, classer,
+    affecter, rediriger, suspendre et autoriser chaque type de compte.
+
+FIN DE LA SPÉCIFICATION

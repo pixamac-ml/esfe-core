@@ -80,7 +80,6 @@ input[type="file"]::file-selector-button {
 .secretary-command-subtitle { margin-top:7px; max-width:620px; color:var(--muted); font-size:.78rem; font-weight:650; }
 .secretary-command-action { position:relative; z-index:1; display:inline-flex; align-items:center; gap:8px; min-height:40px; padding:0 14px; border:1px solid var(--school-primary); border-radius:10px; background:var(--school-primary); color:#fff; font-size:.74rem; font-weight:850; }
 @media(max-width:720px){.secretary-command-content{align-items:flex-start;flex-direction:column}}
-</style>
 /* ── SHELL ── */
 .sg-shell { display: flex; height: 100vh; min-height: 0; overflow: hidden; }
 
@@ -239,7 +238,10 @@ input[type="file"]::file-selector-button {
 .sg-notification-body { font-size: .68rem; color: #64748b; margin-top: 3px; line-height: 1.35; }
 .sg-notification-meta { font-size: .58rem; font-weight: 900; color: #94a3b8; margin-top: 5px; text-transform: uppercase; letter-spacing: .08em; }
 .sg-sidebar-counters { display: none; }
-@keyframes sgToastIn { to { transform: translateY(0); opacity: 1; } }
+.htmx-indicator { display: none !important; }
+.htmx-request .htmx-indicator { display: flex !important; }
+.htmx-request.htmx-indicator { display: flex !important; }
+@keyframes sgToastIn { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 </style>
 {% endblock %}
 
@@ -292,27 +294,59 @@ input[type="file"]::file-selector-button {
 
 {# ═══════ JAVASCRIPT ═══════ #}
 <script>
-function secretaryShell() {
+function reportControls() {
+  const today = new Date().toISOString().split('T')[0];
   return {
-    active: '{{ active_section|default:'overview' }}',
-    drawerOpen: false,
-    modalOpen: false,
-    commandOpen: false,
-    switchSection(section) {
-      this.active = section;
-      document.querySelectorAll('[data-sg-panel]').forEach(p => p.hidden = p.dataset.sgPanel !== section);
-      history.replaceState({}, '', '?section=' + section);
-    },
-    init() {
-      document.addEventListener('keydown', e => {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); this.commandOpen = !this.commandOpen; if (this.commandOpen) this.$nextTick(() => document.getElementById('command-input')?.focus()); }
-      });
-      window.sgOpenDrawer = () => window.dispatchEvent(new CustomEvent('secretary-drawer-open'));
-      window.sgCloseDrawer = () => window.dispatchEvent(new CustomEvent('secretary-drawer-close'));
-      window.sgSwitchSection = (section) => { this.switchSection(section); };
+    reportDate: today,
+    entryType: '',
+    exportBase: '{% url 'secretary:daily_registry_report' %}',
+    loadPreview() {
+      const el = document.getElementById('reports-preview-content');
+      if (!el) return;
+      let url = '{% url 'secretary:htmx_reports_preview' %}?date=' + this.reportDate;
+      if (this.entryType) url += '&entry_type=' + this.entryType;
+      htmx.ajax('GET', url, {target: '#reports-preview-content', swap: 'innerHTML'});
     }
   };
 }
+
+function secretaryShell() {
+  return {
+    drawerOpen: false,
+    modalOpen: false,
+    commandOpen: false,
+    init() {
+      document.addEventListener('keydown', e => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+          e.preventDefault();
+          this.commandOpen = !this.commandOpen;
+          if (this.commandOpen) this.$nextTick(() => document.getElementById('command-input')?.focus());
+        }
+      });
+      window.sgOpenDrawer  = () => window.dispatchEvent(new CustomEvent('secretary-drawer-open'));
+      window.sgCloseDrawer = () => window.dispatchEvent(new CustomEvent('secretary-drawer-close'));
+      // Navigation HTMX — appelé depuis les templates si nécessaire
+      window.sgGoTo = function(section) {
+        htmx.ajax('GET', '?section=' + section, {
+          target: '#secretary-workspace',
+          swap: 'outerHTML',
+          pushURL: '?section=' + section,
+        });
+        if (section === 'reports') {
+          setTimeout(() => htmx.trigger(document.body, 'reports-section-activated'), 400);
+        }
+      };
+    }
+  };
+}
+</script>
+
+{# ── Lucide init — couvre la race condition defer + Alpine ── #}
+<script>
+function _sgInitLucide() { if (window.lucide) lucide.createIcons(); }
+document.addEventListener('DOMContentLoaded', _sgInitLucide);
+document.addEventListener('alpine:initialized', _sgInitLucide);
+document.addEventListener('alpine:init', _sgInitLucide);
 </script>
 
 {# ── HTMX auto-open drawer after load into #sg-drawer-content ── #}
@@ -321,7 +355,9 @@ document.addEventListener('htmx:afterSwap', function(evt) {
   if (evt.detail.target && evt.detail.target.id === 'sg-drawer-content') {
     if (window.sgOpenDrawer) window.sgOpenDrawer();
   }
+  _sgInitLucide();
 });
+document.addEventListener('htmx:afterSettle', _sgInitLucide);
 </script>
 
 {# ── GLOBAL TOAST ── #}
@@ -341,6 +377,15 @@ document.addEventListener('htmx:afterSwap', function(evt) {
     setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateX(20px)'; el.style.transition = 'opacity .2s,transform .2s'; setTimeout(() => el.remove(), 250); }, duration);
   };
   document.addEventListener('secretary-toast', e => { const d = e.detail; if (Array.isArray(d)) d.forEach(t => secretaryToast(t, t.tone)); else secretaryToast(d, d.tone); });
+
+  // Bridge HX-Trigger sg:toast → secretaryToast
+  document.addEventListener('sg:toast', e => {
+    const d = e.detail || {};
+    const message = d.message || d.body || '';
+    const tone = d.tone || 'info';
+    const toneMap = { success: 'success', danger: 'error', warning: 'warning', info: 'info', error: 'error' };
+    secretaryToast({ title: d.title || '', body: message }, toneMap[tone] || tone);
+  });
 })();
 </script>
 

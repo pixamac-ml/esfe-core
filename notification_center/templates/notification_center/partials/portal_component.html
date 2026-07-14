@@ -1,0 +1,55 @@
+<div
+  id="portal-notification-shell"
+  class="portal-notification-shell"
+  data-widget-url="{% url 'notification_center:notifications_widget' %}"
+  aria-label="Notifications institutionnelles"
+>
+  <style>
+    .portal-notification-shell{position:fixed;right:18px;bottom:18px;z-index:96;display:inline-flex}.portal-notification-shell.is-slotted{position:static;right:auto;bottom:auto;z-index:auto}.portal-notification-shell:not(.is-slotted) .notification-widget-panel{top:auto;bottom:48px}.portal-notification-loader{position:relative;display:grid;width:42px;height:42px;place-items:center;border:1px solid #dbe3ef;border-radius:12px;background:#fff;color:#64748b;box-shadow:0 10px 30px rgba(15,23,42,.15)}.portal-notification-loader span{position:absolute;right:-5px;top:-5px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#ef4444;color:#fff;font-size:10px;font-weight:950;display:grid;place-items:center}.portal-notification-error{max-width:240px;border:1px solid #fecaca;border-radius:12px;background:#fff7f7;color:#991b1b;padding:10px 12px;font-size:11px;font-weight:800;box-shadow:0 10px 30px rgba(15,23,42,.12)}@media(max-width:640px){.portal-notification-shell{right:12px;bottom:12px}.portal-notification-shell.is-slotted{right:auto;bottom:auto}}
+  </style>
+  <div
+    id="portal-notification-component"
+    hx-get="{% url 'notification_center:notifications_widget' %}"
+    hx-trigger="load, notificationsChanged from:body"
+    hx-swap="innerHTML"
+    hx-on::response-error="this.innerHTML='<div class=&quot;portal-notification-error&quot;>Notifications momentanément indisponibles.</div>'"
+  >
+    <a class="portal-notification-loader" href="{% url 'notification_center:notifications' %}" aria-label="Ouvrir les notifications">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M15 17H9m9-2V11a6 6 0 0 0-12 0v4l-2 2h16l-2-2Zm-6 6a2.5 2.5 0 0 0 2.35-1.65h-4.7A2.5 2.5 0 0 0 12 21Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      {% if notification_unread_count %}<span>{{ notification_unread_count }}</span>{% endif %}
+    </a>
+  </div>
+</div>
+<script>
+(function () {
+  const shell = document.getElementById('portal-notification-shell');
+  if (!shell || shell.dataset.initialized === '1') return;
+  shell.dataset.initialized = '1';
+
+  function mountInPortalTopbar() {
+    const slot = document.querySelector('[data-portal-notification-slot]');
+    if (slot && shell.parentElement !== slot) slot.appendChild(shell);
+    shell.classList.toggle('is-slotted', Boolean(slot));
+  }
+
+  function refreshWidget(detail) {
+    if (detail && detail.type === 'session.expired') return;
+    const host = document.getElementById('portal-notification-component');
+    if (!host || !window.htmx) return;
+    window.htmx.ajax('GET', shell.dataset.widgetUrl, {
+      target: '#portal-notification-component',
+      swap: 'innerHTML',
+      headers: {'X-ESFE-Automated-Request': '1'}
+    });
+  }
+
+  mountInPortalTopbar();
+  document.body.addEventListener('notifier.notification', function (event) { refreshWidget(event.detail || {}); });
+  document.body.addEventListener('htmx:afterSwap', mountInPortalTopbar);
+  document.addEventListener('click', function (event) {
+    document.querySelectorAll('[data-notification-widget].is-open').forEach(function (widget) {
+      if (!widget.contains(event.target)) widget.classList.remove('is-open');
+    });
+  });
+})();
+</script>

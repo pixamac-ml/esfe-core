@@ -1,8 +1,8 @@
-from django.db.models.signals import post_save, pre_save
+from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 from django.urls import reverse
 
-from academics.models import AcademicDiplomaAward, ECGrade
+from academics.models import AcademicDiplomaAward, ECGrade, LessonLog
 from academics.services.workflow import is_session_complete_for_class
 from notifier.models import NotificationMessage
 from notifier.services import NotificationBus
@@ -133,3 +133,122 @@ def ec_grade_notify_session_complete(sender, instance, created, **kwargs):
         _notify_directors_session_complete(branch, semester, "normal")
     if not getattr(instance, "_was_retake_complete", False) and is_session_complete_for_class(semester, "retake"):
         _notify_directors_session_complete(branch, semester, "retake")
+
+
+def _recalculate_teacher_honorarium(lesson_log):
+    from accounts.services.manager_intelligence import refresh_teacher_honorarium_entry
+
+    if not lesson_log.teacher_id or not lesson_log.branch_id or not lesson_log.date:
+        return
+    period_month = lesson_log.date.replace(day=1)
+    refresh_teacher_honorarium_entry(
+        branch=lesson_log.branch,
+        teacher=lesson_log.teacher,
+        period_month=period_month,
+        user=None,
+    )
+
+
+def _get_branch_managers(branch):
+    from django.contrib.auth import get_user_model
+
+    User = get_user_model()
+    return (
+        User.objects.filter(
+            is_active=True,
+            profile__branch=branch,
+            groups__name="gestionnaire",
+        )
+        .distinct()
+        .select_related("profile")
+    )
+
+
+def _notify_managers_lesson_log_submitted(lesson_log):
+    managers = _get_branch_managers(lesson_log.branch)
+    teacher_name = lesson_log.teacher.get_full_name() or lesson_log.teacher.username
+    ec_name = str(lesson_log.ec)
+    class_name = str(lesson_log.academic_class)
+    date_str = lesson_log.date.strftime("%d/%m/%Y")
+    body = (
+        f"{teacher_name} a soumis un cahier de texte pour {ec_name} / {class_name} "
+        f"du {date_str}. Il est en attente de validation."
+    )
+    for manager in managers:
+        NotificationBus.notify(
+            recipient=manager,
+            actor=lesson_log.teacher,
+            event_type="lesson_log_submitted",
+            title="Cahier de texte soumis",
+            body=body,
+            source_app="academics",
+            priority=NotificationMessage.PRIORITY_NORMAL,
+            legacy_source="lesson_log",
+            legacy_object_id=str(lesson_log.pk),
+        )
+
+
+def _notify_teacher_lesson_log_validated(lesson_log):
+    teacher = lesson_log.teacher
+    validator = lesson_log.validated_by
+    ec_name = str(lesson_log.ec)
+    class_name = str(lesson_log.academic_class)
+    date_str = lesson_log.date.strftime("%d/%m/%Y")
+    body = (
+        f"Votre cahier de texte pour {ec_name} / {class_name} du {date_str} "
+        f"a ete valide par {(validator.get_full_name() or validator.username) if validator else 'la gestion'}."
+    )
+    NotificationBus.notify(
+        recipient=teacher,
+        actor=validator,
+        event_type="lesson_log_validated",
+        title="Cahier de texte valide",
+        body=body,
+        source_app="academics",
+        priority=NotificationMessage.PRIORITY_NORMAL,
+        legacy_source="lesson_log",
+        legacy_object_id=str(lesson_log.pk),
+    )
+
+
+@receiver(pre_save, sender=LessonLog)
+def lesson_log_track_state(sender, instance, **kwargs):
+    instance._old_status = None
+    instance._old_validated_by_id = None
+    if instance.pk:
+        try:
+            old = sender.objects.get(pk=instance.pk)
+            instance._old_status = old.status
+            instance._old_validated_by_id = old.validated_by_id
+        except sender.DoesNotExist:
+            pass
+
+
+@receiver(post_save, sender=LessonLog)
+def lesson_log_notify_on_save(sender, instance, created, **kwargs):
+    old_status = getattr(instance, "_old_status", None)
+    old_validated_by_id = getattr(instance, "_old_validated_by_id", None)
+
+    is_done = instance.status == LessonLog.STATUS_DONE
+    became_done = is_done and (created or old_status != LessonLog.STATUS_DONE)
+    is_submitted = is_done and instance.validated_by_id is None
+    became_submitted = became_done and is_submitted
+
+    was_validated = old_validated_by_id is not None
+    is_now_validated = instance.validated_by_id is not None
+    became_validated = is_now_validated and not was_validated and is_done
+
+    if became_submitted:
+        _notify_managers_lesson_log_submitted(instance)
+    if became_validated:
+        _notify_teacher_lesson_log_validated(instance)
+
+
+@receiver(post_save, sender=LessonLog)
+def lesson_log_refresh_honorarium_on_save(sender, instance, **kwargs):
+    _recalculate_teacher_honorarium(instance)
+
+
+@receiver(post_delete, sender=LessonLog)
+def lesson_log_refresh_honorarium_on_delete(sender, instance, **kwargs):
+    _recalculate_teacher_honorarium(instance)

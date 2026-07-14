@@ -1,0 +1,141 @@
+{% load humanize %}
+
+{# ── TITRE RAPPORT ── #}
+<div class="mb-4 flex items-center gap-2">
+  <i data-lucide="calendar-days" style="width:14px;height:14px;" class="text-[color:var(--school-primary)]"></i>
+  <span class="text-xs font-black text-[color:var(--text)]">Rapport journalier — {{ stats.report_date }}</span>
+</div>
+
+{# ── KPI REGISTRE ── #}
+<div class="mb-2">
+  <div class="text-[10px] font-black uppercase tracking-widest text-[color:var(--muted)] mb-2">📒 Registre administratif</div>
+  <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    <div class="flex flex-col gap-0.5 rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2.5">
+      <span class="text-[10px] font-bold uppercase text-[color:var(--muted)]">Total</span>
+      <span class="text-xl font-black tabular-nums text-[color:var(--text)]">{{ stats.total }}</span>
+      <span class="text-[10px] text-[color:var(--muted-2)]">entrées</span>
+    </div>
+    <div class="flex flex-col gap-0.5 rounded-xl border border-green-200 bg-green-50 px-3 py-2.5">
+      <span class="text-[10px] font-bold uppercase text-green-700">Traitées</span>
+      <span class="text-xl font-black tabular-nums text-green-700">{{ stats.completed }}</span>
+      <span class="text-[10px] text-green-600">complètes</span>
+    </div>
+    <div class="flex flex-col gap-0.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+      <span class="text-[10px] font-bold uppercase text-amber-700">En attente</span>
+      <span class="text-xl font-black tabular-nums text-amber-700">{{ stats.pending }}</span>
+      <span class="text-[10px] text-amber-600">non traitées</span>
+    </div>
+    <div class="flex flex-col gap-0.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5">
+      <span class="text-[10px] font-bold uppercase text-blue-700">En cours</span>
+      <span class="text-xl font-black tabular-nums text-blue-700">{{ stats.in_progress }}</span>
+      <span class="text-[10px] text-blue-600">en traitement</span>
+    </div>
+  </div>
+</div>
+
+{# ── KPI VISITEURS + RDV + DEPOTS ── #}
+<div class="grid grid-cols-3 gap-2 mb-4">
+  <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2.5">
+    <div class="text-[10px] font-black uppercase text-[color:var(--muted)] mb-1">👤 Visiteurs</div>
+    <div class="flex items-end gap-2">
+      <span class="text-xl font-black tabular-nums text-[color:var(--text)]">{{ stats.visitors_total }}</span>
+      <span class="text-[10px] text-green-600 font-bold mb-0.5">{{ stats.visitors_completed }} sortis</span>
+    </div>
+  </div>
+  <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2.5">
+    <div class="text-[10px] font-black uppercase text-[color:var(--muted)] mb-1">📅 Rendez-vous</div>
+    <div class="flex items-end gap-2">
+      <span class="text-xl font-black tabular-nums text-[color:var(--text)]">{{ stats.appointments_total }}</span>
+      <span class="text-[10px] text-green-600 font-bold mb-0.5">{{ stats.appointments_done }} clôturés</span>
+    </div>
+  </div>
+  <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2.5">
+    <div class="text-[10px] font-black uppercase text-[color:var(--muted)] mb-1">📦 Dépôts</div>
+    <div class="flex items-end gap-2">
+      <span class="text-xl font-black tabular-nums text-[color:var(--text)]">{{ stats.documents_total }}</span>
+      <span class="text-[10px] text-green-600 font-bold mb-0.5">{{ stats.documents_done }} remis</span>
+    </div>
+  </div>
+</div>
+
+{# ── REPARTITION PAR TYPE ── #}
+{% if stats.by_type %}
+<div class="mb-4 flex flex-wrap gap-2">
+  {% for item in stats.by_type %}
+  <span class="inline-flex items-center gap-1.5 rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-1 text-[10px] font-bold text-[color:var(--text)]">
+    <i data-lucide="tag" style="width:10px;height:10px;" class="text-[color:var(--school-primary)]"></i>
+    {{ item.label }} — <strong>{{ item.count }}</strong>
+  </span>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# ── TABLEAU DES ENTREES ── #}
+{% if entries %}
+<div class="sg-table-wrap">
+  <table class="sg-table">
+    <thead>
+      <tr>
+        <th>N°</th>
+        <th>Heure</th>
+        <th>Type</th>
+        <th>Visiteur / Motif</th>
+        <th>Étudiant</th>
+        <th>Service cible</th>
+        <th>Statut</th>
+        <th>Sortie</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in entries %}
+      <tr>
+        <td class="sg-mono">{{ entry.registry_number|default:entry.pk }}</td>
+        <td class="sg-mono">{{ entry.created_at|time:"H:i" }}</td>
+        <td>
+          <span class="inline-flex items-center gap-1 rounded-md bg-[color:var(--school-primary-soft)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--school-primary)]">
+            {{ entry.get_entry_type_display }}
+          </span>
+        </td>
+        <td>
+          <div class="font-bold text-[color:var(--text)]">{{ entry.visitor_name|default:"—" }}</div>
+          {% if entry.motive %}<div class="text-[10px] text-[color:var(--muted)] mt-0.5">{{ entry.motive|truncatechars:50 }}</div>{% endif %}
+        </td>
+        <td>
+          {% if entry.related_student %}
+            <span class="font-bold text-[color:var(--text)]">{{ entry.related_student.full_name }}</span>
+          {% else %}
+            <span class="text-[color:var(--muted-2)]">—</span>
+          {% endif %}
+        </td>
+        <td class="text-[10px] font-bold text-[color:var(--muted)]">{{ entry.target_service|default:"—" }}</td>
+        <td>
+          {% if entry.status == 'completed' %}
+            <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700">Traité</span>
+          {% elif entry.status == 'pending' %}
+            <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">En attente</span>
+          {% elif entry.status == 'in_progress' %}
+            <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">En cours</span>
+          {% elif entry.status == 'transferred' %}
+            <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700">Transféré</span>
+          {% elif entry.status == 'cancelled' %}
+            <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">Annulé</span>
+          {% else %}
+            <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-600">{{ entry.get_status_display }}</span>
+          {% endif %}
+        </td>
+        <td class="sg-mono text-[color:var(--muted)]">
+          {% if entry.exited_at %}{{ entry.exited_at|time:"H:i" }}{% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="sg-empty">
+  <div class="sg-empty-icon"><i data-lucide="file-search" style="width:28px;height:28px;"></i></div>
+  <div class="sg-empty-text">Aucune entrée registre pour cette date{% if entry_type_filter %} et ce type{% endif %}.</div>
+</div>
+{% endif %}
+
+<script>if (window.lucide) lucide.createIcons();</script>

@@ -7,10 +7,10 @@ from urllib.parse import quote
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.validators import validate_email
 from django.db.models import Count, Q, Sum
-from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, JsonResponse
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.urls.exceptions import NoReverseMatch
@@ -29,9 +29,16 @@ from academics.models import (
     ECGrade,
     LessonLog,
     Semester,
+    UE,
     WeeklyScheduleSlot,
 )
-from academics.permissions import BULLETIN_MANAGEMENT_POSITIONS, can_manage_bulletins, can_manage_diplomas
+from academics.permissions import (
+    BULLETIN_MANAGEMENT_POSITIONS,
+    DIRECTOR_DASHBOARD_POSITIONS,
+    can_manage_bulletins,
+    can_manage_diplomas,
+    require_director_branch_scope,
+)
 from academic_cycle.services.academic_excel_reports import build_academic_report_xlsx, xlsx_response
 from academics.services.documents import (
     generate_annual_bulletins_for_class,
@@ -56,6 +63,13 @@ from academics.services.schedule_service import (
 from academics.services.semester import compute_semester_result
 from academics.services.grading import resolve_threshold
 from academics.services.workflow import can_publish_semester
+from academics.services.teacher_assignment_service import (
+    activate_teacher_assignment,
+    archive_teacher_assignment,
+    create_teacher_assignment,
+    suspend_teacher_assignment,
+    update_teacher_assignment,
+)
 from accounts.access import can_access, get_user_position, get_user_scope
 from accounts.dashboards.helpers import get_user_branch, paginate_queryset
 from branches.models import Branch
@@ -81,6 +95,7 @@ from portal.services.teacher_dashboard_service import (
     _validate_content_file_extension,
     build_teacher_support_workspace_context,
     build_teacher_settings_context,
+    declare_teacher_absence_for_event,
     delete_teacher_content,
     get_teacher_content_for_edit,
     update_teacher_content,
@@ -88,8 +103,10 @@ from portal.services.teacher_dashboard_service import (
 )
 from students.models import TeacherAttendance
 from portal.services.director import (
+    build_director_calendar_context,
     build_director_classroom_ops_context,
     build_director_document_context,
+    build_director_exam_sessions_context,
     build_director_planning_assignment_context,
     build_director_tasks_center,
     build_director_teacher_assignment_context,
@@ -105,6 +122,7 @@ from portal.services.supervisor_service import build_class_detail_context
 from portal.services.academic_structure_service import (
     delete_ec,
     save_ec,
+    save_semester,
     save_ue,
 )
 from portal.services.it_support_service import (
@@ -124,15 +142,16 @@ from portal.services.it_support_service import (
     update_account_email,
     update_support_ticket_status,
 )
-from portal.models import AdministrativeDocument, DirectorTeacherAssignment, SupportAuditLog, SupportTicket
+from portal.models import AdministrativeDocument, DirectorTeacherAssignment, SupportAuditLog, SupportTicket, TeacherDocument
 from portal.views.it_grades_import import build_it_grade_selection_context
 from portal.dg.services import (
     build_dg_dashboard_context,
     build_dg_drawer_context,
     build_dg_section_context,
 )
-from portal.dg.forms import DgRecruitmentForm
+from portal.dg.forms import DgCouponForm, DgRecruitmentForm
 from portal.dg.rh_service import create_staff_from_recruitment
+from portal.dg.coupons_service import list_coupons, create_coupon, toggle_coupon
 from portal.dg.actions_service import (
     create_finance_followup,
     escalate_student_case,
@@ -173,6 +192,13 @@ def _build_portal_context(request, *, page_title, module_cards):
 
 def _resolve_academic_branch(request):
     return get_user_branch(request.user)
+
+
+def _resolve_director_branch(request, *, additional_scoped_positions=None):
+    return require_director_branch_scope(
+        request.user,
+        additional_scoped_positions=additional_scoped_positions,
+    )
 
 
 def _build_academic_dashboard_context(request, *, page_title, page_kicker, sidebar_links, highlight):
@@ -306,6 +332,57 @@ def _position_required(expected_positions):
     return decorator
 
 
+def _build_director_sidebar_items():
+    return [
+        {"key": "home",              "label": "Accueil",          "icon": "layout-dashboard"},
+        {"key": "calendrier",        "label": "Calendrier",        "icon": "calendar-days"},
+        {
+            "key": "evaluations_calendar",
+            "label": "Évaluations",
+            "icon": "clipboard-check",
+            "children": [
+                {"key": "evaluations_calendar", "label": "Sessions examens"},
+                {"key": "evaluations",          "label": "Résultats & Notes"},
+            ],
+        },
+        {"key": "enseignants",       "label": "Enseignants",       "icon": "user-check"},
+        {"key": "programme",         "label": "Programmes",        "icon": "book-open"},
+        {"key": "planification",     "label": "Emploi du temps",   "icon": "calendar-range"},
+        {"key": "correspondances",   "label": "Documents",         "icon": "mail"},
+    ]
+
+
+def _build_director_class_rows(class_cards, branch=None):
+    rows = []
+    for item in class_cards[:6]:
+        bucket = item.get("workflow_bucket", "")
+        if bucket == "ready":
+            status_badge = {"component": "academic_badge", "label": "Prête", "tone": "success"}
+        elif bucket == "rejected":
+            status_badge = {"component": "academic_badge", "label": "À revoir", "tone": "danger"}
+        else:
+            status_badge = {"component": "academic_badge", "label": "En cours", "tone": "warning"}
+        progress = item.get("progress", 0)
+        progress_html = (
+            f'<div class="flex items-center gap-2">'
+            f'<div class="h-2 flex-1 rounded-full bg-[color:var(--surface-2)] overflow-hidden">'
+            f'<div class="h-full rounded-full bg-[color:var(--school-primary)]" style="width:{progress}%"></div>'
+            f'</div>'
+            f'<span class="text-xs font-bold text-[color:var(--muted)]">{progress}%</span>'
+            f'</div>'
+        )
+        rows.append({
+            "id": item["class"].id,
+            "cells": [
+                {"value": item["class"].display_name, "class": "font-semibold"},
+                {"value": str(item.get("student_count") or 0)},
+                {"html": progress_html},
+                status_badge,
+            ],
+        })
+    return rows
+
+
 def _render_director_dashboard(request):
     workspace_context = _build_director_workspace_context(request)
     branch = workspace_context.get("branch")
@@ -321,6 +398,10 @@ def _render_director_dashboard(request):
         "quality_score": (workspace_context.get("quality") or {}).get("score", 0),
         "home_alerts_count": len(workspace_context.get("alerts") or []),
         "lesson_logs_count": len(workspace_context.get("recent_lesson_logs") or []),
+        "sidebar_items": _build_director_sidebar_items(),
+        "class_table_rows": _build_director_class_rows(
+            workspace_context.get("class_cards", []), branch
+        ),
     }
     return render(request, "portal/staff/director_dashboard.html", context)
 
@@ -356,8 +437,25 @@ def _parse_director_section(request, default="home"):
         "correspondances",
         "enseignants",
         "evaluations",
+        "evaluations_calendar",
+        "calendrier",
     }
     return section if section in allowed else default
+
+
+def _normalize_director_section(section: str, default: str = "home") -> str:
+    """Normalize a raw section name using the same aliases as _parse_director_section."""
+    aliases = {
+        "operations": "planification", "assignments": "planification", "edt": "planification",
+        "schedule": "planification", "planning": "planification", "academic": "programme",
+        "classes": "programme", "teachers": "enseignants", "documents": "enseignants",
+        "transfers": "enseignants", "results": "evaluations", "publications": "evaluations",
+        "settings": "enseignants", "stats": "evaluations", "notifications": "evaluations",
+        "logs": "evaluations", "students": "programme", "anomalies": "evaluations",
+    }
+    normalized = aliases.get(section, section)
+    allowed = {"home", "planification", "programme", "correspondances", "enseignants", "evaluations", "evaluations_calendar", "calendrier"}
+    return normalized if normalized in allowed else default
 
 
 def _parse_director_week_start(request):
@@ -388,28 +486,54 @@ def _director_semester_rows(branch):
     if branch:
         semesters = semesters.filter(academic_class__branch=branch)
 
+    semester_list = list(semesters.order_by("academic_class__level", "academic_class__programme__title", "number", "id"))
+    semester_ids = [s.id for s in semester_list]
+
     enrollments_by_class = defaultdict(list)
     if branch:
         enrollments_qs = AcademicEnrollment.objects.select_related("academic_class", "academic_year").filter(branch=branch, is_active=True)
     else:
         enrollments_qs = AcademicEnrollment.objects.select_related("academic_class", "academic_year").filter(is_active=True)
+    all_enrollment_ids = []
     for enrollment in enrollments_qs:
         enrollments_by_class[enrollment.academic_class_id].append(enrollment)
+        all_enrollment_ids.append(enrollment.id)
 
-    rows = []
-    for semester in semesters.order_by("academic_class__level", "academic_class__programme__title", "number", "id"):
+    all_ec_ids_by_semester = {}
+    for semester in semester_list:
         ec_ids = []
         for ue in semester.ues.all():
             for ec in ue.ecs.all():
                 ec_ids.append(ec.id)
-        ec_ids = list(dict.fromkeys(ec_ids))
+        all_ec_ids_by_semester[semester.id] = list(dict.fromkeys(ec_ids))
+
+    all_ec_ids_flat = list({ec_id for ids in all_ec_ids_by_semester.values() for ec_id in ids})
+    grades_counts_by_semester = defaultdict(int)
+    if all_ec_ids_flat and all_enrollment_ids:
+        for grade in ECGrade.objects.filter(
+            enrollment_id__in=all_enrollment_ids,
+            ec_id__in=all_ec_ids_flat,
+            final_score__isnull=False,
+        ).values("enrollment__academic_class_id", "ec__ue__semester_id"):
+            grades_counts_by_semester[grade["ec__ue__semester_id"]] += 1
+
+    bulletins_counts = defaultdict(int)
+    if semester_ids:
+        for row in (
+            AcademicBulletin.objects
+            .filter(semester_id__in=semester_ids, bulletin_type=AcademicBulletin.TYPE_SEMESTER)
+            .exclude(status=AcademicBulletin.STATUS_CANCELLED)
+            .values("semester_id")
+            .annotate(c=Count("id"))
+        ):
+            bulletins_counts[row["semester_id"]] = row["c"]
+
+    rows = []
+    for semester in semester_list:
+        ec_ids = all_ec_ids_by_semester[semester.id]
         enrollments = enrollments_by_class.get(semester.academic_class_id, [])
         expected = len(ec_ids) * len(enrollments)
-        entered = (
-            ECGrade.objects.filter(enrollment__in=enrollments, ec_id__in=ec_ids, final_score__isnull=False).count()
-            if expected
-            else 0
-        )
+        entered = grades_counts_by_semester[semester.id] if expected else 0
         progress = int((entered / expected) * 100) if expected else 0
         ready = expected > 0 and entered >= expected
         if semester.status == Semester.STATUS_PUBLISHED:
@@ -440,11 +564,7 @@ def _director_semester_rows(branch):
             "can_validate": ready and semester.status not in {Semester.STATUS_FINALIZED, Semester.STATUS_PUBLISHED},
             "can_publish": semester.status == Semester.STATUS_FINALIZED,
             "can_generate": semester.status == Semester.STATUS_PUBLISHED,
-            "bulletins_count": AcademicBulletin.objects.filter(
-                academic_class=semester.academic_class,
-                semester=semester,
-                bulletin_type=AcademicBulletin.TYPE_SEMESTER,
-            ).exclude(status=AcademicBulletin.STATUS_CANCELLED).count(),
+            "bulletins_count": bulletins_counts[semester.id],
         })
     return rows
 
@@ -457,17 +577,36 @@ def _format_director_decimal(value):
 
 
 def _build_director_workspace_context(request, *, toast=None):
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_director_branch(request)
     section = _parse_director_section(request)
     week_start = _parse_director_week_start(request)
     week_end = week_start + timedelta(days=7)
-    director_overview = get_director_schedule_overview(branch, week_start) if branch else {"stats": {}, "quality": {"score": 0, "warnings": []}, "alerts": [], "timetable": {"events": [], "summary": {}, "day_event_counts": []}}
+
+    _NEEDS_SCHEDULE      = {"planification"}
+    _NEEDS_SEMESTERS     = {"planification", "evaluations", "programme", "home"}
+    _NEEDS_TEACHERS      = {"enseignants", "home"}
+    _NEEDS_DOCUMENTS     = {"correspondances", "enseignants"}
+    _NEEDS_TRANSFERS     = {"enseignants"}
+    _NEEDS_RESULTS       = {"evaluations"}
+    _NEEDS_EXAM_SESSIONS = {"evaluations_calendar"}
+    _NEEDS_EVAL_EVENTS   = {"evaluations"}
+    _NEEDS_CALENDAR_MGT  = {"planification", "evaluations_calendar", "calendrier"}
+
+    if section in _NEEDS_SCHEDULE and branch:
+        director_overview = get_director_schedule_overview(branch, week_start)
+    else:
+        director_overview = {"stats": {}, "quality": {"score": 0, "warnings": []}, "alerts": [], "timetable": {"events": [], "summary": {}, "day_event_counts": []}}
     schedule_stats = director_overview.get("stats") or {}
     quality = director_overview.get("quality") or {"score": 0, "warnings": []}
     alerts = director_overview.get("alerts") or []
     timetable = director_overview.get("timetable") or {"events": [], "summary": {}, "day_event_counts": [], "empty_days": []}
+
     class_rows = list(_director_classes_queryset(branch))
-    semester_rows = _director_semester_rows(branch)
+
+    if section in _NEEDS_SEMESTERS:
+        semester_rows = _director_semester_rows(branch)
+    else:
+        semester_rows = []
     semester_rows_by_class = defaultdict(list)
     for row in semester_rows:
         semester_rows_by_class[row["class"].id].append(row)
@@ -580,16 +719,21 @@ def _build_director_workspace_context(request, *, toast=None):
     teacher_load_map = schedule_stats.get("teacher_load") or {}
     class_load_map = schedule_stats.get("class_load") or {}
     teacher_q = (request.GET.get("teacher_q") or request.POST.get("teacher_q") or "").strip()
-    teacher_context = build_director_teacher_assignment_context(
-        branch=branch,
-        schedule_stats=schedule_stats,
-        teacher_q=teacher_q,
-    )
+
+    if section in _NEEDS_TEACHERS:
+        teacher_context = build_director_teacher_assignment_context(
+            branch=branch,
+            schedule_stats=schedule_stats,
+            teacher_q=teacher_q,
+        )
+    else:
+        teacher_context = {"teacher_rows": [], "teachers_total": 0, "teacher_unassigned_count": 0}
+
     teacher_rows = teacher_context["teacher_rows"]
     teacher_rows_page = paginate_queryset(request, teacher_rows, per_page=20, page_param="teachers_page")
-    class_cards_page = paginate_queryset(request, class_cards, per_page=15, page_param="classes_page")
-    teachers_query_suffix = f"section=teachers&teacher_q={quote(teacher_q)}"
-    classes_query_suffix = "section=results"
+    class_cards_page = paginate_queryset(request, class_cards, per_page=10, page_param="classes_page")
+    teachers_query_suffix = f"section=enseignants&teacher_q={quote(teacher_q)}"
+    classes_query_suffix = "section=evaluations"
 
     class_load_items = sorted(
         (class_load_map or {}).items(),
@@ -723,19 +867,30 @@ def _build_director_workspace_context(request, *, toast=None):
     without_notes = [row for row in semester_rows if row["state"] == "pas_de_notes"]
     published = [row for row in semester_rows if row["can_generate"]]
     diploma_candidate_classes = []
-    for item in class_cards:
-        academic_class = item["class"]
-        is_terminal = str(academic_class.level or "").upper().strip() in {"L3", "M2"}
-        if not is_terminal:
-            continue
-        if item["semester_count"] and item["published_count"] >= item["semester_count"]:
-            diploma_candidate_classes.append({
-                "class": academic_class,
-                "student_count": item["student_count"],
-                "awards_count": AcademicDiplomaAward.objects.filter(
-                    academic_class=academic_class,
-                ).exclude(status=AcademicDiplomaAward.STATUS_CANCELLED).count(),
-            })
+    if section in _NEEDS_RESULTS:
+        terminal_class_ids = [
+            item["class"].id for item in class_cards
+            if str(item["class"].level or "").upper().strip() in {"L3", "M2"}
+            and item["semester_count"] and item["published_count"] >= item["semester_count"]
+        ]
+        if terminal_class_ids:
+            awards_counts = dict(
+                AcademicDiplomaAward.objects
+                .filter(academic_class_id__in=terminal_class_ids)
+                .exclude(status=AcademicDiplomaAward.STATUS_CANCELLED)
+                .values_list("academic_class_id")
+                .annotate(c=Count("id"))
+                .values_list("academic_class_id", "c")
+            )
+            for item in class_cards:
+                academic_class = item["class"]
+                if academic_class.id not in terminal_class_ids:
+                    continue
+                diploma_candidate_classes.append({
+                    "class": academic_class,
+                    "student_count": item["student_count"],
+                    "awards_count": awards_counts.get(academic_class.id, 0),
+                })
     document_workflows = [
         {
             "title": "Contrats enseignants",
@@ -770,7 +925,7 @@ def _build_director_workspace_context(request, *, toast=None):
     ]
     upcoming_events = list((timetable.get("events") or [])[:8])
     recent_lesson_logs = []
-    if branch:
+    if (section in _NEEDS_SCHEDULE or section == "home") and branch:
         recent_lesson_logs = list(
             LessonLog.objects.select_related(
                 "academic_class",
@@ -784,17 +939,24 @@ def _build_director_workspace_context(request, *, toast=None):
 
     raw_document_teacher = (request.GET.get("teacher_id") or request.POST.get("teacher_id") or "").strip()
     document_teacher_id = int(raw_document_teacher) if raw_document_teacher.isdigit() else None
-    document_context = build_director_document_context(
-        branch=branch,
-        teacher_id=document_teacher_id,
-    )
-    transfer_context = build_director_transfer_context(branch=branch)
+    if section in _NEEDS_DOCUMENTS:
+        document_context = build_director_document_context(
+            branch=branch,
+            teacher_id=document_teacher_id,
+        )
+    else:
+        document_context = {"document_teacher_rows": [], "selected_document_teacher": None, "teacher_documents": [], "teacher_document_type_choices": []}
+
+    if section in _NEEDS_TRANSFERS:
+        transfer_context = build_director_transfer_context(branch=branch)
+    else:
+        transfer_context = {"transfer_enrollments": [], "transfer_rows": [], "transfer_target_classes": [], "transfer_type_choices": []}
 
     teacher_form_ecs = list(
         EC.objects.select_related("ue", "ue__semester", "ue__semester__academic_class")
         .filter(ue__semester__academic_class__branch=branch, ue__semester__academic_class__is_active=True)
         .order_by("ue__semester__academic_class__level", "ue__semester__academic_class__programme__title", "title", "id")[:200]
-    ) if branch else []
+    ) if (section in _NEEDS_TEACHERS and branch) else []
 
     planning_assignment_context = build_director_planning_assignment_context(
         assignments_alerts=assignments_alerts,
@@ -817,8 +979,83 @@ def _build_director_workspace_context(request, *, toast=None):
 
     admin_documents = list(
         AdministrativeDocument.objects.filter(branch=branch).order_by("-created_at")[:50]
-    ) if branch else []
+    ) if ((section in _NEEDS_DOCUMENTS or section == "home") and branch) else []
     admin_doc_type_choices = AdministrativeDocument.TYPE_CHOICES
+
+    if section in _NEEDS_EXAM_SESSIONS:
+        exam_sessions_context = build_director_exam_sessions_context(
+            branch=branch,
+            class_cards=class_cards,
+        )
+    else:
+        exam_sessions_context = {
+            "exam_sessions": [], "exam_session_rows": [], "upcoming_exam_sessions": [],
+            "exam_sessions_by_class": [], "exam_session_classes": [],
+            "exam_session_type_choices": [], "exam_session_total": 0,
+            "exam_session_upcoming_count": 0,
+        }
+
+    # ── Evaluations planifiées (AcademicScheduleEvent type exam/practical) ───
+    if section in _NEEDS_EVAL_EVENTS and branch:
+        from academics.models import AcademicScheduleEvent as _ASE
+        _now = timezone.now()
+        upcoming_eval_events = list(
+            _ASE.objects.select_related("academic_class", "ec", "ec__ue", "teacher")
+            .filter(
+                branch=branch,
+                event_type__in=[_ASE.EVENT_TYPE_EXAM, _ASE.EVENT_TYPE_PRACTICAL],
+                is_active=True,
+            )
+            .order_by("start_datetime")[:60]
+        )
+        # Grouper par classe
+        _eval_by_class: dict = {}
+        for evt in upcoming_eval_events:
+            cid = evt.academic_class_id
+            if cid not in _eval_by_class:
+                _eval_by_class[cid] = {"academic_class": evt.academic_class, "events": []}
+            _eval_by_class[cid]["events"].append(evt)
+        eval_events_by_class = list(_eval_by_class.values())
+        eval_event_upcoming_count = sum(1 for e in upcoming_eval_events if e.start_datetime >= _now)
+        eval_event_total = len(upcoming_eval_events)
+        # Classes et ECs disponibles pour le formulaire de creation
+        import json as _json
+        eval_form_classes = class_rows
+        _ecs_json: dict = {}
+        for cls in class_rows:
+            _ecs_json[str(cls.id)] = [
+                {"id": ec.id, "title": ec.title}
+                for ec in EC.objects.select_related("ue", "ue__semester")
+                .filter(ue__semester__academic_class=cls)
+                .order_by("ue__semester__number", "ue__code", "title")
+            ]
+        eval_form_ecs_json = _json.dumps(_ecs_json, ensure_ascii=False)
+    else:
+        upcoming_eval_events = []
+        eval_events_by_class = []
+        eval_event_upcoming_count = 0
+        eval_event_total = 0
+        eval_form_classes = []
+        eval_form_ecs_json = "{}"
+
+    if section in _NEEDS_CALENDAR_MGT and branch:
+        raw_cal_id = (request.GET.get("calendar_id") or request.POST.get("calendar_id") or "").strip()
+        selected_cal_id = int(raw_cal_id) if raw_cal_id.isdigit() else None
+        calendar_ctx = build_director_calendar_context(branch, selected_calendar_id=selected_cal_id)
+    else:
+        calendar_ctx = {
+            "director_all_academic_years": [],
+            "director_active_academic_year": None,
+            "director_academic_calendars": [],
+            "director_selected_calendar": None,
+            "director_calendar_entries": [],
+            "director_calendar_entry_count": 0,
+            "director_calendar_can_validate": False,
+            "director_calendar_can_publish": False,
+            "director_calendar_can_add_entry": False,
+            "director_calendar_entry_type_counts": {},
+            "director_calendar_event_type_choices": [],
+        }
 
     context = {
         "branch": branch,
@@ -933,30 +1170,50 @@ def _build_director_workspace_context(request, *, toast=None):
         "admin_doc_type_choices": admin_doc_type_choices,
         "admin_doc_draft_count": sum(1 for d in admin_documents if d.status == AdministrativeDocument.STATUS_DRAFT),
         "admin_doc_published_count": sum(1 for d in admin_documents if d.status == AdministrativeDocument.STATUS_PUBLISHED),
+        "exam_session_rows": exam_sessions_context["exam_session_rows"],
+        "upcoming_exam_sessions": exam_sessions_context["upcoming_exam_sessions"],
+        "exam_sessions_by_class": exam_sessions_context["exam_sessions_by_class"],
+        "exam_session_classes": exam_sessions_context["exam_session_classes"],
+        "exam_session_type_choices": exam_sessions_context["exam_session_type_choices"],
+        "exam_session_total": exam_sessions_context["exam_session_total"],
+        "exam_session_upcoming_count": exam_sessions_context["exam_session_upcoming_count"],
+        "upcoming_eval_events": upcoming_eval_events,
+        "eval_events_by_class": eval_events_by_class,
+        "eval_event_upcoming_count": eval_event_upcoming_count,
+        "eval_event_total": eval_event_total,
+        "eval_form_classes": eval_form_classes,
+        "eval_form_ecs_json": eval_form_ecs_json,
+        **calendar_ctx,
     }
     if toast:
         context["toast"] = toast
     return context
 
 
-@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_workspace(request):
     context = _build_director_workspace_context(request)
     return render(request, "portal/staff/director/partials/workspace.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_drawer(request):
     panel = (request.GET.get("panel") or "").strip().lower()
     section_map = {
         "operation": "operations",
         "result": "results",
         "student": "students",
+        "programme": "programme",
+        "planification": "planification",
+        "evaluations": "evaluations",
     }
     template_map = {
         "operation": "portal/staff/director/partials/drawers/operation_drawer.html",
         "result": "portal/staff/director/partials/drawers/result_drawer.html",
         "student": "portal/staff/director/partials/drawers/student_drawer.html",
+        "programme": "portal/staff/director/partials/drawers/programme_drawer.html",
+        "planification": "portal/staff/director/partials/drawers/planification_drawer.html",
+        "evaluations": "portal/staff/director/partials/drawers/evaluations_drawer.html",
     }
     section = section_map.get(panel)
     template_name = template_map.get(panel)
@@ -978,24 +1235,35 @@ def director_drawer(request):
         return HttpResponseBadRequest("Semestre introuvable.")
     if panel == "student" and not context.get("selected_student_entry"):
         return HttpResponseBadRequest("Etudiant introuvable.")
+    if panel in {"programme", "planification", "evaluations"} and not context.get("selected_class"):
+        return HttpResponseBadRequest("Classe introuvable.")
 
     return render(request, template_name, context)
 
 
-@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_programme_action(request):
     if request.method != "POST":
         return _deny_portal_access(request)
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_director_branch(request)
     if not branch:
         return HttpResponseBadRequest("Aucune annexe.")
     action = (request.POST.get("action") or "").strip()
     class_id = (request.POST.get("class_id") or "").strip()
     toast = None
     try:
-        if action == "save_ue":
+        if action == "save_semester":
+            sem = save_semester(
+                branch=branch,
+                class_id=class_id,
+                number=request.POST.get("number") or 1,
+            )
+            class_id = str(sem.academic_class_id)
+            toast = {"level": "success", "message": f"Semestre {sem.number} cree avec succes."}
+        elif action == "save_ue":
             ue = save_ue(
                 branch=branch,
+                actor=request.user,
                 ue_id=(request.POST.get("ue_id") or "").strip() or None,
                 semester_id=request.POST.get("semester_id"),
                 code=request.POST.get("code"),
@@ -1006,6 +1274,7 @@ def director_programme_action(request):
         elif action == "save_ec":
             ec = save_ec(
                 branch=branch,
+                actor=request.user,
                 ec_id=(request.POST.get("ec_id") or "").strip() or None,
                 ue_id=request.POST.get("ue_id"),
                 title=request.POST.get("title"),
@@ -1015,27 +1284,30 @@ def director_programme_action(request):
             class_id = str(ec.ue.semester.academic_class_id)
             toast = {"level": "success", "message": "Element constitutif enregistre."}
         elif action == "delete_ec":
-            delete_ec(branch=branch, ec_id=request.POST.get("ec_id"))
+            delete_ec(branch=branch, actor=request.user, ec_id=request.POST.get("ec_id"))
             toast = {"level": "success", "message": "EC supprime."}
         else:
             toast = {"level": "error", "message": "Action inconnue."}
     except ValidationError as exc:
         toast = {"level": "error", "message": " ".join(exc.messages)}
 
+    reload_drawer = request.POST.get("_reload_drawer") == "1"
     params = request.GET.copy()
     params["section"] = "programme"
     if class_id:
         params["class_id"] = class_id
     request.GET = params
     context = _build_director_workspace_context(request, toast=toast)
+    if reload_drawer and class_id:
+        return render(request, "portal/staff/director/partials/drawers/programme_drawer.html", context)
     return render(request, "portal/staff/director/partials/workspace.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_correspondance_create(request):
     if request.method != "POST":
         return _deny_portal_access(request)
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_director_branch(request)
     if not branch:
         return HttpResponseBadRequest("Aucune annexe.")
     doc_type = request.POST.get("doc_type", "").strip()
@@ -1070,11 +1342,11 @@ def _build_workspace_response(request, section_override=None, toast=None):
     return render(request, "portal/staff/director/partials/workspace.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_correspondance_publish(request, doc_id):
     if request.method != "POST":
         return _deny_portal_access(request)
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_director_branch(request)
     doc = AdministrativeDocument.objects.filter(id=doc_id, branch=branch).first()
     if not doc:
         return HttpResponseBadRequest("Document introuvable.")
@@ -1083,9 +1355,9 @@ def director_correspondance_publish(request, doc_id):
     return _build_workspace_response(request, section_override="correspondances", toast={"level": "success", "message": "Document publie."})
 
 
-@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_correspondance_pdf(request, doc_id):
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_director_branch(request)
     doc = AdministrativeDocument.objects.filter(id=doc_id, branch=branch).first()
     if not doc:
         return HttpResponseBadRequest("Document introuvable.")
@@ -1105,11 +1377,11 @@ def director_correspondance_pdf(request, doc_id):
         return html_content
 
 
-@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_results_action(request):
     if request.method != "POST":
         return _deny_portal_access(request)
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_director_branch(request)
     action = (request.POST.get("action") or "").strip()
 
     if action == "publish":
@@ -1123,7 +1395,7 @@ def director_results_action(request):
     }
     try:
         semester = Semester.objects.select_related("academic_class", "academic_class__branch", "academic_class__academic_year").get(pk=request.POST.get("semester_id"))
-        if branch and semester.academic_class.branch_id != branch.id:
+        if branch is not None and semester.academic_class.branch_id != branch.id:
             raise ValidationError("Action hors annexe refusee.")
         enrollments = list(AcademicEnrollment.objects.filter(academic_class=semester.academic_class, academic_year=semester.academic_class.academic_year, is_active=True))
         previous_status = semester.status
@@ -1167,8 +1439,10 @@ def director_results_action(request):
         message = " ".join(getattr(exc, "messages", [])) if hasattr(exc, "messages") else str(exc)
         toast = {"level": "error", "message": message or "Action impossible."}
     request.session["director_rejected_semester_ids"] = sorted(rejected_semester_ids)
+    params = request.GET.copy()
+    params["section"] = "evaluations"
+    request.GET = params
     context = _build_director_workspace_context(request, toast=toast)
-    context["section"] = "results"
     return render(request, "portal/staff/director/partials/workspace.html", context)
 
 
@@ -1180,7 +1454,7 @@ def _director_request_publish_otp(request, *, branch):
         semester = Semester.objects.select_related(
             "academic_class", "academic_class__branch", "academic_class__academic_year"
         ).get(pk=request.POST.get("semester_id"))
-        if branch and semester.academic_class.branch_id != branch.id:
+        if branch is not None and semester.academic_class.branch_id != branch.id:
             raise ValidationError("Action hors annexe refusee.")
         if semester.status != Semester.STATUS_FINALIZED:
             raise ValidationError("Le semestre doit etre valide avant publication.")
@@ -1213,12 +1487,13 @@ def _director_request_publish_otp(request, *, branch):
     )
 
 
-@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_results_confirm_otp(request):
     if request.method != "POST":
         return _deny_portal_access(request)
     otp_request_id = request.POST.get("otp_request_id")
     otp_code = (request.POST.get("otp_code") or "").strip()
+    branch = _resolve_director_branch(request)
 
     def _apply(otp_request):
         semester = Semester.objects.select_related(
@@ -1251,6 +1526,11 @@ def director_results_confirm_otp(request):
 
     toast = None
     try:
+        scoped_request = SensitiveActionRequest.objects.filter(pk=otp_request_id).first()
+        if scoped_request is None:
+            raise SensitiveActionRequest.DoesNotExist
+        if branch is not None and scoped_request.branch_id != branch.id:
+            raise SensitiveActionError("Action hors annexe refusee.")
         confirm_sensitive_action(
             request_id=otp_request_id,
             code=otp_code,
@@ -1263,25 +1543,27 @@ def director_results_confirm_otp(request):
         message = str(exc) if isinstance(exc, SensitiveActionError) else "Demande introuvable."
         toast = {"level": "error", "message": message}
 
+    params = request.GET.copy()
+    params["section"] = "evaluations"
+    request.GET = params
     context = _build_director_workspace_context(request, toast=toast)
-    context["section"] = "results"
     response = render(request, "portal/staff/director/partials/workspace.html", context)
     if toast["level"] == "success":
         response["HX-Trigger"] = "director-modal-close"
     return response
 
 
-@_position_required({"director_of_studies", "super_admin"})
+@_position_required(BULLETIN_MANAGEMENT_POSITIONS)
 def director_bulletin_action(request):
     if request.method != "POST":
         return _deny_portal_access(request)
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_director_branch(request)
     action = (request.POST.get("action") or "").strip()
     toast = {"level": "error", "message": "Action bulletin impossible."}
     try:
         if action == "generate_semester_class":
             semester = Semester.objects.select_related("academic_class", "academic_class__branch").get(pk=request.POST.get("semester_id"))
-            if branch and semester.academic_class.branch_id != branch.id:
+            if branch is not None and semester.academic_class.branch_id != branch.id:
                 raise ValidationError("Action hors annexe refusee.")
             if not can_manage_bulletins(request.user, semester.academic_class):
                 raise ValidationError("Seul le Directeur des etudes peut delivrer les bulletins.")
@@ -1294,7 +1576,7 @@ def director_bulletin_action(request):
             toast = {"level": "success", "message": f"{len(bulletins)} bulletin(s) semestriel(s) generes."}
         elif action == "generate_annual_class":
             academic_class = AcademicClass.objects.select_related("branch", "academic_year").get(pk=request.POST.get("class_id"))
-            if branch and academic_class.branch_id != branch.id:
+            if branch is not None and academic_class.branch_id != branch.id:
                 raise ValidationError("Action hors annexe refusee.")
             if not can_manage_bulletins(request.user, academic_class):
                 raise ValidationError("Seul le Directeur des etudes peut delivrer les bulletins.")
@@ -1310,32 +1592,40 @@ def director_bulletin_action(request):
         toast = {"level": "error", "message": "Classe ou semestre introuvable."}
     except ValidationError as exc:
         toast = {"level": "error", "message": " ".join(exc.messages)}
+    params = request.GET.copy()
+    params["section"] = "evaluations"
+    request.GET = params
     context = _build_director_workspace_context(request, toast=toast)
-    context["section"] = "publications"
     return render(request, "portal/staff/director/partials/workspace.html", context)
 
 
 @_position_required(BULLETIN_MANAGEMENT_POSITIONS)
 def director_export_report_xlsx(request):
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_director_branch(request)
     wb = build_academic_report_xlsx(branch=branch)
-    filename = f"rapport_pedagogique_{branch.slug if branch else 'annexe'}.xlsx"
+    branch_slug = branch.slug if branch else "toutes_annexes"
+    filename = f"rapport_pedagogique_{branch_slug}.xlsx"
     return xlsx_response(wb, filename)
 
 
-@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_teacher_create(request):
-    branch = _resolve_academic_branch(request)
-    base_context = _build_director_workspace_context(request)
+    branch = _resolve_director_branch(request)
 
     if request.method == "GET":
+        classes_qs = AcademicClass.objects.select_related("programme", "academic_year").filter(is_active=True)
+        if branch:
+            classes_qs = classes_qs.filter(branch=branch)
+        ecs_qs = EC.objects.select_related("ue", "ue__semester", "ue__semester__academic_class").filter(
+            ue__semester__academic_class__branch=branch,
+            ue__semester__academic_class__is_active=True,
+        ).order_by("ue__semester__academic_class__level", "title", "id")[:200] if branch else []
         return render(
             request,
             "portal/staff/director/modals/teacher_create_modal.html",
             {
-                **base_context,
-                "teacher_form_classes": base_context.get("teacher_form_classes", []),
-                "teacher_form_ecs": base_context.get("teacher_form_ecs", []),
+                "teacher_form_classes": list(classes_qs.order_by("level", "programme__title")),
+                "teacher_form_ecs": list(ecs_qs),
             },
         )
 
@@ -1346,7 +1636,7 @@ def director_teacher_create(request):
 
     try:
         validate_email((request.POST.get("email") or "").strip())
-        creation = create_teacher_with_account(
+        create_teacher_with_account(
             {
                 "first_name": request.POST.get("first_name"),
                 "last_name": request.POST.get("last_name"),
@@ -1362,28 +1652,23 @@ def director_teacher_create(request):
             request.user,
         )
         toast = {"level": "success", "message": "Enseignant cree, affecte et acces generes."}
-        response = render(
-            request,
-            "portal/staff/director/partials/workspace.html",
-            {
-                **_build_director_workspace_context(request, toast=toast),
-                "section": "teachers",
-            },
-        )
-        response["HX-Trigger"] = "director-modal-close"
-        return response
     except ValidationError as exc:
         toast = {"level": "error", "message": " ".join(exc.messages) or "Creation impossible."}
 
+    params = request.GET.copy()
+    params["section"] = "enseignants"
+    request.GET = params
     context = _build_director_workspace_context(request, toast=toast)
-    context["section"] = "teachers"
-    return render(request, "portal/staff/director/partials/workspace.html", context)
+    response = render(request, "portal/staff/director/partials/workspace.html", context)
+    if toast["level"] == "success":
+        response["HX-Trigger"] = "director-modal-close"
+    return response
 
 
-@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_teacher_assign(request):
     """Modale d'affectation enseignant -> classe/EC/salle (GET: modal, POST: sauvegarde)."""
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_director_branch(request)
     User = get_user_model()
 
     teacher_id_raw = (request.GET.get("teacher_id") or request.POST.get("teacher_id") or "").strip()
@@ -1392,7 +1677,10 @@ def director_teacher_assign(request):
     if teacher_id:
         teacher = User.objects.select_related("profile", "profile__branch").filter(
             id=teacher_id, is_active=True, profile__position="teacher"
-        ).first()
+        )
+        if branch is not None:
+            teacher = teacher.filter(profile__branch=branch)
+        teacher = teacher.first()
 
     if request.method == "GET":
         classes_qs = AcademicClass.objects.select_related("programme", "academic_year").filter(is_active=True)
@@ -1405,11 +1693,12 @@ def director_teacher_assign(request):
             ecs_qs = ecs_qs.filter(ue__semester__academic_class__branch=branch)
         existing = []
         if teacher:
-            existing = list(
-                DirectorTeacherAssignment.objects.select_related("academic_class", "ec").filter(
-                    teacher=teacher, is_active=True
-                )
+            existing_qs = DirectorTeacherAssignment.objects.select_related("academic_class", "ec").filter(
+                teacher=teacher, is_active=True
             )
+            if branch is not None:
+                existing_qs = existing_qs.filter(branch=branch)
+            existing = list(existing_qs)
         selected_class_id = ""
         selected_ec_id = ""
         selected_room_label = ""
@@ -1437,74 +1726,109 @@ def director_teacher_assign(request):
     try:
         if teacher is None:
             raise ValidationError("Enseignant introuvable.")
-        if branch and getattr(getattr(teacher, "profile", None), "branch_id", None) != branch.id:
+        if branch is not None and getattr(getattr(teacher, "profile", None), "branch_id", None) != branch.id:
             raise ValidationError("Affectation hors perimetre refusee.")
 
-        if action == "remove":
-            asg_id_raw = (request.POST.get("assignment_id") or "").strip()
-            asg_id = int(asg_id_raw) if asg_id_raw.isdigit() else None
-            if not asg_id:
+        assignment_id_raw = (request.POST.get("assignment_id") or "").strip()
+        assignment_id = int(assignment_id_raw) if assignment_id_raw.isdigit() else None
+        assignment = DirectorTeacherAssignment.objects.select_related(
+            "branch",
+            "teacher",
+            "academic_class",
+            "semester",
+            "ue",
+            "ec",
+        ).filter(id=assignment_id, teacher=teacher).first() if assignment_id else None
+        if branch is not None and assignment is not None and assignment.branch_id != branch.id:
+            raise ValidationError("Affectation hors perimetre refusee.")
+
+        if action in {"remove", "archive"}:
+            if assignment is None:
                 raise ValidationError("Affectation introuvable.")
-            deleted, _ = DirectorTeacherAssignment.objects.filter(id=asg_id, teacher=teacher).delete()
-            if not deleted:
-                raise ValidationError("Affectation introuvable ou deja supprimee.")
+            archive_teacher_assignment(actor=request.user, assignment=assignment, branch=branch or assignment.branch)
             toast = {"level": "success", "message": "Affectation retiree."}
+        elif action == "suspend":
+            if assignment is None:
+                raise ValidationError("Affectation introuvable.")
+            suspend_teacher_assignment(actor=request.user, assignment=assignment, branch=branch or assignment.branch)
+            toast = {"level": "success", "message": "Affectation suspendue."}
+        elif action == "activate":
+            if assignment is None:
+                raise ValidationError("Affectation introuvable.")
+            activate_teacher_assignment(actor=request.user, assignment=assignment, branch=branch or assignment.branch)
+            toast = {"level": "success", "message": "Affectation activee."}
         else:
             class_id_raw = (request.POST.get("class_id") or "").strip()
             class_id = int(class_id_raw) if class_id_raw.isdigit() else None
+            semester_id_raw = (request.POST.get("semester_id") or "").strip()
+            semester_id = int(semester_id_raw) if semester_id_raw.isdigit() else None
+            ue_id_raw = (request.POST.get("ue_id") or "").strip()
+            ue_id = int(ue_id_raw) if ue_id_raw.isdigit() else None
             ec_id_raw = (request.POST.get("ec_id") or "").strip()
             ec_id = int(ec_id_raw) if ec_id_raw.isdigit() else None
             room_label = (request.POST.get("room_label") or "").strip()
             planned_hours_raw = (request.POST.get("planned_hours") or "").strip()
+            starts_on = (request.POST.get("starts_on") or "").strip() or None
+            ends_on = (request.POST.get("ends_on") or "").strip() or None
+            assignment_status = (request.POST.get("status") or "").strip() or None
 
-            if not class_id:
-                raise ValidationError("La classe est obligatoire.")
             if not room_label:
                 raise ValidationError("La salle est obligatoire pour cette affectation.")
             if not planned_hours_raw:
                 raise ValidationError("Le volume horaire est obligatoire pour cette affectation.")
-            academic_class = AcademicClass.objects.filter(id=class_id, is_active=True).first()
-            if academic_class is None:
-                raise ValidationError("Classe introuvable.")
-            if branch and academic_class.branch_id != branch.id:
-                raise ValidationError("Classe hors perimetre refusee.")
-            ec_obj = EC.objects.filter(id=ec_id).first() if ec_id else None
-            if ec_obj is not None and ec_obj.ue.semester.academic_class_id != academic_class.id:
-                raise ValidationError("La matiere selectionnee n'appartient pas a la classe choisie.")
-
-            assignment, created = DirectorTeacherAssignment.objects.get_or_create(
-                teacher=teacher,
-                academic_class=academic_class,
-                ec=ec_obj,
-                defaults={
-                    "branch": branch or academic_class.branch,
-                    "created_by": request.user,
-                    "is_active": True,
-                    "room_label": room_label,
-                    "planned_hours": planned_hours_raw.replace(",", "."),
-                },
-            )
-            if not created:
-                assignment.branch = branch or academic_class.branch
-                assignment.is_active = True
-                assignment.room_label = room_label
-                assignment.planned_hours = planned_hours_raw.replace(",", ".")
-                if assignment.created_by_id is None:
-                    assignment.created_by = request.user
-                assignment.save(update_fields=["branch", "is_active", "room_label", "planned_hours", "created_by", "updated_at"])
+            academic_class = AcademicClass.objects.filter(id=class_id, is_active=True).first() if class_id else None
+            semester = Semester.objects.filter(id=semester_id, academic_class__is_active=True).first() if semester_id else None
+            ue = UE.objects.filter(id=ue_id, semester__academic_class__is_active=True).first() if ue_id else None
+            ec_obj = EC.objects.filter(id=ec_id).select_related("ue", "ue__semester", "ue__semester__academic_class").first() if ec_id else None
+            target_branch = branch
+            if target_branch is None:
+                target_branch = (
+                    academic_class.branch if academic_class else
+                    semester.academic_class.branch if semester else
+                    ue.semester.academic_class.branch if ue else
+                    ec_obj.ue.semester.academic_class if ec_obj else None
+                )
+            if target_branch is None:
+                raise ValidationError("Cible pédagogique introuvable.")
+            payload = {
+                "actor": request.user,
+                "teacher": teacher,
+                "branch": target_branch,
+                "academic_class": academic_class,
+                "semester": semester,
+                "ue": ue,
+                "ec": ec_obj,
+                "room_label": room_label,
+                "planned_hours": planned_hours_raw,
+                "starts_on": starts_on,
+                "ends_on": ends_on,
+                "status": assignment_status or DirectorTeacherAssignment.STATUS_ACTIVE,
+                "created_by": request.user,
+            }
+            if assignment is not None:
+                result = update_teacher_assignment(assignment=assignment, **payload)
+                assignment = result.assignment
+                created = False
+            else:
+                result = create_teacher_assignment(**payload)
+                assignment = result.assignment
+                created = True
             toast = {
                 "level": "success",
                 "message": (
-                    f"Affectation mise a jour : {academic_class.display_name} -> {room_label}, {planned_hours_raw} h."
+                    f"Affectation mise a jour : {assignment.academic_class.display_name} -> {room_label}, {planned_hours_raw} h."
                     if not created
-                    else f"Affectation enregistree : {academic_class.display_name} -> {room_label}, {planned_hours_raw} h."
+                    else f"Affectation enregistree : {assignment.academic_class.display_name} -> {room_label}, {planned_hours_raw} h."
                 ),
             }
 
+        params = request.GET.copy()
+        params["section"] = "enseignants"
+        request.GET = params
         response = render(
             request,
             "portal/staff/director/partials/workspace.html",
-            {**_build_director_workspace_context(request, toast=toast), "section": "teachers"},
+            _build_director_workspace_context(request, toast=toast),
         )
         response["HX-Trigger"] = "director-modal-close"
         return response
@@ -1512,14 +1836,37 @@ def director_teacher_assign(request):
     except ValidationError as exc:
         toast = {"level": "error", "message": " ".join(getattr(exc, "messages", [])) or str(exc)}
 
+    params = request.GET.copy()
+    params["section"] = "enseignants"
+    request.GET = params
     context = _build_director_workspace_context(request, toast=toast)
-    context["section"] = "teachers"
     return render(request, "portal/staff/director/partials/workspace.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
+def director_teacher_profile(request, teacher_id: int):
+    from portal.services.director.teacher_profile_service import build_teacher_profile_context
+    branch = _resolve_director_branch(request)
+    User = get_user_model()
+    teacher = User.objects.select_related("profile", "profile__branch").filter(
+        id=teacher_id,
+        is_active=True,
+        profile__position="teacher",
+    )
+    if branch is not None:
+        teacher = teacher.filter(profile__branch=branch)
+    teacher = teacher.first()
+    if not teacher:
+        return render(request, "portal/staff/director/partials/drawers/teacher_profile_drawer.html", {
+            "toast": {"level": "error", "message": "Enseignant introuvable ou hors annexe."}
+        })
+    ctx = build_teacher_profile_context(teacher=teacher, branch=branch)
+    return render(request, "portal/staff/director/partials/drawers/teacher_profile_drawer.html", ctx)
+
+
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_teacher_contract_download(request, teacher_id: int):
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_director_branch(request)
     User = get_user_model()
     teacher = User.objects.select_related("profile", "profile__branch").filter(
         id=teacher_id,
@@ -1527,7 +1874,7 @@ def director_teacher_contract_download(request, teacher_id: int):
     ).first()
     if teacher is None:
         return HttpResponseBadRequest("Enseignant introuvable.")
-    if branch and getattr(getattr(teacher, "profile", None), "branch_id", None) != branch.id:
+    if branch is not None and getattr(getattr(teacher, "profile", None), "branch_id", None) != branch.id:
         return HttpResponseForbidden("Acces inter-annexes refuse.")
 
     try:
@@ -1541,30 +1888,33 @@ def director_teacher_contract_download(request, teacher_id: int):
     return response
 
 
-@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_teacher_document_upload(request):
-    base_context = _build_director_workspace_context(request)
+    branch = _resolve_director_branch(request)
+    User = get_user_model()
     teacher_id_raw = (request.GET.get("teacher_id") or request.POST.get("teacher_id") or "").strip()
     teacher_id = int(teacher_id_raw) if teacher_id_raw.isdigit() else None
 
     if request.method == "GET":
+        teacher_rows = list(
+            User.objects.select_related("profile")
+            .filter(is_active=True, profile__position="teacher", profile__branch=branch)
+            .order_by("first_name", "last_name")
+        ) if branch else []
+        selected_teacher = next((t for t in teacher_rows if t.id == teacher_id), teacher_rows[0] if teacher_rows else None)
         return render(
             request,
             "portal/staff/director/modals/teacher_document_upload_modal.html",
             {
-                **base_context,
-                "selected_document_teacher": next(
-                    (teacher for teacher in base_context.get("document_teacher_rows", []) if teacher.id == teacher_id),
-                    base_context.get("selected_document_teacher"),
-                ),
-                "teacher_document_type_choices": base_context.get("teacher_document_type_choices", []),
+                "document_teacher_rows": teacher_rows,
+                "selected_document_teacher": selected_teacher,
+                "teacher_document_type_choices": TeacherDocument.DOCUMENT_CHOICES,
             },
         )
     if request.method != "POST":
         return _deny_portal_access(request)
 
     toast = {"level": "error", "message": "Upload impossible."}
-
     try:
         if teacher_id is None:
             raise ValidationError("Selectionnez un enseignant.")
@@ -1576,58 +1926,62 @@ def director_teacher_document_upload(request):
             note=request.POST.get("note"),
         )
         toast = {"level": "success", "message": "Piece enseignant televersee."}
-        response = render(
-            request,
-            "portal/staff/director/partials/workspace.html",
-            {
-                **_build_director_workspace_context(request, toast=toast),
-                "section": "documents",
-            },
-        )
-        response["HX-Trigger"] = "director-modal-close"
-        return response
     except ValidationError as exc:
         toast = {"level": "error", "message": " ".join(exc.messages) or "Upload impossible."}
 
+    params = request.GET.copy()
+    params["section"] = "enseignants"
+    request.GET = params
     context = _build_director_workspace_context(request, toast=toast)
-    context["section"] = "documents"
-    return render(request, "portal/staff/director/partials/workspace.html", context)
+    response = render(request, "portal/staff/director/partials/workspace.html", context)
+    if toast["level"] == "success":
+        response["HX-Trigger"] = "director-modal-close"
+    return response
 
 
-@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_teacher_documents_modal(request):
-    base_context = _build_director_workspace_context(request)
+    branch = _resolve_director_branch(request)
+    User = get_user_model()
     teacher_id_raw = (request.GET.get("teacher_id") or "").strip()
     teacher_id = int(teacher_id_raw) if teacher_id_raw.isdigit() else None
 
-    selected_teacher = next(
-        (teacher for teacher in base_context.get("document_teacher_rows", []) if teacher.id == teacher_id),
-        base_context.get("selected_document_teacher"),
-    )
+    teacher_rows = list(
+        User.objects.select_related("profile")
+        .filter(is_active=True, profile__position="teacher", profile__branch=branch)
+        .order_by("first_name", "last_name")
+    ) if branch else []
+    selected_teacher = next((t for t in teacher_rows if t.id == teacher_id), teacher_rows[0] if teacher_rows else None)
+    teacher_documents = list(
+        TeacherDocument.objects.select_related("teacher", "uploaded_by", "verified_by")
+        .filter(branch=branch, teacher=selected_teacher)
+        .order_by("-created_at", "-id")
+    ) if selected_teacher else []
 
     return render(
         request,
         "portal/staff/director/modals/teacher_documents_modal.html",
         {
-            **base_context,
+            "document_teacher_rows": teacher_rows,
             "selected_document_teacher": selected_teacher,
-            "teacher_documents": base_context.get("teacher_documents", []),
+            "teacher_documents": teacher_documents,
+            "teacher_document_type_choices": TeacherDocument.DOCUMENT_CHOICES,
         },
     )
 
 
-@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_transfer_create(request):
-    base_context = _build_director_workspace_context(request)
+    branch = _resolve_director_branch(request)
     if request.method == "GET":
+        transfer_ctx = build_director_transfer_context(branch=branch)
         return render(
             request,
             "portal/staff/director/modals/transfer_create_modal.html",
             {
-                **base_context,
-                "transfer_enrollments": base_context.get("transfer_enrollments", []),
-                "transfer_target_classes": base_context.get("transfer_target_classes", []),
-                "transfer_type_choices": base_context.get("transfer_type_choices", []),
+                "transfer_enrollments": transfer_ctx["transfer_enrollments"],
+                "transfer_target_classes": transfer_ctx["transfer_target_classes"],
+                "transfer_type_choices": transfer_ctx["transfer_type_choices"],
             },
         )
     if request.method != "POST":
@@ -1649,26 +2003,22 @@ def director_transfer_create(request):
             attachment=request.FILES.get("attachment"),
         )
         toast = {"level": "success", "message": "Demande de transfert enregistree."}
-        response = render(
-            request,
-            "portal/staff/director/partials/workspace.html",
-            {
-                **_build_director_workspace_context(request, toast=toast),
-                "section": "documents",
-            },
-        )
-        response["HX-Trigger"] = "director-modal-close"
-        return response
     except ValidationError as exc:
         toast = {"level": "error", "message": " ".join(exc.messages) or "Creation du transfert impossible."}
 
+    params = request.GET.copy()
+    params["section"] = "enseignants"
+    request.GET = params
     context = _build_director_workspace_context(request, toast=toast)
-    context["section"] = "documents"
-    return render(request, "portal/staff/director/partials/workspace.html", context)
+    response = render(request, "portal/staff/director/partials/workspace.html", context)
+    if toast["level"] == "success":
+        response["HX-Trigger"] = "director-modal-close"
+    return response
 
 
-@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_teacher_document_review(request):
+    _resolve_director_branch(request)
     if request.method != "POST":
         return _deny_portal_access(request)
 
@@ -1688,13 +2038,16 @@ def director_teacher_document_review(request):
     except ValidationError as exc:
         toast = {"level": "error", "message": " ".join(exc.messages) or "Decision sur la piece impossible."}
 
+    params = request.GET.copy()
+    params["section"] = "enseignants"
+    request.GET = params
     context = _build_director_workspace_context(request, toast=toast)
-    context["section"] = "documents"
     return render(request, "portal/staff/director/partials/workspace.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_transfer_review(request):
+    _resolve_director_branch(request)
     if request.method != "POST":
         return _deny_portal_access(request)
 
@@ -1713,8 +2066,10 @@ def director_transfer_review(request):
     except ValidationError as exc:
         toast = {"level": "error", "message": " ".join(exc.messages) or "Decision sur le transfert impossible."}
 
+    params = request.GET.copy()
+    params["section"] = "enseignants"
+    request.GET = params
     context = _build_director_workspace_context(request, toast=toast)
-    context["section"] = "documents"
     return render(request, "portal/staff/director/partials/workspace.html", context)
 
 
@@ -2509,19 +2864,54 @@ def teacher_lesson_log_panel(request, event_id: int):
     return render(request, "portal/partials/teacher_lesson_log_panel.html", context)
 
 
+@_position_required({"teacher"})
+def teacher_declare_absence(request, event_id: int):
+    """Déclare une absence enseignant pour une séance donnée (HTMX)."""
+    branch = _resolve_academic_branch(request)
+
+    if request.method != "POST":
+        return HttpResponseNotAllowed(["POST"])
+
+    try:
+        declare_teacher_absence_for_event(
+            teacher=request.user,
+            branch=branch,
+            event_id=event_id,
+        )
+        response = HttpResponse("")
+        response["HX-Trigger"] = json.dumps({
+            "teacher-toast": {"message": "Absence declaree. Le secretariat est informe.", "type": "warning"},
+            "teacher-dashboard-refresh": True,
+        })
+        return response
+    except ValidationError as exc:
+        error_message = exc.messages[0] if exc.messages else str(exc)
+        response = HttpResponse(error_message, status=400)
+        response["HX-Trigger"] = json.dumps({
+            "teacher-toast": {"message": error_message, "type": "error"},
+        })
+        return response
+
+
 @_position_required({"finance_manager", "payment_agent"})
 def finance_portal(request):
-    return redirect("accounts_portal:portal_dashboard")
+    from accounts.dashboards.finance_dashboard import finance_dashboard
+
+    return finance_dashboard(request)
 
 
 @_position_required({"secretary"})
 def secretary_portal(request):
-    return redirect("secretary:secretary_dashboard")
+    from secretary.views import secretary_dashboard
+
+    return secretary_dashboard(request)
 
 
 @_position_required({"admissions"})
 def admissions_portal(request):
-    return redirect("accounts_portal:portal_dashboard")
+    from accounts.dashboards.admissions_dashboard import admissions_dashboard
+
+    return admissions_dashboard(request)
 
 
 @_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
@@ -2621,6 +3011,8 @@ def it_reset_password(request):
     temp_password = create_temp_password()
     target_user.set_password(temp_password)
     target_user.save(update_fields=["password"])
+    from accounts.session_security import mark_temporary_password
+    mark_temporary_password(target_user, updated_by=request.user)
     log_support_action(
         actor=request.user,
         branch=branch,
@@ -3041,7 +3433,7 @@ def _build_print_week_blocks(schedule_builder, target, week_start, weeks):
 
 
 def _parse_director_planner_request(request):
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_director_branch(request)
     class_id_raw = (request.GET.get("class_id") or request.POST.get("class_id") or "").strip()
     week_start_raw = (request.GET.get("week_start") or request.POST.get("week_start") or "").strip()
     week_start = timezone.localdate()
@@ -3054,7 +3446,7 @@ def _parse_director_planner_request(request):
     return branch, class_id, week_start
 
 
-@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_planner_hub(request):
     branch, class_id, week_start = _parse_director_planner_request(request)
     if branch is None:
@@ -3066,7 +3458,7 @@ def director_planner_hub(request):
     return render(request, "portal/staff/supervisor/partials/planner_class_hub.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_planner_view_workspace(request):
     branch, class_id, week_start = _parse_director_planner_request(request)
     if branch is None:
@@ -3078,7 +3470,7 @@ def director_planner_view_workspace(request):
     return render(request, "portal/staff/supervisor/partials/planner_view_workspace.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_planner_workspace(request):
     branch, class_id, week_start = _parse_director_planner_request(request)
     if branch is None:
@@ -3091,11 +3483,13 @@ def director_planner_workspace(request):
     return render(request, "portal/staff/supervisor/partials/planner_workspace.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_weekly_slots_workspace(request, class_id: int):
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_director_branch(request)
+    _DE_SLOTS_TPL = "portal/staff/director/partials/director_weekly_slots_workspace.html"
+    _DE_FORM_TPL = "portal/staff/director/partials/director_weekly_slot_form_drawer.html"
     if branch is None:
-        return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", {"academic_class": None, "toast": {"level": "error", "message": "Aucune annexe n'est rattachee a ce compte."}})
+        return render(request, _DE_SLOTS_TPL, {"academic_class": None, "toast": {"level": "error", "message": "Aucune annexe n'est rattachee a ce compte."}})
     week_start_raw = (request.GET.get("week_start") or "").strip()
     week_start = timezone.localdate()
     if week_start_raw:
@@ -3105,28 +3499,25 @@ def director_weekly_slots_workspace(request, class_id: int):
             week_start = timezone.localdate()
     edit_raw = (request.GET.get("edit") or "").strip()
     editing_slot_id = int(edit_raw) if edit_raw.isdigit() else None
+    drawer_form = request.GET.get("drawer_form") == "1"
     try:
         context = _build_weekly_slots_workspace_context(request, branch=branch, class_id=class_id, week_start=week_start, editing_slot_id=editing_slot_id)
     except AcademicClass.DoesNotExist:
-        return render(
-            request,
-            "portal/staff/supervisor/partials/weekly_slots_workspace.html",
-            {"academic_class": None, "toast": {"level": "error", "message": "Classe introuvable pour cette annexe."}},
-        )
+        return render(request, _DE_SLOTS_TPL, {"academic_class": None, "toast": {"level": "error", "message": "Classe introuvable pour cette annexe."}})
     _inject_planner_route_context(context, role_prefix="director", workspace_target_id="#director-workspace")
-    return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", context)
+    return render(request, _DE_FORM_TPL if drawer_form else _DE_SLOTS_TPL, context)
 
 
-@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_weekly_slot_save(request, class_id: int):
     if request.method != "POST":
         return _deny_portal_access(request)
 
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_director_branch(request)
     if branch is None:
         return render(
             request,
-            "portal/staff/supervisor/partials/weekly_slots_workspace.html",
+            "portal/staff/director/partials/director_weekly_slots_workspace.html",
             {"toast": {"level": "error", "message": "Aucune annexe n'est rattachee a ce compte."}, "academic_class": None},
         )
 
@@ -3208,16 +3599,16 @@ def director_weekly_slot_save(request, class_id: int):
         toast=toast,
     )
     _inject_planner_route_context(context, role_prefix="director", workspace_target_id="#director-workspace")
-    return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", context)
+    return render(request, "portal/staff/director/partials/director_weekly_slots_workspace.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_week_materialize(request, class_id: int):
     if request.method != "POST":
         return _deny_portal_access(request)
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_director_branch(request)
     if branch is None:
-        return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", {"academic_class": None, "toast": {"level": "error", "message": "Aucune annexe n'est rattachee a ce compte."}})
+        return render(request, "portal/staff/director/partials/director_weekly_slots_workspace.html", {"academic_class": None, "toast": {"level": "error", "message": "Aucune annexe n'est rattachee a ce compte."}})
     week_start_raw = (request.POST.get("week_start") or "").strip()
     week_start = timezone.localdate()
     if week_start_raw:
@@ -3233,16 +3624,16 @@ def director_week_materialize(request, class_id: int):
         toast = {"level": "error", "message": "Classe introuvable pour cette annexe."}
     context = _build_weekly_slots_workspace_context(request, branch=branch, class_id=class_id, week_start=week_start, editing_slot_id=None, toast=toast)
     _inject_planner_route_context(context, role_prefix="director", workspace_target_id="#director-workspace")
-    return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", context)
+    return render(request, "portal/staff/director/partials/director_weekly_slots_workspace.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_month_materialize(request, class_id: int):
     if request.method != "POST":
         return _deny_portal_access(request)
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_director_branch(request)
     if branch is None:
-        return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", {"academic_class": None, "toast": {"level": "error", "message": "Aucune annexe n'est rattachee a ce compte."}})
+        return render(request, "portal/staff/director/partials/director_weekly_slots_workspace.html", {"academic_class": None, "toast": {"level": "error", "message": "Aucune annexe n'est rattachee a ce compte."}})
     week_start_raw = (request.POST.get("week_start") or "").strip()
     week_start = timezone.localdate()
     if week_start_raw:
@@ -3258,28 +3649,43 @@ def director_month_materialize(request, class_id: int):
         toast = {"level": "error", "message": "Classe introuvable pour cette annexe."}
     context = _build_weekly_slots_workspace_context(request, branch=branch, class_id=class_id, week_start=week_start, editing_slot_id=None, toast=toast)
     _inject_planner_route_context(context, role_prefix="director", workspace_target_id="#director-workspace")
-    return render(request, "portal/staff/supervisor/partials/weekly_slots_workspace.html", context)
+    return render(request, "portal/staff/director/partials/director_weekly_slots_workspace.html", context)
 
 
-@_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_create_schedule_event(request, class_id: int):
     if request.method != "POST":
         return _deny_portal_access(request)
 
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_director_branch(request)
     if branch is None:
         return _deny_portal_access(request)
 
     from django.contrib.auth import get_user_model
-    from django.core.exceptions import ValidationError
 
     from academics.models import AcademicClass, AcademicScheduleEvent, EC
     from academics.services.schedule_service import create_schedule_event
 
     User = get_user_model()
-    academic_class = AcademicClass.objects.select_related("academic_year", "branch").get(pk=class_id, branch=branch, is_active=True)
-    ec = EC.objects.select_related("ue", "ue__semester").get(pk=request.POST.get("ec_id"), ue__semester__academic_class=academic_class)
-    teacher = User.objects.get(pk=request.POST.get("teacher_id"), is_active=True, profile__branch=branch, profile__position="teacher")
+    academic_class = AcademicClass.objects.select_related("academic_year", "branch").filter(pk=class_id, branch=branch, is_active=True).first()
+    if academic_class is None:
+        return HttpResponseForbidden("Classe introuvable pour cette annexe.")
+
+    ec = EC.objects.select_related("ue", "ue__semester").filter(
+        pk=request.POST.get("ec_id"),
+        ue__semester__academic_class=academic_class,
+    ).first()
+    if ec is None:
+        return HttpResponseForbidden("Matiere introuvable pour cette annexe.")
+
+    teacher = User.objects.select_related("profile", "profile__branch").filter(
+        pk=request.POST.get("teacher_id"),
+        is_active=True,
+        profile__branch=branch,
+        profile__position="teacher",
+    ).first()
+    if teacher is None:
+        return HttpResponseForbidden("Enseignant introuvable pour cette annexe.")
     date_value = (request.POST.get("date") or "").strip()
     start_time = (request.POST.get("start_time") or "").strip()
     end_time = (request.POST.get("end_time") or "").strip()
@@ -3312,7 +3718,7 @@ def director_create_schedule_event(request, class_id: int):
             is_active=True,
         )
         toast = {"level": "success", "message": "Cours programme sur la semaine."}
-    except (ValidationError, EC.DoesNotExist, User.DoesNotExist) as exc:
+    except ValidationError as exc:
         msg = " ".join(getattr(exc, "messages", [])) if hasattr(exc, "messages") else str(exc)
         toast = {"level": "error", "message": msg or "Impossible de programmer ce cours."}
 
@@ -3332,7 +3738,10 @@ def director_create_schedule_event(request, class_id: int):
 
 @_position_required({"director_of_studies", "academic_supervisor", "executive_director", "deputy_executive_director", "super_admin"})
 def schedule_class_print(request, class_id: int):
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_director_branch(
+        request,
+        additional_scoped_positions={"academic_supervisor"},
+    )
     if branch is None:
         return HttpResponseForbidden("Aucune annexe n'est rattachee a ce compte.")
 
@@ -3361,7 +3770,10 @@ def schedule_class_print(request, class_id: int):
 
 @_position_required({"director_of_studies", "academic_supervisor", "executive_director", "deputy_executive_director", "super_admin"})
 def schedule_teacher_print(request, teacher_id: int):
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_director_branch(
+        request,
+        additional_scoped_positions={"academic_supervisor"},
+    )
     if branch is None:
         return HttpResponseForbidden("Aucune annexe n'est rattachee a ce compte.")
 
@@ -3430,6 +3842,8 @@ def dg_section(request, section: str):
                 }
             )
         context["diploma_candidate_classes"] = diploma_rows
+    if section == "coupons":
+        context.update(_build_coupons_section_extra_context())
     template_map = {
         "kpis": "portal/dg/partials/kpis/overview.html",
         "alerts": "portal/dg/partials/alerts/priority_table.html",
@@ -3440,6 +3854,7 @@ def dg_section(request, section: str):
         "schedule": "portal/dg/partials/schedule/overview.html",
         "realtime": "portal/dg/partials/realtime/monitoring.html",
         "rh": "portal/dg/partials/rh/staff.html",
+        "coupons": "portal/dg/partials/coupons/list.html",
     }
     template = template_map.get(section)
     if not template:
@@ -3463,6 +3878,8 @@ def dg_modal(request):
     modal = (request.GET.get("modal") or "recruitment").strip().lower()
     if modal == "recruitment":
         return render(request, "portal/dg/modals/recruitment.html", {"form": DgRecruitmentForm()})
+    if modal == "coupon":
+        return render(request, "portal/dg/modals/coupon_form.html", {"form": DgCouponForm()})
     if modal in {"branch", "alert", "case", "workflow", "finance", "analytics", "realtime", "rh"}:
         context = build_dg_drawer_context(request)
         context.update(
@@ -3497,6 +3914,63 @@ def dg_recruit_staff(request):
         return render(request, "portal/dg/modals/recruitment.html", {"form": form}, status=400)
     result = create_staff_from_recruitment(actor=request.user, form=form)
     return render(request, "portal/dg/modals/recruitment_success.html", result)
+
+
+def _build_coupons_section_extra_context():
+    return {
+        "coupons": list_coupons(),
+        "coupon_form": DgCouponForm(),
+    }
+
+
+@login_required
+def dg_coupon_programmes_options(request):
+    position = get_user_position(request.user)
+    if position not in {"executive_director", "deputy_executive_director"}:
+        return HttpResponseForbidden("Accès réservé au Directeur Général.")
+    branch_ids = request.GET.getlist("branches")
+    programmes = DgCouponForm.programmes_queryset_for_branches(branch_ids)
+    return render(
+        request,
+        "portal/dg/modals/coupon_programmes_options.html",
+        {"programmes": programmes},
+    )
+
+
+@login_required
+def dg_coupon_create(request):
+    position = get_user_position(request.user)
+    if position not in {"executive_director", "deputy_executive_director"}:
+        return HttpResponseForbidden("Accès réservé au Directeur Général.")
+    if request.method != "POST":
+        return HttpResponseBadRequest("Methode invalide.")
+    form = DgCouponForm(request.POST)
+    if not form.is_valid():
+        return render(request, "portal/dg/modals/coupon_form.html", {"form": form}, status=400)
+    try:
+        coupon = create_coupon(actor=request.user, form=form)
+    except ValidationError as exc:
+        for field, messages in getattr(exc, "message_dict", {"__all__": exc.messages}).items():
+            for message in messages:
+                form.add_error(field if field in form.fields else None, message)
+        return render(request, "portal/dg/modals/coupon_form.html", {"form": form}, status=400)
+    return render(request, "portal/dg/modals/coupon_success.html", {"coupon": coupon})
+
+
+@login_required
+def dg_coupon_toggle(request):
+    position = get_user_position(request.user)
+    if position not in {"executive_director", "deputy_executive_director"}:
+        return HttpResponseForbidden("Accès réservé au Directeur Général.")
+    if request.method != "POST":
+        return HttpResponseBadRequest("Methode invalide.")
+    coupon_id = (request.POST.get("coupon_id") or "").strip()
+    if not coupon_id.isdigit():
+        return HttpResponseBadRequest("Coupon invalide.")
+    toggle_coupon(actor=request.user, coupon_id=int(coupon_id))
+    context = build_dg_section_context(request, "coupons", _build_portal_context)
+    context.update(_build_coupons_section_extra_context())
+    return render(request, "portal/dg/partials/coupons/list.html", context)
 
 
 @login_required
@@ -3720,7 +4194,25 @@ def dg_export(request):
         writer.writerow(["Nom", "Email", "Poste", "Role", "Annexe", "Statut", "Salaire", "Derniere activite"])
         branch_ids = [item["branch"].id for item in context["branch_summaries"]]
         staff_qs = (
-            Profile.objects.filter(user_type="staff")
+            Profile.objects.filter(
+                Q(user__is_staff=True)
+                | Q(position__in={
+                    "teacher",
+                    "finance_manager",
+                    "payment_agent",
+                    "secretary",
+                    "admissions",
+                    "director_of_studies",
+                    "executive_director",
+                    "deputy_executive_director",
+                    "branch_manager",
+                    "annex_manager",
+                    "academic_supervisor",
+                    "it_support",
+                    "marketing_manager",
+                    "super_admin",
+                })
+            )
             .filter(Q(branch_id__in=branch_ids) | Q(branch__isnull=True))
             .select_related("user", "branch")
             .order_by("branch__name", "position", "user__last_name")
@@ -3799,3 +4291,671 @@ def dg_export(request):
     for row in rows:
         csv_writer.writerow(row)
     return response
+
+
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
+def director_exam_session_action(request):
+    if request.method != "POST":
+        return _deny_portal_access(request)
+    branch = _resolve_director_branch(request)
+    if not branch:
+        return HttpResponseBadRequest("Aucune annexe.")
+
+    from academics.models import AcademicCalendarEntry, AcademicCalendar
+
+    action = (request.POST.get("action") or "").strip()
+    toast = None
+
+    try:
+        if action == "create":
+            title = (request.POST.get("title") or "").strip()
+            event_type = (request.POST.get("event_type") or AcademicCalendarEntry.EVENT_EXAM_SESSION).strip()
+            class_id_raw = (request.POST.get("class_id") or "").strip()
+            semester_id_raw = (request.POST.get("semester_id") or "").strip()
+            start_raw = (request.POST.get("start_date") or "").strip()
+            end_raw = (request.POST.get("end_date") or "").strip()
+            supervisor_ids = request.POST.getlist("supervisor_ids")
+
+            if not title:
+                raise ValidationError("L'intitule est obligatoire.")
+            if not start_raw or not end_raw:
+                raise ValidationError("Les dates de debut et de fin sont obligatoires.")
+
+            from datetime import datetime as dt
+            try:
+                start_dt = timezone.make_aware(dt.strptime(start_raw, "%Y-%m-%d"))
+                end_dt = timezone.make_aware(dt.strptime(end_raw, "%Y-%m-%d").replace(hour=23, minute=59))
+            except ValueError:
+                raise ValidationError("Format de date invalide. Utilisez AAAA-MM-JJ.")
+
+            if end_dt <= start_dt:
+                raise ValidationError("La date de fin doit etre apres la date de debut.")
+
+            academic_class = None
+            if class_id_raw.isdigit():
+                academic_class = AcademicClass.objects.filter(id=int(class_id_raw), branch=branch).first()
+
+            semester = None
+            if semester_id_raw.isdigit():
+                semester_qs = Semester.objects.filter(id=int(semester_id_raw))
+                if academic_class:
+                    semester_qs = semester_qs.filter(academic_class=academic_class)
+                semester = semester_qs.first()
+
+            from academics.models import AcademicYear as _AcademicYear
+            academic_year = _AcademicYear.objects.filter(is_active=True).first()
+            if not academic_year:
+                academic_year = _AcademicYear.objects.order_by("-start_date").first()
+            if not academic_year:
+                raise ValidationError(
+                    "Aucune annee academique configuree. "
+                    "Veuillez d'abord creer une annee academique dans le module Calendrier."
+                )
+            # Chercher un calendrier existant pour l'annee active : publie > valide > brouillon
+            from django.db.models import Case, When, IntegerField as _IntField
+            calendar = (
+                AcademicCalendar.objects.filter(branch=branch, academic_year=academic_year)
+                .order_by(
+                    Case(
+                        When(status=AcademicCalendar.STATUS_PUBLISHED, then=0),
+                        When(status=AcademicCalendar.STATUS_VALIDATED, then=1),
+                        When(status=AcademicCalendar.STATUS_DRAFT, then=2),
+                        default=3,
+                        output_field=_IntField(),
+                    ),
+                    "-version",
+                )
+                .first()
+            )
+            if not calendar:
+                from academics.services.calendar_service import create_calendar as _create_cal
+                calendar = _create_cal(
+                    actor=request.user,
+                    branch=branch,
+                    academic_year=academic_year,
+                    version=1,
+                )
+
+            entry = AcademicCalendarEntry.objects.create(
+                calendar=calendar,
+                title=title,
+                event_type=event_type,
+                start_datetime=start_dt,
+                end_datetime=end_dt,
+                target_scope=AcademicCalendarEntry.SCOPE_CLASS if academic_class else AcademicCalendarEntry.SCOPE_BRANCH,
+                academic_class=academic_class,
+                semester=semester,
+                status=AcademicCalendarEntry.STATUS_DRAFT,
+                created_by=request.user,
+                updated_by=request.user,
+            )
+            if supervisor_ids:
+                User = get_user_model()
+                supervisors = User.objects.filter(id__in=[sid for sid in supervisor_ids if sid.isdigit()])
+                pass
+
+            toast = {"level": "success", "message": f"Session « {title} » creee en brouillon."}
+
+        elif action == "publish":
+            entry_id_raw = (request.POST.get("entry_id") or "").strip()
+            if not entry_id_raw.isdigit():
+                raise ValidationError("Session introuvable.")
+            entry = AcademicCalendarEntry.objects.filter(
+                id=int(entry_id_raw), calendar__branch=branch, event_type__in={AcademicCalendarEntry.EVENT_EXAM_SESSION, AcademicCalendarEntry.EVENT_RETAKE_SESSION}
+            ).first()
+            if not entry:
+                raise ValidationError("Session introuvable ou hors perimetre.")
+            entry.status = AcademicCalendarEntry.STATUS_PUBLISHED
+            entry.updated_by = request.user
+            entry.save(update_fields=["status", "updated_by", "updated_at"])
+            toast = {"level": "success", "message": f"Session « {entry.title} » publiee. Visible par tous les utilisateurs."}
+
+        elif action == "cancel":
+            entry_id_raw = (request.POST.get("entry_id") or "").strip()
+            if not entry_id_raw.isdigit():
+                raise ValidationError("Session introuvable.")
+            entry = AcademicCalendarEntry.objects.filter(
+                id=int(entry_id_raw), calendar__branch=branch, event_type__in={AcademicCalendarEntry.EVENT_EXAM_SESSION, AcademicCalendarEntry.EVENT_RETAKE_SESSION}
+            ).first()
+            if not entry:
+                raise ValidationError("Session introuvable ou hors perimetre.")
+            entry.status = AcademicCalendarEntry.STATUS_CANCELLED
+            entry.updated_by = request.user
+            entry.save(update_fields=["status", "updated_by", "updated_at"])
+            toast = {"level": "success", "message": f"Session « {entry.title} » annulee."}
+
+        elif action == "assign_supervisors":
+            entry_id_raw = (request.POST.get("entry_id") or "").strip()
+            supervisor_ids = request.POST.getlist("supervisor_ids")
+            if not entry_id_raw.isdigit():
+                raise ValidationError("Session introuvable.")
+            entry = AcademicCalendarEntry.objects.filter(
+                id=int(entry_id_raw), calendar__branch=branch
+            ).first()
+            if not entry:
+                raise ValidationError("Session introuvable ou hors perimetre.")
+            User = get_user_model()
+            supervisors = User.objects.filter(id__in=[sid for sid in supervisor_ids if sid.isdigit()])
+            pass
+            toast = {"level": "success", "message": "Surveillants mis a jour."}
+
+        else:
+            raise ValidationError(f"Action inconnue : {action!r}")
+
+    except ValidationError as exc:
+        toast = {"level": "error", "message": exc.message if hasattr(exc, "message") else str(exc)}
+    except Exception as exc:
+        toast = {"level": "error", "message": f"Erreur inattendue : {exc}"}
+
+    original_get = request.GET
+    params = request.GET.copy()
+    params["section"] = "evaluations_calendar"
+    request.GET = params
+    try:
+        context = _build_director_workspace_context(request, toast=toast)
+    finally:
+        request.GET = original_get
+    return render(request, "portal/staff/director/partials/workspace.html", context)
+
+
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
+def director_evaluation_action(request):
+    """
+    Creer, publier ou annuler une evaluation (AcademicScheduleEvent type exam/practical).
+    Actions : create | cancel | publish
+    """
+    if request.method != "POST":
+        return _deny_portal_access(request)
+    branch = _resolve_director_branch(request)
+    if not branch:
+        return HttpResponseBadRequest("Aucune annexe.")
+
+    from academics.models import AcademicScheduleEvent as _ASE, AcademicYear as _AY
+    from datetime import datetime as _dt
+
+    action = (request.POST.get("action") or "").strip()
+    toast = None
+
+    try:
+        if action == "create":
+            title         = (request.POST.get("title") or "").strip()
+            event_type    = (request.POST.get("event_type") or _ASE.EVENT_TYPE_EXAM).strip()
+            class_id_raw  = (request.POST.get("class_id") or "").strip()
+            ec_id_raw     = (request.POST.get("ec_id") or "").strip()
+            teacher_id_raw = (request.POST.get("teacher_id") or "").strip()
+            start_raw     = (request.POST.get("start_datetime") or "").strip()
+            end_raw       = (request.POST.get("end_datetime") or "").strip()
+            location      = (request.POST.get("location") or "").strip()
+            description   = (request.POST.get("description") or "").strip()
+
+            if not title:
+                raise ValidationError("L'intitule est obligatoire.")
+            if not class_id_raw.isdigit():
+                raise ValidationError("La classe est obligatoire.")
+            if not ec_id_raw.isdigit():
+                raise ValidationError("La matiere (EC) est obligatoire.")
+            if not start_raw or not end_raw:
+                raise ValidationError("La date/heure de debut et de fin sont obligatoires.")
+
+            try:
+                start_dt = timezone.make_aware(_dt.strptime(start_raw, "%Y-%m-%dT%H:%M"))
+                end_dt   = timezone.make_aware(_dt.strptime(end_raw,   "%Y-%m-%dT%H:%M"))
+            except ValueError:
+                raise ValidationError("Format de date invalide. Utilisez AAAA-MM-JJTHH:MM.")
+
+            if end_dt <= start_dt:
+                raise ValidationError("L'heure de fin doit etre apres l'heure de debut.")
+
+            academic_class = AcademicClass.objects.filter(id=int(class_id_raw), branch=branch, is_active=True).first()
+            if not academic_class:
+                raise ValidationError("Classe introuvable ou hors perimetre.")
+
+            ec = EC.objects.filter(id=int(ec_id_raw), ue__semester__academic_class=academic_class).first()
+            if not ec:
+                raise ValidationError("La matiere ne correspond pas a la classe selectionnee.")
+
+            User = get_user_model()
+            teacher = None
+            if teacher_id_raw.isdigit():
+                teacher = User.objects.filter(id=int(teacher_id_raw), profile__branch=branch, is_active=True).first()
+            if not teacher:
+                teacher = request.user
+
+            academic_year = _AY.objects.filter(is_active=True).first() or _AY.objects.order_by("-start_date").first()
+            if not academic_year:
+                raise ValidationError("Aucune annee academique configuree.")
+
+            if event_type not in {_ASE.EVENT_TYPE_EXAM, _ASE.EVENT_TYPE_PRACTICAL, _ASE.EVENT_TYPE_SEMINAR}:
+                event_type = _ASE.EVENT_TYPE_EXAM
+
+            evt = _ASE.objects.create(
+                title=title,
+                description=description,
+                event_type=event_type,
+                academic_class=academic_class,
+                ec=ec,
+                teacher=teacher,
+                branch=branch,
+                academic_year=academic_year,
+                start_datetime=start_dt,
+                end_datetime=end_dt,
+                status=_ASE.STATUS_PLANNED,
+                location=location,
+                is_active=True,
+                created_by=request.user,
+                updated_by=request.user,
+            )
+            toast = {"level": "success", "message": f"Evaluation « {evt.title} » planifiee pour {academic_class.display_name} le {start_dt.strftime('%d/%m/%Y a %Hh%M')}."}
+
+        elif action == "cancel":
+            evt_id_raw = (request.POST.get("event_id") or "").strip()
+            if not evt_id_raw.isdigit():
+                raise ValidationError("Evaluation introuvable.")
+            evt = _ASE.objects.filter(
+                id=int(evt_id_raw), branch=branch,
+                event_type__in=[_ASE.EVENT_TYPE_EXAM, _ASE.EVENT_TYPE_PRACTICAL],
+            ).first()
+            if not evt:
+                raise ValidationError("Evaluation introuvable ou hors perimetre.")
+            evt.status = _ASE.STATUS_CANCELLED
+            evt.updated_by = request.user
+            evt.save(update_fields=["status", "updated_by", "updated_at"])
+            toast = {"level": "success", "message": f"Evaluation « {evt.title} » annulee."}
+
+        elif action == "publish":
+            evt_id_raw = (request.POST.get("event_id") or "").strip()
+            if not evt_id_raw.isdigit():
+                raise ValidationError("Evaluation introuvable.")
+            evt = _ASE.objects.filter(
+                id=int(evt_id_raw), branch=branch,
+                event_type__in=[_ASE.EVENT_TYPE_EXAM, _ASE.EVENT_TYPE_PRACTICAL],
+            ).first()
+            if not evt:
+                raise ValidationError("Evaluation introuvable ou hors perimetre.")
+            evt.status = _ASE.STATUS_PLANNED
+            evt.updated_by = request.user
+            evt.save(update_fields=["status", "updated_by", "updated_at"])
+            toast = {"level": "success", "message": f"Evaluation « {evt.title} » confirmee et visible pour les etudiants."}
+
+        else:
+            raise ValidationError(f"Action inconnue : {action!r}")
+
+    except ValidationError as exc:
+        toast = {"level": "error", "message": exc.message if hasattr(exc, "message") else str(exc)}
+    except Exception as exc:
+        toast = {"level": "error", "message": f"Erreur inattendue : {exc}"}
+
+    original_get = request.GET
+    params = request.GET.copy()
+    params["section"] = "evaluations"
+    request.GET = params
+    try:
+        context = _build_director_workspace_context(request, toast=toast)
+    finally:
+        request.GET = original_get
+    return render(request, "portal/staff/director/partials/workspace.html", context)
+
+
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
+def director_calendar_action(request):
+    """
+    Point d'entree unique pour toutes les actions de gestion du calendrier academique.
+    Actions supportees :
+      create_calendar, validate_calendar, publish_calendar, archive_calendar
+      add_entry, edit_entry, delete_entry
+    Retourne toujours workspace.html section=calendrier (HTMX swap).
+    """
+    if request.method != "POST":
+        return _deny_portal_access(request)
+    branch = _resolve_director_branch(request)
+    if not branch:
+        return HttpResponseBadRequest("Aucune annexe.")
+
+    from datetime import datetime as _dt
+    from academics.models import (
+        AcademicCalendar as _Cal,
+        AcademicCalendarEntry as _Entry,
+        AcademicYear as _Year,
+        AcademicClass as _Class,
+    )
+    from academics.services.calendar_service import (
+        create_calendar,
+        delete_calendar,
+        validate_calendar,
+        publish_calendar,
+        archive_calendar,
+        create_calendar_entry,
+        update_calendar_entry,
+        delete_calendar_entry,
+    )
+    from portal.services.director.calendar_mgt_service import (
+        validate_entry_business_rules,
+        _next_version_for,
+    )
+
+    action = (request.POST.get("action") or "").strip()
+    cal_id_raw = (request.POST.get("calendar_id") or "").strip()
+    toast = None
+    redirect_cal_id = cal_id_raw if cal_id_raw.isdigit() else None
+
+    def _require_calendar(cid):
+        if not cid.isdigit():
+            raise ValidationError("Identifiant de calendrier invalide.")
+        cal = _Cal.objects.filter(id=int(cid), branch=branch).select_related(
+            "academic_year", "branch"
+        ).first()
+        if not cal:
+            raise ValidationError(
+                "Calendrier introuvable ou vous n'avez pas acc\u00e8s \u00e0 ce calendrier."
+            )
+        return cal
+
+    def _parse_date(raw, hour=0, minute=0):
+        """Parse une date YYYY-MM-DD en datetime aware."""
+        try:
+            naive = _dt.strptime(raw.strip(), "%Y-%m-%d").replace(hour=hour, minute=minute)
+            return timezone.make_aware(naive)
+        except ValueError:
+            raise ValidationError(
+                f"Format de date invalide : {raw!r}. Format attendu : AAAA-MM-JJ."
+            )
+
+    def _extract_entry_fields():
+        """Extrait et valide les champs communs des formulaires add/edit entry."""
+        title = (request.POST.get("title") or "").strip()
+        event_type = (request.POST.get("event_type") or "").strip()
+        start_raw = (request.POST.get("start_date") or "").strip()
+        end_raw = (request.POST.get("end_date") or "").strip()
+        scope = (request.POST.get("target_scope") or "branch").strip()
+        class_id = (request.POST.get("class_id") or "").strip()
+        semester_id = (request.POST.get("semester_id") or "").strip()
+        is_blocking = request.POST.get("is_blocking") == "1"
+        description = (request.POST.get("description") or "").strip()
+
+        if not title:
+            raise ValidationError("L'intitul\u00e9 de l'entr\u00e9e est obligatoire.")
+        if not event_type:
+            raise ValidationError("Le type d'\u00e9v\u00e9nement est obligatoire.")
+        if not start_raw:
+            raise ValidationError("La date de d\u00e9but est obligatoire.")
+        if not end_raw:
+            raise ValidationError("La date de fin est obligatoire.")
+
+        start_dt = _parse_date(start_raw, hour=0, minute=0)
+        end_dt = _parse_date(end_raw, hour=23, minute=59)
+
+        if end_dt <= start_dt:
+            raise ValidationError(
+                "La date de fin doit \u00eatre post\u00e9rieure \u00e0 la date de d\u00e9but."
+            )
+
+        academic_class = None
+        if class_id.isdigit():
+            academic_class = _Class.objects.filter(
+                id=int(class_id), branch=branch
+            ).first()
+            if not academic_class:
+                raise ValidationError("Classe introuvable ou hors p\u00e9rim\u00e8tre.")
+
+        semester = None
+        if semester_id.isdigit():
+            semester = Semester.objects.filter(
+                id=int(semester_id),
+                academic_class__branch=branch,
+            ).select_related("academic_class").first()
+            if not semester:
+                raise ValidationError("Semestre introuvable ou hors p\u00e9rim\u00e8tre.")
+
+        return dict(
+            title=title, event_type=event_type,
+            start_dt=start_dt, end_dt=end_dt,
+            scope=scope, academic_class=academic_class,
+            semester=semester, is_blocking=is_blocking,
+            description=description,
+        )
+
+    try:
+        # ------------------------------------------------------------------
+        # Gestion du calendrier
+        # ------------------------------------------------------------------
+        if action == "create_academic_year":
+            from datetime import date as _date
+            year_name = (request.POST.get("year_name") or "").strip()
+            year_start_raw = (request.POST.get("year_start") or "").strip()
+            year_end_raw = (request.POST.get("year_end") or "").strip()
+            import re
+            if not re.fullmatch(r"\d{4}-\d{4}", year_name):
+                raise ValidationError(
+                    "Le nom doit respecter le format AAAA-AAAA (ex\u00e9mple\u00a0: 2027-2028)."
+                )
+            if not year_start_raw or not year_end_raw:
+                raise ValidationError("Les dates de d\u00e9but et de fin sont obligatoires.")
+            try:
+                year_start = _date.fromisoformat(year_start_raw)
+                year_end = _date.fromisoformat(year_end_raw)
+            except ValueError:
+                raise ValidationError("Format de date invalide. Utilisez AAAA-MM-JJ.")
+            if year_start >= year_end:
+                raise ValidationError(
+                    "La date de fin doit \u00eatre post\u00e9rieure \u00e0 la date de d\u00e9but."
+                )
+            if _Year.objects.filter(name=year_name).exists():
+                raise ValidationError(
+                    f"L'ann\u00e9e acad\u00e9mique \u00ab\u00a0{year_name}\u00a0\u00bb existe d\u00e9j\u00e0."
+                )
+            year = _Year(
+                name=year_name,
+                start_date=year_start,
+                end_date=year_end,
+                is_active=False,
+            )
+            year.full_clean()
+            year.save()
+            toast = {
+                "level": "success",
+                "message": (
+                    f"Ann\u00e9e acad\u00e9mique \u00ab\u00a0{year_name}\u00a0\u00bb cr\u00e9\u00e9e. "
+                    f"Vous pouvez maintenant cr\u00e9er un calendrier pour cette ann\u00e9e."
+                ),
+            }
+
+        elif action == "create_calendar":
+            year_id_raw = (request.POST.get("academic_year_id") or "").strip()
+            if not year_id_raw.isdigit():
+                raise ValidationError("Ann\u00e9e acad\u00e9mique invalide.")
+            year = _Year.objects.filter(id=int(year_id_raw)).first()
+            if not year:
+                raise ValidationError("Ann\u00e9e acad\u00e9mique introuvable.")
+            # Version auto-incrementee
+            version = _next_version_for(branch, year)
+            cal = create_calendar(
+                actor=request.user, branch=branch,
+                academic_year=year, version=version,
+            )
+            redirect_cal_id = str(cal.id)
+            toast = {
+                "level": "success",
+                "message": (
+                    f"Calendrier {year.name} \u2014 Version {cal.version} "
+                    f"cr\u00e9\u00e9 en brouillon."
+                ),
+            }
+
+        elif action == "validate_calendar":
+            cal = _require_calendar(cal_id_raw)
+            validate_calendar(cal, actor=request.user)
+            toast = {
+                "level": "success",
+                "message": (
+                    f"Calendrier {cal.academic_year.name} valid\u00e9. "
+                    f"V\u00e9rifiez les entr\u00e9es puis publiez-le."
+                ),
+            }
+
+        elif action == "publish_calendar":
+            cal = _require_calendar(cal_id_raw)
+            publish_calendar(cal, actor=request.user)
+            toast = {
+                "level": "success",
+                "message": (
+                    f"Calendrier {cal.academic_year.name} publi\u00e9. "
+                    f"Il est maintenant visible par tous les utilisateurs de l'annexe."
+                ),
+            }
+
+        elif action == "delete_calendar":
+            cal = _require_calendar(cal_id_raw)
+            cal_name = str(cal.academic_year.name)
+            delete_calendar(cal, actor=request.user)
+            toast = {
+                "level": "success",
+                "message": f"Calendrier {cal_name} supprim\u00e9.",
+            }
+            redirect_cal_id = None
+
+        elif action == "archive_calendar":
+            cal = _require_calendar(cal_id_raw)
+            archive_calendar(cal, actor=request.user)
+            toast = {
+                "level": "success",
+                "message": f"Calendrier {cal.academic_year.name} archiv\u00e9.",
+            }
+            redirect_cal_id = None
+
+        # ------------------------------------------------------------------
+        # Gestion des entrees
+        # ------------------------------------------------------------------
+        elif action == "add_entry":
+            cal = _require_calendar(cal_id_raw)
+            if cal.status != _Cal.STATUS_DRAFT:
+                raise ValidationError(
+                    "Seul un calendrier en brouillon peut recevoir de nouvelles entr\u00e9es."
+                )
+            f = _extract_entry_fields()
+            validate_entry_business_rules(
+                calendar=cal,
+                event_type=f["event_type"],
+                start_datetime=f["start_dt"],
+                end_datetime=f["end_dt"],
+                target_scope=f["scope"],
+                academic_class=f["academic_class"],
+                semester=f["semester"],
+            )
+            create_calendar_entry(
+                actor=request.user,
+                calendar=cal,
+                title=f["title"],
+                event_type=f["event_type"],
+                start_datetime=f["start_dt"],
+                end_datetime=f["end_dt"],
+                target_scope=f["scope"],
+                academic_class=f["academic_class"],
+                semester=f["semester"],
+                is_blocking=f["is_blocking"],
+                description=f["description"],
+                status=_Entry.STATUS_DRAFT,
+            )
+            toast = {
+                "level": "success",
+                "message": f"Entr\u00e9e \u00ab {f['title']} \u00bb ajout\u00e9e.",
+            }
+
+        elif action == "edit_entry":
+            cal = _require_calendar(cal_id_raw)
+            if cal.status != _Cal.STATUS_DRAFT:
+                raise ValidationError(
+                    "Ce calendrier n'est plus en brouillon et ne peut pas \u00eatre modifi\u00e9."
+                )
+            entry_id_raw = (request.POST.get("entry_id") or "").strip()
+            if not entry_id_raw.isdigit():
+                raise ValidationError("Identifiant d'entr\u00e9e invalide.")
+            entry = _Entry.objects.filter(
+                id=int(entry_id_raw), calendar=cal
+            ).first()
+            if not entry:
+                raise ValidationError("Entr\u00e9e introuvable ou hors p\u00e9rim\u00e8tre.")
+            f = _extract_entry_fields()
+            validate_entry_business_rules(
+                calendar=cal,
+                event_type=f["event_type"],
+                start_datetime=f["start_dt"],
+                end_datetime=f["end_dt"],
+                target_scope=f["scope"],
+                academic_class=f["academic_class"],
+                semester=f["semester"],
+                exclude_entry_id=entry.id,
+            )
+            update_calendar_entry(
+                entry,
+                actor=request.user,
+                title=f["title"],
+                event_type=f["event_type"],
+                start_datetime=f["start_dt"],
+                end_datetime=f["end_dt"],
+                target_scope=f["scope"],
+                academic_class=f["academic_class"],
+                semester=f["semester"],
+                is_blocking=f["is_blocking"],
+                description=f["description"],
+            )
+            toast = {
+                "level": "success",
+                "message": f"Entr\u00e9e \u00ab {f['title']} \u00bb mise \u00e0 jour.",
+            }
+
+        elif action == "delete_entry":
+            entry_id_raw = (request.POST.get("entry_id") or "").strip()
+            if not entry_id_raw.isdigit():
+                raise ValidationError("Identifiant d'entr\u00e9e invalide.")
+            entry = _Entry.objects.filter(
+                id=int(entry_id_raw), calendar__branch=branch
+            ).select_related("calendar").first()
+            if not entry:
+                raise ValidationError("Entr\u00e9e introuvable ou hors p\u00e9rim\u00e8tre.")
+            redirect_cal_id = str(entry.calendar_id)
+            entry_title = entry.title
+            delete_calendar_entry(entry, actor=request.user)
+            toast = {
+                "level": "success",
+                "message": f"Entr\u00e9e \u00ab {entry_title} \u00bb supprim\u00e9e.",
+            }
+
+        else:
+            raise ValidationError(f"Action non reconnue : {action!r}")
+
+    except ValidationError as exc:
+        # Extraire le message lisible, qu'il vienne d'un dict ou d'une liste
+        msgs = getattr(exc, "message_dict", None)
+        if msgs:
+            msg = " | ".join(
+                f"{v[0]}" if isinstance(v, list) else str(v)
+                for v in msgs.values()
+            )
+        elif hasattr(exc, "messages") and isinstance(exc.messages, list):
+            msg = " | ".join(str(m) for m in exc.messages)
+        else:
+            msg = getattr(exc, "message", str(exc))
+        toast = {"level": "error", "message": msg}
+    except PermissionDenied as exc:
+        toast = {"level": "error", "message": str(exc) or "Acc\u00e8s refus\u00e9."}
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).exception("director_calendar_action inattendue")
+        toast = {
+            "level": "error",
+            "message": f"Erreur inattendue : {exc}",
+        }
+
+    # Rendre le workspace section=calendrier avec le contexte mis a jour
+    original_get = request.GET
+    params = request.GET.copy()
+    params["section"] = "calendrier"
+    if redirect_cal_id:
+        params["calendar_id"] = redirect_cal_id
+    request.GET = params
+    try:
+        context = _build_director_workspace_context(request, toast=toast)
+    finally:
+        request.GET = original_get
+    return render(request, "portal/staff/director/partials/workspace.html", context)
+    return render(request, "portal/staff/director/partials/workspace.html", context)

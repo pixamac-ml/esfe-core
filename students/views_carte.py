@@ -8,17 +8,20 @@ Vues carte étudiant ESFE :
 
 import base64
 import logging
+import secrets
 from pathlib import Path
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login
+from django.core import signing
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods, require_POST
 
+from accounts.authentication import AuthenticationGate
 from students.models import CarteEtudiant, VerificationLog
 from students.services.card_security import (
     carte_pin_verrouillee,
@@ -33,6 +36,44 @@ from students.services.card_security import (
 )
 
 logger = logging.getLogger(__name__)
+
+CARD_LOGIN_SALT = "students.card-login.v1"
+CARD_LOGIN_SESSION_KEY = "card_login_nonce"
+CARD_LOGIN_MAX_AGE_SECONDS = 300
+
+
+def _card_login_signer():
+    return signing.TimestampSigner(
+        key=settings.CARD_SIGNING_KEY or settings.SECRET_KEY,
+        salt=CARD_LOGIN_SALT,
+    )
+
+
+def _issue_card_login_challenge(request, carte):
+    nonce = secrets.token_urlsafe(24)
+    request.session[CARD_LOGIN_SESSION_KEY] = nonce
+    payload = f"{carte.pk}:{nonce}"
+    return _card_login_signer().sign(payload)
+
+
+def _consume_card_login_challenge(request, challenge):
+    expected_nonce = request.session.pop(CARD_LOGIN_SESSION_KEY, None)
+    if not challenge or not expected_nonce:
+        return None
+    try:
+        payload = _card_login_signer().unsign(
+            challenge,
+            max_age=CARD_LOGIN_MAX_AGE_SECONDS,
+        )
+        carte_id, nonce = payload.split(":", 1)
+    except (signing.BadSignature, signing.SignatureExpired, ValueError):
+        return None
+    if not secrets.compare_digest(nonce, expected_nonce):
+        return None
+    try:
+        return int(carte_id)
+    except ValueError:
+        return None
 
 # ---------------------------------------------------------------
 # Helpers
@@ -257,7 +298,7 @@ def card_scan_verify_view(request):
 
     ctx = {
         "step": "pin",
-        "carte_id": carte.pk,
+        "card_challenge": _issue_card_login_challenge(request, carte),
         "nom_etudiant": carte.etudiant.full_name,
     }
     return render(request, "students/partials/card_scan_login.html", ctx)
@@ -270,13 +311,15 @@ def card_pin_verify_view(request):
     Étape 2 : vérifie le PIN, ouvre la session Django si correct.
     Rate limiting : blocage après 5 tentatives (30 min).
     """
-    carte_id = request.POST.get("carte_id", "")
+    carte_id = _consume_card_login_challenge(
+        request,
+        request.POST.get("card_challenge", ""),
+    )
     raw_pin = request.POST.get("pin", "")
 
     try:
-        carte_id = int(carte_id)
         carte = CarteEtudiant.objects.select_related("etudiant__user").get(pk=carte_id)
-    except (ValueError, CarteEtudiant.DoesNotExist):
+    except (TypeError, CarteEtudiant.DoesNotExist):
         ctx = {"step": "error", "message": "Session expirée. Recommencez le scan."}
         return render(request, "students/partials/card_scan_login.html", ctx)
 
@@ -287,7 +330,7 @@ def card_pin_verify_view(request):
     if carte_pin_verrouillee(carte_id):
         ctx = {
             "step": "pin",
-            "carte_id": carte_id,
+            "card_challenge": _issue_card_login_challenge(request, carte),
             "nom_etudiant": carte.etudiant.full_name,
             "erreur_pin": "Compte temporairement verrouillé après trop d'essais. Réessayez dans 30 minutes.",
         }
@@ -299,7 +342,7 @@ def card_pin_verify_view(request):
         msg = f"PIN incorrect. {restants} tentative(s) restante(s)." if restants else "Compte verrouillé pour 30 minutes."
         ctx = {
             "step": "pin",
-            "carte_id": carte_id,
+            "card_challenge": _issue_card_login_challenge(request, carte),
             "nom_etudiant": carte.etudiant.full_name,
             "erreur_pin": msg,
         }
@@ -308,6 +351,11 @@ def card_pin_verify_view(request):
     # PIN correct → connexion
     reinitialiser_tentatives_pin(carte_id)
     user = carte.etudiant.user
+    auth_decision = AuthenticationGate.evaluate(user)
+    if not auth_decision.allowed:
+        ctx = {"step": "error", "message": auth_decision.message}
+        return render(request, "students/partials/card_scan_login.html", ctx)
+    request._esfe_authentication_method = "student_card"
     login(request, user, backend="django.contrib.auth.backends.ModelBackend")
 
     from portal.permissions import get_post_login_portal_url

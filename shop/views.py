@@ -370,9 +370,11 @@ def student_shop_verify_agent(request, pk):
 @require_GET
 def shop_payment_receipt(request, pk):
     payment = get_object_or_404(ShopPayment.objects.select_related("order"), pk=pk)
-    manager_branch = get_user_branch(request.user) if is_manager(request.user) else None
+    user_is_manager = is_manager(request.user)
+    manager_branch = get_user_branch(request.user) if user_is_manager else None
     can_view_as_manager = bool(manager_branch and manager_branch.pk == payment.order.branch_id)
-    if payment.order.student_id != request.user.id and not request.user.is_staff and not can_view_as_manager:
+    can_view_as_owner = payment.order.student_id == request.user.id
+    if not (can_view_as_owner or can_view_as_manager or request.user.is_superuser):
         return HttpResponse("Non autorise", status=403)
     if not payment.receipt_pdf:
         raise Http404("Recu indisponible.")

@@ -1,0 +1,1202 @@
+AUDIT APPROFONDI DU SYSTEME D'AUTHENTIFICATION ET D'AUTORISATION ESFE CORE
+Date de l'audit : 12 juillet 2026
+Projet : Django 6.0 / Python 3.14
+
+===============================================================================
+1. RESUME EXECUTIF
+===============================================================================
+
+Mon avis general : la fondation Django est saine, mais le systeme d'identite
+metier est devenu trop ambigu. Le probleme principal n'est pas le stockage des
+mots de passe ni la session Django. Le probleme est l'existence simultanee de
+plusieurs sources d'autorite pour definir qui est l'utilisateur et ce qu'il peut
+faire :
+
+- User.is_staff et User.is_superuser ;
+- Profile.role ;
+- Profile.position ;
+- Profile.user_type ;
+- les groupes Django, avec plusieurs noms historiques pour la meme fonction ;
+- certaines relations metier (Branch.manager et PaymentAgent) ;
+- des etats de compte separes dans AccountSupportState ;
+- des helpers et decorateurs differents selon les applications.
+
+accounts/access.py tente intelligemment de rendre ces sources compatibles. Cette
+couche a evite des regressions, mais elle masque aussi les contradictions au lieu
+de les rendre impossibles. Une autorisation peut aujourd'hui etre accordee par
+n'importe laquelle de plusieurs identites concurrentes. Plus le projet grandira,
+plus il sera difficile de savoir pourquoi un utilisateur a obtenu un acces.
+
+Conclusion courte :
+
+- conserver Django User, ses mots de passe, ses sessions et ses protections ;
+- choisir Profile.position comme fonction metier unique et explicite ;
+- utiliser les permissions/groupes Django comme capacites, pas comme autre source
+  de fonction metier ;
+- rendre l'annexe obligatoire pour tous les comptes non globaux ;
+- supprimer progressivement role et user_type comme sources d'autorisation ;
+- centraliser toutes les decisions dans une politique testable ;
+- corriger immediatement les failles du parametre next, du login par carte et de
+  la reinitialisation IT.
+
+Niveau actuel estime : fonctionnel, mais fragile pour un ERP scolaire multi-annexe.
+Le systeme peut etre solidifie sans remplacer Django Auth ni interrompre les
+dashboards.
+
+===============================================================================
+2. PERIMETRE REELLEMENT LU ET ANALYSE
+===============================================================================
+
+L'audit couvre :
+
+- accounts/models.py : Profile, UserPreference et etats financiers sensibles ;
+- accounts/signals.py et accounts/apps.py : creation automatique des profils ;
+- accounts/auth_views.py : formulaire et vue de connexion ;
+- accounts/views.py et accounts/forms.py : inscription, profil et email ;
+- accounts/access.py et accounts/ACCESS_MAPPING.md : resolution des roles,
+  positions, groupes, annexe, scope et decisions can_access ;
+- accounts/dashboards/permissions.py, helpers.py et mixins.py ;
+- portal/permissions.py : classification portail et redirection post-login ;
+- portal/views/views.py et portal/views/it_workflows.py : routage, decorateurs,
+  actions IT et reinitialisation des mots de passe ;
+- portal/services/it_support_service.py : suspension, blocage, perimetre annexe,
+  mot de passe temporaire et audit ;
+- portal/models.py : AccountSupportState et SupportAuditLog ;
+- portail enseignant et portail etudiant : changement de mot de passe ;
+- students/views_carte.py : authentification QR + PIN ;
+- config/settings.py, settings_test_local.py, urls.py et asgi.py ;
+- notifier/realtime/consumer.py : authentification WebSocket ;
+- commandes de groupes et de migration des profils ;
+- tests d'acces, de redirection, de portail et d'actions IT ;
+- etat agrege de la base locale, sans exposer d'identite ni de secret.
+
+Ce rapport est une analyse statique et dynamique du code local actuel. Il ne
+constitue pas un test d'intrusion externe de l'infrastructure de production.
+
+===============================================================================
+3. CARTOGRAPHIE DU FONCTIONNEMENT ACTUEL
+===============================================================================
+
+3.1 Authentification classique
+
+Le login /accounts/login/ utilise PortalLoginView, derive de LoginView, et
+PortalAuthenticationForm, derive d'AuthenticationForm. Django verifie le mot de
+passe avec ModelBackend. django-axes est place avant ModelBackend afin de limiter
+les tentatives. Apres connexion, get_post_login_portal_url() choisit un point
+d'entree selon la position.
+
+Points positifs :
+
+- pas de verification de mot de passe artisanale ;
+- hashage et rotation de session geres par Django ;
+- CSRF actif ;
+- limitation brute-force via django-axes ;
+- comptes is_active=False refuses par AuthenticationForm ;
+- AccountSupportState est consulte lors du login classique.
+
+3.2 Authentification par carte et PIN
+
+Le QR signe identifie une CarteEtudiant. Le navigateur recoit ensuite carte_id,
+puis envoie carte_id + PIN a un second endpoint. Le PIN est verifie, avec compteur
+de tentatives en cache, puis login() ouvre directement une session Django.
+
+3.3 Reinitialisation et changement de mot de passe
+
+- Django fournit le flux standard password_reset par email ;
+- l'etudiant change son mot de passe en donnant l'ancien mot de passe, avec
+  validate_password et update_session_auth_hash ;
+- le personnel IT peut generer un mot de passe temporaire pour un compte de son
+  annexe ;
+- l'interface enseignant contient un formulaire de changement de mot de passe,
+  mais aucun endpoint Python correspondant n'a ete trouve dans les routes lues.
+
+3.4 Autorisation et routage
+
+accounts/access.py calcule successivement :
+
+- les groupes reels et leurs alias historiques ;
+- le Profile.role brut ;
+- la Profile.position explicite ou une position deduite ;
+- un role canonique ;
+- l'annexe via Profile.branch, PaymentAgent.branch ou Branch.manager ;
+- un scope is_global ;
+- la decision can_access(action, resource).
+
+portal/permissions.py retransforme ensuite le role canonique en trois categories
+plus larges : student, staff et admin. Plusieurs applications possedent en plus
+leurs propres decorateurs et helpers.
+
+3.5 WebSocket
+
+AuthMiddlewareStack recupere la session Django. NotificationConsumer refuse les
+utilisateurs anonymes et abonne les utilisateurs authentifies a leur groupe de
+notifications. Le rejet vu lors d'une page non authentifiee est donc attendu.
+
+===============================================================================
+4. CE QUI EST BIEN CONCU ET DOIT ETRE CONSERVE
+===============================================================================
+
+4.1 Usage du framework Django
+
+Le projet ne reinvente pas le stockage des identifiants, le hashage, la session,
+le CSRF ou les tokens de reinitialisation. C'est le bon choix. Un Custom User
+Model n'est pas necessaire uniquement pour clarifier les autorisations.
+
+4.2 Parametres de production
+
+Les valeurs par defaut hors DEBUG activent HTTPS force, cookies secure, HSTS,
+HttpOnly, SameSite=Lax et les protections usuelles. SECRET_KEY est obligatoire.
+Le check --deploy ne remonte des avertissements dans l'environnement local que
+parce que DEBUG=True y desactive volontairement ces options.
+
+4.3 Limitation brute-force classique
+
+django-axes limite a 5 echecs et applique un cooldown de 30 minutes, avec remise
+a zero apres succes. Le principe est correct, meme si la strategie doit etre
+documentee plus precisement et reunifiee avec AccountSupportState.
+
+4.4 Creation automatique du Profile
+
+Les signaux garantissent actuellement que tous les User possedent un Profile.
+Le diagnostic confirme zero profil manquant sur 57 utilisateurs.
+
+4.5 Portee par annexe dans plusieurs services recents
+
+Les actions IT et plusieurs dashboards filtrent explicitement leur cible par
+annexe. can_manage_user_in_branch() est une bonne direction. La regle metier
+critique est connue et souvent appliquee.
+
+4.6 Journalisation des actions support
+
+La reinitialisation, la suspension, le deblocage et les changements sensibles
+generent des SupportAuditLog. Cette tracabilite est indispensable et doit devenir
+un service generique d'audit de securite.
+
+4.7 Strategie de compatibilite
+
+accounts/access.py est lisible, fail-closed pour les regles inconnues et facilite
+une migration progressive. Il ne faut pas le supprimer brutalement : il doit
+devenir la facade de la future politique, puis perdre ses fallbacks historiques.
+
+===============================================================================
+5. CONSTATS CRITIQUES A CORRIGER EN PREMIER
+===============================================================================
+
+CRITIQUE 1 - Redirection ouverte apres inscription
+
+Fichier : accounts/views.py, fonction register().
+
+request.GET['next'] est passe directement a redirect(). Un lien du type
+/accounts/register/?next=https://site-malveillant.example peut rediriger un
+nouvel utilisateur vers un domaine externe apres creation du compte. Cela peut
+servir au phishing et donne une legitimite ESFE a la redirection.
+
+Correction : utiliser url_has_allowed_host_and_scheme(), limiter aux hosts
+autorises et preferer resolve_url sur une route interne. Le POST doit transporter
+le next dans un champ cache valide, car le code actuel ne lit que request.GET.
+
+CRITIQUE 2 - Le QR n'est pas lie a la seconde etape du login carte
+
+Fichier : students/views_carte.py, card_scan_verify_view() et
+card_pin_verify_view().
+
+Apres verification du QR, le serveur renvoie un carte_id brut. Le second endpoint
+accepte directement n'importe quel carte_id valide et un PIN. Un attaquant n'a
+donc pas besoin de posseder ni de scanner le QR signe s'il peut deviner/enumerer
+l'identifiant de carte. Le QR devient presque seulement une aide ergonomique.
+
+Correction : creer un challenge aleatoire, signe, court (2 a 5 minutes), lie a
+la carte, a la session pre-authentification et a un nonce a usage unique. Le POST
+PIN doit accepter ce challenge, jamais carte_id seul. Invalider le challenge au
+premier succes et apres trop d'echecs.
+
+CRITIQUE 3 - Login carte contourne des controles du login classique
+
+Le login carte appelle directement login(request, user). Il ne verifie pas
+explicitement user.is_active, AccountSupportState.is_suspended,
+AccountSupportState.is_blocked, blocked_until ni must_change_password. Ainsi, les
+regles appliquees par PortalAuthenticationForm ne sont pas garanties pour la
+carte. Une carte valide pourrait potentiellement ouvrir la session d'un compte
+desactive ou suspendu.
+
+Correction : centraliser confirm_login_allowed(user, method) dans un service
+unique appele par chaque mode d'authentification. Toutes les portes d'entree
+doivent appliquer exactement les memes etats de compte.
+
+CRITIQUE 4 - Les mots de passe temporaires IT ne forcent pas le changement
+
+Les deux flux IT appellent set_password(), affichent le secret temporaire dans la
+reponse/session, mais ne positionnent pas must_change_password=True. Le champ
+existe pourtant. Le mot de passe temporaire peut donc devenir permanent.
+
+Correction : transaction atomique, set_password(), must_change_password=True,
+invalidation des autres sessions et notification securisee. Le secret ne doit
+pas apparaitre dans les logs. Idealement, preferer un lien d'activation a usage
+unique. Si le contexte local impose un code temporaire, l'afficher une seule fois,
+avec expiration et changement obligatoire.
+
+CRITIQUE 5 - Une position explicite incoherente est acceptee aveuglement
+
+get_user_position() retourne Profile.position avant de verifier is_superuser,
+les relations metier ou les groupes. get_user_role() donne en revanche priorite
+a is_superuser et parfois a Profile.role. Un meme compte peut donc etre dirige
+selon une identite et autorise selon une autre.
+
+Exemple conceptuel : role=student, position=finance_manager, groupe=teacher.
+Selon le helper utilise, ce compte peut etre etudiant, finance ou enseignant.
+
+Correction : imposer les invariants en base et refuser les contradictions dans
+un service d'affectation. Une seule fonction metier doit etre autoritative.
+
+CRITIQUE 6 - Le caractere global peut etre accorde par des alias trop larges
+
+_is_global_user() accepte notamment profile.role=superadmin et certains groupes.
+GROUP_COMPAT_CLUSTERS transforme deputy_executive_director en executive_director
+et executive. Les fallbacks historiques augmentent la surface d'escalade : un
+simple changement de groupe peut accorder is_global sans controle structurel de
+l'affectation.
+
+Correction : is_global doit provenir uniquement d'une politique explicite et
+auditee, par exemple position dans GLOBAL_POSITIONS, avec contrainte branch=NULL,
+ou is_superuser. Ne jamais le deduire d'un alias historique.
+
+===============================================================================
+6. CONSTATS IMPORTANTS D'ARCHITECTURE ET DE SECURITE
+===============================================================================
+
+IMPORTANT 1 - Trois champs d'identite se recouvrent
+
+Profile.role, Profile.position et Profile.user_type decrivent partiellement la
+meme realite. role contient seulement six familles historiques, position contient
+la vraie fonction, user_type oppose public/staff mais les etudiants sont parfois
+marques staff par la commande de backfill. Cette derniere regle semble etre un bug
+semantique dans backfill_user_role_type.py : is_student_like assigne user_type
+'staff'.
+
+Recommandation :
+
+- position = fonction metier unique ;
+- access_scope = BRANCH ou GLOBAL, calcule/valide ;
+- User.is_staff = acces a l'admin Django uniquement, pas personnel ESFE ;
+- groupes/permissions = capacites supplementaires ;
+- supprimer role et user_type des decisions d'acces, puis les deprecier.
+
+IMPORTANT 2 - Groupes non normalises dans la base
+
+La base locale contient notamment des variantes de casse et de vocabulaire :
+gestionnaire/Gestionnaire, des noms anglais et francais, deputy_director,
+Direction, Support, Responsable Qualite, etc. La casse est significative pour les
+comparaisons actuelles. Certaines fonctions ne connaissent qu'une partie de ces
+noms.
+
+Correction : registre ferme de groupes dans le code, migration de donnees,
+commande idempotente de synchronisation et interdiction de creer des groupes
+metier libres depuis l'admin.
+
+IMPORTANT 3 - Les permissions Django existent mais sont peu utilisees
+
+setup_staff_groups.py assigne des Permission, mais presque toutes les vues
+metier utilisent des noms de groupes, des positions ou des helpers. Une recherche
+globale ne trouve qu'un usage direct notable de permission_required dans coupons.
+Le contenu des groupes donne donc une impression de controle sans etre la source
+reelle de decision.
+
+Correction : choisir un modele clair :
+
+- politique de domaine pour acces au portail et scope annexe ;
+- permissions Django explicites pour les actions (view, add, change, validate,
+  publish, pay, reset_password) ;
+- chaque vue appelle les deux dimensions lorsque necessaire.
+
+IMPORTANT 4 - AccountSupportState duplique django-axes et User.is_active
+
+Le projet possede trois mecanismes de blocage : axes, User.is_active et
+AccountSupportState (is_suspended, is_blocked, failed_login_count, blocked_until).
+AccountSupportState ne semble pas synchronise avec les echecs axes. blocked_until
+n'est pas interprete dans PortalAuthenticationForm ; seul is_blocked est lu.
+
+Correction : definir des sens differents et non redondants :
+
+- is_active : compte administrativement utilisable ;
+- suspension metier : etat explicite avec motif, auteur et dates ;
+- axes : verrouillage technique temporaire des tentatives ;
+- must_change_password : obligation post-authentification limitee.
+
+Supprimer failed_login_count et blocked_until de AccountSupportState si axes les
+porte, ou remplacer axes par un backend integre, mais ne pas garder deux compteurs.
+
+IMPORTANT 5 - Le statut employment_status n'est pas un verrou d'authentification
+
+Un Profile peut etre suspended/inactive au niveau emploi sans que ce statut soit
+verifie au login. A l'inverse, la suspension support met is_active=False. Deux
+notions de suspension coexistent donc.
+
+Correction : etablir la transition unique : employment_status suspended/inactive
+doit desactiver l'acces selon une regle documentee, idealement via un service
+transactionnel, pas un signal implicite difficile a controler.
+
+IMPORTANT 6 - L'inscription publique cree un compte sans identite ESFE
+
+/accounts/register/ est public, cree un User, cree un Profile vide et connecte
+immediatement le compte. Cette fonction semble provenir de la communaute publique,
+mais elle partage le meme modele que les comptes institutionnels. On obtient donc
+des comptes authentifies sans role, position, annexe ni email obligatoire.
+
+Correction : separer clairement :
+
+- compte public communaute : acces strictement public/communaute ;
+- compte institutionnel : cree ou invite depuis un dossier ESFE valide ;
+- aucune auto-promotion par simple mise a jour de Profile.
+
+IMPORTANT 7 - Email non unique et parfois vide
+
+La base locale contient 5 valeurs email non vides dupliquees et 3 emails vides.
+La reinitialisation Django par email peut envoyer plusieurs liens pour plusieurs
+comptes partageant une adresse. Cela n'est pas necessairement une prise de compte,
+mais rend l'identite, le support et l'audit ambigus.
+
+Correction : pour les comptes institutionnels, email normalise en minuscules et
+unique via UniqueConstraint(Lower('email')) avec condition email non vide. Prevoir
+un workflow de verification d'email avant d'activer la recuperation autonome.
+
+IMPORTANT 8 - Case catch-all sur Profile
+
+_get_profile() intercepte Exception au lieu de l'exception precise
+RelatedObjectDoesNotExist. Une panne de base ou une erreur de programmation peut
+etre transformee en profil absent et produire une mauvaise decision silencieuse.
+
+Correction : capturer uniquement User.profile.RelatedObjectDoesNotExist. Une
+erreur inattendue doit remonter et etre corrigee.
+
+IMPORTANT 9 - Les lectures d'autorisation font des requetes multiples
+
+can_access() appelle plusieurs helpers qui recalculent groupes, profile, position,
+role et relations. Cela peut provoquer beaucoup de requetes et des decisions
+prises sur des lectures non atomiques.
+
+Correction : AccessContext.from_user(user), calcule une seule fois par requete,
+stocke sur request et alimente toutes les policies.
+
+IMPORTANT 10 - Les refus normaux sont journalises en warning
+
+Le routage du portail teste d'abord l'acces student puis teacher. Pour un
+enseignant, le refus student produit un warning a chaque page. Cela pollue les
+logs et masque les vraies tentatives interdites.
+
+Correction : les sondes de routage doivent etre silencieuses/debug. Les refus
+d'une action effectivement demandee doivent produire un audit warning structure.
+
+IMPORTANT 11 - Password reset depend de la qualite email
+
+Le flux Django est cryptographiquement correct, mais sa securite operationnelle
+depend de l'unicite, de la verification et de la confidentialite des emails. Les
+templates existent, mais aucune politique visible ne garantit email_verified.
+
+Correction : ajouter email_verified_at, un flux de verification et une politique
+de recuperation assistee auditee pour les utilisateurs sans email personnel.
+
+IMPORTANT 12 - Le changement de mot de passe enseignant semble incomplet
+
+Le template change_password_modal.html poste vers
+accounts_portal:teacher_change_password_modal, mais cette route/vue n'apparait pas
+dans les routes et fonctions inspectees. Le portail etudiant possede en revanche
+un service complet avec validate_password et update_session_auth_hash.
+
+Correction : reutiliser un service commun ChangeOwnPasswordService pour tous les
+portails. Ne pas dupliquer la validation par role.
+
+IMPORTANT 13 - Les sessions existantes survivent probablement aux actions IT
+
+set_password() change le hash et Django invalidera normalement les sessions lors
+de leur prochaine validation, mais la suspension et certains changements de
+privileges ne revoquent pas explicitement toutes les sessions. Une politique
+claire de revocation manque.
+
+Correction : service revoke_user_sessions(user), appele lors de suspension,
+reset support, changement de fonction, retrait d'annexe et compromission.
+
+IMPORTANT 14 - WebSocket ne revalide que l'authentification de session
+
+Le consumer verifie anonymous, mais pas is_active, suspension ou autorisation de
+recevoir les notifications. Une socket deja ouverte peut continuer apres un
+changement d'etat jusqu'a sa deconnexion.
+
+Correction : appliquer le meme AccountAccessState au connect, fermer les sockets
+via un evenement lors d'une suspension et envisager une courte revalidation pour
+les connexions longues.
+
+===============================================================================
+7. DIAGNOSTIC AGREGE DE LA BASE LOCALE
+===============================================================================
+
+Diagnostic execute sans afficher de noms, emails ni secrets :
+
+- 57 utilisateurs ;
+- 55 actifs ;
+- 32 avec is_staff=True ;
+- 2 superusers ;
+- 0 Profile manquant ;
+- 17 Profile.role vides, dont 15 comptes actifs ;
+- 23 Profile.position vides, dont 21 comptes actifs ;
+- 30 Profile.user_type vides ;
+- 26 profils sans annexe ;
+- 5 adresses email non vides dupliquees ;
+- 3 emails vides ;
+- 55 AccountSupportState ont ete crees ;
+- aucun etat suspendu, bloque ou must_change_password actif au moment de l'audit.
+
+Le nombre eleve d'AccountSupportState vient probablement du get_or_create lors de
+simples lectures de login ou de dashboard. Lire un etat ne devrait pas ecrire en
+base. Utiliser un etat par defaut virtuel et ne creer la ligne qu'a la premiere
+modification support.
+
+Ces chiffres confirment que les fallbacks ne sont pas seulement une precaution
+historique : le fonctionnement actuel depend reellement d'eux.
+
+===============================================================================
+8. ARCHITECTURE CIBLE RECOMMANDEE
+===============================================================================
+
+8.1 Identite
+
+Conserver django.contrib.auth.models.User pour cette refonte. Ajouter seulement
+les contraintes manquantes autour du Profile.
+
+Profile.position devient l'unique fonction principale, avec une enum TextChoices :
+
+- STUDENT
+- TEACHER
+- FINANCE_MANAGER
+- PAYMENT_AGENT
+- SECRETARY
+- ADMISSIONS
+- DIRECTOR_OF_STUDIES
+- EXECUTIVE_DIRECTOR
+- DEPUTY_EXECUTIVE_DIRECTOR
+- BRANCH_MANAGER
+- ACADEMIC_SUPERVISOR
+- IT_SUPPORT
+- MARKETING_MANAGER
+- SUPER_ADMIN
+- COMMUNITY_MEMBER, si le compte public reste dans le meme User.
+
+8.2 Scope organisationnel
+
+Ajouter une notion explicite :
+
+- BRANCH : branch obligatoire ;
+- GLOBAL : branch doit etre NULL ;
+- PUBLIC : aucune donnee institutionnelle.
+
+Ne pas deduire GLOBAL d'un groupe. Valider position + scope + branch dans
+Profile.clean(), dans les formulaires/admin et dans une contrainte lorsque
+possible.
+
+8.3 Capacites
+
+Utiliser les permissions Django avec des codenames metier, par exemple :
+
+- accounts.access_finance_dashboard
+- payments.validate_payment
+- academics.publish_results
+- portal.reset_branch_user_password
+- accounts.view_cross_branch_data
+
+Les groupes deviennent des bundles de permissions, synchronises par une commande
+idempotente. Ils ne definissent plus la position.
+
+8.4 Policy centrale
+
+Introduire une API unique :
+
+AccessContext :
+  user, position, branch, is_global, is_active, capabilities
+
+Policy :
+  can(user, action, obj=None, branch=None) -> Decision
+
+Decision :
+  allowed, reason_code, effective_branch
+
+Exemples :
+
+- policy.require('payments.validate', branch=payment.branch)
+- policy.require('teacher.view_class', obj=academic_class)
+- policy.require('support.reset_password', obj=target_user)
+
+Le controle d'annexe doit etre dans la policy et dans les querysets. Une policy
+ne remplace pas le filtrage : elle le complete.
+
+8.5 Decorateurs/mixins
+
+Fournir seulement :
+
+- @institutional_login_required ;
+- @position_required(...) ;
+- @capability_required(...) ;
+- @branch_object_required(loader=...) ;
+- PolicyRequiredMixin.
+
+Tous doivent utiliser la meme AccessContext. Deprecier les helpers locaux et les
+tests directs de group.name.
+
+8.6 Etat de compte
+
+Un AccountAccessState clair :
+
+- status = ACTIVE, SUSPENDED, DISABLED, PENDING_ACTIVATION ;
+- reason ;
+- starts_at / ends_at ;
+- changed_by ;
+- must_change_password ;
+- password_changed_at ;
+- credentials_version ou session_revoked_at.
+
+Axes reste responsable uniquement du brute-force temporaire.
+
+8.7 Authentification multi-methode
+
+Toutes les methodes appellent :
+
+AuthenticationGate.confirm_allowed(user, method, request)
+
+Puis Django login(). Cette gate verifie user.is_active, statut metier, expiration,
+affectation institutionnelle et obligations post-login.
+
+===============================================================================
+9. PLAN DE REFONTE PROGRESSIF ET PRUDENT
+===============================================================================
+
+PHASE 0 - Correctifs urgents, faible risque
+
+1. Valider next dans register().
+2. Verifier l'etat complet du compte lors du login carte.
+3. Remplacer carte_id par un challenge signe a usage unique.
+4. Positionner must_change_password lors des resets IT.
+5. Ajouter revocation des sessions aux suspensions et resets.
+6. Implementer/reparer le changement de mot de passe enseignant.
+7. Capturer l'exception Profile precise.
+
+PHASE 1 - Observabilite sans changement fonctionnel
+
+1. Creer AccessContext et l'alimenter avec la logique actuelle.
+2. Ajouter reason_code a chaque decision.
+3. Journaliser les contradictions role/position/groupes/relations.
+4. Ajouter une commande audit_access_state --json/--fix-dry-run.
+5. Ne plus journaliser en warning les sondes normales de routage.
+
+PHASE 2 - Nettoyage des donnees
+
+1. Definir la matrice officielle position -> scope -> branch obligatoire.
+2. Resoudre manuellement les 21 comptes actifs sans position.
+3. Normaliser les groupes et leur casse.
+4. Resoudre les emails dupliques.
+5. Corriger user_type des etudiants cree par le backfill.
+6. Identifier chaque contradiction avant toute suppression de fallback.
+
+PHASE 3 - Politique unique
+
+1. Faire de position la source de fonction.
+2. Migrer les vues application par application vers Policy.
+3. Remplacer les tests de groupes par capability_required.
+4. Imposer le scope annexe dans les selectors/querysets.
+5. Ajouter des tests de non-visibilite inter-annexe pour chaque workflow.
+
+PHASE 4 - Contraintes et suppression du legacy
+
+1. Rendre position non vide pour les comptes institutionnels.
+2. Rendre branch obligatoire pour les positions locales.
+3. Retirer Profile.role des decisions, puis de l'interface admin.
+4. Retirer Profile.user_type des decisions, puis evaluer sa suppression.
+5. Retirer GROUP_COMPAT_CLUSTERS apres migration complete.
+6. Mettre ACCESS_MAPPING.md a jour comme specification normative.
+
+PHASE 5 - Durcissement avance
+
+1. MFA obligatoire pour super_admin, DG/DGA, finance et IT.
+2. Email verifie et recovery codes pour les comptes privilegies.
+3. Historique des connexions et alertes de connexion inhabituelle.
+4. Rotation/revocation de toutes les sessions depuis l'espace compte.
+5. Politique d'expiration adaptee au niveau de privilege.
+6. Revue trimestrielle des acces et comptes dormants.
+
+===============================================================================
+10. MATRICE DE TESTS A RENDRE OBLIGATOIRE
+===============================================================================
+
+Tests d'authentification :
+
+- login valide/invalide/inactif/suspendu/bloque ;
+- axes apres 5 echecs, cooldown et reset apres succes ;
+- meme resultat pour mot de passe et carte ;
+- QR falsifie, expire, revoque, challenge rejoue ou lie a une autre session ;
+- PIN limite par carte, session et source ;
+- password reset avec email unique/verifie ;
+- reset IT impose le changement et revoque les sessions ;
+- changement de mot de passe conserve seulement la session courante voulue.
+
+Tests d'autorisation :
+
+- une ligne par position x ressource x action ;
+- refus si position absente ou inconnue ;
+- refus de toute contradiction d'identite ;
+- refus inter-annexe sur GET, POST, export, PDF, HTMX et WebSocket ;
+- un IDOR ne doit jamais permettre de charger un objet d'une autre annexe ;
+- un utilisateur public ne peut atteindre aucune ressource institutionnelle ;
+- is_staff seul n'accorde aucun dashboard ESFE ;
+- retrait d'un privilege effectif immediatement.
+
+Tests de redirection :
+
+- next relatif autorise ;
+- URL externe refusee ;
+- next //evil.example refuse ;
+- redirection post-login deterministe pour chaque position ;
+- aucune boucle entre /accounts/dashboard/ et /portal/dashboard/.
+
+Tests de donnees :
+
+- position locale => branch non nulle ;
+- position globale => branch nulle ;
+- email institutionnel unique insensible a la casse ;
+- groupes officiels uniquement ;
+- aucune creation de Profile incomplet par les workflows institutionnels.
+
+===============================================================================
+11. REGLES NON NEGOCIABLES POUR LA REFONTE
+===============================================================================
+
+1. Deny by default : toute action inconnue est refusee.
+2. Une seule source de fonction metier.
+3. L'annexe est verifiee dans le queryset ET dans la policy.
+4. Aucun role n'est deduit d'un username.
+5. Aucun groupe libre ne donne automatiquement un acces global.
+6. is_staff signifie admin Django, pas staff ESFE.
+7. Tous les modes de login appliquent la meme gate de compte.
+8. Toute elevation, suspension ou reinitialisation est auditee.
+9. Toute modification de privilege revoque les sessions necessaires.
+10. Les secrets temporaires ne sont ni logs ni conserves en clair.
+11. Les vues HTMX et exports ont les memes controles que les pages completes.
+12. Les tests inter-annexe sont obligatoires avant fusion.
+
+===============================================================================
+12. AVIS FINAL
+===============================================================================
+
+Le projet n'a pas besoin d'un nouveau framework d'authentification. Django Auth,
+django-axes, les sessions et AuthMiddlewareStack sont des bases solides. La
+refonte doit porter principalement sur le modele d'autorisation et la gouvernance
+des comptes.
+
+La couche accounts/access.py a rempli un role utile de transition, mais elle ne
+doit pas devenir definitive dans sa forme actuelle. Elle additionne trop de
+preuves alternatives d'autorisation. Une politique de securite robuste doit au
+contraire reduire l'ambiguite : une fonction officielle, un scope officiel, des
+capacites explicites et une raison tracable pour chaque decision.
+
+La meilleure strategie est progressive : corriger d'abord les failles concretes,
+observer les contradictions, nettoyer les donnees, migrer les vues vers une API
+unique, puis seulement supprimer les fallbacks historiques. Une reecriture totale
+en une fois serait plus risquee et rendrait les regressions multi-annexes difficiles
+a detecter.
+
+Priorite absolue : le login carte, la redirection next, les mots de passe
+temporaires IT et la consolidation de position/annexe. Une fois ces quatre sujets
+traites, le reste peut avancer par application avec une matrice de tests stable.
+
+FIN DU RAPPORT
+
+===============================================================================
+ADDENDUM - AVIS SUR SPECIFICATION_AUTHENTIFICATION_DASHBOARDS_ESFE_CORE.txt
+===============================================================================
+
+Document examine : SPECIFICATION_AUTHENTIFICATION_DASHBOARDS_ESFE_CORE.txt
+Date de l'examen : 12 juillet 2026
+
+-------------------------------------------------------------------------------
+A. AVIS GENERAL
+-------------------------------------------------------------------------------
+
+Mon avis : cette specification est excellente comme document de direction et de
+gouvernance. Elle traduit correctement la quasi-totalite des constats de l'audit
+en principes actionnables. Elle evite les deux erreurs classiques de ce type de
+refonte : remplacer inutilement Django Auth et tenter une reecriture totale.
+
+Elle est particulierement juste sur les points suivants :
+
+- separation obligatoire entre univers public et logiciel institutionnel ;
+- conservation du User Django comme noyau technique ;
+- position comme fonction metier autoritative ;
+- groupes comme bundles de capacites, jamais comme identite ;
+- un seul dashboard principal par position ;
+- scope organisationnel distinct des permissions ;
+- double protection queryset + policy pour l'annexe ;
+- facade accounts/access.py conservee temporairement pour la migration ;
+- migration progressive, auditee et testee ;
+- correctifs urgents places avant la refonte structurelle ;
+- refus d'inventer les decisions metier encore ambigues ;
+- definition de termine exigeante et mesurable.
+
+Le document peut servir de base officielle. Toutefois, je ne conseille pas de
+l'executer mot pour mot dans son etat actuel. Il manque quelques arbitrages et
+certains termes ne correspondent pas encore aux dashboards reels. Le titre
+"specification definitive" est donc un peu premature : le document est definitif
+sur les principes, mais pas encore sur la matrice metier ni sur le schema cible.
+
+Evaluation synthetique :
+
+- vision et principes : tres solides ;
+- securite : tres solide ;
+- methode de migration : solide ;
+- correspondance exacte avec le code actuel : encore a finaliser ;
+- capacite d'implementation immediate : partielle avant arbitrages ci-dessous.
+
+-------------------------------------------------------------------------------
+B. POINTS QUE JE VALIDE SANS RESERVE
+-------------------------------------------------------------------------------
+
+B.1 Deux univers fonctionnels
+
+La separation PUBLIC / SYSTEM est necessaire. Le Profile actuel contient a la
+fois reputation, badges, biographie communautaire, salaire, tarif enseignant,
+poste, annexe et statut d'emploi. Cette concentration est la source de nombreuses
+redirections incoherentes. Separer le profil public du profil institutionnel est
+une bonne cible.
+
+B.2 Un seul poste, un seul dashboard principal
+
+Cette regle clarifie le routage sans empecher les fonctions transversales. Une
+permission peut ajouter une action dans le dashboard officiel, mais ne doit pas
+changer l'identite ni ouvrir un autre dashboard complet. C'est exactement la
+bonne distinction.
+
+B.3 Scope different de permission
+
+GLOBAL ne doit jamais signifier "tous les droits". Il signifie seulement que les
+droits deja possedes peuvent s'exercer sur plusieurs annexes. Cette separation
+est essentielle pour la DG, la DGA, le superadmin et de futurs auditeurs globaux.
+
+B.4 Position autoritative
+
+La specification corrige le defaut principal du systeme actuel. Une relation
+Branch.manager, un PaymentAgent ou un groupe ne doit plus inventer la position au
+moment de la requete. Ces elements doivent etre verifies comme coherence ou
+capacite, pas utilises comme identite de secours permanente.
+
+B.5 Migration dashboard par dashboard
+
+Le depot contient de nombreux endpoints HTMX, exports et vues paralleles. Une
+bascule globale serait dangereuse. La migration verticale par dashboard, avec
+tests positifs et tests de refus des autres postes, est l'approche la plus sure.
+
+B.6 Correctifs urgents
+
+Les sept correctifs de la phase B sont bien choisis et doivent preceder les
+migrations de schema. Ils reduisent des risques reels sans dependre de la future
+architecture.
+
+-------------------------------------------------------------------------------
+C. DECISIONS A CLARIFIER AVANT IMPLEMENTATION
+-------------------------------------------------------------------------------
+
+C.1 Gestionnaire, FINANCE_MANAGER et BRANCH_MANAGER
+
+C'est le point le plus important.
+
+La specification indique dans sa matrice de depart :
+
+  gestionnaires -> FINANCE_MANAGER -> BRANCH
+
+Mais le code distingue actuellement trois realites :
+
+- finance_manager ouvre le dashboard finance separe ;
+- branch_manager est accepte par la regle du dashboard manager ;
+- le groupe gestionnaire/manager ouvre le dashboard gestionnaire principal ;
+- ce dashboard gestionnaire couvre caisse, candidatures, inscriptions, paiements,
+  depenses, salaires, honoraires, rapports et clotures.
+
+Le dashboard gestionnaire n'est donc pas simplement le dashboard finance. Le
+nom FINANCE_MANAGER serait reducteur et pourrait envoyer la gestionnaire vers le
+mauvais dashboard, recreant precisement le probleme que la specification veut
+eliminer.
+
+Arbitrage recommande :
+
+- conserver BRANCH_MANAGER si cette personne pilote l'administration complete
+  d'une annexe ; ou
+- introduire BRANCH_ADMINISTRATOR / ANNEX_MANAGER si "directeur d'annexe" est
+  une autre fonction reelle ;
+- reserver FINANCE_MANAGER au dashboard finance separe ;
+- reserver PAYMENT_AGENT au role d'encaissement si son experience est distincte.
+
+Il faut demander au proprietaire du projet : "gestionnaire d'annexe" et
+"directeur d'annexe" sont-ils une seule personne ou deux postes differents ?
+Cette reponse determine le registre central.
+
+C.2 Position et dashboard du PAYMENT_AGENT
+
+Le code reconnait PaymentAgent comme relation metier et le fait entrer dans la
+famille finance. La specification dit justement "si ce dashboard existe
+reellement". Il faut decider s'il possede :
+
+- son propre dashboard ;
+- une vue restreinte du dashboard finance ;
+- une vue restreinte du dashboard gestionnaire.
+
+Ne pas creer une entree de registre tant que ce parcours n'est pas confirme.
+
+C.3 Portee du DIRECTOR_OF_STUDIES
+
+La specification laisse cette decision ouverte, ce qui est correct. Le code
+actuel le traite comme non global dans accounts/access.py, mais certaines donnees
+academiques peuvent etre centrales. Il faut choisir entre :
+
+- BRANCH obligatoire ;
+- GLOBAL ;
+- un mecanisme multi-annexes explicite si un directeur supervise seulement un
+  sous-ensemble d'annexes.
+
+La troisieme option ne doit pas etre simulee par GLOBAL. Si elle existe, un modele
+d'affectations organisationnelles sera plus juste qu'un simple scope binaire.
+
+C.4 SUPER_ADMIN metier contre superuser Django
+
+La specification liste SUPER_ADMIN comme position, tout en reservant
+User.is_superuser au superutilisateur Django. Il faut preciser si SUPER_ADMIN :
+
+- est un administrateur fonctionnel ESFE sans acces automatique a /admin/ ;
+- ou doit toujours etre un vrai is_superuser Django.
+
+Recommandation : les separer. SUPER_ADMIN est une position metier SYSTEM globale.
+is_superuser est un pouvoir technique exceptionnel, attribue a tres peu de
+comptes. Un SUPER_ADMIN fonctionnel ne devrait pas contourner automatiquement
+toutes les permissions Django via is_superuser.
+
+C.5 DGA : dashboard propre ou dashboard DG
+
+Le document laisse les deux possibilites. Cette decision doit etre prise avant
+le registre final. Si DG et DGA partagent l'interface mais pas toutes les actions,
+ils peuvent avoir deux positions pointant vers la meme route avec des capacites
+differentes. "Un dashboard principal" ne signifie pas necessairement "une URL
+unique par position".
+
+C.6 ADMISSIONS_OFFICER et SECRETARY
+
+Le code autorise actuellement secretary dans certaines regles admissions, alors
+que les dashboards secretary et admissions sont separes. Il faut definir si la
+secretaire :
+
+- possede seulement son dashboard, avec certaines capacites admissions integrees ;
+- ou peut reellement utiliser le dashboard admissions complet.
+
+Selon le principe de la specification, la premiere option est preferable.
+
+-------------------------------------------------------------------------------
+D. AJUSTEMENTS RECOMMANDES AU MODELE CIBLE
+-------------------------------------------------------------------------------
+
+D.1 Eviter un account_type redondant si les profils suffisent
+
+Le document propose account_type PUBLIC ou SYSTEM et deux profils. Cela peut
+fonctionner, mais trois sources peuvent alors se contredire : account_type,
+presence de PublicProfile et presence de SystemProfile.
+
+Deux schemas raisonnables existent :
+
+Option 1, type explicite :
+
+- AccountMembership.account_type est autoritatif ;
+- une contrainte/service garantit exactement le profil correspondant ;
+- aucun profil de l'autre type ne peut exister.
+
+Option 2, presence du profil :
+
+- PublicProfile present => compte public ;
+- InstitutionalProfile present => compte systeme ;
+- une contrainte metier interdit les deux si HYBRID est refuse ;
+- pas de champ account_type duplique.
+
+Je recommande de choisir explicitement l'une des deux. Ne pas laisser trois
+indicateurs libres.
+
+D.2 Verifier le refus de HYBRID contre les donnees reelles
+
+Le refus d'introduire HYBRID sans besoin valide est prudent. Cependant, avant
+d'imposer l'exclusivite, il faut mesurer si des enseignants ou membres du staff
+ont deja une activite communautaire (topics, answers, reputation, badges). Une
+separation stricte pourrait leur retirer ou orpheliner des donnees publiques.
+
+Trois strategies sont possibles :
+
+- comptes strictement distincts ;
+- migration de leur activite vers un compte public separe ;
+- coexistence controlee des deux profils sur un User, sans jamais heriter les
+  permissions de l'un vers l'autre.
+
+La troisieme correspond techniquement a un hybride, meme si on ne l'appelle pas
+ainsi. La decision doit partir des donnees, pas seulement du modele ideal.
+
+D.3 Category est derivee de position
+
+STUDENT, TEACHING_STAFF et ADMIN_STAFF sont utiles pour les listes et les regles
+generales, mais chaque position appartient exactement a une categorie. Stocker
+category comme champ libre cree une nouvelle contradiction possible :
+position=TEACHER, category=ADMIN_STAFF.
+
+Recommandation : category doit etre derivee d'un registre de positions. Si elle
+est stockee pour faciliter les requetes, elle doit etre synchronisee et non
+modifiable independamment.
+
+D.4 Scope peut etre derive ou contraint par position
+
+Pour la plupart des postes, scope semble fixe. Le stocker librement permet par
+exemple TEACHER + GLOBAL sans validation. Le registre doit definir les scopes
+autorises par position. Un changement exceptionnel doit passer par une
+affectation explicite, pas une simple valeur de formulaire.
+
+D.5 PublicProfile et InstitutionalProfile doivent rester petits
+
+Le Profile actuel est deja devenu un objet central trop large. Il ne faut pas
+simplement le couper en deux nouveaux objets monolithiques. Les donnees lourdes
+doivent rester dans leurs modeles de domaine : Student, PaymentAgent, affectations
+enseignant, paie, preferences, etc.
+
+InstitutionalProfile devrait contenir seulement l'identite institutionnelle
+commune : position, scope, branch, statut et identifiants generaux. Les donnees
+propres a une fonction restent dans les applications concernees.
+
+D.6 Photo et coordonnees
+
+Dupliquer avatar, email, telephone et adresse dans les deux profils pose une
+question de source de verite. La specification doit preciser si les valeurs sont
+independantes ou partagees. Pour la confidentialite, une photo professionnelle
+et un avatar public peuvent etre distincts. Pour l'email technique de login, le
+User peut rester autoritatif, avec adresses de contact metier separees si besoin.
+
+-------------------------------------------------------------------------------
+E. AJUSTEMENTS RECOMMANDES AU PLAN D'EXECUTION
+-------------------------------------------------------------------------------
+
+E.1 Ajouter une phase de decisions metier entre A et B/C
+
+La phase A produit la matrice, mais le plan devrait exiger sa validation humaine
+avant de creer les nouvelles enums et migrations. Ajouter un jalon :
+
+  MATRICE VALIDEE PAR LE PROPRIETAIRE DU PROJET
+
+Sans ce jalon, Codex pourrait implementer une hypothese marquee "a confirmer".
+
+E.2 Separer correctifs urgents et refonte schema
+
+Les correctifs de phase B doivent former un lot autonome, teste et livrable. Ils
+ne doivent pas attendre PublicProfile/SystemProfile. Cela reduit rapidement le
+risque et facilite la revue.
+
+E.3 Inventorier les dependances du Profile avant de le scinder
+
+Le code contient de tres nombreux acces directs aux champs Profile. La recherche
+effectuee pendant cette comparaison trouve environ 259 references directes aux
+champs communautaires et institutionnels selectionnes. Avant migration :
+
+- classer chaque champ comme PUBLIC, SYSTEM, SHARED ou DOMAIN-SPECIFIC ;
+- inventorier formulaires, admin, templates, services, seeds et tests ;
+- ajouter les nouveaux profils sans retirer l'ancien ;
+- faire une migration de donnees reversible ;
+- passer les lectures puis les ecritures par domaine ;
+- supprimer les anciens champs seulement a la fin.
+
+E.4 Ajouter une strategie de rollback
+
+La specification parle de sauvegarde, mais chaque phase de schema devrait definir :
+
+- migration reversible ou justification si impossible ;
+- feature flag pour le nouveau routage ;
+- comparaison old_decision/new_decision en mode observation ;
+- seuil de contradictions accepte avant bascule ;
+- procedure de retour au registre precedent.
+
+E.5 Ajouter un mode shadow pour la policy
+
+Avant que la nouvelle policy refuse ou accorde reellement, elle peut calculer sa
+Decision en parallele de l'ancien systeme et journaliser les differences sans
+modifier la reponse. Ce mode est tres utile sur les dashboards sensibles et
+permet de trouver les cas que les tests n'ont pas modelises.
+
+E.6 Ne pas lancer automatiquement un --fix global
+
+audit_access_state doit separer :
+
+- constats certains ;
+- propositions deterministes ;
+- ambiguities humaines ;
+- erreurs bloquantes.
+
+Le mode --fix devrait exiger un plan JSON valide et une sauvegarde, ou etre divise
+en commandes de migration tres ciblees. La simple option --fix sur toute la base
+serait trop dangereuse.
+
+-------------------------------------------------------------------------------
+F. COMPLEMENTS AUX TESTS D'ACCEPTATION
+-------------------------------------------------------------------------------
+
+La matrice de tests de la specification est deja tres bonne. J'ajouterais :
+
+- un compte PUBLIC et un compte SYSTEM ne peuvent partager une identite sans la
+  strategie explicitement choisie ;
+- category ne peut jamais contredire position ;
+- scope ne peut jamais contredire position ;
+- un SUPER_ADMIN metier sans is_superuser n'accede pas automatiquement a l'admin
+  Django ni a toutes les permissions de modele ;
+- un is_superuser technique sans InstitutionalProfile suit une politique
+  explicitement definie au lieu de recevoir un dashboard par fallback ;
+- changement de position => changement de dashboard atomique et revocation des
+  sessions ;
+- retrait d'annexe => aucun objet de l'ancienne annexe accessible dans une
+  session deja ouverte ;
+- le mode shadow ne contient aucune donnee personnelle sensible dans les logs ;
+- deux positions pointant vers une meme route peuvent conserver des capacites
+  differentes ;
+- les anciennes URLs de profil institutionnel redirigent uniquement vers le bon
+  workspace interne ou retournent un refus controle ;
+- les migrations conservent topics, answers, badges, paie, affectations et
+  preferences du compte concerne.
+
+-------------------------------------------------------------------------------
+G. VERSION AMENDEE DE LA DECISION CENTRALE
+-------------------------------------------------------------------------------
+
+Je recommande de figer les decisions dans cet ordre :
+
+1. User Django reste le noyau technique.
+2. PUBLIC et SYSTEM n'heritent jamais de droits l'un de l'autre.
+3. La strategie d'exclusivite/coexistence des profils est decidee apres audit des
+   utilisateurs systeme ayant une activite communautaire.
+4. InstitutionalProfile.position est l'identite metier autoritative.
+5. Category est derivee de position.
+6. Les scopes autorises sont contraints par position.
+7. Branch est obligatoire pour BRANCH et interdite pour GLOBAL.
+8. Un registre valide position -> dashboard principal.
+9. Une autre table valide position -> category -> scopes autorises -> groupe de
+   capacites par defaut.
+10. Les groupes et permissions ajoutent des actions, jamais une identite.
+11. La policy applique action + scope + objet + annexe et retourne une raison.
+12. Les fallbacks historiques peuvent seulement maintenir temporairement un
+    acces equivalent ; ils ne doivent jamais augmenter les droits de la nouvelle
+    identite.
+
+-------------------------------------------------------------------------------
+H. VERDICT FINAL SUR LA SPECIFICATION
+-------------------------------------------------------------------------------
+
+La specification est approuvee comme base strategique et comme direction de
+refonte. Elle est coherente avec l'audit et place correctement la securite,
+l'isolation multi-annexes et la migration progressive au centre du travail.
+
+Avant de la declarer executable et definitive, je recommande un court amendement
+qui tranche au minimum :
+
+1. gestionnaire vs finance_manager vs branch_manager ;
+2. dashboard exact du payment_agent ;
+3. scope du director_of_studies ;
+4. separation SUPER_ADMIN metier / is_superuser technique ;
+5. dashboard DG/DGA ;
+6. coexistence ou exclusivite PublicProfile/SystemProfile ;
+7. source de verite pour category et account_type.
+
+Une fois cette matrice validee, le plan d'execution propose est le bon : audit,
+correctifs urgents, structure compatible, nettoyage controle, migration par
+dashboard, puis suppression du legacy. Il faut resister a la tentation de creer
+les nouvelles enums avant ces sept arbitrages, car les renommer apres les
+migrations et les tests serait couteux et risquerait de reproduire les alias que
+la refonte cherche precisement a eliminer.
+
+FIN DE L'ADDENDUM SUR LA SPECIFICATION
+
+
+
+Ton addendum est validé.
+
+Ne lance encore aucune modification, migration, création d’enum ni correction
+automatique des données.
+
+Exécute uniquement la PHASE A d’audit factuel.
+
+Je veux recevoir :
+
+1. l’inventaire exact de tous les dashboards existants et de leurs URLs ;
+2. l’inventaire exact des positions, rôles, user_type, groupes et alias ;
+3. la liste des règles qui donnent actuellement accès à chaque dashboard ;
+4. la reproduction technique du cas de la gestionnaire ayant accès à deux
+   dashboards ;
+5. la distinction réelle dans le code entre gestionnaire, finance_manager,
+   branch_manager et payment_agent ;
+6. les utilisateurs système possédant déjà des données communautaires, sous
+   forme agrégée et sans données personnelles ;
+7. la cartographie de tous les champs du Profile actuel en quatre catégories :
+   PUBLIC, SYSTEM, SHARED et DOMAIN-SPECIFIC ;
+8. une proposition de matrice finale :
+   position -> catégorie dérivée -> scopes autorisés -> annexe requise ->
+   dashboard principal -> groupe de capacités par défaut ;
+9. les décisions métier restant à me soumettre ;
+10. un plan de migration réversible avec mode shadow, feature flag et rollback.
+
+Aucun fichier ne doit être modifié pendant cette phase.
+
+Ne propose pas encore d’implémentation définitive avant ma validation explicite
+de la matrice.
+
+
+
+
+
+DÉCISION MÉTIER — GESTIONNAIRE
+
+La gestionnaire doit posséder une seule fonction métier officielle et un seul
+dashboard principal.
+
+Les identités historiques manager, gestionnaire, finance_manager et
+branch_manager ne doivent plus lui donner plusieurs dashboards.
+
+Avant de proposer le nom technique définitif de cette fonction :
+
+1. analyse entièrement le dashboard gestionnaire actuel ;
+2. inventorie toutes ses pages, vues, endpoints HTMX, services, formulaires,
+   exports, permissions et activités ;
+3. analyse séparément le dashboard finance actuel ;
+4. identifie ce qui est déjà présent dans le dashboard gestionnaire, ce qui fait
+   doublon et ce qui doit être intégré ;
+5. vérifie si “directeur d’annexe” est une fonction réellement distincte de la
+   gestionnaire dans les modèles et workflows ;
+6. vérifie le rôle réel de PaymentAgent ;
+7. reproduis la cause exacte du double accès actuel.
+
+La cible métier est :
+
+- une seule position officielle pour la gestionnaire ;
+- une annexe obligatoire ;
+- un seul dashboard principal ;
+- toutes ses fonctions accessibles depuis ce dashboard ;
+- aucune redirection vers un dashboard finance ou manager concurrent ;
+- les capacités financières deviennent des permissions/modules de son poste,
+  pas une deuxième identité.
+
+Ne reconstruis pas le dashboard à partir de zéro. Réutilise et consolide les
+éléments existants après inventaire.
+
+Ne fusionne pas tout le code dans un fichier Python monolithique. Il faut fusionner
+la fonction métier, la navigation et l’expérience utilisateur tout en conservant
+des modules internes maintenables.
+
+À la fin de l’audit, présente :
+
+1. la liste complète des activités de la gestionnaire ;
+2. les doublons entre les dashboards ;
+3. les fonctions manquantes à intégrer ;
+4. le nom technique recommandé pour sa position unique ;
+5. la route de son dashboard principal ;
+6. son groupe de capacités par défaut ;
+7. les anciens rôles/groupes/alias à migrer ;
+8. le plan de consolidation sans perte de fonctionnalité.
+
+Aucune implémentation avant ma validation.
+

@@ -3,6 +3,7 @@ from decimal import Decimal
 from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
@@ -46,10 +47,12 @@ from academics.services.schedule_service import (
     postpone_schedule_event,
     suggest_available_slots,
 )
+from accounts.models import TeacherHonorariumEntry
 from admissions.models import Candidature
 from branches.models import Branch
 from formations.models import Cycle, Diploma, Filiere, Programme
 from inscriptions.models import Inscription
+from notifier.models import NotificationMessage
 from students.models import Student, TeacherAttendance
 
 
@@ -1275,6 +1278,7 @@ class LessonLogServiceTests(TestCase):
         updated = update_lesson_log(
             lesson_log,
             updated_by=self.supervisor,
+            validated_by=self.supervisor,
             status=LessonLog.STATUS_DONE,
             content="Cours dispense",
             homework="Exercice 1",
@@ -1539,3 +1543,370 @@ class LessonLogApiTests(TestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()["lesson_log"]["status"], LessonLog.STATUS_ABSENT_TEACHER)
+
+
+class CalendarFrontendViewTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username="calendaruser", password="test")
+
+    def test_calendar_frontend_page_renders(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse("academics:calendar_frontend"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Calendrier académique")
+        self.assertContains(response, "calendarApp")
+
+
+class LessonLogHonorariumSignalTests(TestCase):
+    """Vérifie que les changements de cahier de texte recalculent l'honoraire mensuel."""
+
+    def setUp(self):
+        self.branch = Branch.objects.create(name="ESFE Honoraria", code="HNR", slug="esfe-honoraria")
+        self.supervisor = User.objects.create_user(username="hon_supervisor", password="pass1234")
+        self.supervisor.profile.position = "academic_supervisor"
+        self.supervisor.profile.user_type = "staff"
+        self.supervisor.profile.branch = self.branch
+        self.supervisor.profile.save(update_fields=["position", "user_type", "branch", "updated_at"])
+
+        self.teacher = User.objects.create_user(username="hon_teacher", password="pass1234")
+        self.teacher.profile.user_type = "teacher"
+        self.teacher.profile.teacher_hourly_rate = 5000
+        self.teacher.profile.branch = self.branch
+        self.teacher.profile.save(update_fields=["user_type", "teacher_hourly_rate", "branch", "updated_at"])
+
+        self.academic_year = AcademicYear.objects.create(
+            name="2027-2028",
+            start_date=date(2027, 9, 1),
+            end_date=date(2028, 6, 30),
+            is_active=True,
+        )
+        self.programme = Programme.objects.create(
+            title="Licence Gestion",
+            slug="licence-gestion",
+            cycle=Cycle.objects.create(name="Licence", min_duration_years=3, max_duration_years=5),
+            filiere=Filiere.objects.create(name="Gestion"),
+            diploma_awarded=Diploma.objects.create(name="Licence", level="superieur"),
+            duration_years=3,
+            short_description="Licence en gestion",
+            description="Description",
+        )
+        self.academic_class = AcademicClass.objects.create(
+            programme=self.programme,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            level="L1",
+            study_level="LICENCE",
+            validation_threshold=Decimal("10.00"),
+            is_active=True,
+        )
+        self.semester = Semester.objects.create(
+            academic_class=self.academic_class,
+            number=1,
+            total_required_credits=Decimal("30.00"),
+        )
+        self.ue = UE.objects.create(semester=self.semester, code="HON101", title="Honoraires")
+        self.ec = EC.objects.create(
+            ue=self.ue,
+            title="Management",
+            credit_required=Decimal("3.00"),
+            coefficient=Decimal("3.00"),
+        )
+        self.lesson_date = date(2027, 10, 5)
+        self.schedule_event = create_schedule_event(
+            user=self.supervisor,
+            title="Cours Management",
+            description="Seance honoraires",
+            event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+            academic_class=self.academic_class,
+            ec=self.ec,
+            teacher=self.teacher,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            start_datetime=timezone.make_aware(datetime.combine(self.lesson_date, time(8, 0))),
+            end_datetime=timezone.make_aware(datetime.combine(self.lesson_date, time(10, 0))),
+            status=AcademicScheduleEvent.STATUS_PLANNED,
+            location="Salle H1",
+            is_online=False,
+            meeting_link="",
+            is_active=True,
+        )
+
+    def test_validated_lesson_log_creates_honorarium_entry(self):
+        entry_before = TeacherHonorariumEntry.objects.filter(
+            branch=self.branch, teacher=self.teacher, period_month=date(2027, 10, 1)
+        ).first()
+        self.assertIsNone(entry_before)
+
+        create_lesson_log(
+            academic_class=self.academic_class,
+            ec=self.ec,
+            teacher=self.teacher,
+            schedule_event=self.schedule_event,
+            date=self.lesson_date,
+            start_time=time(8, 0),
+            end_time=time(10, 0),
+            status=LessonLog.STATUS_DONE,
+            branch=self.branch,
+            created_by=self.supervisor,
+            content="Cours dispense",
+            validated_by=self.supervisor,
+        )
+
+        entry = TeacherHonorariumEntry.objects.get(
+            branch=self.branch, teacher=self.teacher, period_month=date(2027, 10, 1)
+        )
+        self.assertEqual(entry.validated_hours, Decimal("2.00"))
+        self.assertEqual(entry.hourly_rate, 5000)
+
+    def test_unvalidated_lesson_log_does_not_count_hours(self):
+        create_lesson_log(
+            academic_class=self.academic_class,
+            ec=self.ec,
+            teacher=self.teacher,
+            schedule_event=self.schedule_event,
+            date=self.lesson_date,
+            start_time=time(8, 0),
+            end_time=time(10, 0),
+            status=LessonLog.STATUS_DONE,
+            branch=self.branch,
+            created_by=self.supervisor,
+            content="Cours soumis",
+        )
+
+        entry = TeacherHonorariumEntry.objects.filter(
+            branch=self.branch, teacher=self.teacher, period_month=date(2027, 10, 1)
+        ).first()
+        self.assertIsNone(entry)
+
+    def test_absent_teacher_lesson_log_does_not_count_hours(self):
+        create_lesson_log(
+            academic_class=self.academic_class,
+            ec=self.ec,
+            teacher=self.teacher,
+            schedule_event=self.schedule_event,
+            date=self.lesson_date,
+            start_time=time(8, 0),
+            end_time=time(10, 0),
+            status=LessonLog.STATUS_ABSENT_TEACHER,
+            branch=self.branch,
+            created_by=self.supervisor,
+            content="Absence",
+            validated_by=self.supervisor,
+        )
+
+        entry = TeacherHonorariumEntry.objects.filter(
+            branch=self.branch, teacher=self.teacher, period_month=date(2027, 10, 1)
+        ).first()
+        self.assertIsNone(entry)
+
+    def test_deleting_validated_lesson_log_resets_honorarium(self):
+        lesson_log = create_lesson_log(
+            academic_class=self.academic_class,
+            ec=self.ec,
+            teacher=self.teacher,
+            schedule_event=self.schedule_event,
+            date=self.lesson_date,
+            start_time=time(8, 0),
+            end_time=time(10, 0),
+            status=LessonLog.STATUS_DONE,
+            branch=self.branch,
+            created_by=self.supervisor,
+            content="Cours dispense",
+            validated_by=self.supervisor,
+        )
+
+        entry = TeacherHonorariumEntry.objects.get(
+            branch=self.branch, teacher=self.teacher, period_month=date(2027, 10, 1)
+        )
+        self.assertEqual(entry.validated_hours, Decimal("2.00"))
+
+        lesson_log.delete()
+
+        entry.refresh_from_db()
+        self.assertEqual(entry.validated_hours, Decimal("0.00"))
+
+
+class LessonLogNotificationTests(TestCase):
+    def setUp(self):
+        self.branch = Branch.objects.create(name="Annexe Notif", code="NOT", slug="annexe-notif")
+        self.other_branch = Branch.objects.create(name="Autre Notif", code="NOT2", slug="autre-notif")
+
+        self.manager = User.objects.create_user(username="notif_manager", password="pass1234", is_staff=True)
+        self.manager_group, _ = Group.objects.get_or_create(name="gestionnaire")
+        self.manager.groups.add(self.manager_group)
+        self.manager.profile.branch = self.branch
+        self.manager.profile.save(update_fields=["branch", "updated_at"])
+
+        self.other_manager = User.objects.create_user(username="other_notif_manager", password="pass1234", is_staff=True)
+        self.other_manager.groups.add(self.manager_group)
+        self.other_manager.profile.branch = self.other_branch
+        self.other_manager.profile.save(update_fields=["branch", "updated_at"])
+
+        self.supervisor = User.objects.create_user(username="notif_supervisor", password="pass1234")
+        self.supervisor.profile.position = "director_of_studies"
+        self.supervisor.profile.user_type = "supervisor"
+        self.supervisor.profile.branch = self.branch
+        self.supervisor.profile.save(update_fields=["position", "user_type", "branch", "updated_at"])
+
+        self.teacher = User.objects.create_user(username="notif_teacher", password="pass1234")
+        self.teacher.profile.user_type = "teacher"
+        self.teacher.profile.teacher_hourly_rate = 5000
+        self.teacher.profile.branch = self.branch
+        self.teacher.profile.save(update_fields=["user_type", "teacher_hourly_rate", "branch", "updated_at"])
+
+        self.academic_year = AcademicYear.objects.create(
+            name="2027-2028",
+            start_date=date(2027, 9, 1),
+            end_date=date(2028, 6, 30),
+            is_active=True,
+        )
+        self.programme = Programme.objects.create(
+            title="Licence Gestion",
+            slug="licence-gestion-notif",
+            cycle=Cycle.objects.create(name="Licence", min_duration_years=3, max_duration_years=5),
+            filiere=Filiere.objects.create(name="Gestion"),
+            diploma_awarded=Diploma.objects.create(name="Licence", level="superieur"),
+            duration_years=3,
+            short_description="Licence en gestion",
+            description="Description",
+        )
+        self.academic_class = AcademicClass.objects.create(
+            programme=self.programme,
+            branch=self.branch,
+            academic_year=self.academic_year,
+            level="L1",
+            study_level="LICENCE",
+            validation_threshold=Decimal("10.00"),
+            is_active=True,
+        )
+        self.semester = Semester.objects.create(
+            academic_class=self.academic_class,
+            number=1,
+            total_required_credits=Decimal("30.00"),
+        )
+        self.ue = UE.objects.create(
+            semester=self.semester,
+            code="UE_GEST",
+            title="Gestion",
+        )
+        self.ec = EC.objects.create(
+            ue=self.ue,
+            title="Communication",
+            credit_required=Decimal("3.00"),
+            coefficient=Decimal("1.00"),
+        )
+        self.schedule_event = AcademicScheduleEvent.objects.create(
+            event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+            academic_class=self.academic_class,
+            ec=self.ec,
+            teacher=self.teacher,
+            branch=self.branch,
+            title="Cours Communication",
+            start_datetime=datetime(2027, 10, 15, 8, 0),
+            end_datetime=datetime(2027, 10, 15, 10, 0),
+            is_active=True,
+        )
+        self.lesson_date = date(2027, 10, 15)
+
+    def test_submitting_lesson_log_notifies_branch_managers(self):
+        create_lesson_log(
+            academic_class=self.academic_class,
+            ec=self.ec,
+            teacher=self.teacher,
+            schedule_event=self.schedule_event,
+            date=self.lesson_date,
+            start_time=time(8, 0),
+            end_time=time(10, 0),
+            status=LessonLog.STATUS_DONE,
+            branch=self.branch,
+            created_by=self.teacher,
+            content="Cours dispense",
+        )
+        self.assertTrue(
+            NotificationMessage.objects.filter(
+                recipient=self.manager,
+                event_type="lesson_log_submitted",
+            ).exists()
+        )
+        self.assertFalse(
+            NotificationMessage.objects.filter(
+                recipient=self.other_manager,
+                event_type="lesson_log_submitted",
+            ).exists()
+        )
+
+    def test_validating_lesson_log_notifies_teacher(self):
+        lesson_log = create_lesson_log(
+            academic_class=self.academic_class,
+            ec=self.ec,
+            teacher=self.teacher,
+            schedule_event=self.schedule_event,
+            date=self.lesson_date,
+            start_time=time(8, 0),
+            end_time=time(10, 0),
+            status=LessonLog.STATUS_DONE,
+            branch=self.branch,
+            created_by=self.teacher,
+            content="Cours dispense",
+        )
+        update_lesson_log(
+            lesson_log=lesson_log,
+            content="Cours dispense et valide",
+            validated_by=self.supervisor,
+            updated_by=self.supervisor,
+        )
+        self.assertTrue(
+            NotificationMessage.objects.filter(
+                recipient=self.teacher,
+                event_type="lesson_log_validated",
+            ).exists()
+        )
+
+    def test_editing_submitted_log_does_not_duplicate_manager_notification(self):
+        lesson_log = create_lesson_log(
+            academic_class=self.academic_class,
+            ec=self.ec,
+            teacher=self.teacher,
+            schedule_event=self.schedule_event,
+            date=self.lesson_date,
+            start_time=time(8, 0),
+            end_time=time(10, 0),
+            status=LessonLog.STATUS_DONE,
+            branch=self.branch,
+            created_by=self.teacher,
+            content="Cours dispense",
+        )
+        update_lesson_log(
+            lesson_log=lesson_log,
+            content="Cours mis a jour",
+            updated_by=self.teacher,
+        )
+        self.assertEqual(
+            NotificationMessage.objects.filter(
+                recipient=self.manager,
+                event_type="lesson_log_submitted",
+            ).count(),
+            1,
+        )
+
+    def test_creating_absent_log_does_not_notify_managers(self):
+        create_lesson_log(
+            academic_class=self.academic_class,
+            ec=self.ec,
+            teacher=self.teacher,
+            schedule_event=self.schedule_event,
+            date=self.lesson_date,
+            start_time=time(8, 0),
+            end_time=time(10, 0),
+            status=LessonLog.STATUS_ABSENT_TEACHER,
+            branch=self.branch,
+            created_by=self.teacher,
+            content="Absence",
+        )
+        self.assertFalse(
+            NotificationMessage.objects.filter(
+                recipient=self.manager,
+                event_type="lesson_log_submitted",
+            ).exists()
+        )
+

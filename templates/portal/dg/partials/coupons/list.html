@@ -1,0 +1,82 @@
+{% load humanize %}
+<div id="dg-coupons-panel" class="dg-card dg-card-pad">
+  <div class="dg-section-hero">
+    <div>
+      <div class="dg-section-hero-title">
+        <i class="fa-solid fa-ticket" style="color:#2563eb; margin-right:8px;"></i>Coupons de reduction
+      </div>
+      <div class="dg-section-hero-sub">{{ coupons|length }} coupon{{ coupons|length|pluralize }} cree{{ coupons|length|pluralize }} · Le Directeur General cree, la gestionnaire applique</div>
+    </div>
+    <div class="dg-section-actions">
+      <button type="button" class="dg-btn dg-btn-primary" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=coupon')">
+        <i class="fa-solid fa-plus"></i>Nouveau coupon
+      </button>
+    </div>
+  </div>
+
+  <div class="dg-panel" style="margin-top:16px;">
+    <div class="dg-table-wrap">
+      <table class="dg-table">
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Description</th>
+            <th>Reduction</th>
+            <th>Annexes</th>
+            <th>Formations</th>
+            <th>Validite</th>
+            <th>Utilisations</th>
+            <th>Statut</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for coupon in coupons %}
+          <tr>
+            <td class="font-black">{{ coupon.code }}</td>
+            <td>{{ coupon.label }}</td>
+            <td>
+              {% if coupon.discount_type == "percentage" %}{{ coupon.value }}%{% else %}{{ coupon.value|intcomma }} FCFA{% endif %}
+            </td>
+            <td>
+              {% with branch_count=coupon.branches.count %}
+                {% if branch_count %}{{ branch_count }} annexe{{ branch_count|pluralize }}{% else %}Toutes les annexes{% endif %}
+              {% endwith %}
+            </td>
+            <td>
+              {% with programme_count=coupon.programmes.count %}
+                {% if programme_count %}{{ programme_count }} formation{{ programme_count|pluralize }}{% else %}Toutes les formations{% endif %}
+              {% endwith %}
+            </td>
+            <td class="text-xs">
+              {{ coupon.valid_from|date:"d/m/Y" }} → {{ coupon.valid_until|date:"d/m/Y"|default:"sans limite" }}
+            </td>
+            <td>{{ coupon.redemptions_count }} / {{ coupon.max_redemptions|default:"∞" }}</td>
+            <td>
+              <span class="dg-badge {% if coupon.is_active %}bg-emerald-100 text-emerald-700{% else %}bg-slate-100 text-slate-500{% endif %}">
+                {% if coupon.is_active %}Actif{% else %}Desactive{% endif %}
+              </span>
+            </td>
+            <td>
+              <form method="post" action="{% url 'accounts_portal:dg_coupon_toggle' %}" onsubmit="return dgSubmitCouponToggle(this)">
+                {% csrf_token %}
+                <input type="hidden" name="coupon_id" value="{{ coupon.id }}">
+                <button type="submit" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;">
+                  {% if coupon.is_active %}Desactiver{% else %}Reactiver{% endif %}
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="9" class="dg-empty">
+              <div class="dg-empty-icon"><i class="fa-solid fa-ticket"></i></div>
+              <div class="dg-empty-text">Aucun coupon cree pour le moment</div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

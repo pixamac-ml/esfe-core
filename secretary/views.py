@@ -30,11 +30,13 @@ from notifier.services import NotificationBus
 from .forms import (
     AppointmentForm,
     DocumentReceiptForm,
+    MeetingForm,
+    MeetingMinutesForm,
     RegistryEntryForm,
     SecretaryTaskForm,
     VisitorLogForm,
 )
-from .models import DocumentReceipt, RegistryEntry, SecretaryTask
+from .models import DocumentReceipt, Meeting, MeetingMinutes, RegistryEntry, SecretaryTask
 from .permissions import ensure_secretary_access
 from .selectors import (
     get_active_students,
@@ -79,6 +81,14 @@ from .services import (
     update_registry_entry,
     update_task,
     update_visitor,
+    get_daily_report_stats,
+    transmit_daily_report_to_dg,
+    get_meetings_queryset,
+    get_upcoming_meetings,
+    create_meeting,
+    update_meeting,
+    update_meeting_status,
+    save_meeting_minutes,
 )
 
 
@@ -220,6 +230,14 @@ def _render_create_drawer_or_page(request, drawer_template, page_template, conte
 
 @login_required
 def secretary_dashboard(request):
+    from django.conf import settings
+
+    if (
+        settings.AUTH_PORTAL_ROUTING_V2_ENABLED
+        and request.resolver_match
+        and request.resolver_match.namespace == "secretary"
+    ):
+        return redirect("accounts_portal:portal_secretary")
     ensure_secretary_access(request.user)
     context = get_secretary_dashboard_data(request.user)
     branch = context.get("branch")
@@ -235,20 +253,21 @@ def secretary_dashboard(request):
     active_sec = context["active_section"]
     sidebar_items = [
         {"divider": "Général"},
-        {"label": "Vue d'ensemble", "icon": "layout-dashboard", "url": "?section=overview", "active": active_sec == "overview"},
-        {"label": "Registre", "icon": "book-open", "url": "?section=registry", "active": active_sec == "registry", "badge": context.get("pending_registry_count", 0), "badge_tone": "primary"},
-        {"label": "Visiteurs", "icon": "user-clock", "url": "?section=visits", "active": active_sec == "visits"},
-        {"label": "Dépôts", "icon": "archive", "url": "?section=deposits", "active": active_sec == "deposits", "badge": context.get("pending_documents_count", 0), "badge_tone": "warning"},
+        {"id": "overview",       "label": "Vue d'ensemble", "icon": "layout-dashboard", "url": "?section=overview",       "active": active_sec == "overview"},
+        {"id": "registry",      "label": "Registre",       "icon": "book-open",        "url": "?section=registry",      "active": active_sec == "registry",      "badge": context.get("pending_registry_count", 0) or None,  "badge_tone": "primary"},
+        {"id": "visits",        "label": "Visiteurs",      "icon": "user-clock",       "url": "?section=visits",        "active": active_sec == "visits"},
+        {"id": "deposits",      "label": "Dépôts",         "icon": "archive",          "url": "?section=deposits",      "active": active_sec == "deposits",      "badge": context.get("pending_documents_count", 0) or None, "badge_tone": "warning"},
         {"divider": "Suivi"},
-        {"label": "Rendez-vous", "icon": "calendar-days", "url": "?section=appointments", "active": active_sec == "appointments", "badge": context.get("appointments_today", 0), "badge_tone": "info"},
-        {"label": "Classes", "icon": "school", "url": "?section=classes", "active": active_sec == "classes"},
-        {"label": "Étudiants", "icon": "graduation-cap", "url": "?section=students", "active": active_sec == "students"},
+        {"id": "appointments",  "label": "Rendez-vous",    "icon": "calendar-days",    "url": "?section=appointments",  "active": active_sec == "appointments",  "badge": context.get("appointments_today", 0) or None,      "badge_tone": "info"},
+        {"id": "classes",       "label": "Classes",        "icon": "school",           "url": "?section=classes",       "active": active_sec == "classes"},
+        {"id": "students",      "label": "Étudiants",      "icon": "graduation-cap",   "url": "?section=students",      "active": active_sec == "students"},
         {"divider": "Gestion"},
-        {"label": "Rapports", "icon": "file-export", "url": "?section=reports", "active": active_sec == "reports"},
-        {"label": "Salaire", "icon": "wallet", "url": "?section=salary", "active": active_sec == "salary"},
-        {"label": "Notifications", "icon": "bell", "url": "?section=notifications", "active": active_sec == "notifications", "badge": context.get("messages_count", 0), "badge_tone": "danger"},
+        {"id": "meetings",      "label": "Réunions",       "icon": "calendar-range",   "url": "?section=meetings",      "active": active_sec == "meetings",      "badge": context.get("meetings_count") or None,             "badge_tone": "info"},
+        {"id": "reports",       "label": "Rapports",       "icon": "file-export",      "url": "?section=reports",       "active": active_sec == "reports"},
+        {"id": "salary",        "label": "Salaire",        "icon": "wallet",           "url": "?section=salary",        "active": active_sec == "salary"},
+        {"id": "notifications", "label": "Notifications",  "icon": "bell",             "url": "?section=notifications", "active": active_sec == "notifications", "badge": context.get("messages_count") or None,             "badge_tone": "danger"},
         {"divider": "Compte"},
-        {"label": "Paramètres", "icon": "settings", "url": "?section=settings", "active": active_sec == "settings"},
+        {"id": "settings",      "label": "Paramètres",     "icon": "settings",         "url": "?section=settings",      "active": active_sec == "settings"},
     ]
     context["nav_items"] = sidebar_items
     selected_notification = None
@@ -425,6 +444,18 @@ def secretary_dashboard(request):
     context["quick_visitor_form"] = VisitorLogForm(**_form_kwargs(request))
     context["quick_document_form"] = DocumentReceiptForm(**_form_kwargs(request))
     context["quick_task_form"] = SecretaryTaskForm(**_form_kwargs(request))
+    context["quick_meeting_form"] = MeetingForm(**_form_kwargs(request))
+    context["upcoming_meetings"] = list(get_upcoming_meetings(branch=branch, limit=5))
+    context["meetings_page"] = _paginate(
+        request,
+        get_meetings_queryset(branch=branch),
+        per_page=10,
+        page_param="meetings_page",
+    )
+    context["meetings_rows"] = context["meetings_page"].object_list
+    context["meetings_count"] = get_meetings_queryset(branch=branch).count()
+    if _is_htmx(request) and request.headers.get("HX-Target") == "secretary-workspace":
+        return render(request, "secretary/workspace_partial.html", context)
     return render(request, "secretary/dashboard.html", context)
 
 
@@ -1386,6 +1417,60 @@ def htmx_documents_pending(request):
 
 
 @login_required
+def htmx_reports_preview(request):
+    ensure_secretary_access(request.user)
+    branch = get_user_branch(request.user)
+    report_date_str = request.GET.get("date", "")
+    entry_type_filter = request.GET.get("entry_type", "").strip()
+    try:
+        from django.utils.dateparse import parse_date
+        report_date = parse_date(report_date_str) if report_date_str else timezone.localdate()
+        if report_date is None:
+            report_date = timezone.localdate()
+    except Exception:
+        report_date = timezone.localdate()
+    stats = get_daily_report_stats(user=request.user, branch=branch, report_date=report_date)
+    entries = stats["entries"]
+    if entry_type_filter:
+        entries = entries.filter(entry_type=entry_type_filter)
+    return render(request, "secretary/htmx/reports_preview.html", {
+        "stats": stats,
+        "entries": entries,
+        "report_date": report_date,
+        "branch": branch,
+        "entry_type_filter": entry_type_filter,
+        "entry_type_choices": RegistryEntry.ENTRY_TYPE_CHOICES,
+    })
+
+
+@login_required
+@require_POST
+def transmit_report_to_dg(request):
+    ensure_secretary_access(request.user)
+    branch = get_user_branch(request.user)
+    report_date_str = request.POST.get("date", "")
+    note = request.POST.get("note", "").strip()
+    try:
+        from django.utils.dateparse import parse_date
+        report_date = parse_date(report_date_str) if report_date_str else timezone.localdate()
+        if report_date is None:
+            report_date = timezone.localdate()
+    except Exception:
+        report_date = timezone.localdate()
+    result = transmit_daily_report_to_dg(
+        user=request.user, branch=branch, report_date=report_date, note=note
+    )
+    recipients = result["recipients_count"]
+    if recipients > 0:
+        messages.success(request, f"Rapport du {report_date} transmis au DG ({recipients} destinataire(s)).")
+    else:
+        messages.warning(request, "Rapport transmis mais aucun DG trouve sur cette annexe.")
+    if _is_htmx(request):
+        return _refresh_response(request)
+    return redirect(f"{reverse('secretary:secretary_dashboard')}?section=reports")
+
+
+@login_required
 def daily_registry_report(request):
     ensure_secretary_access(request.user)
     branch = get_user_branch(request.user)
@@ -1462,3 +1547,107 @@ def daily_registry_report(request):
         "secretary/daily_registry_report.html",
         {"entries": entries, "branch": branch, "report_date": report_date},
     )
+
+@login_required
+def meeting_list(request):
+    ensure_secretary_access(request.user)
+    branch = get_user_branch(request.user)
+    meetings = get_meetings_queryset(branch=branch)
+    page = _paginate(request, meetings, per_page=15)
+    return render(request, "secretary/meeting_list.html", {"meetings": page.object_list, "page_obj": page, "branch": branch})
+
+
+@login_required
+def meeting_create(request):
+    ensure_secretary_access(request.user)
+    branch = get_user_branch(request.user)
+    if request.method == "POST":
+        form = MeetingForm(request.POST, user=request.user, branch=branch)
+        if form.is_valid():
+            meeting = create_meeting(user=request.user, branch=branch, form_data=form.cleaned_data)
+            if _is_htmx(request):
+                response = HttpResponse(status=204)
+                response["HX-Trigger"] = json.dumps({"sg:toast": {"message": "Réunion planifiée.", "tone": "success"}, "secretary:meetings-updated": {}})
+                return _drawer_close_response(response)
+            return redirect("?section=meetings")
+    else:
+        form = MeetingForm(user=request.user, branch=branch)
+    return render(request, "secretary/htmx/meeting_form.html", {"form": form, "action": "Planifier une réunion"})
+
+
+@login_required
+def meeting_update(request, pk):
+    ensure_secretary_access(request.user)
+    branch = get_user_branch(request.user)
+    meeting = get_object_or_404(Meeting, pk=pk, branch=branch)
+    if request.method == "POST":
+        form = MeetingForm(request.POST, instance=meeting, user=request.user, branch=branch)
+        if form.is_valid():
+            update_meeting(meeting=meeting, form_data=form.cleaned_data)
+            if _is_htmx(request):
+                response = HttpResponse(status=204)
+                response["HX-Trigger"] = json.dumps({"sg:toast": {"message": "Réunion mise à jour.", "tone": "success"}, "secretary:meetings-updated": {}})
+                return _drawer_close_response(response)
+            return redirect("?section=meetings")
+    else:
+        form = MeetingForm(instance=meeting, user=request.user, branch=branch)
+    return render(request, "secretary/htmx/meeting_form.html", {"form": form, "meeting": meeting, "action": "Modifier la réunion"})
+
+
+@login_required
+@require_POST
+def meeting_status_update(request, pk):
+    ensure_secretary_access(request.user)
+    branch = get_user_branch(request.user)
+    meeting = get_object_or_404(Meeting, pk=pk, branch=branch)
+    new_status = request.POST.get("status", "")
+    try:
+        update_meeting_status(meeting=meeting, status=new_status)
+        msg = f"Réunion marquée : {meeting.get_status_display()}."
+        tone = "success"
+    except (ValueError, Exception) as e:
+        msg = str(e)
+        tone = "danger"
+    response = HttpResponse(status=204)
+    response["HX-Trigger"] = json.dumps({"sg:toast": {"message": msg, "tone": tone}, "secretary:meetings-updated": {}})
+    return response
+
+
+@login_required
+def meeting_minutes(request, pk):
+    ensure_secretary_access(request.user)
+    branch = get_user_branch(request.user)
+    meeting = get_object_or_404(Meeting, pk=pk, branch=branch)
+    existing = getattr(meeting, "minutes", None)
+    if request.method == "POST":
+        form = MeetingMinutesForm(request.POST, instance=existing)
+        if form.is_valid():
+            save_meeting_minutes(
+                user=request.user,
+                meeting=meeting,
+                content=form.cleaned_data["content"],
+                decisions=form.cleaned_data.get("decisions", ""),
+                next_steps=form.cleaned_data.get("next_steps", ""),
+            )
+            if _is_htmx(request):
+                response = HttpResponse(status=204)
+                response["HX-Trigger"] = json.dumps({"sg:toast": {"message": "Procès-verbal enregistré.", "tone": "success"}, "secretary:meetings-updated": {}})
+                return _drawer_close_response(response)
+            return redirect("?section=meetings")
+    else:
+        form = MeetingMinutesForm(instance=existing)
+    return render(request, "secretary/htmx/meeting_minutes_form.html", {"form": form, "meeting": meeting, "existing": existing})
+
+
+@login_required
+def htmx_meetings_list(request):
+    ensure_secretary_access(request.user)
+    branch = get_user_branch(request.user)
+    status_filter = request.GET.get("status", "")
+    qs = get_meetings_queryset(branch=branch, status=status_filter if status_filter else None)
+    page = _paginate(request, qs, per_page=10, page_param="meetings_page")
+    return render(request, "secretary/htmx/meetings_list.html", {
+        "meetings_rows": page.object_list,
+        "meetings_page": page,
+        "status_filter": status_filter,
+    })

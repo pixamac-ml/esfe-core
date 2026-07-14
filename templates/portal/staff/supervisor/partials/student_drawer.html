@@ -1,44 +1,16 @@
+{% load component_tags %}
 {% if not student %}
-  {% load component_tags %}
   {% component "empty_state" icon="user-x" title="Étudiant introuvable" message="La sélection ne correspond pas à votre annexe ou à cette classe." %}{% endcomponent %}
 {% else %}
-  <div style="display:flex;align-items:center;gap:13px;margin-bottom:8px">
-    <div class="pic" style="width:50px;height:50px;font-size:16px;background:#3d4f63">{{ student.full_name|slice:":2"|upper }}</div>
-    <div><b style="font-size:15px">{{ student.full_name }}</b><div style="color:var(--ink-3);font-size:12.5px">{{ student.matricule }} · {{ student.programme_title }}</div></div>
-  </div>
-  <div class="kv"><span>Email</span><b>{{ student.email }}</b></div>
-
-  {% if active_alerts %}
-    <div class="sec-title">Alertes actives</div>
-    {% for alert in active_alerts %}
-      <div class="banner warn">{{ alert.get_alert_type_display }} · {{ alert.count }} signalement(s)</div>
-    {% endfor %}
-  {% endif %}
-
-  <div class="sec-title">Dossiers liés</div>
-  <div hx-get="{% url 'accounts_portal:supervisor_student_cases' student.id %}" hx-trigger="load" hx-target="this">
-    <p style="font-size:12px;color:var(--ink-3)">Chargement des cas...</p>
-  </div>
-
-  <div class="sec-title">Actions</div>
-  <button type="button" class="btn primary" style="width:100%;justify-content:center;margin-bottom:10px"
-          hx-get="{% url 'accounts_portal:supervisor_convocation_drawer' %}?target_type=student&target_id={{ student.id }}"
-          hx-target="#supervisor-drawer-content">
-    Convoquer (étudiant / parents)
-  </button>
-
-  <div class="sec-title">Historique récent ({{ attendance_history|length }})</div>
-  {% for row in attendance_history %}
-    <div class="row" style="padding:10px 0">
-      <div class="main">
-        <b>{{ row.date|date:"d/m/Y" }}{% if row.schedule_event_time %} · {{ row.schedule_event_time }}{% endif %}</b>
-        <span>{{ row.classroom }}</span>
-      </div>
-      <span class="tail">
-        <span class="chip {% if row.status == 'present' %}ok{% elif row.status == 'absent' %}bad{% else %}warn{% endif %}">{{ row.status }}</span>
-      </span>
+  <div class="space-y-4">
+    <div class="flex items-center gap-3"><span class="pic h-12 w-12 text-base">{{ student.full_name|slice:":2"|upper }}</span><div><strong class="block">{{ student.full_name }}</strong><span class="text-xs text-[color:var(--muted)]">{{ student.matricule }} · {{ student.programme_title }}</span></div></div>
+    {% if student.email %}<div class="kv"><span>Email</span><b>{{ student.email }}</b></div>{% endif %}
+    {% if active_alerts %}<div><h4 class="sec-title">Alertes actives</h4><div class="space-y-2">{% for alert in active_alerts %}{% component "alert" tone="warning" message=alert.get_alert_type_display %}{% endcomponent %}{% endfor %}</div></div>{% endif %}
+    <div><h4 class="sec-title">Dossiers liés</h4><div hx-get="{% url 'accounts_portal:supervisor_student_cases' student.id %}" hx-trigger="load" hx-target="this" aria-live="polite">{% component "skeleton_card" lines=2 %}{% endcomponent %}</div></div>
+    <button type="button" class="btn primary w-full justify-center" hx-get="{% url 'accounts_portal:supervisor_convocation_drawer' %}?target_type=student&target_id={{ student.id }}" hx-target="#supervisor-drawer-content">Convoquer l'étudiant ou les parents</button>
+    <div><h4 class="sec-title">Historique récent ({{ attendance_history|length }})</h4>
+      {% for row in attendance_history %}<div class="row py-2"><span class="main"><b>{{ row.date|date:"d/m/Y" }}{% if row.schedule_event_time %} · {{ row.schedule_event_time }}{% endif %}</b><span>{{ row.classroom }}</span></span><span class="tail">{% if row.status == 'present' %}{% component "status_badge" label="Présent" tone="success" %}{% endcomponent %}{% elif row.status == 'absent' %}{% component "status_badge" label="Absent" tone="danger" %}{% endcomponent %}{% else %}{% component "status_badge" label=row.status tone="warning" %}{% endcomponent %}{% endif %}</span></div>
+      {% empty %}{% component "empty_state" icon="history" title="Aucun historique" message="Aucune donnée d'assiduité disponible." compact=True %}{% endcomponent %}{% endfor %}
     </div>
-  {% empty %}
-    <p style="font-size:12px;color:var(--ink-3)">Aucun historique d’assiduité disponible.</p>
-  {% endfor %}
+  </div>
 {% endif %}

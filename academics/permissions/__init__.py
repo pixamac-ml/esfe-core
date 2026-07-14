@@ -1,11 +1,33 @@
+from django.core.exceptions import PermissionDenied
+
 from accounts.access import get_user_annexe, get_user_position
 
 
 GLOBAL_POSITIONS = {"super_admin", "executive_director", "deputy_executive_director"}
+DIRECTOR_DASHBOARD_POSITIONS = GLOBAL_POSITIONS | {"director_of_studies"}
 REPORT_POSITIONS = GLOBAL_POSITIONS | {"director_of_studies", "academic_supervisor", "it_support"}
 IMPORT_POSITIONS = GLOBAL_POSITIONS | {"director_of_studies", "it_support"}
-BULLETIN_MANAGEMENT_POSITIONS = {"super_admin", "director_of_studies"}
+BULLETIN_MANAGEMENT_POSITIONS = DIRECTOR_DASHBOARD_POSITIONS
 DIPLOMA_MANAGEMENT_POSITIONS = {"executive_director", "deputy_executive_director"}
+
+
+def require_director_branch_scope(user, *, additional_scoped_positions=None):
+    """Return the mandatory branch for a scoped academic dashboard user."""
+    if not user or not user.is_authenticated:
+        raise PermissionDenied("Authentification requise.")
+
+    position = get_user_position(user)
+    if user.is_superuser or position in GLOBAL_POSITIONS:
+        return None
+
+    scoped_positions = {"director_of_studies"} | set(additional_scoped_positions or ())
+    if position not in scoped_positions:
+        raise PermissionDenied("Acces reserve au pilotage academique autorise.")
+
+    branch = get_user_annexe(user)
+    if branch is None:
+        raise PermissionDenied("Aucune annexe n'est rattachee a ce compte.")
+    return branch
 
 
 def is_global_academic_user(user):

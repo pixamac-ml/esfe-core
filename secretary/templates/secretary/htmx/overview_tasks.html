@@ -8,22 +8,45 @@
     {% if pending_tasks_rows %}
       <div class="divide-y divide-[color:var(--line)]">
         {% for item in pending_tasks_rows %}
-          <div class="flex items-center justify-between py-2.5 text-sm">
-            <div class="min-w-0">
-              <div class="font-bold text-[color:var(--text)]">{{ item.title }}</div>
-              <div class="flex items-center gap-2 text-xs text-[color:var(--muted-2)]">
-                <span>{{ item.due_date|date:"d/m"|default:"Sans date" }}</span>
+          <div class="flex items-start justify-between py-3 gap-3 text-sm">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-bold text-[color:var(--text)] truncate">{{ item.title }}</span>
+                {% if item.priority == "urgent" %}
+                  <span class="rounded-full bg-red-100 px-2 py-0.5 text-[9px] font-black text-red-700">URGENT</span>
+                {% elif item.priority == "high" %}
+                  <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-black text-amber-700">Haute</span>
+                {% elif item.priority == "medium" %}
+                  <span class="rounded-full bg-blue-100 px-2 py-0.5 text-[9px] font-bold text-blue-700">Moyenne</span>
+                {% else %}
+                  <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[9px] font-bold text-gray-500">Faible</span>
+                {% endif %}
+              </div>
+              {% if item.description %}
+                <div class="mt-0.5 text-[10px] text-[color:var(--muted)] truncate">{{ item.description|truncatechars:60 }}</div>
+              {% endif %}
+              <div class="mt-0.5 flex items-center gap-1 text-[10px]">
+                <i data-lucide="calendar" style="width:10px;height:10px;" class="text-[color:var(--muted-2)]"></i>
+                {% if item.due_date %}
+                  <span class="{% if item.due_date < today %}text-red-600 font-bold{% else %}text-[color:var(--muted)]{% endif %}">
+                    {{ item.due_date|date:"d/m/Y" }}{% if item.due_date < today %} — en retard{% endif %}
+                  </span>
+                {% else %}
+                  <span class="text-[color:var(--muted-2)]">Sans date</span>
+                {% endif %}
               </div>
             </div>
-            {% if item.status == "pending" %}
-              <form method="post" hx-post="{% url 'secretary:task_start' item.id %}" hx-target="closest div" hx-swap="outerHTML swap:180ms">{% csrf_token %}
-                {% component "button" label="Démarrer" variant="primary" size="sm" type="submit" icon_left="play" %}{% endcomponent %}
-              </form>
-            {% elif item.status == "in_progress" %}
-              <form method="post" hx-post="{% url 'secretary:task_complete' item.id %}" hx-target="closest div" hx-swap="outerHTML swap:180ms">{% csrf_token %}
-                {% component "button" label="Terminer" variant="success" size="sm" type="submit" icon_left="check" %}{% endcomponent %}
-              </form>
-            {% endif %}
+            <div class="shrink-0">
+              {% if item.status == "pending" %}
+                <form method="post" hx-post="{% url 'secretary:task_start' item.id %}" hx-target="closest div" hx-swap="outerHTML swap:180ms">{% csrf_token %}
+                  {% component "button" label="Démarrer" variant="primary" size="sm" type="submit" icon_left="play" %}{% endcomponent %}
+                </form>
+              {% elif item.status == "in_progress" %}
+                <form method="post" hx-post="{% url 'secretary:task_complete' item.id %}" hx-target="closest div" hx-swap="outerHTML swap:180ms">{% csrf_token %}
+                  {% component "button" label="Terminer" variant="success" size="sm" type="submit" icon_left="check" %}{% endcomponent %}
+                </form>
+              {% endif %}
+            </div>
           </div>
         {% endfor %}
       </div>

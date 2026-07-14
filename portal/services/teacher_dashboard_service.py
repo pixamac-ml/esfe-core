@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from django.core.exceptions import ValidationError
 from django.db import OperationalError, ProgrammingError, transaction
 from django.db.models import Count, Prefetch, Q
+from django.urls import reverse
 from django.utils import timezone
 
 from academics.models import AcademicClass, AcademicScheduleEvent, EC, ECChapter, ECContent, LessonLog, WeeklyScheduleSlot
@@ -16,6 +17,7 @@ from notification_center.selectors import get_user_in_app_messages, get_user_unr
 from portal.models import AccountSupportState
 from students.models import Student, TeacherAttendance
 from portal.models import TeacherDashboardPreference
+from portal.services.director.exam_session_service import get_upcoming_exam_sessions_for_class
 
 WEEKDAY_LABELS = [
     "Lundi",
@@ -142,6 +144,81 @@ def _get_teacher_director_assignments(*, teacher, branch, academic_class=None):
     if academic_class is not None:
         assignments_qs = assignments_qs.filter(academic_class=academic_class)
     return list(assignments_qs)
+
+
+def _lesson_log_hours_minutes(log):
+    """Retourne la durée en minutes d'un cahier de texte."""
+    from datetime import datetime
+
+    if not log.start_time or not log.end_time or log.end_time <= log.start_time:
+        return 0
+    start = datetime.combine(log.date, log.start_time)
+    end = datetime.combine(log.date, log.end_time)
+    return int((end - start).total_seconds() // 60)
+
+
+def _build_teacher_volume_context(*, teacher, branch, today):
+    """Calcule le volume horaire prévu et les heures effectuées/soumises/validées."""
+    from datetime import date
+    from decimal import Decimal
+
+    if branch is None:
+        return {
+            "planned_hours": 0.0,
+            "remaining_hours": 0.0,
+            "month": {"submitted_hours": 0.0, "validated_hours": 0.0, "absent_hours": 0.0},
+            "total": {"submitted_hours": 0.0, "validated_hours": 0.0, "absent_hours": 0.0},
+            "assignment_count": 0,
+        }
+
+    assignments = _get_teacher_director_assignments(teacher=teacher, branch=branch)
+    planned_hours = Decimal(
+        sum(
+            (assignment.planned_hours or Decimal("0"))
+            for assignment in assignments
+        )
+    )
+
+    month_logs = LessonLog.objects.filter(
+        teacher=teacher,
+        branch=branch,
+        date__year=today.year,
+        date__month=today.month,
+    )
+    all_logs = LessonLog.objects.filter(
+        teacher=teacher,
+        branch=branch,
+    )
+
+    def sum_hours(queryset):
+        total_minutes = 0
+        for log in queryset:
+            total_minutes += _lesson_log_hours_minutes(log)
+        return Decimal(total_minutes) / Decimal(60)
+
+    submitted_month_hours = sum_hours(month_logs.filter(status=LessonLog.STATUS_DONE, validated_by__isnull=True))
+    validated_month_hours = sum_hours(month_logs.filter(status=LessonLog.STATUS_DONE, validated_by__isnull=False))
+    absent_month_hours = sum_hours(month_logs.filter(status=LessonLog.STATUS_ABSENT_TEACHER))
+
+    submitted_total_hours = sum_hours(all_logs.filter(status=LessonLog.STATUS_DONE, validated_by__isnull=True))
+    validated_total_hours = sum_hours(all_logs.filter(status=LessonLog.STATUS_DONE, validated_by__isnull=False))
+    absent_total_hours = sum_hours(all_logs.filter(status=LessonLog.STATUS_ABSENT_TEACHER))
+
+    return {
+        "planned_hours": float(planned_hours),
+        "remaining_hours": max(float(planned_hours - validated_total_hours), 0.0),
+        "month": {
+            "submitted_hours": float(submitted_month_hours),
+            "validated_hours": float(validated_month_hours),
+            "absent_hours": float(absent_month_hours),
+        },
+        "total": {
+            "submitted_hours": float(submitted_total_hours),
+            "validated_hours": float(validated_total_hours),
+            "absent_hours": float(absent_total_hours),
+        },
+        "assignment_count": len(assignments),
+    }
 
 
 def _resolve_teacher_class(*, teacher, branch, class_id):
@@ -298,6 +375,66 @@ def _resolve_teacher_ec(*, teacher, branch, academic_class, ec_id):
         if ec.id == ec_id:
             return ec
     raise ValidationError("Cette matiere n'est pas rattachee a cet enseignant pour la classe choisie.")
+
+
+def _build_today_event_rows(*, teacher, branch, today_events):
+    """Enrichit les cours du jour avec le statut de completion et les actions rapides."""
+    if not today_events:
+        return []
+
+    event_ids = [event.id for event in today_events]
+    ec_ids = {event.ec_id for event in today_events if event.ec_id}
+
+    logged_event_ids = set(
+        LessonLog.objects.filter(
+            schedule_event_id__in=event_ids,
+            teacher=teacher,
+            branch=branch,
+        ).values_list("schedule_event_id", flat=True)
+    )
+    attendance_map = {
+        att.schedule_event_id: att.status
+        for att in TeacherAttendance.objects.filter(
+            schedule_event_id__in=event_ids,
+            teacher=teacher,
+            branch=branch,
+        )
+    }
+    support_ec_ids = set(
+        ECContent.objects.filter(
+            chapter__ec_id__in=ec_ids,
+            is_active=True,
+        ).values_list("chapter__ec_id", flat=True)
+    )
+
+    rows = []
+    for event in today_events:
+        attendance_status = attendance_map.get(event.id)
+        has_lesson_log = event.id in logged_event_ids
+        has_attendance = attendance_status == TeacherAttendance.STATUS_PRESENT
+        is_absent = attendance_status == TeacherAttendance.STATUS_ABSENT
+        if is_absent:
+            status = "absent"
+        elif has_lesson_log and has_attendance:
+            status = "done"
+        else:
+            status = "pending"
+
+        rows.append({
+            "event": event,
+            "has_lesson_log": has_lesson_log,
+            "has_attendance": has_attendance,
+            "is_absent": is_absent,
+            "has_support": event.ec_id in support_ec_ids,
+            "status": status,
+            "lesson_log_url": reverse("accounts_portal:teacher_lesson_log_panel", args=[event.id]),
+            "support_url": (
+                f"{reverse('accounts_portal:teacher_support_workspace')}"
+                f"?class_id={event.academic_class_id}&ec_id={event.ec_id or ''}"
+            ),
+            "declare_absence_url": reverse("accounts_portal:teacher_declare_absence", args=[event.id]),
+        })
+    return rows
 
 
 def _parse_positive_int(raw_value, *, field_label, default=0, allow_zero=True):
@@ -663,12 +800,38 @@ def build_teacher_dashboard_context(
     today_events = list(
         teacher_events_qs.filter(start_datetime__date=today).order_by("start_datetime", "id")
     ) if needs_schedule or section == "overview" else []
+    today_event_rows = _build_today_event_rows(
+        teacher=teacher,
+        branch=branch,
+        today_events=today_events,
+    ) if section == "overview" else []
     week_events = list(
         teacher_events_qs
         .filter(start_datetime__date__gte=week_start, start_datetime__date__lt=week_end)
         .order_by("start_datetime", "id")
     )
     upcoming_events = get_teacher_next_events(teacher, limit=8, branch=branch) if section == "overview" else []
+
+    teacher_class_ids = list(
+        AcademicScheduleEvent.objects.filter(teacher=teacher, branch=branch, is_active=True)
+        .values_list("academic_class_id", flat=True).distinct()
+    ) if section == "overview" else []
+    upcoming_exam_sessions = []
+    if section == "overview" and teacher_class_ids:
+        from academics.models import AcademicCalendarEntry
+        now_dt = timezone.now()
+        exam_entries = list(
+            AcademicCalendarEntry.objects.select_related("academic_class", "semester")
+            .filter(
+                academic_class_id__in=teacher_class_ids,
+                event_type__in={AcademicCalendarEntry.EVENT_EXAM_SESSION, AcademicCalendarEntry.EVENT_RETAKE_SESSION},
+                end_datetime__gte=now_dt,
+                status=AcademicCalendarEntry.STATUS_PUBLISHED,
+            )
+            .order_by("start_datetime")[:4]
+        )
+        from portal.services.director.exam_session_service import _session_row
+        upcoming_exam_sessions = [_session_row(e) for e in exam_entries]
 
     week_schedule = get_teacher_week_schedule(teacher, week_start, branch=branch) if needs_schedule else {"events": [], "days": []}
 
@@ -974,6 +1137,8 @@ def build_teacher_dashboard_context(
                     "montant": cm.amount,
                 })
 
+    teacher_volume = _build_teacher_volume_context(teacher=teacher, branch=branch, today=today)
+
     context = {
         **base_context_builder(
             request,
@@ -993,6 +1158,7 @@ def build_teacher_dashboard_context(
         "week_start": week_start,
         "week_end": week_end - timedelta(days=1),
         "today_events": today_events,
+        "today_event_rows": today_event_rows,
         "upcoming_events": upcoming_events,
         "teaching_days": teaching_days,
         "class_focus_rows": class_focus_rows,
@@ -1033,8 +1199,10 @@ def build_teacher_dashboard_context(
         "teacher_hours": teacher_hours,
         "teacher_payments": teacher_payments,
         "teacher_hour_rows": teacher_hour_rows,
+        "teacher_volume": teacher_volume,
         "notifications_count": 0,
         "teacher_notifications": {"unread_count": 0, "items": []},
+        "upcoming_exam_sessions": upcoming_exam_sessions,
     }
     return context
 
@@ -1455,3 +1623,36 @@ def build_teacher_lesson_log_context(request, *, branch, event_id, toast=None):
             (LessonLog.STATUS_PLANNED, "Planifie"),
         ],
     }
+
+
+@transaction.atomic
+def declare_teacher_absence_for_event(*, teacher, branch, event_id):
+    """Déclare une absence enseignant pour une séance planifiée."""
+    if branch is None:
+        raise ValidationError("Aucune annexe rattachee pour le compte enseignant.")
+
+    event = (
+        AcademicScheduleEvent.objects.select_related("academic_class", "ec")
+        .filter(
+            pk=event_id,
+            teacher=teacher,
+            branch=branch,
+            is_active=True,
+        )
+        .exclude(status=AcademicScheduleEvent.STATUS_CANCELLED)
+        .first()
+    )
+    if event is None:
+        raise ValidationError("Cours introuvable pour cet enseignant.")
+
+    TeacherAttendance.objects.update_or_create(
+        teacher=teacher,
+        schedule_event=event,
+        branch=branch,
+        defaults={
+            "date": timezone.localdate(event.start_datetime),
+            "status": TeacherAttendance.STATUS_ABSENT,
+            "recorded_by": teacher,
+        },
+    )
+    return event

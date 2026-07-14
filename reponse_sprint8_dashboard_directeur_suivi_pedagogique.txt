@@ -1,0 +1,66 @@
+SPRINT 8 — DASHBOARD DIRECTEUR DES ÉTUDES : SYNTHÈSE DE SUIVI PÉDAGOGIQUE
+
+1. RÉSUMÉ
+
+Le Sprint 8 a été exécuté sous forme d'une couche de pilotage strictement en lecture seule.
+La synthèse est disponible par classe, formation et semestre. Elle consolide :
+- le calendrier académique ;
+- la structure des programmes UE/EC ;
+- les affectations enseignants ;
+- les emplois du temps ;
+- la progression, les cours non réalisés et reportés ;
+- les absences enseignants ;
+- les volumes horaires réalisés et restants ;
+- les examens planifiés ;
+- les notes importées, résultats validés et bulletins publiés.
+
+Chaque indicateur retourne un statut (OK, Attention, Bloqué), une couleur, un message et une action recommandée.
+La réponse contient également les alertes bloquantes, anomalies pédagogiques et actions prioritaires.
+
+Les services existants academic_readiness_service et timetable_management_service sont réutilisés. Les données issues des affectations, du calendrier, des cours, des notes et des bulletins sont lues par des sélecteurs dédiés, sans duplication de moteur métier et sans écriture en base.
+
+Les permissions appliquent le périmètre obligatoire par annexe : Directeur des Études sur son annexe ; DG/Super Admin en accès global.
+
+2. FICHIERS CRÉÉS
+
+- academics/selectors/director_monitoring_selectors.py
+- academics/services/director_monitoring_service.py
+- academics/test_director_monitoring.py
+- reponse_sprint8_dashboard_directeur_suivi_pedagogique.txt
+
+3. FICHIERS MODIFIÉS
+
+Aucun fichier métier existant n'a été modifié.
+Le moteur des notes, l'import Excel, le dashboard Informaticien et le dashboard Surveillant Général restent inchangés.
+
+4. TESTS
+
+Résultat Sprint 8 : 3 tests réussis.
+- affichage et structure complète des indicateurs ;
+- génération des alertes et actions prioritaires ;
+- permission et refus inter-annexe ;
+- caractère lecture seule ;
+- cohérence d'une synthèse entièrement au statut OK.
+
+La compilation Python des nouveaux modules a réussi.
+Le contrôle système Django exécuté pendant les tests ne signale aucun problème.
+
+La commande de non-régression séparée du Sprint 7 a dépassé le délai d'exécution disponible sans produire de résultat final ; elle n'est donc pas annoncée comme validée dans ce rapport.
+
+5. COMMANDES DE TEST
+
+python -m py_compile academics/selectors/director_monitoring_selectors.py academics/services/director_monitoring_service.py academics/test_director_monitoring.py
+python manage.py test --settings=config.settings_test_local academics.test_director_monitoring -v 2
+python manage.py check --settings=config.settings_test_local
+python manage.py test --settings=config.settings_test_local academics.test_timetable_management -v 1 --keepdb
+
+6. PRÉPARATION DE LA REFONTE FINALE DU DASHBOARD
+
+Le service expose trois niveaux prêts à être branchés à l'interface :
+- build_director_semester_monitoring ;
+- build_director_class_monitoring ;
+- build_director_monitoring_dashboard.
+
+Le futur dashboard pourra consommer directement les sections global_indicators, indicateurs, alertes_bloquantes, anomalies_pedagogiques et actions_prioritaires. La propriété read_only=True rend explicite le contrat de consultation et évite d'introduire des actions de saisie dans cette interface.
+
+FIN DU SPRINT 8

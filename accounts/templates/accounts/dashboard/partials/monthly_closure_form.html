@@ -12,7 +12,7 @@
         </div>
         <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
             <p class="text-xs uppercase tracking-wide text-slate-400">Charges</p>
-            <p class="mt-2 text-lg font-bold text-slate-900">{{ period_summary.charges_paid|default:0|intcomma }} FCFA</p>
+            <p class="mt-2 text-lg font-bold text-slate-900">{{ period_summary.total_expenses|default:0|intcomma }} FCFA</p>
         </div>
         <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
             <p class="text-xs uppercase tracking-wide text-slate-400">Resultat</p>
@@ -33,13 +33,26 @@
         </p>
     </div>
 
+    {% if report_closure_blockers %}
+    <div class="dashboard-closure-alert" role="alert">
+        <div class="dashboard-closure-alert-title">
+            {% component "icon" name="triangle-alert" %}{% endcomponent %}
+            Clôture bloquée : anomalies financières à corriger
+        </div>
+        <ul>
+            {% for blocker in report_closure_blockers %}<li>{{ blocker }}</li>{% endfor %}
+        </ul>
+        <a href="?section=rapport&report_month={{ report_period.month }}&report_year={{ report_period.year }}" class="dashboard-btn dashboard-btn-danger" style="margin-top:10px; text-decoration:none;">Consulter les alertes financières</a>
+    </div>
+    {% endif %}
+
     <form method="post" action="{% url 'accounts:htmx_manager_monthly_closure_create' %}" enctype="multipart/form-data" class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6" hx-boost="false">
         {% csrf_token %}
         <div class="space-y-4">
             {% include "accounts/dashboard/partials/dg_form_fields.html" with form=closure_form %}
 
             <input type="hidden" name="total_entries" value="{{ period_summary.total_revenue|default:0 }}">
-            <input type="hidden" name="total_exits" value="{{ period_summary.charges_paid|default:0 }}">
+            <input type="hidden" name="total_exits" value="{{ period_summary.total_expenses|default:0 }}">
             <input type="hidden" name="student_revenue" value="{{ period_summary.student_revenue|default:0 }}">
             <input type="hidden" name="shop_revenue" value="{{ period_summary.shop_revenue|default:0 }}">
             <input type="hidden" name="salary_paid" value="{{ period_summary.salary_paid|default:0 }}">
@@ -59,31 +72,31 @@
             </div>
             <div class="dashboard-form-grid" style="grid-template-columns:1fr;">
                 <div class="dashboard-field">
-                    <label for="{{ transfer_form.bank_name.id_for_label }}">{% component "icon" name="award" class_str="{{" %}{% endcomponent %}{{ transfer_form.bank_name.label }}</label>
-                    <div class="dashboard-input-wrap">{% component "icon" name="award" class_str="{{" %}{% endcomponent %}{{ transfer_form.bank_name }}</div>
+                    <label for="{{ transfer_form.bank_name.id_for_label }}">{% component "icon" name="building-columns" %}{% endcomponent %}{{ transfer_form.bank_name.label }}</label>
+                    {{ transfer_form.bank_name }}
                 </div>
                 <div class="dashboard-field">
-                    <label for="{{ transfer_form.reference.id_for_label }}">{% component "icon" name="award" class_str="{{" %}{% endcomponent %}{{ transfer_form.reference.label }}</label>
-                    <div class="dashboard-input-wrap">{% component "icon" name="award" class_str="{{" %}{% endcomponent %}{{ transfer_form.reference }}</div>
+                    <label for="{{ transfer_form.reference.id_for_label }}">{% component "icon" name="hash" %}{% endcomponent %}{{ transfer_form.reference.label }}</label>
+                    {{ transfer_form.reference }}
                 </div>
                 <div class="dashboard-field">
-                    <label for="{{ transfer_form.transfer_date.id_for_label }}">{% component "icon" name="award" class_str="{{" %}{% endcomponent %}{{ transfer_form.transfer_date.label }}</label>
-                    <div class="dashboard-input-wrap">{% component "icon" name="award" class_str="{{" %}{% endcomponent %}{{ transfer_form.transfer_date }}</div>
+                    <label for="{{ transfer_form.transfer_date.id_for_label }}">{% component "icon" name="calendar" %}{% endcomponent %}{{ transfer_form.transfer_date.label }}</label>
+                    {{ transfer_form.transfer_date }}
                 </div>
                 <input type="hidden" id="transfer-amount-sync" name="amount" value="{{ closure_form.bank_transfer_amount.value|default:0 }}">
                 <div class="dashboard-field">
-                    <label for="{{ transfer_form.proof.id_for_label }}">{% component "icon" name="award" class_str="{{" %}{% endcomponent %}{{ transfer_form.proof.label }}</label>
+                    <label for="{{ transfer_form.proof.id_for_label }}">{% component "icon" name="file-text" %}{% endcomponent %}{{ transfer_form.proof.label }}</label>
                     {{ transfer_form.proof }}
                 </div>
                 <div class="dashboard-field">
-                    <label for="{{ transfer_form.comment.id_for_label }}">{% component "icon" name="award" class_str="{{" %}{% endcomponent %}{{ transfer_form.comment.label }}</label>
+                    <label for="{{ transfer_form.comment.id_for_label }}">{% component "icon" name="message-square" %}{% endcomponent %}{{ transfer_form.comment.label }}</label>
                     {{ transfer_form.comment }}
                 </div>
             </div>
             <div class="dashboard-form-footer">
-                <button type="submit" class="dashboard-btn dashboard-btn-primary" style="width:100%;">
+                <button type="submit" class="dashboard-btn dashboard-btn-primary" style="width:100%;" {% if report_closure_blockers %}disabled aria-disabled="true" title="Corrigez les anomalies financières avant de préparer la clôture"{% endif %}>
                     {% component "icon" name="lock" %}{% endcomponent %}
-                    Cloturer la periode
+                    {% if report_closure_blockers %}Clôture bloquée{% else %}Préparer la clôture{% endif %}
                 </button>
             </div>
         </div>

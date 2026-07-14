@@ -2,6 +2,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from academics.models import AcademicYear
 from admissions.models import Candidature
 from branches.models import Branch
 from notifier.models import NotificationMessage
@@ -11,6 +12,14 @@ from formations.models import Cycle, Diploma, Filiere, Programme, ProgrammeRequi
 class AdmissionTunnelValidationTests(TestCase):
 	def setUp(self):
 		self.url = reverse("admissions:admission_tunnel")
+
+		current_year = timezone.now().year
+		AcademicYear.objects.create(
+			name=f"{current_year}-{current_year + 1}",
+			start_date=f"{current_year}-10-01",
+			end_date=f"{current_year + 1}-07-31",
+			is_active=True,
+		)
 
 		self.branch = Branch.objects.create(
 			name="Annexe Bamako",

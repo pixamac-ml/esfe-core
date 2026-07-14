@@ -3,6 +3,7 @@ from datetime import date
 from typing import Any
 
 from django.contrib.auth.decorators import login_required
+from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, render
@@ -25,6 +26,16 @@ PAYABLE_INSCRIPTION_STATUSES: set[str] = {
 
 def manager_required(view_func: Callable[..., HttpResponse]) -> Callable[..., HttpResponse]:
     def wrapper(request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
+        if settings.AUTH_POLICY_V2_ENABLED:
+            from accounts.access_context import get_request_access_context
+            from accounts.policy_v2 import decide
+
+            context = get_request_access_context(request)
+            decision = decide(context, allowed_positions={"annex_manager"})
+            if not decision.allowed:
+                return HttpResponse("Non autorise", status=403)
+            request.branch = context.branch
+            return view_func(request, *args, **kwargs)
         from accounts.dashboards.helpers import is_manager, get_user_branch
 
         if not is_manager(request.user):

@@ -3,6 +3,11 @@ from io import BytesIO
 from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.pdfgen import canvas
+from reportlab.platypus import Table, TableStyle
 
 from core.pdf_documents import generate_pdf as generate_esfe_pdf
 

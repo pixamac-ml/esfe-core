@@ -1,15 +1,24 @@
+<style>
+  [data-director-section] table thead { background-color: var(--surface-1); text-align: left; }
+  [data-director-section] table th { padding: 0.625rem 1rem; font-size: 0.7rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); border-bottom: 1px solid var(--line); }
+  [data-director-section] table td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--line); color: var(--text); vertical-align: middle; }
+  [data-director-section] table tr:last-child td { border-bottom: none; }
+</style>
 <div data-director-section="{{ section }}" class="space-y-6">
 
   {% if toast %}
-  <div class="rounded-2xl border px-5 py-4 shadow-sm
+  <div class="flex items-start gap-3 rounded-2xl border px-5 py-3.5 shadow-sm
     {% if toast.level == 'success' %}border-emerald-200 bg-emerald-50 text-emerald-900
+    {% elif toast.level == 'warning' %}border-amber-200 bg-amber-50 text-amber-900
     {% else %}border-rose-200 bg-rose-50 text-rose-900{% endif %}">
-    <p class="text-sm font-extrabold">{{ toast.message }}</p>
+    <i data-lucide="{% if toast.level == 'success' %}check-circle-2{% elif toast.level == 'warning' %}alert-triangle{% else %}alert-circle{% endif %}"
+       class="mt-0.5 shrink-0 w-4 h-4 {% if toast.level == 'success' %}text-emerald-600{% elif toast.level == 'warning' %}text-amber-600{% else %}text-rose-600{% endif %}"></i>
+    <p class="text-sm font-bold">{{ toast.message }}</p>
   </div>
   {% endif %}
 
   {% if branch is None %}
-  <section class="de-card px-6 py-12 text-center">
+  <section class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm px-6 py-12 text-center">
     <i data-lucide="alert-triangle" class="w-12 h-12 mx-auto text-amber-400 mb-4"></i>
     <h2 class="text-xl font-black text-slate-900">Aucune annexe rattachee a ce compte.</h2>
     <p class="mt-2 text-sm font-semibold text-slate-500">Contactez l'administrateur pour configurer votre perimetre.</p>
@@ -21,11 +30,110 @@
   {% elif section == "planification" %}
   <section class="space-y-6">
 
+    <!-- Panneau Calendrier Academique -->
+    <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm overflow-hidden"
+         x-data="{ showCalForm: false }">
+      <div class="px-6 py-4 border-b border-[color:var(--line)] flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <i data-lucide="calendar-range" class="w-5 h-5 text-[color:var(--school-primary)]"></i>
+          <div>
+            <h3 class="text-sm font-black text-[color:var(--text)]">Calendrier academique</h3>
+            {% if director_active_academic_year %}
+            <p class="text-[11px] font-semibold text-[color:var(--muted)]">Annee active : <span class="font-black text-[color:var(--school-primary)]">{{ director_active_academic_year.name }}</span> ({{ director_active_academic_year.start_date|date:"d/m/Y" }} — {{ director_active_academic_year.end_date|date:"d/m/Y" }})</p>
+            {% else %}
+            <p class="text-[11px] font-bold text-[color:var(--danger)]">Aucune annee academique active. Contactez l'administrateur.</p>
+            {% endif %}
+          </div>
+        </div>
+        {% if director_active_academic_year %}
+        <button type="button" @click="showCalForm = !showCalForm"
+          class="inline-flex items-center gap-2 rounded-lg border border-[color:var(--school-primary)] bg-[color:var(--school-primary)] px-3 py-2 text-xs font-bold text-white transition hover:opacity-90">
+          <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+          <span x-text="showCalForm ? 'Annuler' : 'Creer un calendrier'"></span>
+        </button>
+        {% endif %}
+      </div>
+
+      <!-- Formulaire creation calendrier -->
+      <div x-show="showCalForm" x-transition class="px-6 py-4 border-b border-[color:var(--line)] bg-[color:var(--surface)]">
+        <form hx-post="{% url 'accounts_portal:director_calendar_action' %}"
+              hx-target="#director-workspace" hx-swap="innerHTML"
+              hx-disabled-elt="button[type=submit]"
+              class="flex flex-wrap items-end gap-3">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="create_calendar">
+          <div class="flex-1 min-w-[160px]">
+            <label class="block text-[11px] font-bold text-[color:var(--muted)] mb-1">Annee scolaire</label>
+            <select name="academic_year_id" class="w-full rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-sm font-semibold text-[color:var(--text)]">
+              {% for yr in director_all_academic_years %}
+              <option value="{{ yr.id }}" {% if yr.is_active %}selected{% endif %}>{{ yr.name }}{% if yr.is_active %} (active){% endif %}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="w-24">
+            <label class="block text-[11px] font-bold text-[color:var(--muted)] mb-1">Version</label>
+            <input type="number" name="version" value="1" min="1"
+              class="w-full rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-sm font-semibold text-[color:var(--text)]">
+          </div>
+          <button type="submit"
+            class="inline-flex items-center gap-2 rounded-lg bg-[color:var(--school-primary)] px-4 py-2 text-sm font-bold text-white transition hover:opacity-90">
+            <i data-lucide="check" class="w-4 h-4"></i>Creer
+          </button>
+        </form>
+      </div>
+
+      <!-- Liste des calendriers existants -->
+      {% if director_academic_calendars %}
+      <div class="divide-y divide-[color:var(--line)]">
+        {% for cal in director_academic_calendars %}
+        <div class="flex items-center justify-between gap-4 px-6 py-3">
+          <div>
+            <span class="text-sm font-black text-[color:var(--text)]">{{ cal.academic_year.name }}</span>
+            <span class="ml-2 text-[11px] font-semibold text-[color:var(--muted)]">v{{ cal.version }}</span>
+          </div>
+          <div class="flex items-center gap-3">
+            {% if cal.status == "published" %}
+            <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">Publie</span>
+            {% elif cal.status == "validated" %}
+            <span class="rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-bold text-blue-800">Valide</span>
+            {% elif cal.status == "archived" %}
+            <span class="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-600">Archive</span>
+            {% else %}
+            <span class="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800">Brouillon</span>
+            {% endif %}
+            {% if cal.status == "draft" %}
+            <form hx-post="{% url 'accounts_portal:director_calendar_action' %}" hx-target="#director-workspace" hx-swap="innerHTML" class="inline">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="validate_calendar">
+              <input type="hidden" name="calendar_id" value="{{ cal.id }}">
+              <button type="submit" class="text-[11px] font-bold text-[color:var(--school-primary)] hover:underline">Valider</button>
+            </form>
+            {% elif cal.status == "validated" %}
+            <form hx-post="{% url 'accounts_portal:director_calendar_action' %}" hx-target="#director-workspace" hx-swap="innerHTML" class="inline">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="publish_calendar">
+              <input type="hidden" name="calendar_id" value="{{ cal.id }}">
+              <button type="submit" class="text-[11px] font-bold text-emerald-700 hover:underline">Publier</button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="px-6 py-5 text-sm font-semibold text-[color:var(--muted)] text-center">
+        <i data-lucide="calendar-off" class="w-6 h-6 mx-auto mb-2 text-[color:var(--muted)]"></i>
+        Aucun calendrier cree pour cette annexe.
+        {% if director_active_academic_year %}Cliquez sur "Creer un calendrier" pour commencer.{% endif %}
+      </div>
+      {% endif %}
+    </div>
+
     <!-- En-tete -->
-    <div class="de-card px-6 py-5">
+    <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm px-6 py-5">
       <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
-          <p class="de-section-label">Direction des etudes / Planification</p>
+          <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">Direction des etudes / Planification</p>
           <h2 class="mt-2 text-2xl font-black text-slate-900">Planification academique</h2>
           <p class="mt-1 text-sm font-semibold text-slate-500">Calendrier de l'annee, emplois du temps par classe et detection des conflits.</p>
         </div>
@@ -34,7 +142,8 @@
           <a href="{% url 'accounts_portal:director_weekly_slots_workspace' selected_class.id %}?week_start={{ week_start|date:'Y-m-d' }}"
             hx-get="{% url 'accounts_portal:director_weekly_slots_workspace' selected_class.id %}?week_start={{ week_start|date:'Y-m-d' }}"
             hx-target="#director-workspace" hx-swap="innerHTML"
-            class="de-btn de-btn-primary">
+            hx-disabled-elt="this"
+            class="inline-flex items-center justify-center rounded-lg border border-[color:var(--school-primary)] bg-[color:var(--school-primary)] px-4 py-2 text-sm font-bold text-white transition hover:opacity-90">
             <i data-lucide="calendar-plus" class="w-4 h-4 mr-2"></i>Modifier l'EDT
           </a>
           {% endif %}
@@ -43,31 +152,33 @@
     </div>
 
     <!-- Navigation semaine -->
-    <div class="de-card px-6 py-4 flex items-center justify-between">
-      <button type="button" class="de-btn de-btn-secondary !py-2 !px-4"
+    <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm px-6 py-4 flex items-center justify-between">
+      <button type="button" class="inline-flex items-center justify-center rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2 text-sm font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface)]"
         hx-get="{% url 'accounts_portal:director_workspace' %}?section=planification&week_start={{ prev_week_start|date:'Y-m-d' }}{% if selected_class %}&class_id={{ selected_class.id }}{% endif %}"
-        hx-target="#director-workspace" hx-swap="innerHTML">
+        hx-target="#director-workspace" hx-swap="innerHTML"
+        hx-disabled-elt="this">
         <i data-lucide="chevron-left" class="w-4 h-4 mr-1"></i>Semaine precedente
       </button>
       <p class="text-sm font-black text-slate-700">Semaine du {{ week_start|date:"d/m/Y" }} au {{ week_end|date:"d/m/Y" }}</p>
-      <button type="button" class="de-btn de-btn-secondary !py-2 !px-4"
+      <button type="button" class="inline-flex items-center justify-center rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2 text-sm font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface)]"
         hx-get="{% url 'accounts_portal:director_workspace' %}?section=planification&week_start={{ next_week_start|date:'Y-m-d' }}{% if selected_class %}&class_id={{ selected_class.id }}{% endif %}"
-        hx-target="#director-workspace" hx-swap="innerHTML">
+        hx-target="#director-workspace" hx-swap="innerHTML"
+        hx-disabled-elt="this">
         Semaine suivante<i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i>
       </button>
     </div>
 
     <!-- Alertes planning -->
     {% if assignments_alerts %}
-    <div class="de-card overflow-hidden">
+    <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm overflow-hidden">
       <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
         <h3 class="font-black text-slate-900">Alertes de planification</h3>
-        <span class="de-badge-danger">{{ assignments_alerts_count }} alerte(s)</span>
+        <span class="inline-flex items-center rounded-full bg-[color:var(--danger-soft)] px-2.5 py-0.5 text-xs font-bold text-[color:var(--danger)]">{{ assignments_alerts_count }} alerte(s)</span>
       </div>
       <div class="divide-y divide-slate-100">
         {% for alert in assignments_alerts %}
         <div class="px-6 py-3 flex items-center gap-3 hover:bg-slate-50">
-          <div class="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+          <div class="w-8 h-8 rounded-lg bg-[color:var(--danger-soft)] text-[color:var(--danger)] flex items-center justify-center shrink-0">
             <i data-lucide="triangle-alert" class="w-4 h-4"></i>
           </div>
           <p class="text-sm font-semibold text-slate-700">{{ alert.message|default:alert.type }}</p>
@@ -77,93 +188,47 @@
     </div>
     {% endif %}
 
-    <!-- Emplois du temps par classe -->
-    <div class="grid grid-cols-1 xl:grid-cols-[300px_1fr] gap-6">
-
-      <!-- Sélecteur classe -->
-      <div class="de-card overflow-hidden">
-        <div class="px-5 py-4 border-b border-slate-100">
-          <h3 class="font-black text-slate-900 text-sm">Choisir une classe</h3>
-        </div>
-        <div class="divide-y divide-slate-100">
-          {% for item in class_cards %}
-          <button type="button"
-            hx-get="{% url 'accounts_portal:director_workspace' %}?section=planification&class_id={{ item.class.id }}&week_start={{ week_start|date:'Y-m-d' }}"
-            hx-target="#director-workspace" hx-swap="innerHTML"
-            class="w-full px-5 py-3 text-left hover:bg-blue-50 transition
-              {% if selected_class and item.class.id == selected_class.id %}bg-blue-50 border-l-4 border-blue-600{% endif %}">
-            <p class="text-sm font-bold text-slate-900">{{ item.class.display_name }}</p>
-            <p class="text-xs text-slate-400 mt-0.5">{{ item.student_count }} etudiants</p>
-          </button>
-          {% empty %}
-          <div class="px-5 py-6 text-sm font-semibold text-slate-400 text-center">Aucune classe.</div>
-          {% endfor %}
-        </div>
+    <!-- Grille de classes → clic ouvre le drawer EDT -->
+    <div id="de-grid-planif" class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm overflow-hidden">
+      <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+        <h3 class="font-black text-slate-900 text-sm">Classes — cliquez pour voir l'emploi du temps</h3>
+        {% if class_cards_page.paginator.num_pages > 1 %}
+        <span class="text-xs font-semibold text-slate-400">Page {{ class_cards_page.number }}/{{ class_cards_page.paginator.num_pages }}</span>
+        {% endif %}
       </div>
-
-      <!-- Grille EDT -->
-      <div class="de-card overflow-hidden">
-        {% if selected_class %}
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <div>
-            <h3 class="font-black text-slate-900">Emploi du temps — {{ selected_class.display_name }}</h3>
-            <p class="text-xs text-slate-400 mt-0.5">Creneaux hebdomadaires recurrents</p>
+      {% if class_cards_page.object_list %}
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-0 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+        {% for item in class_cards_page.object_list %}
+        <button type="button"
+          hx-get="{% url 'accounts_portal:director_drawer' %}?panel=planification&class_id={{ item.class.id }}&week_start={{ week_start|date:'Y-m-d' }}"
+          hx-target="#director-drawer-content" hx-swap="innerHTML"
+          hx-disabled-elt="this"
+          class="group flex flex-col gap-1 p-5 text-left transition hover:bg-[color:var(--school-primary-soft)] active:scale-[0.98]">
+          <div class="flex items-start justify-between gap-2">
+            <p class="text-sm font-black text-slate-900 group-hover:text-[color:var(--school-primary)]">{{ item.class.display_name }}</p>
+            <i data-lucide="panel-right-open" class="w-4 h-4 shrink-0 text-slate-300 group-hover:text-[color:var(--school-primary)]"></i>
           </div>
-          <a href="{% url 'accounts_portal:director_weekly_slots_workspace' selected_class.id %}?week_start={{ week_start|date:'Y-m-d' }}"
-            hx-get="{% url 'accounts_portal:director_weekly_slots_workspace' selected_class.id %}?week_start={{ week_start|date:'Y-m-d' }}"
-            hx-target="#director-workspace" hx-swap="innerHTML"
-            class="de-btn de-btn-primary !py-2 !px-4 !text-xs">
-            <i data-lucide="edit-3" class="w-3.5 h-3.5 mr-1"></i>Gerer les creneaux
-          </a>
-        </div>
-        {% if selected_class_schedule %}
-        {% with slots=selected_class_schedule.slots %}
-        {% if slots %}
-        <div class="overflow-x-auto">
-          <table class="de-table">
-            <thead>
-              <tr>
-                <th>Jour</th>
-                <th>Heure</th>
-                <th>Matiere (EC)</th>
-                <th>Salle</th>
-                <th>Enseignant</th>
-              </tr>
-            </thead>
-            <tbody class="text-sm">
-              {% for slot in slots %}
-              <tr class="hover:bg-slate-50">
-                <td class="font-semibold">{{ slot.get_weekday_display }}</td>
-                <td>{{ slot.start_time|time:"H:i" }} – {{ slot.end_time|time:"H:i" }}</td>
-                <td>{{ slot.ec.title|default:"—" }}</td>
-                <td>{{ slot.room|default:"—" }}</td>
-                <td>{{ slot.teacher.get_full_name|default:"—" }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        {% else %}
-        <div class="de-empty m-6">Aucun creneau configure pour cette classe cette semaine.</div>
-        {% endif %}
-        {% endwith %}
-        {% else %}
-        <div class="de-empty m-6">Aucun emploi du temps disponible.</div>
-        {% endif %}
-        {% else %}
-        <div class="de-empty m-6">Selectionnez une classe pour voir son emploi du temps.</div>
-        {% endif %}
+          <p class="text-xs text-slate-400">{{ item.student_count }} etudiant(s)</p>
+          <p class="mt-1 text-xs font-semibold text-[color:var(--school-secondary)]">
+            {{ item.semester_count }} semestre(s)
+          </p>
+        </button>
+        {% endfor %}
       </div>
+      {% include "portal/staff/director/partials/_pagination.html" with page_obj=class_cards_page query_suffix="section=planification" target_id="#de-grid-planif" hx_select="#de-grid-planif" %}
+      {% else %}
+      <div class="p-8 text-center text-sm font-semibold text-[color:var(--muted)]">Aucune classe configuree.</div>
+      {% endif %}
     </div>
 
     <!-- Evenements recents -->
     {% if assignment_log_rows %}
-    <div class="de-card overflow-hidden">
+    <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm overflow-hidden">
       <div class="px-6 py-4 border-b border-slate-100">
         <h3 class="font-black text-slate-900">Derniers cours enregistres</h3>
       </div>
       <div class="overflow-x-auto">
-        <table class="de-table">
+        <table class="w-full text-sm border-collapse">
           <thead><tr>
             <th>Date</th><th>Classe</th><th>Matiere</th><th>Enseignant</th><th>Heure</th>
           </tr></thead>
@@ -192,10 +257,10 @@
   {% elif section == "programme" %}
   <section class="space-y-6">
 
-    <div class="de-card px-6 py-5">
+    <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm px-6 py-5">
       <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
-          <p class="de-section-label">Direction des etudes / Programme</p>
+          <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">Direction des etudes / Programme</p>
           <h2 class="mt-2 text-2xl font-black text-slate-900">Programme academique</h2>
           <p class="mt-1 text-sm font-semibold text-slate-500">Creer et gerer les Unites d'Enseignement (UE) et Elements Constitutifs (EC) par classe.</p>
         </div>
@@ -203,231 +268,55 @@
     </div>
 
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-      <div class="de-kpi">
-        <p class="de-section-label">Classes</p>
+      <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 shadow-sm">
+        <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">Classes</p>
         <p class="mt-2 text-3xl font-black text-slate-900">{{ total_classes|default:0 }}</p>
-        <p class="mt-1 text-xs font-semibold text-blue-600">Actives</p>
+        <p class="mt-1 text-xs font-semibold text-[color:var(--school-primary)]">Actives</p>
       </div>
-      <div class="de-kpi">
-        <p class="de-section-label">Semestres</p>
+      <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 shadow-sm">
+        <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">Semestres</p>
         <p class="mt-2 text-3xl font-black text-slate-900">{{ total_semesters|default:0 }}</p>
       </div>
-      <div class="de-kpi">
-        <p class="de-section-label">UE</p>
+      <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 shadow-sm">
+        <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">UE</p>
         <p class="mt-2 text-3xl font-black text-slate-900">{{ programme_ue_rows|length|default:0 }}</p>
         <p class="mt-1 text-xs font-semibold text-slate-400">Classe selectionnee</p>
       </div>
-      <div class="de-kpi">
-        <p class="de-section-label">Etudiants</p>
+      <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 shadow-sm">
+        <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">Etudiants</p>
         <p class="mt-2 text-3xl font-black text-slate-900">{{ selected_class_student_count|default:0 }}</p>
       </div>
     </div>
 
-    <div class="grid grid-cols-1 xl:grid-cols-[300px_1fr] gap-6">
-
-      <!-- Sélecteur classe -->
-      <div class="de-card overflow-hidden">
-        <div class="px-5 py-4 border-b border-slate-100">
-          <h3 class="font-black text-slate-900 text-sm">Classes</h3>
-        </div>
-        <div class="divide-y divide-slate-100 max-h-[600px] overflow-y-auto scrollbar-thin">
-          {% for item in class_cards %}
-          <button type="button"
-            hx-get="{% url 'accounts_portal:director_workspace' %}?section=programme&class_id={{ item.class.id }}"
-            hx-target="#director-workspace" hx-swap="innerHTML"
-            class="w-full px-5 py-4 text-left hover:bg-blue-50 transition
-              {% if selected_class and item.class.id == selected_class.id %}bg-blue-50 border-l-4 border-blue-600{% endif %}">
-            <p class="text-sm font-bold text-slate-900">{{ item.class.display_name }}</p>
-            <p class="text-xs text-slate-400 mt-0.5">{{ item.student_count }} etudiant(s)</p>
-          </button>
-          {% empty %}
-          <div class="px-5 py-6 text-sm font-semibold text-slate-400 text-center">Aucune classe.</div>
-          {% endfor %}
-        </div>
-      </div>
-
-      <!-- Detail UE/EC par semestre -->
-      <div class="space-y-5">
-        {% if selected_class %}
-
-        <!-- En-tete classe -->
-        <div class="de-card px-6 py-4 flex items-center justify-between">
-          <div>
-            <h3 class="text-lg font-black text-slate-900">{{ selected_class.display_name }}</h3>
-            <p class="text-xs text-slate-400 mt-0.5">{{ selected_class_student_count }} etudiant(s)</p>
-          </div>
-          <div class="flex gap-2">
-            <button type="button"
-              hx-get="{% url 'accounts_portal:director_workspace' %}?section=evaluations&class_id={{ selected_class.id }}"
-              hx-target="#director-workspace" hx-swap="innerHTML"
-              class="de-btn de-btn-secondary !py-2 !px-3 !text-xs">
-              <i data-lucide="clipboard-check" class="w-3.5 h-3.5 mr-1"></i>Evaluations
-            </button>
-          </div>
-        </div>
-
-        <!-- Semestres avec UE/EC et formulaires de création -->
-        {% for ue_row in programme_ue_rows %}
-        <div class="de-card overflow-hidden">
-
-          <!-- Header semestre -->
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-            <h4 class="font-black text-slate-900">Semestre {{ ue_row.semester.number }}</h4>
-            <button type="button"
-              onclick="document.getElementById('form-ue-sem-{{ ue_row.semester.id }}').classList.toggle('hidden')"
-              class="de-btn de-btn-primary !py-1.5 !px-3 !text-xs !min-h-0">
-              <i data-lucide="plus" class="w-3.5 h-3.5 mr-1"></i>Ajouter UE
-            </button>
-          </div>
-
-          <!-- Formulaire ajout UE (masqué) -->
-          <div id="form-ue-sem-{{ ue_row.semester.id }}" class="hidden border-b border-slate-100 bg-blue-50 px-6 py-4">
-            <p class="text-xs font-black text-blue-700 uppercase tracking-wide mb-3">Nouvelle Unite d'Enseignement</p>
-            <form hx-post="{% url 'accounts_portal:director_programme_action' %}"
-                  hx-target="#director-workspace" hx-swap="innerHTML"
-                  class="flex flex-wrap gap-3 items-end">
-              {% csrf_token %}
-              <input type="hidden" name="action" value="save_ue">
-              <input type="hidden" name="semester_id" value="{{ ue_row.semester.id }}">
-              <input type="hidden" name="class_id" value="{{ selected_class.id }}">
-              <div>
-                <label class="block text-xs font-bold text-slate-600 mb-1">Code</label>
-                <input type="text" name="code" required placeholder="Ex: UE1" maxlength="20"
-                  class="rounded-lg border border-slate-200 px-3 py-2 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-blue-500">
-              </div>
-              <div class="flex-1 min-w-[200px]">
-                <label class="block text-xs font-bold text-slate-600 mb-1">Intitule de l'UE</label>
-                <input type="text" name="title" required placeholder="Ex: Sciences fondamentales"
-                  class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-              </div>
-              <div class="flex gap-2">
-                <button type="submit" class="de-btn de-btn-primary !py-2 !px-4 !text-xs !min-h-0">
-                  <i data-lucide="save" class="w-3.5 h-3.5 mr-1"></i>Enregistrer
-                </button>
-                <button type="button"
-                  onclick="document.getElementById('form-ue-sem-{{ ue_row.semester.id }}').classList.add('hidden')"
-                  class="de-btn de-btn-secondary !py-2 !px-3 !text-xs !min-h-0">
-                  Annuler
-                </button>
-              </div>
-            </form>
-          </div>
-
-          <!-- Liste des UE -->
-          {% if ue_row.ues %}
-          <div class="divide-y divide-slate-100">
-            {% for ue in ue_row.ues %}
-            <div class="px-6 py-4">
-
-              <!-- En-tete UE -->
-              <div class="flex items-center justify-between mb-3">
-                <div>
-                  <span class="de-badge-ready mr-2">{{ ue.code }}</span>
-                  <span class="text-sm font-black text-slate-900">{{ ue.title }}</span>
-                </div>
-                <button type="button"
-                  onclick="document.getElementById('form-ec-ue-{{ ue.id }}').classList.toggle('hidden')"
-                  class="de-btn de-btn-secondary !py-1 !px-3 !text-xs !min-h-0">
-                  <i data-lucide="plus" class="w-3 h-3 mr-1"></i>Ajouter EC
-                </button>
-              </div>
-
-              <!-- Formulaire ajout EC (masqué) -->
-              <div id="form-ec-ue-{{ ue.id }}" class="hidden bg-emerald-50 rounded-xl px-4 py-3 mb-3">
-                <p class="text-xs font-black text-emerald-700 uppercase tracking-wide mb-3">Nouvel Element Constitutif</p>
-                <form hx-post="{% url 'accounts_portal:director_programme_action' %}"
-                      hx-target="#director-workspace" hx-swap="innerHTML"
-                      class="flex flex-wrap gap-3 items-end">
-                  {% csrf_token %}
-                  <input type="hidden" name="action" value="save_ec">
-                  <input type="hidden" name="ue_id" value="{{ ue.id }}">
-                  <input type="hidden" name="class_id" value="{{ selected_class.id }}">
-                  <div class="flex-1 min-w-[180px]">
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Intitule (matiere)</label>
-                    <input type="text" name="title" required placeholder="Ex: Anatomie"
-                      class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                  </div>
-                  <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Coefficient</label>
-                    <input type="number" name="coefficient" step="0.5" min="0" placeholder="1"
-                      class="rounded-lg border border-slate-200 px-3 py-2 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                  </div>
-                  <div>
-                    <label class="block text-xs font-bold text-slate-600 mb-1">Credits</label>
-                    <input type="number" name="credit_required" step="0.5" min="0" placeholder="3"
-                      class="rounded-lg border border-slate-200 px-3 py-2 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                  </div>
-                  <div class="flex gap-2">
-                    <button type="submit" class="de-btn de-btn-primary !py-2 !px-4 !text-xs !min-h-0 !bg-emerald-600 !border-emerald-600">
-                      <i data-lucide="save" class="w-3.5 h-3.5 mr-1"></i>Enregistrer
-                    </button>
-                    <button type="button"
-                      onclick="document.getElementById('form-ec-ue-{{ ue.id }}').classList.add('hidden')"
-                      class="de-btn de-btn-secondary !py-2 !px-3 !text-xs !min-h-0">
-                      Annuler
-                    </button>
-                  </div>
-                </form>
-              </div>
-
-              <!-- Liste EC de cette UE -->
-              {% if ue.ecs.all %}
-              <div class="overflow-x-auto">
-                <table class="de-table !border-0 !rounded-xl">
-                  <thead><tr>
-                    <th class="!py-2">Matiere (EC)</th>
-                    <th class="!py-2">Coefficient</th>
-                    <th class="!py-2">Credits</th>
-                    <th class="!py-2 text-right">Action</th>
-                  </tr></thead>
-                  <tbody class="text-sm">
-                    {% for ec in ue.ecs.all %}
-                    <tr class="hover:bg-slate-50">
-                      <td class="font-semibold !py-2">{{ ec.title }}</td>
-                      <td class="!py-2">{{ ec.coefficient|default:"—" }}</td>
-                      <td class="!py-2">{{ ec.credit_required|default:"—" }}</td>
-                      <td class="!py-2 text-right">
-                        <form hx-post="{% url 'accounts_portal:director_programme_action' %}"
-                              hx-target="#director-workspace" hx-swap="innerHTML"
-                              hx-confirm="Supprimer la matiere « {{ ec.title }} » ?"
-                              class="inline">
-                          {% csrf_token %}
-                          <input type="hidden" name="action" value="delete_ec">
-                          <input type="hidden" name="ec_id" value="{{ ec.id }}">
-                          <input type="hidden" name="class_id" value="{{ selected_class.id }}">
-                          <button type="submit" class="de-btn de-btn-danger !py-1 !px-2 !text-xs !min-h-0">
-                            <i data-lucide="trash-2" class="w-3 h-3"></i>
-                          </button>
-                        </form>
-                      </td>
-                    </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
-              {% else %}
-              <p class="text-xs font-semibold text-slate-400 italic">Aucun EC pour cette UE. Cliquez sur "Ajouter EC".</p>
-              {% endif %}
-
-            </div>
-            {% endfor %}
-          </div>
-          {% else %}
-          <div class="de-empty m-4">Aucune UE pour ce semestre. Cliquez sur "Ajouter UE".</div>
-          {% endif %}
-
-        </div>
-        {% empty %}
-        <div class="de-empty">Aucun semestre trouve pour cette classe.</div>
-        {% endfor %}
-
-        {% else %}
-        <div class="de-empty py-12">
-          <i data-lucide="book-open" class="w-10 h-10 mx-auto text-slate-300 mb-3"></i>
-          <p>Selectionnez une classe pour gerer son programme.</p>
-        </div>
+    <!-- Grille de classes → clic ouvre le drawer Programme -->
+    <div id="de-grid-programme" class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm overflow-hidden">
+      <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+        <h3 class="font-black text-slate-900 text-sm">Classes — cliquez pour gerer le programme</h3>
+        {% if class_cards_page.paginator.num_pages > 1 %}
+        <span class="text-xs font-semibold text-slate-400">Page {{ class_cards_page.number }}/{{ class_cards_page.paginator.num_pages }}</span>
         {% endif %}
       </div>
+      {% if class_cards_page.object_list %}
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-0 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+        {% for item in class_cards_page.object_list %}
+        <button type="button"
+          hx-get="{% url 'accounts_portal:director_drawer' %}?panel=programme&class_id={{ item.class.id }}"
+          hx-target="#director-drawer-content" hx-swap="innerHTML"
+          hx-disabled-elt="this"
+          class="group flex flex-col gap-1 p-5 text-left transition hover:bg-[color:var(--school-primary-soft)] active:scale-[0.98]">
+          <div class="flex items-start justify-between gap-2">
+            <p class="text-sm font-black text-slate-900 group-hover:text-[color:var(--school-primary)]">{{ item.class.display_name }}</p>
+            <i data-lucide="panel-right-open" class="w-4 h-4 shrink-0 text-slate-300 group-hover:text-[color:var(--school-primary)]"></i>
+          </div>
+          <p class="text-xs text-slate-400">{{ item.student_count }} etudiant(s)</p>
+          <p class="mt-1 text-xs font-semibold text-[color:var(--school-secondary)]">{{ item.semester_count }} semestre(s)</p>
+        </button>
+        {% endfor %}
+      </div>
+      {% include "portal/staff/director/partials/_pagination.html" with page_obj=class_cards_page query_suffix="section=programme" target_id="#de-grid-programme" hx_select="#de-grid-programme" %}
+      {% else %}
+      <div class="p-8 text-center text-sm font-semibold text-[color:var(--muted)]">Aucune classe configuree.</div>
+      {% endif %}
     </div>
 
   </section>
@@ -439,16 +328,16 @@
   {% elif section == "correspondances" %}
   <section class="space-y-6">
 
-    <div class="de-card px-6 py-5">
+    <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm px-6 py-5">
       <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
-          <p class="de-section-label">Direction des etudes / Correspondances</p>
+          <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">Direction des etudes / Correspondances</p>
           <h2 class="mt-2 text-2xl font-black text-slate-900">Correspondances & Documents administratifs</h2>
           <p class="mt-1 text-sm font-semibold text-slate-500">Rediger, enregistrer et generer les documents officiels de la direction.</p>
         </div>
         <button type="button"
           onclick="document.getElementById('de-corr-form').classList.toggle('hidden')"
-          class="de-btn de-btn-primary">
+          class="inline-flex items-center justify-center rounded-lg border border-[color:var(--school-primary)] bg-[color:var(--school-primary)] px-4 py-2 text-sm font-bold text-white transition hover:opacity-90">
           <i data-lucide="file-plus-2" class="w-4 h-4 mr-2"></i>Nouveau document
         </button>
       </div>
@@ -456,22 +345,22 @@
 
     <!-- KPIs -->
     <div class="grid grid-cols-3 gap-4">
-      <div class="de-kpi">
-        <p class="de-section-label">Total</p>
+      <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 shadow-sm">
+        <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">Total</p>
         <p class="mt-2 text-3xl font-black text-slate-900">{{ admin_documents|length }}</p>
       </div>
-      <div class="de-kpi">
-        <p class="de-section-label">Brouillons</p>
+      <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 shadow-sm">
+        <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">Brouillons</p>
         <p class="mt-2 text-3xl font-black text-amber-600">{{ admin_doc_draft_count|default:0 }}</p>
       </div>
-      <div class="de-kpi">
-        <p class="de-section-label">Publies</p>
+      <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 shadow-sm">
+        <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">Publies</p>
         <p class="mt-2 text-3xl font-black text-emerald-600">{{ admin_doc_published_count|default:0 }}</p>
       </div>
     </div>
 
     <!-- Formulaire création (masqué par defaut) -->
-    <div id="de-corr-form" class="hidden de-card px-6 py-6">
+    <div id="de-corr-form" class="hidden rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm px-6 py-6">
       <h3 class="font-black text-slate-900 mb-5">Nouveau document administratif</h3>
       <form method="post" action="{% url 'accounts_portal:director_correspondance_create' %}" class="space-y-4">
         {% csrf_token %}
@@ -480,7 +369,7 @@
           <div>
             <label class="block text-xs font-black text-slate-600 mb-2 uppercase tracking-wide">Type de document</label>
             <select name="doc_type" required
-              class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500">
+              class="w-full rounded-xl border border-[color:var(--line)] px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
               {% for value, label in admin_doc_type_choices %}
               <option value="{{ value }}">{{ label }}</option>
               {% endfor %}
@@ -489,32 +378,32 @@
           <div>
             <label class="block text-xs font-black text-slate-600 mb-2 uppercase tracking-wide">Reference (optionnel)</label>
             <input type="text" name="reference" placeholder="Ex: REF/DE/2024/001"
-              class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500">
+              class="w-full rounded-xl border border-[color:var(--line)] px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
           </div>
         </div>
         <div>
           <label class="block text-xs font-black text-slate-600 mb-2 uppercase tracking-wide">Titre / Objet</label>
           <input type="text" name="title" required placeholder="Ex: Convocation seance de travail du 15/01/2025"
-            class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500">
+            class="w-full rounded-xl border border-[color:var(--line)] px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
         </div>
         <div>
           <label class="block text-xs font-black text-slate-600 mb-2 uppercase tracking-wide">Destinataires</label>
           <input type="text" name="recipients" placeholder="Ex: Tous les enseignants de la filiere Informatique"
-            class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500">
+            class="w-full rounded-xl border border-[color:var(--line)] px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
         </div>
         <div>
           <label class="block text-xs font-black text-slate-600 mb-2 uppercase tracking-wide">Corps du document</label>
           <textarea name="body" rows="8" required
             placeholder="Redigez ici le contenu du document..."
-            class="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+            class="w-full rounded-xl border border-[color:var(--line)] px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30 resize-none"></textarea>
         </div>
         <div class="flex items-center justify-end gap-3">
           <button type="button" onclick="document.getElementById('de-corr-form').classList.add('hidden')"
-            class="de-btn de-btn-secondary">Annuler</button>
-          <button type="submit" name="action" value="draft" class="de-btn de-btn-secondary">
+            class="inline-flex items-center justify-center rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2 text-sm font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface)]">Annuler</button>
+          <button type="submit" name="action" value="draft" class="inline-flex items-center justify-center rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2 text-sm font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface)]">
             <i data-lucide="save" class="w-4 h-4 mr-2"></i>Enregistrer brouillon
           </button>
-          <button type="submit" name="action" value="publish" class="de-btn de-btn-primary">
+          <button type="submit" name="action" value="publish" class="inline-flex items-center justify-center rounded-lg border border-[color:var(--school-primary)] bg-[color:var(--school-primary)] px-4 py-2 text-sm font-bold text-white transition hover:opacity-90">
             <i data-lucide="send" class="w-4 h-4 mr-2"></i>Publier & Generer PDF
           </button>
         </div>
@@ -522,13 +411,13 @@
     </div>
 
     <!-- Liste des documents -->
-    <div class="de-card overflow-hidden">
+    <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm overflow-hidden">
       <div class="px-6 py-4 border-b border-slate-100">
         <h3 class="font-black text-slate-900">Documents de la direction</h3>
       </div>
       {% if admin_documents %}
       <div class="overflow-x-auto">
-        <table class="de-table">
+        <table class="w-full text-sm border-collapse">
           <thead><tr>
             <th>Type</th>
             <th>Titre / Objet</th>
@@ -541,15 +430,15 @@
             {% for doc in admin_documents %}
             <tr class="hover:bg-slate-50">
               <td>
-                <span class="de-badge-ready">{{ doc.get_doc_type_display }}</span>
+                <span class="inline-flex items-center rounded-full bg-[color:var(--success-soft)] px-2.5 py-0.5 text-xs font-bold text-[color:var(--success)]">{{ doc.get_doc_type_display }}</span>
               </td>
               <td class="font-semibold">{{ doc.title }}</td>
               <td class="text-slate-400">{{ doc.reference|default:"—" }}</td>
               <td>
                 {% if doc.status == "published" %}
-                  <span class="de-badge-published">Publie</span>
+                  <span class="inline-flex items-center rounded-full bg-[color:var(--success-soft)] px-2.5 py-0.5 text-xs font-bold text-[color:var(--success)]">Publie</span>
                 {% else %}
-                  <span class="de-badge-draft">Brouillon</span>
+                  <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-500">Brouillon</span>
                 {% endif %}
               </td>
               <td class="text-slate-400">{{ doc.created_at|date:"d/m/Y" }}</td>
@@ -557,13 +446,13 @@
                 <div class="flex gap-2">
                   <a href="{% url 'accounts_portal:director_correspondance_pdf' doc.id %}"
                     target="_blank"
-                    class="de-btn de-btn-secondary !py-1 !px-3 !text-xs !min-h-0">
+                    class="inline-flex items-center justify-center rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-1 text-xs font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface)]">
                     <i data-lucide="printer" class="w-3.5 h-3.5 mr-1"></i>PDF
                   </a>
                   {% if doc.status == "draft" %}
                   <form method="post" action="{% url 'accounts_portal:director_correspondance_publish' doc.id %}" class="inline">
                     {% csrf_token %}
-                    <button type="submit" class="de-btn de-btn-primary !py-1 !px-3 !text-xs !min-h-0">
+                    <button type="submit" class="inline-flex items-center justify-center rounded-lg border border-[color:var(--school-primary)] bg-[color:var(--school-primary)] px-3 py-1 text-xs font-bold text-white transition hover:opacity-90">
                       Publier
                     </button>
                   </form>
@@ -576,7 +465,7 @@
         </table>
       </div>
       {% else %}
-      <div class="de-empty m-6">
+      <div class="m-6 rounded-xl border border-dashed border-[color:var(--line)] p-8 text-center text-sm font-semibold text-[color:var(--muted)]">
         <i data-lucide="file-text" class="w-10 h-10 mx-auto text-slate-300 mb-3"></i>
         <p>Aucun document enregistre. Cliquez sur "Nouveau document" pour commencer.</p>
       </div>
@@ -592,10 +481,10 @@
   {% elif section == "enseignants" %}
   <section class="space-y-6">
 
-    <div class="de-card px-6 py-5">
+    <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm px-6 py-5">
       <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
-          <p class="de-section-label">Direction des etudes / Enseignants</p>
+          <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">Direction des etudes / Enseignants</p>
           <h2 class="mt-2 text-2xl font-black text-slate-900">Personnel enseignant</h2>
           <p class="mt-1 text-sm font-semibold text-slate-500">Recrutement, affectations de matieres, contrats et dossiers des enseignants.</p>
         </div>
@@ -604,8 +493,9 @@
             hx-get="{% url 'accounts_portal:director_teacher_create' %}"
             hx-target="#director-modal-content"
             hx-swap="innerHTML"
-            hx-on="htmx:afterOnLoad: window.deOpenModal && window.deOpenModal()"
-            class="de-btn de-btn-primary">
+            hx-disabled-elt="this"
+            hx-on::after-request="window.deOpenModal && window.deOpenModal()"
+            class="inline-flex items-center justify-center rounded-lg border border-[color:var(--school-primary)] bg-[color:var(--school-primary)] px-4 py-2 text-sm font-bold text-white transition hover:opacity-90">
             <i data-lucide="user-plus" class="w-4 h-4 mr-2"></i>Recruter un enseignant
           </button>
         </div>
@@ -614,47 +504,48 @@
 
     <!-- KPIs -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-      <div class="de-kpi">
-        <p class="de-section-label">Enseignants</p>
+      <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 shadow-sm">
+        <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">Enseignants</p>
         <p class="mt-2 text-3xl font-black text-slate-900">{{ teachers_total|default:0 }}</p>
-        <p class="mt-1 text-xs font-semibold text-blue-600">Total</p>
+        <p class="mt-1 text-xs font-semibold text-[color:var(--school-primary)]">Total</p>
       </div>
-      <div class="de-kpi">
-        <p class="de-section-label">Affectes</p>
-        <p class="mt-2 text-3xl font-black text-emerald-600">{{ teacher_assigned_count|default:0 }}</p>
+      <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 shadow-sm">
+        <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">Affectes</p>
+        <p class="mt-2 text-3xl font-black text-[color:var(--success)]">{{ teacher_assigned_count|default:0 }}</p>
       </div>
-      <div class="de-kpi">
-        <p class="de-section-label">Sans matiere</p>
-        <p class="mt-2 text-3xl font-black text-amber-600">{{ teacher_unassigned_count|default:0 }}</p>
+      <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 shadow-sm">
+        <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">Sans matiere</p>
+        <p class="mt-2 text-3xl font-black text-[color:var(--warning)]">{{ teacher_unassigned_count|default:0 }}</p>
       </div>
-      <div class="de-kpi">
-        <p class="de-section-label">Transferts</p>
+      <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 shadow-sm">
+        <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">Transferts</p>
         <p class="mt-2 text-3xl font-black text-slate-900">{{ transfer_rows|length|default:0 }}</p>
         <p class="mt-1 text-xs font-semibold text-slate-400">En attente</p>
       </div>
     </div>
 
     <!-- Recherche -->
-    <div class="de-card px-6 py-4">
+    <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm px-6 py-4">
       <form hx-get="{% url 'accounts_portal:director_workspace' %}?section=enseignants"
             hx-target="#director-workspace" hx-swap="innerHTML"
+            hx-disabled-elt="find button[type='submit']"
             class="flex gap-3">
         <input type="text" name="teacher_q" value="{{ teacher_q|default:'' }}" placeholder="Rechercher un enseignant..."
-          class="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500">
-        <button type="submit" class="de-btn de-btn-primary !py-3 !px-5">
+          class="flex-1 rounded-xl border border-[color:var(--line)] px-4 py-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+        <button type="submit" class="inline-flex items-center justify-center rounded-lg border border-[color:var(--school-primary)] bg-[color:var(--school-primary)] px-5 py-3 text-sm font-bold text-white transition hover:opacity-90">
           <i data-lucide="search" class="w-4 h-4"></i>
         </button>
       </form>
     </div>
 
     <!-- Tableau enseignants -->
-    <div class="de-card overflow-hidden">
+    <div id="de-grid-teachers" class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm overflow-hidden">
       <div class="px-6 py-4 border-b border-slate-100">
         <h3 class="font-black text-slate-900">Liste des enseignants</h3>
       </div>
       {% if teachers %}
       <div class="overflow-x-auto">
-        <table class="de-table">
+        <table class="w-full text-sm border-collapse">
           <thead><tr>
             <th>Enseignant</th>
             <th>Matieres affectees</th>
@@ -672,37 +563,47 @@
                 {% if row.assignments %}
                   <div class="flex flex-wrap gap-1">
                     {% for asgn in row.assignments|slice:":4" %}
-                    <span class="de-badge-ready">{{ asgn.ec.title|truncatechars:20 }}</span>
+                    <span class="inline-flex items-center rounded-full bg-[color:var(--success-soft)] px-2.5 py-0.5 text-xs font-bold text-[color:var(--success)]">{{ asgn.ec.title|truncatechars:20 }}</span>
                     {% endfor %}
                     {% if row.assignments|length > 4 %}
-                    <span class="de-badge-draft">+{{ row.assignments|length|add:"-4" }}</span>
+                    <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-500">+{{ row.assignments|length|add:"-4" }}</span>
                     {% endif %}
                   </div>
                 {% else %}
-                  <span class="de-badge-warning">Aucune affectation</span>
+                  <span class="inline-flex items-center rounded-full bg-[color:var(--warning-soft)] px-2.5 py-0.5 text-xs font-bold text-[color:var(--warning)]">Aucune affectation</span>
                 {% endif %}
               </td>
               <td class="font-semibold">{{ row.total_planned_hours|default:0 }}h</td>
               <td>
-                <div class="flex gap-2">
+                <div class="flex flex-wrap gap-1.5">
+                  <button type="button"
+                    hx-get="{% url 'accounts_portal:director_teacher_profile' row.teacher.id %}"
+                    hx-target="#director-drawer-content" hx-swap="innerHTML"
+                    hx-disabled-elt="this"
+                    hx-on::after-request="window.deOpenDrawer && window.deOpenDrawer()"
+                    class="inline-flex items-center gap-1 rounded-lg border border-[color:var(--school-primary)] bg-[color:var(--school-primary-soft)] px-3 py-1.5 text-xs font-bold text-[color:var(--school-primary)] transition hover:bg-[color:var(--school-primary)] hover:text-white">
+                    <i data-lucide="user-round" class="w-3.5 h-3.5"></i>Voir fiche
+                  </button>
                   <button type="button"
                     hx-get="{% url 'accounts_portal:director_teacher_assign' %}?teacher_id={{ row.teacher.id }}"
                     hx-target="#director-modal-content" hx-swap="innerHTML"
-                    hx-on="htmx:afterOnLoad: window.deOpenModal && window.deOpenModal()"
-                    class="de-btn de-btn-secondary !py-1 !px-3 !text-xs !min-h-0">
-                    Affecter EC
+                    hx-disabled-elt="this"
+                    hx-on::after-request="window.deOpenModal && window.deOpenModal()"
+                    class="inline-flex items-center gap-1 rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-1.5 text-xs font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface)]">
+                    <i data-lucide="link" class="w-3.5 h-3.5"></i>Affecter
                   </button>
                   <button type="button"
                     hx-get="{% url 'accounts_portal:director_teacher_documents_modal' %}?teacher_id={{ row.teacher.id }}"
                     hx-target="#director-modal-content" hx-swap="innerHTML"
-                    hx-on="htmx:afterOnLoad: window.deOpenModal && window.deOpenModal()"
-                    class="de-btn de-btn-secondary !py-1 !px-3 !text-xs !min-h-0">
-                    Dossier
+                    hx-disabled-elt="this"
+                    hx-on::after-request="window.deOpenModal && window.deOpenModal()"
+                    class="inline-flex items-center gap-1 rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-1.5 text-xs font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface)]">
+                    <i data-lucide="folder-open" class="w-3.5 h-3.5"></i>Dossier
                   </button>
                   <a href="{% url 'accounts_portal:director_teacher_contract_download' row.teacher.id %}"
                     target="_blank"
-                    class="de-btn de-btn-secondary !py-1 !px-3 !text-xs !min-h-0">
-                    Contrat PDF
+                    class="inline-flex items-center gap-1 rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-1.5 text-xs font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface)]">
+                    <i data-lucide="file-down" class="w-3.5 h-3.5"></i>Contrat
                   </a>
                 </div>
               </td>
@@ -713,27 +614,28 @@
           </tbody>
         </table>
       </div>
-      {% include "portal/staff/director/partials/_pagination.html" with page_obj=teacher_rows_page query_suffix=teachers_query_suffix %}
+      {% include "portal/staff/director/partials/_pagination.html" with page_obj=teacher_rows_page query_suffix=teachers_query_suffix page_param="teachers_page" target_id="#de-grid-teachers" hx_select="#de-grid-teachers" %}
       {% else %}
-      <div class="de-empty m-6">Aucun enseignant dans cette annexe.</div>
+      <div class="m-6 rounded-xl border border-dashed border-[color:var(--line)] p-8 text-center text-sm font-semibold text-[color:var(--muted)]">Aucun enseignant dans cette annexe.</div>
       {% endif %}
     </div>
 
     <!-- Transferts etudiants -->
     {% if transfer_rows %}
-    <div class="de-card overflow-hidden">
+    <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm overflow-hidden">
       <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
         <h3 class="font-black text-slate-900">Demandes de transfert</h3>
         <button type="button"
           hx-get="{% url 'accounts_portal:director_transfer_create' %}"
           hx-target="#director-modal-content" hx-swap="innerHTML"
-          hx-on="htmx:afterOnLoad: window.deOpenModal && window.deOpenModal()"
-          class="de-btn de-btn-secondary !py-2 !px-3 !text-xs">
+          hx-disabled-elt="this"
+          hx-on::after-request="window.deOpenModal && window.deOpenModal()"
+          class="inline-flex items-center justify-center rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface)]">
           <i data-lucide="plus" class="w-3.5 h-3.5 mr-1"></i>Nouvelle demande
         </button>
       </div>
       <div class="overflow-x-auto">
-        <table class="de-table">
+        <table class="w-full text-sm border-collapse">
           <thead><tr>
             <th>Etudiant</th><th>Type</th><th>Source</th><th>Cible</th><th>Statut</th><th>Actions</th>
           </tr></thead>
@@ -745,18 +647,19 @@
               <td>{{ tr.source_class.display_name|default:"—" }}</td>
               <td>{{ tr.target_class.display_name|default:tr.target_school_name|default:"—" }}</td>
               <td>
-                {% if tr.status == "validated" %}<span class="de-badge-published">Valide</span>
-                {% elif tr.status == "rejected" %}<span class="de-badge-danger">Rejete</span>
-                {% elif tr.status == "submitted" %}<span class="de-badge-ready">Soumis</span>
-                {% else %}<span class="de-badge-draft">Brouillon</span>{% endif %}
+                {% if tr.status == "validated" %}<span class="inline-flex items-center rounded-full bg-[color:var(--success-soft)] px-2.5 py-0.5 text-xs font-bold text-[color:var(--success)]">Valide</span>
+                {% elif tr.status == "rejected" %}<span class="inline-flex items-center rounded-full bg-[color:var(--danger-soft)] px-2.5 py-0.5 text-xs font-bold text-[color:var(--danger)]">Rejete</span>
+                {% elif tr.status == "submitted" %}<span class="inline-flex items-center rounded-full bg-[color:var(--success-soft)] px-2.5 py-0.5 text-xs font-bold text-[color:var(--success)]">Soumis</span>
+                {% else %}<span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-500">Brouillon</span>{% endif %}
               </td>
               <td>
                 {% if tr.status == "submitted" %}
                 <button type="button"
                   hx-get="{% url 'accounts_portal:director_transfer_review' %}?transfer_id={{ tr.id }}"
                   hx-target="#director-modal-content" hx-swap="innerHTML"
-                  hx-on="htmx:afterOnLoad: window.deOpenModal && window.deOpenModal()"
-                  class="de-btn de-btn-primary !py-1 !px-3 !text-xs !min-h-0">
+                  hx-disabled-elt="this"
+                  hx-on::after-request="window.deOpenModal && window.deOpenModal()"
+                  class="inline-flex items-center justify-center rounded-lg border border-[color:var(--school-primary)] bg-[color:var(--school-primary)] px-3 py-1 text-xs font-bold text-white transition hover:opacity-90">
                   Examiner
                 </button>
                 {% endif %}
@@ -773,229 +676,322 @@
 
 
   {# =========================================================== #}
-  {#  5. EVALUATIONS & RESULTATS                                  #}
+  {#  5. EVALUATIONS                                              #}
   {# =========================================================== #}
   {% elif section == "evaluations" %}
   <section class="space-y-6">
 
-    <div class="de-card px-6 py-5">
-      <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+    {# ── En-tete ── #}
+    <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm px-6 py-5">
+      <div class="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
         <div>
-          <p class="de-section-label">Direction des etudes / Evaluations</p>
-          <h2 class="mt-2 text-2xl font-black text-slate-900">Evaluations & Resultats</h2>
-          <p class="mt-1 text-sm font-semibold text-slate-500">Valider et publier les resultats, generer les releves de notes et les PV d'evaluations.</p>
+          <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">Direction des etudes</p>
+          <h2 class="mt-1 text-2xl font-black text-[color:var(--text)]">Planification des evaluations</h2>
+          <p class="mt-1 text-sm font-semibold text-[color:var(--muted)]">Creez les devoirs, controles et examens — ils apparaissent immediatement dans l'agenda des etudiants.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 shrink-0">
+          <span class="inline-flex items-center gap-1.5 rounded-full border border-[color:var(--line)] bg-[color:var(--surface)] px-3 py-1.5 text-xs font-bold text-[color:var(--text)]">
+            <i data-lucide="clipboard-list" class="w-3.5 h-3.5 text-[color:var(--school-primary)]"></i>
+            {{ eval_event_total }} evaluation(s)
+          </span>
+          {% if eval_event_upcoming_count %}
+          <span class="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--school-primary-soft)] px-3 py-1.5 text-xs font-bold text-[color:var(--school-primary)]">
+            <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+            {{ eval_event_upcoming_count }} a venir
+          </span>
+          {% endif %}
         </div>
       </div>
     </div>
 
-    <!-- KPIs -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-      <div class="de-kpi">
-        <p class="de-section-label">A valider</p>
-        <p class="mt-2 text-3xl font-black text-amber-600">{{ ready_to_validate_count|default:0 }}</p>
-      </div>
-      <div class="de-kpi">
-        <p class="de-section-label">A publier</p>
-        <p class="mt-2 text-3xl font-black text-blue-600">{{ ready_to_publish|length|default:0 }}</p>
-      </div>
-      <div class="de-kpi">
-        <p class="de-section-label">Publies</p>
-        <p class="mt-2 text-3xl font-black text-emerald-600">{{ published_count|default:0 }}</p>
-      </div>
-      <div class="de-kpi">
-        <p class="de-section-label">Anomalies</p>
-        <p class="mt-2 text-3xl font-black text-red-600">{{ result_anomalies|length|default:0 }}</p>
+    {# ── Formulaire de creation ── #}
+    <div x-data="deEvalForm()"
+         class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm overflow-hidden">
+      <button type="button" @click="open = !open"
+        class="flex w-full items-center justify-between px-6 py-4 text-left transition hover:bg-[color:var(--surface)]">
+        <div class="flex items-center gap-3">
+          <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-[color:var(--school-primary)] text-white">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+          </span>
+          <div>
+            <p class="text-sm font-black text-[color:var(--text)]">Planifier une nouvelle evaluation</p>
+            <p class="text-xs text-[color:var(--muted)]">Devoir, controle, examen S1/S2, rattrapage</p>
+          </div>
+        </div>
+        <i :class="open ? 'rotate-180' : ''" data-lucide="chevron-down" class="w-5 h-5 text-[color:var(--muted)] transition-transform duration-200"></i>
+      </button>
+
+      <div x-show="open"
+           x-transition:enter="transition ease-out duration-200"
+           x-transition:enter-start="opacity-0 -translate-y-2"
+           x-transition:enter-end="opacity-100 translate-y-0"
+           x-transition:leave="transition ease-in duration-150"
+           x-transition:leave-start="opacity-100"
+           x-transition:leave-end="opacity-0 -translate-y-1"
+           class="border-t border-[color:var(--line)] bg-[color:var(--surface)] px-6 py-6">
+        <form hx-post="{% url 'accounts_portal:director_evaluation_action' %}"
+              hx-target="#director-workspace" hx-swap="innerHTML"
+              hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+              hx-disabled-elt="button[type=submit]"
+              @htmx:after-request="open = false"
+              class="space-y-5">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="create">
+
+          {# Ligne 1 : Titre + Type #}
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="md:col-span-2">
+              <label class="mb-1.5 block text-xs font-black uppercase tracking-wide text-[color:var(--text)]">Intitule *</label>
+              <input type="text" name="title" required placeholder="Ex: Devoir 1 — Algorithmique · Controle S1"
+                class="w-full rounded-xl border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+            </div>
+            <div>
+              <label class="mb-1.5 block text-xs font-black uppercase tracking-wide text-[color:var(--text)]">Type</label>
+              <select name="event_type"
+                class="w-full rounded-xl border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+                <option value="exam">Examen</option>
+                <option value="practical">Devoir / TP</option>
+                <option value="seminar">Seminaire</option>
+              </select>
+            </div>
+          </div>
+
+          {# Ligne 2 : Classe + Matiere #}
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="mb-1.5 block text-xs font-black uppercase tracking-wide text-[color:var(--text)]">Classe *</label>
+              <select name="class_id" required x-model="selectedClass"
+                class="w-full rounded-xl border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+                <option value="">— Choisir une classe —</option>
+                {% for cls in eval_form_classes %}
+                <option value="{{ cls.id }}">{{ cls.display_name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label class="mb-1.5 block text-xs font-black uppercase tracking-wide text-[color:var(--text)]">Matiere (EC) *</label>
+              <select name="ec_id" required
+                :disabled="!selectedClass"
+                :class="selectedClass ? 'border-[color:var(--school-primary)]' : 'opacity-60'"
+                class="w-full rounded-xl border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30 transition">
+                <option value="" x-text="selectedClass ? '— Choisir une matiere —' : '— Choisir d\'abord une classe —'"></option>
+                <template x-if="selectedClass && ecsByClass[selectedClass]">
+                  <template x-for="ec in ecsByClass[selectedClass]" :key="ec.id">
+                    <option :value="ec.id" x-text="ec.title"></option>
+                  </template>
+                </template>
+              </select>
+            </div>
+          </div>
+
+          {# Ligne 3 : Date/heure debut + fin #}
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="mb-1.5 block text-xs font-black uppercase tracking-wide text-[color:var(--text)]">Debut *</label>
+              <input type="datetime-local" name="start_datetime" required
+                class="w-full rounded-xl border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+            </div>
+            <div>
+              <label class="mb-1.5 block text-xs font-black uppercase tracking-wide text-[color:var(--text)]">Fin *</label>
+              <input type="datetime-local" name="end_datetime" required
+                class="w-full rounded-xl border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+            </div>
+          </div>
+
+          {# Ligne 4 : Salle + Description/Programme #}
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label class="mb-1.5 block text-xs font-black uppercase tracking-wide text-[color:var(--text)]">Salle</label>
+              <input type="text" name="location" placeholder="Ex: Salle A · Amphi 1"
+                class="w-full rounded-xl border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+            </div>
+            <div class="md:col-span-2">
+              <label class="mb-1.5 block text-xs font-black uppercase tracking-wide text-[color:var(--text)]">Programme / Contenu evalue</label>
+              <textarea name="description" rows="2"
+                placeholder="Ex: Chapitres 1 a 4 — Algorithmes de tri, recursivite, complexite..."
+                class="w-full rounded-xl border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30 resize-none"></textarea>
+            </div>
+          </div>
+
+          <div class="flex justify-end">
+            <button type="submit"
+              class="inline-flex items-center gap-2 rounded-xl bg-[color:var(--school-primary)] px-5 py-2.5 text-sm font-black text-white shadow-sm hover:opacity-90 transition disabled:opacity-50">
+              <i data-lucide="calendar-plus" class="w-4 h-4"></i>Planifier l'evaluation
+            </button>
+          </div>
+        </form>
       </div>
     </div>
 
-    <div class="grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-6">
+    {# Donnees EC par classe serialisees depuis le backend #}
+    <script id="de-ecs-by-class-data" type="application/json">{{ eval_form_ecs_json|safe }}</script>
+    <script>
+    function deEvalForm() {
+      return {
+        open: false,
+        selectedClass: '',
+        ecsByClass: {},
+        init() {
+          try {
+            var el = document.getElementById('de-ecs-by-class-data');
+            this.ecsByClass = el ? JSON.parse(el.textContent) : {};
+          } catch(e) { this.ecsByClass = {}; }
+        }
+      };
+    }
+    </script>
 
-      <!-- Sélecteur classe -->
-      <div class="de-card overflow-hidden">
-        <div class="px-5 py-4 border-b border-slate-100">
-          <h3 class="font-black text-slate-900 text-sm">Selectionner une classe</h3>
-        </div>
-        <div class="divide-y divide-slate-100 max-h-[520px] overflow-y-auto scrollbar-thin">
-          {% for item in class_cards %}
-          <button type="button"
-            hx-get="{% url 'accounts_portal:director_workspace' %}?section=evaluations&class_id={{ item.class.id }}"
-            hx-target="#director-workspace" hx-swap="innerHTML"
-            class="w-full px-5 py-4 text-left hover:bg-blue-50 transition
-              {% if selected_class and item.class.id == selected_class.id %}bg-blue-50 border-l-4 border-blue-600{% endif %}">
-            <div class="flex items-center justify-between">
-              <p class="text-sm font-bold text-slate-900">{{ item.class.display_name }}</p>
-              {% if item.workflow_bucket == "ready" %}
-                <span class="de-badge-ready">Prete</span>
-              {% elif item.workflow_bucket == "rejected" %}
-                <span class="de-badge-danger">A revoir</span>
-              {% else %}
-                <span class="de-badge-warning">En cours</span>
+    {# ── Liste des evaluations planifiees par classe ── #}
+    {% if eval_events_by_class %}
+    <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm overflow-hidden">
+      <div class="px-6 py-4 border-b border-[color:var(--line)] flex items-center justify-between">
+        <h3 class="text-sm font-black text-[color:var(--text)]">Evaluations planifiees</h3>
+        <span class="text-xs font-bold text-[color:var(--muted)]">{{ eval_event_total }} au total</span>
+      </div>
+      <div class="divide-y divide-[color:var(--line)]">
+        {% for group in eval_events_by_class %}
+        <div>
+          <div class="flex items-center gap-2 bg-[color:var(--surface)] px-6 py-2.5">
+            <i data-lucide="users" class="w-3.5 h-3.5 text-[color:var(--school-primary)]"></i>
+            <p class="text-xs font-black text-[color:var(--text)]">{{ group.academic_class.display_name }}</p>
+            <span class="ml-auto text-[10px] font-semibold text-[color:var(--muted)]">{{ group.events|length }} eval.</span>
+          </div>
+          {% for evt in group.events %}
+          <div class="flex items-start gap-4 px-6 py-4">
+            {# Icone type #}
+            <div class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl
+              {% if evt.event_type == 'exam' %}bg-red-50 text-red-600
+              {% elif evt.event_type == 'practical' %}bg-amber-50 text-amber-600
+              {% else %}bg-sky-50 text-sky-600{% endif %}">
+              <i data-lucide="{% if evt.event_type == 'exam' %}file-check{% elif evt.event_type == 'practical' %}pen-line{% else %}presentation{% endif %}"
+                 class="w-5 h-5"></i>
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="text-sm font-black text-[color:var(--text)]">{{ evt.title }}</p>
+                  <p class="text-xs font-semibold text-[color:var(--muted)]">{{ evt.ec.title }}</p>
+                </div>
+                <div class="shrink-0 text-right">
+                  <p class="text-xs font-black text-[color:var(--text)]">{{ evt.start_datetime|date:"d/m/Y" }}</p>
+                  <p class="text-xs font-semibold text-[color:var(--school-primary)]">{{ evt.start_datetime|time:"H:i" }} – {{ evt.end_datetime|time:"H:i" }}</p>
+                </div>
+              </div>
+              <div class="mt-1.5 flex flex-wrap items-center gap-2">
+                {% if evt.location %}
+                <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-[color:var(--muted)]">
+                  <i data-lucide="map-pin" class="w-3 h-3"></i>{{ evt.location }}
+                </span>
+                {% endif %}
+                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold
+                  {% if evt.status == 'planned' %}bg-emerald-50 text-emerald-700
+                  {% elif evt.status == 'cancelled' %}bg-red-50 text-red-600
+                  {% elif evt.status == 'completed' %}bg-slate-100 text-slate-500
+                  {% else %}bg-amber-50 text-amber-600{% endif %}">
+                  {{ evt.get_status_display }}
+                </span>
+                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold
+                  {% if evt.event_type == 'exam' %}bg-red-50 text-red-600{% elif evt.event_type == 'practical' %}bg-amber-50 text-amber-600{% else %}bg-sky-50 text-sky-600{% endif %}">
+                  {{ evt.get_event_type_display }}
+                </span>
+              </div>
+              {% if evt.description %}
+              <p class="mt-1 text-xs text-[color:var(--muted)] line-clamp-2">
+                <span class="font-semibold text-[color:var(--text)]">Programme :</span> {{ evt.description }}
+              </p>
               {% endif %}
             </div>
-            <p class="text-xs text-slate-400 mt-1">
-              {{ item.ready_to_validate_count }} a valider · {{ item.ready_to_publish_count }} a publier
-            </p>
-          </button>
-          {% empty %}
-          <div class="px-5 py-6 text-sm text-slate-400 text-center font-semibold">Aucune classe.</div>
+            {# Bouton annuler #}
+            {% if evt.status != 'cancelled' and evt.status != 'completed' %}
+            <form hx-post="{% url 'accounts_portal:director_evaluation_action' %}"
+                  hx-target="#director-workspace" hx-swap="innerHTML"
+                  hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                  hx-confirm="Annuler l'evaluation « {{ evt.title }} » ?">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="cancel">
+              <input type="hidden" name="event_id" value="{{ evt.id }}">
+              <button type="submit"
+                class="mt-0.5 rounded-lg border border-[color:var(--line)] p-1.5 text-[color:var(--muted)] hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+              </button>
+            </form>
+            {% endif %}
+          </div>
           {% endfor %}
         </div>
-      </div>
-
-      <!-- Panel resultats -->
-      <div class="space-y-4">
-        {% if selected_class %}
-
-        <div class="de-card px-6 py-5">
-          <h3 class="text-xl font-black text-slate-900">{{ selected_class.display_name }}</h3>
-          <p class="text-sm text-slate-400 mt-1">{{ result_panel_subtitle }}</p>
-        </div>
-
-        <!-- Semestres -->
-        {% for row in selected_class_rows %}
-        <div class="de-card overflow-hidden">
-          <div class="px-6 py-4 border-b border-slate-100">
-            <div class="flex items-center justify-between">
-              <div>
-                <h4 class="font-black text-slate-900">Semestre {{ row.semester.number }}</h4>
-                <p class="text-xs text-slate-400 mt-0.5">
-                  {{ row.entered }}/{{ row.expected }} notes saisies · {{ row.progress }}%
-                </p>
-              </div>
-              <span class="
-                {% if row.tone == 'emerald' %}de-badge-published
-                {% elif row.tone == 'blue' %}de-badge-ready
-                {% elif row.tone == 'amber' %}de-badge-warning
-                {% else %}de-badge-danger{% endif %}">
-                {{ row.state }}
-              </span>
-            </div>
-          </div>
-          <div class="px-6 py-4 flex flex-wrap gap-2">
-            {% if row.can_validate %}
-            <button type="button"
-              hx-post="{% url 'accounts_portal:director_results_action' %}"
-              hx-vals='{"action": "validate", "class_id": "{{ selected_class.id }}", "semester_id": "{{ row.semester.id }}"}'
-              hx-target="#director-workspace" hx-swap="innerHTML"
-              hx-confirm="Confirmer la validation du Semestre {{ row.semester.number }} ?"
-              class="de-btn de-btn-primary">
-              <i data-lucide="check-circle" class="w-4 h-4 mr-2"></i>Valider
-            </button>
-            {% endif %}
-            {% if row.can_publish %}
-            <button type="button"
-              hx-post="{% url 'accounts_portal:director_results_confirm_otp' %}"
-              hx-vals='{"action": "publish", "class_id": "{{ selected_class.id }}", "semester_id": "{{ row.semester.id }}"}'
-              hx-target="#director-modal-content" hx-swap="innerHTML"
-              hx-on="htmx:afterOnLoad: window.deOpenModal && window.deOpenModal()"
-              class="de-btn de-btn-primary">
-              <i data-lucide="send" class="w-4 h-4 mr-2"></i>Publier
-            </button>
-            {% endif %}
-            {% if row.can_generate %}
-            <button type="button"
-              hx-post="{% url 'accounts_portal:director_bulletin_action' %}"
-              hx-vals='{"action": "generate", "class_id": "{{ selected_class.id }}", "semester_id": "{{ row.semester.id }}"}'
-              hx-target="#director-workspace" hx-swap="innerHTML"
-              class="de-btn de-btn-secondary">
-              <i data-lucide="file-text" class="w-4 h-4 mr-2"></i>Generer bulletins
-            </button>
-            {% endif %}
-          </div>
-        </div>
-        {% empty %}
-        <div class="de-empty">Aucun semestre pour cette classe.</div>
         {% endfor %}
-
-        <!-- Tableau des resultats -->
-        {% if result_table_rows %}
-        <div class="de-card overflow-hidden">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h4 class="font-black text-slate-900">Classement — {{ selected_class.display_name }}</h4>
-            {% if result_summary %}
-            <span class="text-xs font-semibold text-slate-400">
-              Moy. classe : <strong>{{ result_summary.class_average }}</strong> ·
-              {{ result_summary.completed_students }}/{{ result_summary.student_count }} complets
-            </span>
-            {% endif %}
-          </div>
-          <div class="overflow-x-auto">
-            <table class="de-table">
-              <thead><tr>
-                <th>#</th><th>Etudiant</th><th>Matricule</th><th>Moyenne</th><th>Credits</th><th>Completude</th><th>Statut</th>
-              </tr></thead>
-              <tbody class="text-sm">
-                {% for row in result_table_rows_page.object_list %}
-                <tr class="hover:bg-slate-50">
-                  <td class="font-black text-slate-400">{{ row.rank }}</td>
-                  <td class="font-semibold">{{ row.student_name }}</td>
-                  <td class="text-slate-400">{{ row.matricule }}</td>
-                  <td class="font-black">{{ row.average }}</td>
-                  <td>{{ row.credits }}</td>
-                  <td>{{ row.completion }}</td>
-                  <td>
-                    <span class="de-badge-
-                      {% if row.status_tone == 'emerald' %}published
-                      {% elif row.status_tone == 'rose' %}danger
-                      {% else %}warning{% endif %}">
-                      {{ row.status }}
-                    </span>
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-          {% include "portal/staff/director/partials/_pagination.html" with page_obj=result_table_rows_page query_suffix=results_query_suffix %}
-        </div>
-        {% endif %}
-
-        <!-- Anomalies -->
-        {% if result_anomalies %}
-        <div class="de-card overflow-hidden">
-          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h4 class="font-black text-red-700">Anomalies detectees</h4>
-            <span class="de-badge-danger">{{ result_anomalies|length }}</span>
-          </div>
-          <div class="divide-y divide-slate-100">
-            {% for anomaly in result_anomalies_page.object_list %}
-            <div class="px-6 py-3 flex items-center gap-3">
-              <div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0
-                {% if anomaly.level == 'blocking' %}bg-red-100 text-red-600{% else %}bg-amber-100 text-amber-600{% endif %}">
-                <i data-lucide="{% if anomaly.level == 'blocking' %}x-circle{% else %}alert-circle{% endif %}" class="w-4 h-4"></i>
-              </div>
-              <div>
-                <p class="text-sm font-bold text-slate-900">{{ anomaly.student }}</p>
-                <p class="text-xs text-slate-400">{{ anomaly.message }}</p>
-              </div>
-            </div>
-            {% endfor %}
-          </div>
-          {% include "portal/staff/director/partials/_pagination.html" with page_obj=result_anomalies_page query_suffix=results_query_suffix %}
-        </div>
-        {% endif %}
-
-        {% else %}
-        <div class="de-empty py-12">
-          <i data-lucide="clipboard-check" class="w-10 h-10 mx-auto text-slate-300 mb-3"></i>
-          <p>Selectionnez une classe pour voir ses resultats.</p>
-        </div>
-        {% endif %}
       </div>
     </div>
 
-    <!-- Publications (relevés et diplômes) -->
-    {% if diploma_candidate_classes %}
-    <div class="de-card overflow-hidden">
-      <div class="px-6 py-4 border-b border-slate-100">
-        <h3 class="font-black text-slate-900">Classes candidates au diplome</h3>
+    {% else %}
+    {# Etat vide : aucune evaluation planifiee #}
+    <div class="rounded-2xl border border-dashed border-[color:var(--line)] bg-[color:var(--card)] px-6 py-12 text-center">
+      <i data-lucide="clipboard-list" class="mx-auto w-12 h-12 text-[color:var(--muted)] mb-4"></i>
+      <p class="text-sm font-black text-[color:var(--text)]">Aucune evaluation planifiee</p>
+      <p class="mt-1 text-xs text-[color:var(--muted)]">Utilisez le formulaire ci-dessus pour creer votre premiere evaluation. Elle sera immediatement visible par les etudiants dans leur agenda.</p>
+    </div>
+    {% endif %}
+
+    {# ── Validation des resultats (en bas, section secondaire) ── #}
+    <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm overflow-hidden">
+      <div class="flex items-center gap-3 border-b border-[color:var(--line)] px-6 py-4">
+        <i data-lucide="check-circle" class="w-4 h-4 text-[color:var(--school-primary)]"></i>
+        <h3 class="text-sm font-black text-[color:var(--text)]">Validation des notes — par classe</h3>
+        <div class="ml-auto flex flex-wrap gap-2">
+          {% if ready_to_validate_count %}
+          <span class="inline-flex items-center rounded-full bg-[color:var(--warning-soft)] px-2.5 py-0.5 text-[10px] font-black text-[color:var(--warning)]">
+            {{ ready_to_validate_count }} a valider
+          </span>
+          {% endif %}
+          {% if ready_to_publish|length %}
+          <span class="inline-flex items-center rounded-full bg-[color:var(--school-primary-soft)] px-2.5 py-0.5 text-[10px] font-black text-[color:var(--school-primary)]">
+            {{ ready_to_publish|length }} a publier
+          </span>
+          {% endif %}
+        </div>
       </div>
-      <div class="divide-y divide-slate-100">
+      {% if class_cards_page.object_list %}
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-0 divide-y sm:divide-y-0 sm:divide-x divide-[color:var(--line)]">
+        {% for item in class_cards_page.object_list %}
+        <button type="button"
+          hx-get="{% url 'accounts_portal:director_drawer' %}?panel=evaluations&class_id={{ item.class.id }}"
+          hx-target="#director-drawer-content" hx-swap="innerHTML"
+          hx-disabled-elt="this"
+          hx-on::after-request="window.deOpenDrawer && window.deOpenDrawer()"
+          class="group flex flex-col gap-1 p-5 text-left transition hover:bg-[color:var(--school-primary-soft)] active:scale-[0.98]">
+          <div class="flex items-start justify-between gap-2">
+            <p class="text-sm font-black text-[color:var(--text)] group-hover:text-[color:var(--school-primary)]">{{ item.class.display_name }}</p>
+            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold shrink-0
+              {% if item.workflow_bucket == 'ready' %}bg-[color:var(--success-soft)] text-[color:var(--success)]
+              {% elif item.workflow_bucket == 'rejected' %}bg-[color:var(--danger-soft)] text-[color:var(--danger)]
+              {% else %}bg-[color:var(--warning-soft)] text-[color:var(--warning)]{% endif %}">
+              {% if item.workflow_bucket == 'ready' %}Prete{% elif item.workflow_bucket == 'rejected' %}A revoir{% else %}En cours{% endif %}
+            </span>
+          </div>
+          <p class="text-xs text-[color:var(--muted)]">{{ item.student_count }} etudiant(s)</p>
+          <p class="mt-1 text-xs font-semibold text-[color:var(--muted)]">
+            {{ item.ready_to_validate_count }} a valider · {{ item.ready_to_publish_count }} a publier
+          </p>
+        </button>
+        {% endfor %}
+      </div>
+      {% include "portal/staff/director/partials/_pagination.html" with page_obj=class_cards_page query_suffix="section=evaluations" target_id="#de-grid-evals" hx_select="#de-grid-evals" %}
+      {% else %}
+      <div class="p-8 text-center text-sm font-semibold text-[color:var(--muted)]">Aucune classe configuree.</div>
+      {% endif %}
+    </div>
+
+    {% if diploma_candidate_classes %}
+    <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm overflow-hidden">
+      <div class="px-6 py-4 border-b border-[color:var(--line)]">
+        <h3 class="font-black text-[color:var(--text)]">Classes candidates au diplome</h3>
+      </div>
+      <div class="divide-y divide-[color:var(--line)]">
         {% for item in diploma_candidate_classes %}
         <div class="px-6 py-4 flex items-center justify-between gap-4">
           <div>
-            <p class="font-bold text-slate-900">{{ item.class.display_name }}</p>
-            <p class="text-xs text-slate-400 mt-0.5">{{ item.student_count }} etudiant(s) · {{ item.awards_count }} diplome(s) genere(s)</p>
+            <p class="font-bold text-[color:var(--text)]">{{ item.class.display_name }}</p>
+            <p class="text-xs text-[color:var(--muted)] mt-0.5">{{ item.student_count }} etudiant(s) · {{ item.awards_count }} diplome(s) genere(s)</p>
           </div>
         </div>
         {% endfor %}
@@ -1005,8 +1001,913 @@
 
   </section>
 
+  {# =========================================================== #}
+  {#  6. CALENDRIER DES EVALUATIONS                               #}
+  {# =========================================================== #}
+  {% elif section == "evaluations_calendar" %}
+  <section class="space-y-6">
+
+    <!-- En-tete -->
+    <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm px-6 py-5">
+      <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div>
+          <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">Direction des etudes</p>
+          <h2 class="mt-1 text-2xl font-black text-slate-900">Calendrier des evaluations</h2>
+          <p class="mt-1 text-sm font-semibold text-[color:var(--muted)]">Creer, planifier et publier les sessions d'examens et de rattrapage.</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="inline-flex items-center gap-1.5 rounded-full border border-[color:var(--line)] bg-[color:var(--surface)] px-3 py-1.5 text-xs font-bold text-slate-700">
+            <i data-lucide="calendar-check" class="w-3.5 h-3.5 text-[color:var(--school-primary)]"></i>
+            {{ exam_session_total }} session(s)
+          </span>
+          {% if exam_session_upcoming_count %}
+          <span class="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--school-primary-soft)] px-3 py-1.5 text-xs font-bold text-[color:var(--school-primary)]">
+            <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+            {{ exam_session_upcoming_count }} a venir
+          </span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Formulaire creation nouvelle session -->
+    <div x-data="{ open: false }" class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm overflow-hidden">
+      <button type="button" @click="open = !open"
+        class="flex w-full items-center justify-between px-6 py-4 text-left transition hover:bg-[color:var(--surface)]">
+        <div class="flex items-center gap-3">
+          <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-[color:var(--school-primary)] text-white">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+          </span>
+          <div>
+            <p class="text-sm font-black text-slate-900">Nouvelle session d'evaluation</p>
+            <p class="text-xs text-[color:var(--muted)]">Examens, rattrapages — avec affectation des surveillants</p>
+          </div>
+        </div>
+        <i :class="open ? 'rotate-180' : ''" data-lucide="chevron-down" class="w-5 h-5 text-[color:var(--muted)] transition-transform duration-200"></i>
+      </button>
+      <div x-show="open"
+           x-transition:enter="transition ease-out duration-200"
+           x-transition:enter-start="opacity-0 -translate-y-2"
+           x-transition:enter-end="opacity-100 translate-y-0"
+           x-transition:leave="transition ease-in duration-150"
+           x-transition:leave-start="opacity-100"
+           x-transition:leave-end="opacity-0 -translate-y-1"
+           class="border-t border-[color:var(--line)] bg-[color:var(--surface)] px-6 py-6">
+        <form hx-post="{% url 'accounts_portal:director_exam_session_action' %}"
+              hx-target="#director-workspace" hx-swap="innerHTML"
+              hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+              hx-disabled-elt="button[type=submit]"
+              @htmx:after-request="open = false"
+              class="space-y-4">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="create">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="md:col-span-2">
+              <label class="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-600">Intitule *</label>
+              <input type="text" name="title" required placeholder="Ex: Session d'examens S1 — L1 Informatique"
+                class="w-full rounded-xl border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+            </div>
+            <div>
+              <label class="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-600">Type</label>
+              <select name="event_type" class="w-full rounded-xl border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+                {% for val, label in exam_session_type_choices %}
+                <option value="{{ val }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label class="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-600">Classe concernee</label>
+              <select name="class_id" class="w-full rounded-xl border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+                <option value="">— Toutes les classes —</option>
+                {% for cls in exam_session_classes %}
+                <option value="{{ cls.id }}">{{ cls.display_name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label class="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-600">Date de debut *</label>
+              <input type="date" name="start_date" required
+                class="w-full rounded-xl border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+            </div>
+            <div>
+              <label class="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-600">Date de fin *</label>
+              <input type="date" name="end_date" required
+                class="w-full rounded-xl border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+            </div>
+          </div>
+          <div class="flex gap-3 pt-2">
+            <button type="submit"
+              class="inline-flex items-center justify-center rounded-xl border border-[color:var(--school-primary)] bg-[color:var(--school-primary)] px-5 py-2.5 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-50">
+              <i data-lucide="save" class="w-4 h-4 mr-2"></i>Enregistrer en brouillon
+            </button>
+            <button type="button" @click="open = false"
+              class="inline-flex items-center justify-center rounded-xl border border-[color:var(--line)] bg-white px-5 py-2.5 text-sm font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface)]">
+              Annuler
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Sessions existantes -->
+    {% if exam_session_rows %}
+    <div class="space-y-3">
+      {% for row in exam_session_rows %}
+      <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm overflow-hidden">
+        <div class="flex items-start justify-between gap-4 px-6 py-4">
+          <div class="flex items-start gap-4 min-w-0">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl
+              {% if row.tone == 'success' %}bg-[color:var(--success-soft)] text-[color:var(--success)]
+              {% elif row.tone == 'warning' %}bg-[color:var(--warning-soft)] text-[color:var(--warning)]
+              {% elif row.tone == 'school_primary' %}bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]
+              {% else %}bg-[color:var(--surface)] text-[color:var(--muted)]{% endif %}">
+              <i data-lucide="{% if row.state == 'en_cours' %}play-circle{% elif row.state == 'termine' %}check-circle{% else %}calendar{% endif %}" class="w-5 h-5"></i>
+            </div>
+            <div class="min-w-0">
+              <p class="font-black text-slate-900">{{ row.entry.title }}</p>
+              <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[color:var(--muted)]">
+                <span><i data-lucide="calendar" class="w-3 h-3 inline mr-0.5"></i>{{ row.entry.start_datetime|date:"d/m/Y" }} &rarr; {{ row.entry.end_datetime|date:"d/m/Y" }}</span>
+                <span>{{ row.type_label }}</span>
+                {% if row.class_label != "—" %}<span class="font-semibold text-slate-600">{{ row.class_label }}</span>{% endif %}
+                {% if row.semester_label != "—" %}<span>{{ row.semester_label }}</span>{% endif %}
+                {% if row.supervisor_count %}<span><i data-lucide="users" class="w-3 h-3 inline mr-0.5"></i>{{ row.supervisor_count }} surveillant(s)</span>{% endif %}
+              </div>
+            </div>
+          </div>
+          <div class="flex shrink-0 flex-col items-end gap-2">
+            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide
+              {% if row.state == 'en_cours' %}bg-[color:var(--success-soft)] text-[color:var(--success)]
+              {% elif row.state == 'publie' %}bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]
+              {% elif row.state == 'termine' %}bg-[color:var(--surface)] text-[color:var(--muted)]
+              {% else %}bg-[color:var(--warning-soft)] text-[color:var(--warning)]{% endif %}">
+              {{ row.state }}
+            </span>
+            <div class="flex gap-1.5">
+              {% if row.is_draft %}
+              <form hx-post="{% url 'accounts_portal:director_exam_session_action' %}"
+                    hx-target="#director-workspace" hx-swap="innerHTML"
+                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                    hx-confirm="Publier « {{ row.entry.title }} » ? Elle sera visible par tous."
+                    hx-disabled-elt="button[type=submit]" class="inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="publish">
+                <input type="hidden" name="entry_id" value="{{ row.entry.id }}">
+                <button type="submit"
+                  class="inline-flex items-center rounded-lg border border-[color:var(--school-primary)] bg-[color:var(--school-primary)] px-2.5 py-1 text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-50">
+                  <i data-lucide="send" class="w-3 h-3 mr-1"></i>Publier
+                </button>
+              </form>
+              {% endif %}
+              {% if row.state != 'termine' %}
+              <form hx-post="{% url 'accounts_portal:director_exam_session_action' %}"
+                    hx-target="#director-workspace" hx-swap="innerHTML"
+                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                    hx-confirm="Annuler « {{ row.entry.title }} » ?"
+                    hx-disabled-elt="button[type=submit]" class="inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="cancel">
+                <input type="hidden" name="entry_id" value="{{ row.entry.id }}">
+                <button type="submit"
+                  class="inline-flex items-center rounded-lg border border-[color:var(--line)] bg-[color:var(--surface)] px-2.5 py-1 text-xs font-semibold text-[color:var(--muted)] transition hover:border-[color:var(--danger-soft)] hover:bg-[color:var(--danger-soft)] hover:text-[color:var(--danger)] disabled:opacity-50">
+                  <i data-lucide="x" class="w-3 h-3 mr-1"></i>Annuler
+                </button>
+              </form>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% if row.supervisors %}
+        <div class="border-t border-[color:var(--line)] bg-[color:var(--surface)] px-6 py-3">
+          <p class="text-[10px] font-black uppercase tracking-wide text-[color:var(--muted)] mb-1.5">Surveillants</p>
+          <div class="flex flex-wrap gap-2">
+            {% for sup in row.supervisors %}
+            <span class="inline-flex items-center rounded-full bg-[color:var(--card)] border border-[color:var(--line)] px-2.5 py-0.5 text-xs font-semibold text-slate-700">
+              {{ sup.get_full_name|default:sup.username }}
+            </span>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="rounded-2xl border border-dashed border-[color:var(--line)] p-12 text-center">
+      <i data-lucide="calendar-x" class="mx-auto mb-3 h-10 w-10 text-[color:var(--muted)]"></i>
+      <p class="text-sm font-semibold text-[color:var(--muted)]">Aucune session d'evaluation planifiee.</p>
+      <p class="mt-1 text-xs text-[color:var(--muted)]">Utilisez le formulaire ci-dessus pour en creer une.</p>
+    </div>
+    {% endif %}
+
+  </section>
+
+  {# ================================================================== #}
+  {#  CALENDRIER ACADEMIQUE                                            #}
+  {# ================================================================== #}
+  {% elif section == "calendrier" %}
+
+  {# Injecter les metadonnees evenements pour Alpine AVANT le x-data #}
+  <script>window._calMeta = {{ director_calendar_event_meta_json|safe }};</script>
+
+  <section class="space-y-5"
+    x-data="{
+      showNewCalForm: false,
+      showEntryForm: false,
+      formMode: 'add',
+      entryId: '',
+      eventType: '',
+      title: '',
+      startDate: '',
+      endDate: '',
+      targetScope: 'branch',
+      classId: '',
+      semesterId: '',
+      isBlocking: false,
+      description: '',
+      get meta() { return window._calMeta[this.eventType] || {}; },
+      get needsClass() { return this.meta.needs_class || false; },
+      get needsSemester() { return this.meta.needs_semester || false; },
+      get scopeLocked() { return !!this.meta.force_scope; },
+      onTypeChange() {
+        if (this.meta.force_scope) this.targetScope = this.meta.force_scope;
+        if (!this.needsClass) this.classId = '';
+        if (!this.needsSemester) this.semesterId = '';
+        if (this.formMode === 'add') this.isBlocking = this.meta.is_blocking || false;
+      },
+      openAdd() {
+        this.formMode = 'add';
+        this.entryId = '';
+        this.eventType = '';
+        this.title = '';
+        this.startDate = '';
+        this.endDate = '';
+        this.targetScope = 'branch';
+        this.classId = '';
+        this.semesterId = '';
+        this.isBlocking = false;
+        this.description = '';
+        this.showEntryForm = true;
+        this.$nextTick(() => this.$el.querySelector('[name=event_type]')?.focus());
+      },
+      openEdit(id, type, ttl, start, end, scope, clsId, semId, blocking, desc) {
+        this.formMode = 'edit';
+        this.entryId = id;
+        this.eventType = type;
+        this.title = ttl;
+        this.startDate = start;
+        this.endDate = end;
+        this.targetScope = scope;
+        this.classId = clsId;
+        this.semesterId = semId;
+        this.isBlocking = blocking;
+        this.description = desc;
+        this.showEntryForm = true;
+        this.$nextTick(() => window.scrollTo({ top: document.getElementById('cal-entry-form')?.offsetTop - 80 || 0, behavior: 'smooth' }));
+      },
+      closeForm() {
+        this.showEntryForm = false;
+        this.formMode = 'add';
+      }
+    }">
+
+    {# ── En-tête de page ── #}
+    <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm px-6 py-5">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)] mb-1">Calendrier academique</p>
+          <h2 class="text-xl font-black text-[color:var(--text)]">Creer et gerer le calendrier academique de l'annexe</h2>
+          <p class="mt-0.5 text-xs font-semibold text-[color:var(--muted)]">
+            {% if director_active_academic_year %}
+              Annee active : <strong class="text-[color:var(--text)]">{{ director_active_academic_year.name }}</strong>
+              ({{ director_active_academic_year.start_date|date:"d/m/Y" }} &mdash; {{ director_active_academic_year.end_date|date:"d/m/Y" }})
+            {% else %}
+              <span class="text-[color:var(--danger)] font-bold">Aucune annee academique active — configurez-en une d'abord.</span>
+            {% endif %}
+          </p>
+        </div>
+        {% if director_all_academic_years %}
+        <button type="button" @click="showNewCalForm = !showNewCalForm"
+          class="shrink-0 inline-flex items-center gap-2 rounded-xl bg-[color:var(--school-primary)] px-4 py-2.5 text-sm font-bold text-white transition hover:opacity-90">
+          <i data-lucide="plus" class="w-4 h-4"></i>
+          <span x-text="showNewCalForm ? 'Annuler' : 'Nouveau calendrier'"></span>
+        </button>
+        {% endif %}
+      </div>
+    </div>
+
+    {# ── Formulaire : nouveau calendrier ── #}
+    <div x-show="showNewCalForm" x-transition:enter="transition ease-out duration-150"
+         x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
+         x-data="{ showNewYearForm: false }"
+         class="rounded-2xl border border-[color:var(--school-primary)]/25 bg-[color:var(--school-primary-soft)] shadow-sm px-6 py-5 space-y-4">
+
+      <h3 class="text-sm font-black text-[color:var(--text)]">Creer un nouveau calendrier</h3>
+
+      {# Formulaire principal : choisir une annee existante #}
+      <form hx-post="{% url 'accounts_portal:director_calendar_action' %}"
+            hx-target="#director-workspace" hx-swap="innerHTML"
+            hx-disabled-elt="button[type=submit]"
+            class="flex flex-wrap items-end gap-3">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create_calendar">
+        <div class="flex-1 min-w-[220px]">
+          <label class="block text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)] mb-1.5">Annee scolaire</label>
+          {% if director_all_academic_years %}
+          <select name="academic_year_id"
+            class="w-full rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2.5 text-sm font-semibold text-[color:var(--text)] focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+            {% for yr in director_all_academic_years %}
+            <option value="{{ yr.id }}" {% if yr.is_active %}selected{% endif %}>
+              {{ yr.name }}{% if yr.is_active %} (active){% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          {% else %}
+          <p class="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+            Aucune annee academique disponible. Creez-en une ci-dessous d'abord.
+          </p>
+          <input type="hidden" name="academic_year_id" value="">
+          {% endif %}
+        </div>
+        <div class="text-xs font-semibold text-[color:var(--muted)] self-center pb-1">
+          Version attribuee automatiquement : <strong class="text-[color:var(--text)]">v{{ director_calendar_next_version }}</strong>
+        </div>
+        {% if director_all_academic_years %}
+        <button type="submit"
+          class="inline-flex items-center gap-2 rounded-xl bg-[color:var(--school-primary)] px-5 py-2.5 text-sm font-bold text-white hover:opacity-90 transition">
+          <i data-lucide="check" class="w-4 h-4"></i>Creer
+        </button>
+        {% endif %}
+      </form>
+
+      {# Separateur + toggle nouvelle annee #}
+      <div class="border-t border-[color:var(--school-primary)]/20 pt-3">
+        <button type="button" @click="showNewYearForm = !showNewYearForm"
+          class="inline-flex items-center gap-1.5 text-xs font-bold text-[color:var(--school-primary)] hover:underline">
+          <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+          <span x-text="showNewYearForm ? 'Annuler' : 'L\'annee que je cherche n\'est pas dans la liste — en creer une nouvelle'"></span>
+        </button>
+
+        {# Sous-formulaire : creer une nouvelle annee academique #}
+        <div x-show="showNewYearForm" x-transition style="display:none"
+             class="mt-3 rounded-xl border border-[color:var(--school-primary)]/30 bg-white/60 px-4 py-4">
+          <p class="mb-3 text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)]">Nouvelle annee academique</p>
+          <form hx-post="{% url 'accounts_portal:director_calendar_action' %}"
+                hx-target="#director-workspace" hx-swap="innerHTML"
+                hx-disabled-elt="button[type=submit]"
+                class="flex flex-wrap items-end gap-3">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create_academic_year">
+            <div>
+              <label class="block text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)] mb-1.5">
+                Nom <span class="font-normal normal-case">(ex: 2027-2028)</span>
+              </label>
+              <input type="text" name="year_name" placeholder="2027-2028" maxlength="9" required
+                pattern="\d{4}-\d{4}"
+                class="w-40 rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2.5 text-sm font-semibold text-[color:var(--text)] focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+            </div>
+            <div>
+              <label class="block text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)] mb-1.5">Date de debut</label>
+              <input type="date" name="year_start" required
+                class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2.5 text-sm font-semibold text-[color:var(--text)] focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+            </div>
+            <div>
+              <label class="block text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)] mb-1.5">Date de fin</label>
+              <input type="date" name="year_end" required
+                class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2.5 text-sm font-semibold text-[color:var(--text)] focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+            </div>
+            <button type="submit"
+              class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:opacity-90 transition">
+              <i data-lucide="plus" class="w-4 h-4"></i>Creer l'annee
+            </button>
+          </form>
+          <p class="mt-2 text-[10px] font-semibold text-[color:var(--muted)]">
+            L'annee sera creee sans etre activee. Pour l'activer, utilisez le module <strong>Cycle academique</strong>.
+          </p>
+        </div>
+      </div>
+
+    </div>
+
+    {# ── Corps : liste gauche + detail droite ── #}
+    <div class="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-5">
+
+      {# Colonne gauche : liste des calendriers #}
+      <div class="space-y-1.5">
+        <p class="px-1 pb-1 text-[10px] font-black uppercase tracking-widest text-[color:var(--muted)]">Mes calendriers</p>
+        {% if director_academic_calendars %}
+          {% for cal_item in director_academic_calendars %}
+          <a hx-get="{% url 'accounts_portal:director_workspace' %}?section=calendrier&calendar_id={{ cal_item.id }}"
+             hx-target="#director-workspace" hx-swap="innerHTML"
+             class="flex items-center gap-3 rounded-xl border px-3.5 py-3 transition cursor-pointer
+               {% if director_selected_calendar and director_selected_calendar.id == cal_item.id %}border-[color:var(--school-primary)] bg-[color:var(--school-primary-soft)]
+               {% else %}border-[color:var(--line)] bg-[color:var(--card)] hover:border-[color:var(--school-primary)]/40 hover:bg-[color:var(--surface)]{% endif %}">
+            <i data-lucide="calendar-days" class="w-4 h-4 shrink-0
+              {% if director_selected_calendar and director_selected_calendar.id == cal_item.id %}text-[color:var(--school-primary)]{% else %}text-[color:var(--muted)]{% endif %}"></i>
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-black truncate
+                {% if director_selected_calendar and director_selected_calendar.id == cal_item.id %}text-[color:var(--school-primary)]{% else %}text-[color:var(--text)]{% endif %}">
+                {{ cal_item.academic_year.name }}
+              </p>
+              <p class="text-[10px] font-semibold text-[color:var(--muted)]">Version {{ cal_item.version }}</p>
+            </div>
+            {% if cal_item.status == "published" %}
+            <span class="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-black text-emerald-700">PUBLIE</span>
+            {% elif cal_item.status == "validated" %}
+            <span class="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[9px] font-black text-blue-700">VALIDE</span>
+            {% elif cal_item.status == "archived" %}
+            <span class="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-black text-slate-500">ARCHIVE</span>
+            {% else %}
+            <span class="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-black text-amber-700">BROUILLON</span>
+            {% endif %}
+          </a>
+          {% endfor %}
+        {% else %}
+        <div class="rounded-xl border border-dashed border-[color:var(--line)] p-6 text-center">
+          <i data-lucide="calendar-off" class="w-8 h-8 mx-auto mb-2 text-[color:var(--muted)]"></i>
+          <p class="text-xs font-semibold text-[color:var(--muted)]">Aucun calendrier existant.<br>Creez-en un ci-dessus.</p>
+        </div>
+        {% endif %}
+      </div>
+
+      {# Colonne droite : detail du calendrier selectionne #}
+      {% if director_selected_calendar %}
+      {% with cal=director_selected_calendar %}
+      <div class="space-y-4">
+
+        {# ── Fiche calendrier + workflow ── #}
+        <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm px-6 py-5">
+
+          {# Titre + statut + meta #}
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2.5 mb-1">
+                <h3 class="text-xl font-black text-[color:var(--text)]">{{ cal.academic_year.name }}</h3>
+                {% if cal.status == "published" %}
+                <span class="rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-black text-emerald-700">Publie</span>
+                {% elif cal.status == "validated" %}
+                <span class="rounded-full bg-blue-100 px-3 py-1 text-[11px] font-black text-blue-700">Valide</span>
+                {% elif cal.status == "archived" %}
+                <span class="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-600">Archive</span>
+                {% else %}
+                <span class="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-black text-amber-700">Brouillon</span>
+                {% endif %}
+              </div>
+              <p class="text-[11px] font-semibold text-[color:var(--muted)] flex flex-wrap gap-x-3 gap-y-0.5">
+                <span>Version {{ cal.version }}</span>
+                <span>&middot;</span>
+                <span>{{ director_calendar_entry_count }} entree{{ director_calendar_entry_count|pluralize }}</span>
+                <span>&middot;</span>
+                <span>Cree par <strong class="text-[color:var(--text)]">{{ cal.created_by.get_full_name|default:cal.created_by.username }}</strong></span>
+                {% if cal.published_at %}
+                <span>&middot;</span>
+                <span>Publie le {{ cal.published_at|date:"d/m/Y" }}</span>
+                {% endif %}
+              </p>
+            </div>
+
+            {# Boutons d'action workflow #}
+            <div class="flex flex-wrap gap-2 shrink-0">
+              {% if director_calendar_can_add_entry %}
+              <button type="button" @click="showEntryForm ? closeForm() : openAdd()"
+                class="inline-flex items-center gap-1.5 rounded-xl bg-[color:var(--school-primary)] px-3.5 py-2 text-xs font-black text-white transition hover:opacity-90">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                <span x-text="showEntryForm && formMode === 'add' ? 'Fermer' : 'Ajouter une entree'"></span>
+              </button>
+              {% endif %}
+              {% if director_calendar_can_validate %}
+              <form hx-post="{% url 'accounts_portal:director_calendar_action' %}"
+                    hx-target="#director-workspace" hx-swap="innerHTML" class="inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="validate_calendar">
+                <input type="hidden" name="calendar_id" value="{{ cal.id }}">
+                <button type="submit"
+                  class="inline-flex items-center gap-1.5 rounded-xl border border-blue-300 bg-blue-50 px-3.5 py-2 text-xs font-black text-blue-700 transition hover:bg-blue-100">
+                  <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>Valider
+                </button>
+              </form>
+              {% endif %}
+              {% if director_calendar_can_publish %}
+              <form hx-post="{% url 'accounts_portal:director_calendar_action' %}"
+                    hx-target="#director-workspace" hx-swap="innerHTML" class="inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="publish_calendar">
+                <input type="hidden" name="calendar_id" value="{{ cal.id }}">
+                <button type="submit"
+                  class="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-black text-emerald-700 transition hover:bg-emerald-100">
+                  <i data-lucide="send" class="w-3.5 h-3.5"></i>Publier
+                </button>
+              </form>
+              {% endif %}
+              {% if director_calendar_can_archive %}
+              <form hx-post="{% url 'accounts_portal:director_calendar_action' %}"
+                    hx-target="#director-workspace" hx-swap="innerHTML"
+                    hx-confirm="Archiver ce calendrier ? Il ne sera plus modifiable." class="inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="archive_calendar">
+                <input type="hidden" name="calendar_id" value="{{ cal.id }}">
+                <button type="submit"
+                  class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2 text-xs font-black text-slate-600 transition hover:bg-slate-100">
+                  <i data-lucide="archive" class="w-3.5 h-3.5"></i>Archiver
+                </button>
+              </form>
+              {% endif %}
+              {% if cal.status == "draft" %}
+              <form hx-post="{% url 'accounts_portal:director_calendar_action' %}"
+                    hx-target="#director-workspace" hx-swap="innerHTML"
+                    hx-confirm="Supprimer definitivement ce calendrier et toutes ses entrees ? Cette action est irreversible." class="inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete_calendar">
+                <input type="hidden" name="calendar_id" value="{{ cal.id }}">
+                <button type="submit"
+                  class="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-black text-red-700 transition hover:bg-red-100">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>Supprimer
+                </button>
+              </form>
+              {% endif %}
+            </div>
+          </div>
+
+          {# Pipeline workflow visuel #}
+          <div class="mt-5 flex items-center gap-0 text-[10px] font-black select-none overflow-x-auto">
+            {% with s=cal.status %}
+            <div class="flex items-center gap-1.5 rounded-l-full px-3.5 py-1.5 whitespace-nowrap
+              {% if s == 'draft' %}bg-amber-500 text-white ring-2 ring-amber-300
+              {% elif s == 'validated' or s == 'published' or s == 'archived' %}bg-amber-200 text-amber-700
+              {% else %}bg-[color:var(--surface-2)] text-[color:var(--muted)]{% endif %}">
+              <i data-lucide="pencil" class="w-3 h-3"></i>Brouillon
+            </div>
+            <div class="w-8 h-0.5 shrink-0 {% if s == 'validated' or s == 'published' or s == 'archived' %}bg-blue-400{% else %}bg-[color:var(--line)]{% endif %}"></div>
+            <div class="flex items-center gap-1.5 px-3.5 py-1.5 whitespace-nowrap
+              {% if s == 'validated' %}bg-blue-500 text-white ring-2 ring-blue-300
+              {% elif s == 'published' or s == 'archived' %}bg-blue-200 text-blue-700
+              {% else %}bg-[color:var(--surface-2)] text-[color:var(--muted)]{% endif %}">
+              <i data-lucide="check-circle" class="w-3 h-3"></i>Valide
+            </div>
+            <div class="w-8 h-0.5 shrink-0 {% if s == 'published' or s == 'archived' %}bg-emerald-400{% else %}bg-[color:var(--line)]{% endif %}"></div>
+            <div class="flex items-center gap-1.5 px-3.5 py-1.5 whitespace-nowrap
+              {% if s == 'published' %}bg-emerald-500 text-white ring-2 ring-emerald-300
+              {% elif s == 'archived' %}bg-emerald-200 text-emerald-700
+              {% else %}bg-[color:var(--surface-2)] text-[color:var(--muted)]{% endif %}">
+              <i data-lucide="send" class="w-3 h-3"></i>Publie
+            </div>
+            <div class="w-8 h-0.5 shrink-0 {% if s == 'archived' %}bg-slate-400{% else %}bg-[color:var(--line)]{% endif %}"></div>
+            <div class="flex items-center gap-1.5 rounded-r-full px-3.5 py-1.5 whitespace-nowrap
+              {% if s == 'archived' %}bg-slate-500 text-white ring-2 ring-slate-300
+              {% else %}bg-[color:var(--surface-2)] text-[color:var(--muted)]{% endif %}">
+              <i data-lucide="archive" class="w-3 h-3"></i>Archive
+            </div>
+            {% endwith %}
+          </div>
+
+          {# Compteurs par type #}
+          {% if director_calendar_entry_counts_by_type %}
+          <div class="mt-4 flex flex-wrap gap-1.5">
+            {% for lbl, cnt in director_calendar_entry_counts_by_type.items %}
+            <span class="inline-flex items-center gap-1 rounded-full border border-[color:var(--line)] bg-[color:var(--surface)] px-2.5 py-0.5 text-[10px] font-bold text-[color:var(--muted)]">
+              {{ cnt }}&times; {{ lbl }}
+            </span>
+            {% endfor %}
+          </div>
+          {% endif %}
+
+          {# Alerte : evenements structurels manquants #}
+          {% if director_calendar_missing_key_events and director_calendar_can_add_entry %}
+          <div class="mt-4 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0 mt-0.5 text-amber-600"></i>
+            <div>
+              <p class="text-xs font-black text-amber-900">Evenements structurels manquants :</p>
+              <p class="text-xs font-semibold text-amber-800">
+                {% for ev in director_calendar_missing_key_events %}{{ ev }}{% if not forloop.last %}, {% endif %}{% endfor %}.
+                Ajoutez-les pour structurer correctement l'annee academique.
+              </p>
+            </div>
+          </div>
+          {% endif %}
+
+        </div>
+
+        {# ── Formulaire ajout / edition entree ── #}
+        <div id="cal-entry-form"
+             x-show="showEntryForm"
+             x-transition:enter="transition ease-out duration-150"
+             x-transition:enter-start="opacity-0 -translate-y-2"
+             x-transition:enter-end="opacity-100 translate-y-0"
+             class="rounded-2xl border border-[color:var(--school-primary)]/25 bg-[color:var(--school-primary-soft)] shadow-sm px-6 py-5">
+
+          {# Titre du formulaire + hint contextuel #}
+          <div class="flex flex-wrap items-start justify-between gap-3 mb-5">
+            <div>
+              <h4 class="text-sm font-black text-[color:var(--text)]"
+                x-text="formMode === 'edit' ? 'Modifier l\'entree' : 'Nouvelle entree'"></h4>
+              <p class="mt-0.5 text-[11px] font-semibold text-[color:var(--muted)]"
+                x-show="meta.description" x-text="meta.description"></p>
+            </div>
+            <button type="button" @click="closeForm()"
+              class="inline-flex items-center gap-1 rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-2.5 py-1.5 text-[11px] font-bold text-[color:var(--muted)] hover:bg-[color:var(--surface)] transition">
+              <i data-lucide="x" class="w-3 h-3"></i>Fermer
+            </button>
+          </div>
+
+          <form hx-post="{% url 'accounts_portal:director_calendar_action' %}"
+                hx-target="#director-workspace" hx-swap="innerHTML"
+                hx-disabled-elt="button[type=submit]"
+                class="space-y-4">
+            {% csrf_token %}
+            <input type="hidden" name="action" :value="formMode === 'edit' ? 'edit_entry' : 'add_entry'">
+            <input type="hidden" name="calendar_id" value="{{ cal.id }}">
+            <input type="hidden" name="entry_id" :value="entryId">
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+              {# Type d'evenement #}
+              <div class="sm:col-span-2">
+                <label class="block text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)] mb-1.5">
+                  Type d'evenement <span class="text-[color:var(--danger)]">*</span>
+                </label>
+                <select name="event_type" x-model="eventType" @change="onTypeChange()" required
+                  class="w-full rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2.5 text-sm font-semibold text-[color:var(--text)] focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+                  <option value="">— Selectionner un type —</option>
+                  {% for group in director_calendar_event_groups %}
+                  <optgroup label="{{ group.label }}">
+                    {% for val, lbl in group.choices %}
+                    <option value="{{ val }}">{{ lbl }}</option>
+                    {% endfor %}
+                  </optgroup>
+                  {% endfor %}
+                </select>
+              </div>
+
+              {# Intitule #}
+              <div class="sm:col-span-2">
+                <label class="block text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)] mb-1.5">
+                  Intitule <span class="text-[color:var(--danger)]">*</span>
+                </label>
+                <input type="text" name="title" x-model="title" required
+                  placeholder="ex: Rentree academique 2026-2027"
+                  class="w-full rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2.5 text-sm font-semibold text-[color:var(--text)] focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+              </div>
+
+              {# Date debut #}
+              <div>
+                <label class="block text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)] mb-1.5">
+                  Date de debut <span class="text-[color:var(--danger)]">*</span>
+                </label>
+                <input type="date" name="start_date" x-model="startDate" required
+                  class="w-full rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2.5 text-sm font-semibold text-[color:var(--text)] focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+              </div>
+
+              {# Date fin #}
+              <div>
+                <label class="block text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)] mb-1.5">
+                  Date de fin <span class="text-[color:var(--danger)]">*</span>
+                </label>
+                <input type="date" name="end_date" x-model="endDate" required
+                  class="w-full rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2.5 text-sm font-semibold text-[color:var(--text)] focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+              </div>
+
+              {# Portee #}
+              <div>
+                <label class="block text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)] mb-1.5">Portee</label>
+                <select name="target_scope" x-model="targetScope" :disabled="scopeLocked"
+                  class="w-full rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2.5 text-sm font-semibold text-[color:var(--text)] focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30 disabled:opacity-50 disabled:cursor-not-allowed">
+                  <option value="branch">Toute l'annexe</option>
+                  <option value="class">Classe specifique</option>
+                  <option value="semester">Semestre specifique</option>
+                </select>
+                <p x-show="scopeLocked" style="display:none"
+                  class="mt-1 text-[10px] font-bold text-[color:var(--school-primary)]">
+                  Portee imposee par ce type d'evenement.
+                </p>
+              </div>
+
+              {# Classe — affichee uniquement si le type l'exige #}
+              <div x-show="needsClass" x-transition style="display:none">
+                <label class="block text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)] mb-1.5">
+                  Classe <span class="text-[color:var(--danger)]">*</span>
+                </label>
+                {% if director_calendar_available_classes %}
+                <select name="class_id" x-model="classId" :required="needsClass"
+                  class="w-full rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2.5 text-sm font-semibold text-[color:var(--text)] focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+                  <option value="">— Choisir une classe —</option>
+                  {% for cls in director_calendar_available_classes %}
+                  <option value="{{ cls.id }}">{{ cls.display_name }}</option>
+                  {% endfor %}
+                </select>
+                {% else %}
+                <div class="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+                  <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0 mt-0.5 text-amber-600"></i>
+                  <p class="text-[11px] font-bold text-amber-800">
+                    Aucune classe active pour cette annee. Allez dans <strong>Programmes</strong> pour en creer.
+                  </p>
+                </div>
+                <input type="hidden" name="class_id" value="">
+                {% endif %}
+              </div>
+
+              {# Semestre — affiche si le type l'exige (examens, jury, rattrapages...) #}
+              {# Prend toute la largeur si la classe n'est pas requise simultanement #}
+              <div x-show="needsSemester" x-transition style="display:none"
+                   :class="needsClass ? '' : 'sm:col-span-2'">
+                <label class="block text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)] mb-1.5">
+                  Semestre <span class="text-[color:var(--danger)]">*</span>
+                </label>
+                <p class="mb-2 text-[11px] font-semibold text-[color:var(--muted)]"
+                   x-show="needsSemester && !needsClass">
+                  Selectionnez le semestre concerne par cette session (S1 ou S2).
+                </p>
+                {% if director_calendar_available_semesters %}
+                <select name="semester_id" x-model="semesterId" :required="needsSemester"
+                  class="w-full rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2.5 text-sm font-semibold text-[color:var(--text)] focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+                  <option value="">— Selectionner le semestre —</option>
+                  {% for sem in director_calendar_available_semesters %}
+                  <option value="{{ sem.id }}">{{ sem.academic_class.display_name }} &mdash; Semestre {{ sem.number }}</option>
+                  {% endfor %}
+                </select>
+                {% else %}
+                <div class="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+                  <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0 mt-0.5 text-amber-600"></i>
+                  <p class="text-[11px] font-bold text-amber-800">
+                    Aucun semestre disponible. Creez d'abord des classes avec leurs semestres dans <strong>Programmes</strong>.
+                  </p>
+                </div>
+                <input type="hidden" name="semester_id" value="">
+                {% endif %}
+              </div>
+
+              {# Description #}
+              <div class="sm:col-span-2">
+                <label class="block text-[11px] font-black uppercase tracking-wide text-[color:var(--muted)] mb-1.5">Description <span class="font-normal normal-case">(optionnel)</span></label>
+                <textarea name="description" x-model="description" rows="2"
+                  placeholder="Precisions, instructions, informations complementaires..."
+                  class="w-full rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2.5 text-sm font-semibold text-[color:var(--text)] focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30 resize-none"></textarea>
+              </div>
+
+              {# Bloquant #}
+              <div class="sm:col-span-2 flex items-center gap-3">
+                <label class="relative inline-flex items-center gap-2.5 cursor-pointer select-none">
+                  <input type="checkbox" name="is_blocking" value="1" x-model="isBlocking" class="sr-only peer">
+                  <div class="relative w-9 h-5 bg-[color:var(--line)] rounded-full peer
+                    peer-checked:bg-[color:var(--danger)]
+                    after:content-[''] after:absolute after:top-0.5 after:left-[2px]
+                    after:bg-white after:border after:rounded-full after:h-4 after:w-4
+                    after:transition-all peer-checked:after:translate-x-full after:border-gray-300"></div>
+                  <span class="text-xs font-bold text-[color:var(--text)]">Periode bloquante</span>
+                </label>
+                <span class="text-[10px] font-semibold text-[color:var(--muted)]">Empeche la creation de cours pendant cette periode</span>
+              </div>
+            </div>
+
+            {# Actions du formulaire #}
+            <div class="flex gap-2.5 pt-1">
+              <button type="submit"
+                class="inline-flex items-center gap-2 rounded-xl bg-[color:var(--school-primary)] px-5 py-2.5 text-sm font-black text-white hover:opacity-90 transition disabled:opacity-50">
+                <i data-lucide="save" class="w-4 h-4"></i>
+                <span x-text="formMode === 'edit' ? 'Enregistrer les modifications' : 'Ajouter l\'entree'"></span>
+              </button>
+              <button type="button" @click="closeForm()"
+                class="inline-flex items-center gap-2 rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2.5 text-sm font-semibold text-[color:var(--text)] hover:bg-[color:var(--surface)] transition">
+                Annuler
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {# ── Liste des entrees : vue chronologique ── #}
+        {% if director_calendar_entries %}
+        <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm overflow-hidden">
+          <div class="px-5 py-3.5 border-b border-[color:var(--line)] flex items-center justify-between">
+            <h4 class="text-sm font-black text-[color:var(--text)]">Entrees du calendrier</h4>
+            <span class="text-[11px] font-bold text-[color:var(--muted)]">
+              {{ director_calendar_entry_count }} entree{{ director_calendar_entry_count|pluralize }} &mdash; ordre chronologique
+            </span>
+          </div>
+          <div class="divide-y divide-[color:var(--line)]">
+            {% for row in director_calendar_entries %}
+            <div class="group flex items-start gap-3.5 px-5 py-3.5 hover:bg-[color:var(--surface)] transition">
+
+              {# Icone type #}
+              <div class="shrink-0 mt-0.5 w-8 h-8 rounded-xl flex items-center justify-center {{ row.color_bg }}">
+                <i data-lucide="{{ row.icon }}" class="w-3.5 h-3.5 {{ row.color_text }}"></i>
+              </div>
+
+              {# Contenu principal #}
+              <div class="flex-1 min-w-0">
+                <div class="flex flex-wrap items-center gap-1.5 mb-0.5">
+                  <span class="text-sm font-black text-[color:var(--text)] truncate max-w-xs">{{ row.entry.title }}</span>
+                  {# Badges #}
+                  {% if row.entry.is_blocking %}
+                  <span class="rounded-full bg-red-100 px-1.5 py-0.5 text-[9px] font-black text-red-700 uppercase tracking-wide">Bloquant</span>
+                  {% endif %}
+                  {% if row.is_active %}
+                  <span class="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-black text-emerald-700 uppercase tracking-wide">En cours</span>
+                  {% elif row.is_past %}
+                  <span class="rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-black text-slate-500 uppercase tracking-wide">Passe</span>
+                  {% else %}
+                  <span class="rounded-full bg-sky-100 px-1.5 py-0.5 text-[9px] font-black text-sky-700 uppercase tracking-wide">A venir</span>
+                  {% endif %}
+                </div>
+                <div class="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[10px] font-semibold text-[color:var(--muted)]">
+                  <span class="{{ row.color_text }} font-black">{{ row.type_label }}</span>
+                  <span>&middot;</span>
+                  <span>{{ row.entry.start_datetime|date:"d/m/Y" }} &mdash; {{ row.entry.end_datetime|date:"d/m/Y" }}</span>
+                  <span class="text-[color:var(--line)]">&middot;</span>
+                  <span>{{ row.duration_label }}</span>
+                  {% if row.class_label %}
+                  <span>&middot;</span>
+                  <span class="font-black text-[color:var(--text)]">{{ row.class_label }}</span>
+                  {% endif %}
+                  {% if row.semester_label %}
+                  <span>&middot;</span>
+                  <span>{{ row.semester_label }}</span>
+                  {% endif %}
+                  <span>&middot;</span>
+                  <span>{{ row.scope_label }}</span>
+                </div>
+                {% if row.entry.description %}
+                <p class="mt-1 text-[10px] font-semibold text-[color:var(--muted)] italic leading-relaxed">{{ row.entry.description }}</p>
+                {% endif %}
+              </div>
+
+              {# Actions sur l'entree — visibles au survol #}
+              <div class="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                {% if row.can_edit %}
+                <button type="button"
+                  @click="openEdit(
+                    '{{ row.entry.id }}',
+                    '{{ row.entry.event_type }}',
+                    '{{ row.entry.title|escapejs }}',
+                    '{{ row.entry.start_datetime|date:"Y-m-d" }}',
+                    '{{ row.entry.end_datetime|date:"Y-m-d" }}',
+                    '{{ row.entry.target_scope }}',
+                    '{% if row.entry.academic_class %}{{ row.entry.academic_class.id }}{% endif %}',
+                    '{% if row.entry.semester %}{{ row.entry.semester.id }}{% endif %}',
+                    {{ row.entry.is_blocking|yesno:"true,false" }},
+                    '{{ row.entry.description|escapejs }}'
+                  )"
+                  class="inline-flex items-center gap-1 rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-2.5 py-1.5 text-[10px] font-black text-[color:var(--text)] hover:bg-[color:var(--surface)] transition">
+                  <i data-lucide="pencil" class="w-3 h-3"></i>Editer
+                </button>
+                {% endif %}
+                {% if row.can_delete %}
+                <form hx-post="{% url 'accounts_portal:director_calendar_action' %}"
+                      hx-target="#director-workspace" hx-swap="innerHTML"
+                      hx-confirm="Supprimer cette entree ? Cette action est irreversible." class="inline">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="delete_entry">
+                  <input type="hidden" name="entry_id" value="{{ row.entry.id }}">
+                  <button type="submit"
+                    class="inline-flex items-center rounded-lg border border-red-200 bg-red-50 px-2 py-1.5 text-[10px] font-black text-red-700 hover:bg-red-100 transition">
+                    <i data-lucide="trash-2" class="w-3 h-3"></i>
+                  </button>
+                </form>
+                {% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        {% else %}
+        {# Calendrier vide #}
+        <div class="rounded-2xl border border-dashed border-[color:var(--line)] bg-[color:var(--card)] px-8 py-14 text-center">
+          <i data-lucide="calendar-plus" class="w-10 h-10 mx-auto mb-3 text-[color:var(--muted)]"></i>
+          <p class="text-sm font-black text-[color:var(--text)]">Ce calendrier ne contient aucune entree</p>
+          <p class="mt-1 text-xs font-semibold text-[color:var(--muted)]">
+            {% if director_calendar_can_add_entry %}
+            Commencez par ajouter la rentree academique, puis structurez les semestres et les periodes cles.
+            {% else %}
+            Ce calendrier est {{ cal.get_status_display|lower }} et ne peut plus etre modifie.
+            {% endif %}
+          </p>
+          {% if director_calendar_can_add_entry %}
+          <button type="button" @click="openAdd()"
+            class="mt-5 inline-flex items-center gap-2 rounded-xl bg-[color:var(--school-primary)] px-5 py-2.5 text-sm font-black text-white hover:opacity-90 transition">
+            <i data-lucide="plus" class="w-4 h-4"></i>Ajouter la premiere entree
+          </button>
+          {% endif %}
+        </div>
+        {% endif %}
+
+      </div>{# /col droite #}
+      {% endwith %}
+
+      {% else %}
+      {# Aucun calendrier selectionne #}
+      <div class="rounded-2xl border border-dashed border-[color:var(--line)] bg-[color:var(--card)] px-8 py-16 text-center">
+        <i data-lucide="calendar-off" class="w-12 h-12 mx-auto mb-4 text-[color:var(--muted)]"></i>
+        <p class="text-base font-black text-[color:var(--text)]">Aucun calendrier selectionne</p>
+        <p class="mt-2 text-sm font-semibold text-[color:var(--muted)]">
+          Selectionnez un calendrier dans la liste ou creez-en un nouveau avec le bouton ci-dessus.
+        </p>
+      </div>
+      {% endif %}
+
+    </div>{# /grid #}
+
+  </section>
+
   {% else %}
-  <section class="de-card px-6 py-12 text-center">
+  <section class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm px-6 py-12 text-center">
     <i data-lucide="layout-dashboard" class="w-12 h-12 mx-auto text-slate-300 mb-4"></i>
     <h2 class="text-xl font-black text-slate-900">Section inconnue.</h2>
     <p class="mt-2 text-sm font-semibold text-slate-500">Utilisez la navigation du menu pour acceder a une section.</p>

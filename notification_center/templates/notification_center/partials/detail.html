@@ -1,27 +1,61 @@
-{% load humanize %}
-<div class="comm-detail-card">
+{% load humanize notification_center_tags %}
+{% notification_action_url notification as action_url %}
+<div class="nc-detail">
   <style>
-    .comm-detail-card{padding:16px}.comm-detail-title{font-size:18px;font-weight:950;color:#0f172a}.comm-detail-body{margin-top:10px;border:1px solid #eef2f7;background:#f8fafc;border-radius:12px;padding:13px;font-size:13px;font-weight:700;color:#475569;line-height:1.55;white-space:pre-wrap}.comm-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}.comm-detail-box{border:1px solid #eef2f7;border-radius:10px;padding:10px}.comm-detail-label{font-size:10px;font-weight:950;text-transform:uppercase;color:#64748b}.comm-detail-value{font-size:13px;font-weight:900;color:#0f172a;margin-top:4px}.comm-delivery{margin-top:12px;border-top:1px solid #eef2f7;padding-top:12px}@media(max-width:720px){.comm-detail-grid{grid-template-columns:1fr}}
+    .nc-detail{display:flex;flex-direction:column;height:100%;color:#0f172a}.nc-detail__head{padding:20px 20px 0}.nc-detail__priority{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:3px 10px;font-size:10px;font-weight:950;margin-bottom:10px}.nc-detail__priority--danger{background:#fee2e2;color:#b91c1c}.nc-detail__priority--warning{background:#fef3c7;color:#b45309}.nc-detail__title{font-size:17px;font-weight:950;line-height:1.35}.nc-detail__body{flex:1;margin:16px 20px;padding:16px 18px;background:#f8fafc;border:1px solid #eef2f7;border-radius:12px;font-size:13.5px;font-weight:500;color:#334155;line-height:1.75;white-space:pre-wrap;word-break:break-word;overflow-y:auto;max-height:340px}.nc-detail__empty{color:#94a3b8;font-style:italic}.nc-detail__footer{padding:14px 20px;border-top:1px solid #f1f5f9;display:flex;flex-direction:column;gap:7px}.nc-detail__meta-row{display:flex;align-items:center;gap:7px;font-size:12px;color:#64748b;font-weight:600}.nc-detail__meta-row svg{flex-shrink:0;opacity:.6}.nc-detail__meta-row strong{font-weight:900;color:#0f172a}.nc-detail__meta-row--read svg{color:#16a34a;opacity:1}.nc-detail__meta-row--unread{color:#b45309}.nc-detail__actions{display:flex;flex-wrap:wrap;gap:8px;padding:0 20px 16px}.nc-btn{border:1px solid #dbe3ef;background:#fff;color:#475569;border-radius:8px;padding:6px 10px;font-size:11px;font-weight:900;cursor:pointer;text-decoration:none;white-space:nowrap}.nc-btn:hover{border-color:#bfdbfe;color:#1d4ed8;background:#eff6ff}
   </style>
-  <div class="comm-detail-title">{{ notification.title }}</div>
-  <div class="comm-detail-body">{{ notification.body|default:"Aucun detail complementaire." }}</div>
-  <div class="comm-detail-grid">
-    <div class="comm-detail-box"><div class="comm-detail-label">Priorite</div><div class="comm-detail-value">{{ notification.get_priority_display }}</div></div>
-    <div class="comm-detail-box"><div class="comm-detail-label">Canal</div><div class="comm-detail-value">{{ notification.get_channel_display }}</div></div>
-    <div class="comm-detail-box"><div class="comm-detail-label">Statut</div><div class="comm-detail-value">{{ notification.get_status_display }}</div></div>
-    <div class="comm-detail-box"><div class="comm-detail-label">Source</div><div class="comm-detail-value">{% if notification.event %}{{ notification.event.source_app }}{% else %}{{ notification.legacy_source|default:"systeme" }}{% endif %}</div></div>
-    <div class="comm-detail-box"><div class="comm-detail-label">Recu</div><div class="comm-detail-value">{{ notification.created_at|date:"d/m/Y H:i" }}</div></div>
-    <div class="comm-detail-box"><div class="comm-detail-label">Lu</div><div class="comm-detail-value">{{ notification.read_at|date:"d/m/Y H:i"|default:"Non lu" }}</div></div>
+
+  {# ── En-tête : titre + badge priorité ── #}
+  <div class="nc-detail__head">
+    {% if notification.priority == 'critical' %}
+    <span class="nc-detail__priority nc-detail__priority--danger">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Urgent
+    </span>
+    {% elif notification.priority == 'high' %}
+    <span class="nc-detail__priority nc-detail__priority--warning">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Important
+    </span>
+    {% endif %}
+    <h2 class="nc-detail__title">{{ notification.title }}</h2>
   </div>
-  <div class="comm-delivery">
-    <div class="comm-panel-title">Livraisons</div>
-    {% for delivery in notification.delivery_attempts.all %}
-      <div class="comm-detail-box" style="margin-top:8px">
-        <div class="comm-detail-value">{{ delivery.channel }} - {{ delivery.provider|default:"internal" }} - {{ delivery.get_status_display }}</div>
-        {% if delivery.error_message %}<div class="comm-row-body">{{ delivery.error_message }}</div>{% endif %}
-      </div>
-    {% empty %}
-      <div class="comm-detail-box" style="margin-top:8px"><div class="comm-detail-value">Aucune livraison rattachee.</div></div>
-    {% endfor %}
+
+  {# ── Corps du message — zone de lecture principale ── #}
+  <div class="nc-detail__body">
+    {% if notification.body %}
+      {{ notification.body|linebreaksbr }}
+    {% else %}
+      <span class="nc-detail__empty">Aucun contenu pour cette notification.</span>
+    {% endif %}
   </div>
+
+  {# ── Métadonnées discrètes ── #}
+  <div class="nc-detail__footer">
+    <div class="nc-detail__meta-row">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm0 5v5l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Reçu le <strong>{{ notification.created_at|date:"d/m/Y à H:i" }}</strong></span>
+    </div>
+    {% if notification.read_at %}
+    <div class="nc-detail__meta-row nc-detail__meta-row--read">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 6 9 17l-5-5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Lu le <strong>{{ notification.read_at|date:"d/m/Y à H:i" }}</strong></span>
+    </div>
+    {% else %}
+    <div class="nc-detail__meta-row nc-detail__meta-row--unread">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/></svg>
+      <span>Non lue</span>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="nc-detail__actions">
+    {% if action_url %}<a class="nc-btn" href="{{ action_url }}">Ouvrir la ressource</a>{% endif %}
+    {% if notification.archived_at %}
+      <form method="post" action="{% url 'notification_center:unarchive_notification' notification.id %}">{% csrf_token %}<button class="nc-btn" type="submit">Restaurer</button></form>
+    {% else %}
+      <form method="post" action="{% url 'notification_center:archive_notification' notification.id %}">{% csrf_token %}<button class="nc-btn" type="submit">Archiver</button></form>
+    {% endif %}
+  </div>
+
 </div>

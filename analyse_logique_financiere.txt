@@ -1,0 +1,438 @@
+RAPPORT D'ANALYSE DE LA LOGIQUE FINANCIERE
+===========================================
+
+1. ARCHITECTURE FINANCIERE ACTUELLE
+
+BranchCashMovement constitue le journal financier central par annexe :
+- TYPE_IN : entree de caisse ;
+- TYPE_OUT : sortie de caisse ;
+- source : paiement etudiant, boutique, don, depense, salaire, honoraire, saisie manuelle ou ajustement ;
+- source_reference : rattachement technique a l'operation d'origine.
+
+Le solde est calcule ainsi dans accounts/services/manager_intelligence.py :
+
+Somme des entrees BranchCashMovement
+- Somme des sorties BranchCashMovement
+= Solde de caisse
+
+Les rapports et la cloture reposent principalement sur ce journal. Une operation non transformee en BranchCashMovement devient donc invisible ou partiellement invisible dans la situation financiere.
+
+
+2. FLUX PAR OPERATION
+
+2.1. PAIEMENT ETUDIANT
+
+Carte du flux :
+
+Inscription
+  -> Payment pending
+  -> validation
+  -> Payment validated
+  -> mise a jour financiere de l'Inscription
+  -> recu PDF et numero de recu
+  -> BranchCashMovement / entree / student_payment
+  -> caisse et rapports
+  -> cloture mensuelle
+
+Objet cree : Payment.
+
+Modeles modifies :
+- Payment ;
+- Inscription ;
+- eventuellement creation du compte etudiant ;
+- BranchCashMovement ;
+- FinancialLog lors d'une validation depuis le dashboard.
+
+Services appeles :
+- generation du recu ;
+- create_student_after_first_payment() ;
+- run_first_payment_validated_workflow() ;
+- sync_payment_finance_history().
+
+Signal : le post_save de Payment existe, mais ne fait rien.
+
+Le mouvement est cree dans payments/services/workflows.py par sync_payment_finance_history(). La vue gestionnaire realise egalement une verification de synchronisation.
+
+Integration : bonne. Un outil de resynchronisation recupere les paiements valides absents du journal.
+
+Risque : plusieurs chemins declenchent la synchronisation. source_reference et get_or_create() limitent les doublons, mais la logique reste distribuee entre modele, workflow et vue.
+
+
+2.2. PAIEMENT BOUTIQUE
+
+Carte du flux :
+
+ShopOrder
+  -> ShopPayment pending
+  -> validation
+  -> ShopPayment validated
+  -> facture/recu, mise a jour commande et stock
+  -> BranchCashMovement / entree / shop
+  -> caisse et rapports
+  -> cloture mensuelle
+
+Objet cree : ShopPayment.
+
+Modeles modifies :
+- ShopPayment ;
+- ShopOrder ;
+- stock et mouvements de stock ;
+- BranchCashMovement.
+
+Service central : validate_shop_payment() dans shop/services/shop_service.py.
+
+Signal financier : aucun. L'integration est explicitement realisee dans le service.
+
+Integration : bonne quand tous les paiements passent par validate_shop_payment().
+
+Risque : contrairement aux paiements etudiants, il n'existe pas de mecanisme general de resynchronisation des paiements boutique manquants.
+
+
+2.3. DON
+
+Carte du flux :
+
+Donation
+  -> BranchCashMovement / entree / donation
+  -> caisse
+  -> rapports globaux
+  -> cloture dans total_entries
+
+Objet cree : Donation.
+
+Modeles modifies :
+- Donation ;
+- BranchCashMovement.
+
+Creation : donation_create() dans accounts/dashboards/htmx_depenses.py.
+
+Services et signaux : aucun service metier dedie et aucun signal.
+
+Integration : partielle.
+
+Points faibles :
+- creation du don et du mouvement hors transaction atomique ;
+- le champ Donation.cash_movement existe, mais la vue ne l'assigne pas ;
+- aucune resynchronisation en cas d'echec ;
+- le don entre dans total_entries, mais la cloture ne possede pas de champ donation_revenue ;
+- certains indicateurs de revenu reel additionnent seulement les paiements etudiants et la boutique.
+
+
+2.4. DEPENSE
+
+Carte du flux :
+
+BranchExpense
+  -> soumission
+  -> approbation
+  -> paiement
+  -> BranchExpense paid
+  -> BranchCashMovement / sortie / expense
+  -> caisse et rapports
+  -> cloture mensuelle
+
+Objet cree : BranchExpense.
+
+Au paiement :
+- statut paid ;
+- agent et date de paiement ;
+- reference comptable ;
+- creation d'un BranchCashMovement.
+
+Implementation : expense_pay() dans accounts/dashboards/htmx_depenses.py.
+
+Integration : bonne et atomique.
+
+Limite : aucune resynchronisation generale des depenses payees sans mouvement. Une anomalie historique resterait absente de la caisse.
+
+
+2.5. SALAIRE
+
+Carte du flux :
+
+Profile.salary_base
+  -> signal post_save
+  -> PayrollEntry draft
+  -> verification et disponibilite
+  -> PayrollEntry ready
+  -> paiement total ou partiel
+  -> PayrollEntry partial/paid
+  -> BranchCashMovement / sortie / payroll
+  -> caisse et rapports
+  -> cloture mensuelle
+
+Objet central : PayrollEntry.
+
+Creation automatique : signal post_save(Profile) dans accounts/signals.py.
+
+Paiement : salary_pay() dans accounts/dashboards/htmx_salaires.py.
+
+Modeles modifies :
+- PayrollEntry ;
+- BranchCashMovement.
+
+Integration : bonne. La disponibilite reelle de la caisse est verifiee avant paiement.
+
+Les avances creent egalement une sortie payroll, puis sont enregistrees dans PayrollEntry.advances.
+
+Risque : les references de mouvements reposent sur l'entree et le montant. La tracabilite serait plus solide avec une identite propre a chaque decaissement.
+
+
+2.6. HONORAIRE ENSEIGNANT
+
+Carte du flux :
+
+Profile.teacher_hourly_rate
+  -> signal post_save
+  -> TeacherHonorariumEntry draft
+  -> heures de cours validees x tarif
+  -> TeacherHonorariumEntry ready
+  -> paiement
+  -> BranchCashMovement / sortie / honorarium
+  -> caisse et rapports
+  -> cloture mensuelle
+
+Objet central : TeacherHonorariumEntry.
+
+Creation automatique : signal post_save(Profile).
+
+Preparation complementaire : recalcul depuis les LessonLog termines et valides.
+
+Paiement : teacher_honorarium_pay() dans accounts/dashboards/htmx_honoraires.py.
+
+Integration : bonne. Les honoraires restent distincts des salaires et verifient le solde de caisse.
+
+
+2.7. REMBOURSEMENT
+
+Carte du flux actuel :
+
+Aucun objet metier
+  -> aucun workflow
+  -> aucun BranchCashMovement
+  -> aucune integration financiere
+
+Un template PDF refund_document existe, mais aucun modele, service ou flux financier de remboursement n'a ete trouve.
+
+Consequences :
+- aucune sortie de caisse dediee ;
+- aucune correction du paiement ou de la commande d'origine ;
+- aucune prise en compte dans les rapports ;
+- aucune prise en compte dans la cloture ;
+- aucun historique financier de remboursement.
+
+Le remboursement est actuellement absent, pas simplement isole.
+
+
+2.8. VERSEMENT BANCAIRE
+
+Carte du flux actuel :
+
+BranchCashMovement du mois
+  -> calcul de cloture
+  -> montant saisi ou suggere
+  -> BranchMonthlyClosure
+  -> BranchBankTransfer
+  -> historique bancaire
+
+Creation : pendant monthly_closure_create() dans accounts/dashboards/htmx_depenses.py.
+
+Montant suggere :
+
+Solde de caisse disponible
+- reserve cible de l'annexe
+= montant suggere
+
+Le montant definitif vient toutefois du formulaire.
+
+Relation :
+- un BranchBankTransfer appartient a une annexe ;
+- relation OneToOne avec BranchMonthlyClosure ;
+- justificatif bancaire facultatif.
+
+Defaut critique : aucun BranchCashMovement TYPE_OUT n'est cree pour le versement.
+
+Le systeme considere donc toujours l'argent verse a la banque comme disponible dans la caisse physique. Le transfert est historique, mais pas comptablement relie au solde.
+
+
+3. ROLE DES MODELES
+
+BranchCashMovement
+Journal de caisse central. Il est reellement utilise par les soldes, rapports et clotures.
+
+BranchMonthlyClosure
+Photographie mensuelle agregee du journal. Elle est reellement utilisee et conserve l'historique.
+
+BranchBankTransfer
+Preuve du versement lie a une cloture. Il est utilise, mais faiblement integre a la caisse.
+
+Payment
+Encaissement etudiant, suivi de l'inscription et generation du recu. Il est bien integre.
+
+ShopPayment
+Encaissement boutique et facture/recu. Il est bien integre quand la validation passe par le service officiel.
+
+PayrollEntry
+Dette salariale et paiements du personnel. Il est bien integre.
+
+TeacherHonorariumEntry
+Dette et paiement des enseignants. Il est bien integre et distinct des salaires.
+
+BranchExpense
+Demande, validation et paiement des charges. Il est bien integre.
+
+Donation
+Objet reellement utilise, mais sa relation cash_movement est sous-exploitee.
+
+
+4. LOGIQUE DE CAISSE
+
+Toutes les recettes arrivent-elles dans la caisse ?
+
+Les paiements etudiants valides, paiements boutique valides et dons saisis depuis le dashboard creent des entrees de caisse. Cependant, la couverture depend du passage par les vues et services officiels. Seul le paiement etudiant possede une vraie logique de resynchronisation.
+
+Toutes les depenses sortent-elles de la caisse ?
+
+Les depenses payees, salaires, avances et honoraires produisent des sorties. Le versement bancaire ne produit aucune sortie, ce qui rend le solde de caisse inexact apres un depot bancaire.
+
+Existe-t-il plusieurs chemins ?
+
+Oui. Le paiement etudiant peut etre synchronise depuis le workflow du modele, la vue gestionnaire ou l'outil de synchronisation. Les autres operations utilisent chacune leur propre service ou vue.
+
+Existe-t-il des doublons ?
+
+Le paiement etudiant est protege par source_reference et get_or_create(). La boutique protege la validation par verrouillage et statut. Les autres sources ne disposent pas toutes d'une contrainte d'unicite ou d'une reconciliation equivalente.
+
+Incoherences principales :
+- banque sans sortie de caisse ;
+- Donation.cash_movement non renseigne ;
+- cloture analytiquement incomplete ;
+- remboursement absent ;
+- logique de synchronisation distribuee.
+
+
+5. FONCTIONNEMENT DE LA CLOTURE MENSUELLE
+
+La cloture selectionne les BranchCashMovement de l'annexe entre le premier et le dernier jour du mois.
+
+Elle calcule :
+- total des entrees ;
+- total des sorties ;
+- paiements etudiants ;
+- ventes boutique ;
+- salaires ;
+- honoraires ;
+- depenses ;
+- resultat = entrees - sorties.
+
+Elle enregistre ensuite un instantane dans BranchMonthlyClosure avec les statuts :
+
+draft -> validated -> closed
+
+Apres validation, les donnees de la cloture ne sont plus recalculables par l'interface.
+
+Ventilations oubliees :
+- dons ;
+- entrees manuelles ;
+- ajustements ;
+- autres sources futures ;
+- remboursements ;
+- versements bancaires comme sorties de caisse.
+
+Les dons et operations manuelles entrent dans les totaux globaux, mais ne possedent pas de colonnes explicites. Le bilan arithmetique peut etre juste tout en etant analytiquement incomplet.
+
+
+6. ANALYSE DU MODULE BANQUE
+
+Un BranchBankTransfer est cree pendant la creation ou mise a jour d'une cloture mensuelle.
+
+Son montant est saisi dans le formulaire. Une suggestion est calculee depuis le solde de caisse moins la reserve cible de l'annexe.
+
+Il est lie en OneToOne a la cloture et conserve la banque, la reference, la date, le montant, le justificatif et le commentaire.
+
+Il n'est pas relie au journal de caisse. Le transfert ne diminue donc pas le solde disponible et n'apparait pas comme sortie dans les rapports bases sur BranchCashMovement.
+
+
+7. POINTS FORTS
+
+- filtrage financier par annexe ;
+- journal de caisse central ;
+- categories de sources explicites ;
+- controle du solde avant paiement des depenses, salaires et honoraires ;
+- transactions atomiques sur plusieurs workflows sensibles ;
+- cloture conservee comme historique ;
+- resynchronisation des paiements etudiants ;
+- distinction correcte entre salaires et honoraires ;
+- rapports Excel principalement construits depuis le journal de caisse.
+
+
+8. POINTS FAIBLES
+
+- versement bancaire sans sortie de caisse ;
+- remboursement totalement absent ;
+- Donation.cash_movement jamais renseigne par le workflow normal ;
+- don et mouvement non proteges par une transaction commune ;
+- absence de reconciliation boutique, dons, depenses, salaires et honoraires ;
+- plusieurs chemins de synchronisation pour les paiements etudiants ;
+- cloture figee sans controle prealable systematique des operations non synchronisees ;
+- categories de cloture incompletes ;
+- operations manuelles integrees aux totaux sans classification analytique suffisante.
+
+
+9. MODULES BIEN INTEGRES
+
+- paiement etudiant ;
+- paiement boutique ;
+- depense payee ;
+- salaire paye ;
+- honoraire paye.
+
+Ils produisent tous un BranchCashMovement et alimentent caisse, rapports et cloture.
+
+
+10. MODULES ISOLES OU PARTIELS
+
+- banque : historique present, impact caisse absent ;
+- dons : mouvement present, relation metier incomplete ;
+- remboursement : absent ;
+- cloture : bonne photographie du journal, mais ventilation incomplete.
+
+
+11. ELEMENTS MANQUANTS
+
+- workflow de remboursement ;
+- sortie de caisse associee au versement bancaire ;
+- reconciliation generale de chaque source financiere ;
+- controle de coherence avant cloture ;
+- ventilation analytique des dons, ajustements et operations manuelles ;
+- rattachement effectif Donation -> BranchCashMovement.
+
+
+12. RECOMMANDATIONS SANS CHANGER L'ARCHITECTURE
+
+1. Faire de BranchCashMovement le passage obligatoire de toute entree ou sortie reelle.
+2. Creer une sortie de caisse lors d'un versement bancaire.
+3. Relier le don cree a son mouvement existant.
+4. Encapsuler don et mouvement dans une transaction atomique.
+5. Ajouter une reconciliation pour chaque source, sur le modele des paiements etudiants.
+6. Bloquer ou avertir avant cloture lorsqu'un objet paye n'a pas de mouvement.
+7. Ventiler les dons, ajustements, operations manuelles et remboursements dans la cloture.
+8. Implementer le remboursement comme contre-mouvement relie a l'operation d'origine.
+9. Conserver les modeles actuels : ils sont suffisants pour unifier la majorite des flux.
+10. Presenter le dashboard comme vue de controle du journal central sans reconstruire les modules metiers.
+
+
+13. TRANSFORMER LE DASHBOARD EN CENTRE FINANCIER SANS LE RECONSTRUIRE
+
+Le dashboard peut devenir le centre financier en consolidant l'existant autour de BranchCashMovement :
+- chaque module conserve son objet metier ;
+- toute validation monetaire produit un mouvement central ;
+- chaque mouvement conserve une reference vers sa source ;
+- une reconciliation detecte les objets et mouvements orphelins ;
+- la cloture refuse les periodes incoherentes ;
+- la banque devient un transfert de tresorerie reel et non un simple historique ;
+- les rapports distinguent resultat d'exploitation, caisse physique, banque et engagements restants.
+
+Cette evolution complete l'architecture existante sans la remplacer.
+
+FIN DU RAPPORT

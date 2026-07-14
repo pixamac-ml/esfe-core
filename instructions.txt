@@ -1,452 +1,2924 @@
-Tu es en train de travailler sur le projet Django ESFE Core (École de Santé Félix Houphouët-Boigny Mali).
-Avant toute modification, analyse complètement l’architecture actuelle du projet, tous les dashboards existants, les modèles utilisateurs, les systèmes de profils, les paramètres utilisateurs, les composants UI, les vues, les services, les selectors, les templates HTMX et les workflows par rôle.
+Je ne peux pas arbitrer des comptes uniquement à partir de leurs identifiants
+numériques.
 
-⚠️ IMPORTANT :
+N’applique encore aucune classification sur ces comptes ambigus.
 
-* Ne casse aucun workflow existant.
-* Ne supprime aucune logique métier existante.
-* Respecte strictement l’architecture actuelle :
+Produis-moi un tableau de régularisation lisible contenant, pour chaque compte :
 
-  * business logic dans services.py
-  * requêtes optimisées dans selectors.py
-  * vues fines
-  * HTMX/AJAX pour les interactions dynamiques
-  * composants réutilisables
-  * filtrage strict par annexe/branch
-  * aucun mélange de logique métier dans les templates
-  * le dashboard `portal` reste un orchestrateur UI uniquement
+- ID ;
+- username ;
+- nom et prénom ;
+- email ;
+- type actuel ;
+- role actuel ;
+- position actuelle ;
+- groupes actuels ;
+- annexe actuelle ;
+- relation Student éventuelle ;
+- relation Teacher éventuelle ;
+- relation PaymentAgent éventuelle ;
+- relation Branch.manager éventuelle ;
+- activité communautaire éventuelle ;
+- dashboard(s) actuellement accessible(s) ;
+- classification proposée ;
+- justification de la proposition ;
+- niveau de confiance : CERTAIN, PROBABLE ou AMBIGU.
 
-====================================================
-PHASE 1 — AUDIT COMPLET DES DASHBOARDS
-======================================
+Comptes concernés :
 
-Analyse tous les dashboards du système :
+2, 4, 15, 19, 40, 41, 42, 44, 46, 54, 65, 67, 90, 91, 95, 97, 98, 100, 101
+et l’utilisateur 56.
 
-* Étudiant
-* Enseignant
-* Directeur des études
-* Surveillant général
-* Directeur général
-* Gestionnaire
-* Secrétaire
-* Informaticien
-* Staff administratif
-* Superadmin
-* Tout autre dashboard existant
+Présente les informations nécessaires à l’identification, mais n’affiche aucun
+mot de passe, token, PIN, secret, donnée bancaire ou autre donnée sensible.
 
-Tu dois produire un audit technique clair de :
+Règles :
 
-1. Quels dashboards possèdent déjà :
+1. Si une relation métier officielle et non contradictoire permet une
+   classification certaine, marque CERTAIN.
+2. Si plusieurs sources se contredisent, marque AMBIGU.
+3. Ne transforme jamais automatiquement une simple activité communautaire en
+   compte PUBLIC si une relation institutionnelle existe.
+4. Ne déduis jamais une annexe à partir du username.
+5. Ne crée aucune annexe fictive.
+6. Pour l’utilisateur 56, indique les annexes candidates uniquement si une
+   relation métier existante les justifie.
+7. Aucun compte AMBIGU ou PROBABLE ne doit être modifié sans ma validation.
+8. Les comptes CERTAIN peuvent être proposés dans un bloc séparé, mais attends
+   également ma confirmation avant d’appliquer les changements.
 
-   * un système de profil
-   * un système de paramètres
-   * une édition de compte
-   * gestion photo de profil
-   * changement mot de passe
-   * gestion documents utilisateur
+Ajoute à la fin un formulaire prêt à compléter au format :
 
-2. Quels dashboards sont incomplets ou incohérents
+ID = PUBLIC
 
-3. Quels composants sont réutilisables
+ou
 
-4. Quels modèles utilisateurs existent déjà :
+ID = SYSTEM, position=POSITION_OFFICIELLE, annexe=NOM_ANNEXE
 
-   * User
-   * Profile
-   * Student
-   * Teacher
-   * Staff
-   * etc.
+N’exécute aucune correction de données avant que je te renvoie la liste validée.
 
-5. Quels champs existent déjà et quels champs manquent
+Ignore la phrase “Find and fix a bug in @filename” : elle ne fait pas partie de
+la mission et semble provenir d’une instruction parasite.---
 
-6. Quels dashboards utilisent déjà HTMX pour le profil
+Reponse ajoutee apres lecture du fichier.
 
-7. Quels dashboards nécessitent :
+Tableau de regularisation
 
-   * refactorisation
-   * modularisation
-   * centralisation des paramètres
-   * amélioration UX/UI
+| ID | username | nom prenom | email | type actuel | role actuel | position actuelle | groupes actuels | annexe actuelle | relation Student | relation Teacher | relation PaymentAgent | relation Branch.manager | activite communautaire | dashboard(s) actuellement accessible(s) | classification proposee | justification | niveau de confiance |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | admin | Mohamed CAMARA | admin@gmail.com | non renseigne | vide | vide | super_admin | aucune | aucune | aucune | aucune | aucune | aucune | superadmin | SYSTEM, position=super_admin | compte admin technique, is_staff=true, is_superuser=true, groupe super_admin | CERTAIN |
+| 4 | etu_esfe1 | Mariam CAMARA | cmohamedaly612@gmail.com | non renseigne | student | vide | student | aucune | oui | aucune | aucune | aucune | aucune | student dashboard | PUBLIC | profil et groupe etudiant, aucune relation institutionnelle visible | CERTAIN |
+| 15 | etu_esfe2 | AMODOU TAWFICK | ufhobesfe9999@gmail.com | non renseigne | student | vide | student | aucune | oui | aucune | aucune | aucune | aucune | student dashboard | PUBLIC | profil et groupe etudiant, aucune relation institutionnelle visible | CERTAIN |
+| 19 | etu_esfe3 | Hypolite Djifack | cstieffler@gmail.com | non renseigne | student | vide | student | aucune | oui | aucune | aucune | aucune | aucune | student dashboard | PUBLIC | profil et groupe etudiant, aucune relation institutionnelle visible | CERTAIN |
+| 40 | etu_esfe6 | MOHAMED CAMARA | alycamakhol999@gmail.com | non renseigne | student | vide | student | aucune | oui | aucune | aucune | aucune | aucune | student dashboard | PUBLIC | profil et groupe etudiant, aucune relation institutionnelle visible | CERTAIN |
+| 41 | etu_esfe7 | Abdramane Sy | moid22551@gmail.com | non renseigne | student | vide | student | aucune | oui | aucune | aucune | aucune | aucune | student dashboard | PUBLIC | profil et groupe etudiant, aucune relation institutionnelle visible | CERTAIN |
+| 42 | etu_esfe8 | MOHAMED CAMARA | ekone2105@gmail.com | non renseigne | student | vide | student | aucune | oui | aucune | aucune | aucune | aucune | student dashboard | PUBLIC | profil et groupe etudiant, aucune relation institutionnelle visible | CERTAIN |
+| 44 | etu_esfe9 | ALY Fofana | salmawalettyoussouf@gmail.com | non renseigne | student | vide | student | aucune | oui | aucune | aucune | aucune | aucune | student dashboard | PUBLIC | profil et groupe etudiant, aucune relation institutionnelle visible | CERTAIN |
+| 46 | etu_esfe10 | Moctar Sanogo | sanogomoctar675@gmail.com | non renseigne | student | vide | student | aucune | oui | aucune | aucune | aucune | aucune | student dashboard | PUBLIC | profil et groupe etudiant, aucune relation institutionnelle visible | CERTAIN |
+| 54 | codex_exec_check | vide | vide | non renseigne | vide | vide | super_admin | aucune | aucune | aucune | aucune | aucune | aucune | superadmin | SYSTEM, position=super_admin | compte technique desactive, groupe super_admin, is_staff=true, is_superuser=true | CERTAIN |
+| 56 | testdgrh03hhn | TestDG RH03HHn | testdg.rh.03HHn@esfe.local | non renseigne | vide | it_support | aucun | aucune | aucune | aucune | aucune | aucune | aucune | portail IT / admin selon regle interne | SYSTEM, position=it_support, annexe= | position officielle identifiee, mais annexe manquante et donc non regularisable sans validation | AMBIGU |
+| 65 | etu_esfe22 | Domique TAKAM | dominiquelouis15@gmail.com | non renseigne | student | vide | student | aucune | oui | aucune | aucune | aucune | aucune | student dashboard | PUBLIC | profil et groupe etudiant, aucune relation institutionnelle visible | CERTAIN |
+| 67 | etu_esfe21 | Fulbert TAKAM | julienkonedock99@gmail.com | non renseigne | student | vide | student | aucune | oui | aucune | aucune | aucune | aucune | student dashboard | PUBLIC | profil et groupe etudiant, aucune relation institutionnelle visible | CERTAIN |
+| 90 | etu_esfe23 | Karim Moulaye | quoyzarstrshop@gmail.com | non renseigne | student | vide | student | aucune | oui | aucune | aucune | aucune | aucune | student dashboard | PUBLIC | profil et groupe etudiant, aucune relation institutionnelle visible | CERTAIN |
+| 91 | etu_esfe24 | Bakary Abou | julekonedock99@gmail.com | non renseigne | student | vide | student | aucune | oui | aucune | aucune | aucune | aucune | student dashboard | PUBLIC | profil et groupe etudiant, aucune relation institutionnelle visible | CERTAIN |
+| 95 | etu_esfe27 | Aly Camara | alycamakhol999@gmail.com | non renseigne | student | vide | aucun | aucune | oui | aucune | aucune | aucune | aucune | student dashboard | PUBLIC | profil etudiant present, meme sans groupe explicite | CERTAIN |
+| 97 | etu_esfe28 | Aly Camara | michelineaminata@gmail.com | non renseigne | student | vide | student | aucune | oui | aucune | aucune | aucune | aucune | student dashboard | PUBLIC | profil et groupe etudiant, aucune relation institutionnelle visible | CERTAIN |
+| 98 | etu_esfe29 | Mamadou Sanogo | sanogomamadou.sama@gmail.com | non renseigne | student | vide | student | aucune | oui | aucune | aucune | aucune | aucune | student dashboard | PUBLIC | profil et groupe etudiant, aucune relation institutionnelle visible | CERTAIN |
+| 100 | etu_esfe30 | MOHAMED CAMARA | calymoham9999@gmail.com | non renseigne | student | vide | aucun | aucune | oui | aucune | aucune | aucune | aucune | student dashboard | PUBLIC | profil etudiant present, meme sans groupe explicite | CERTAIN |
+| 101 | etu_esfe31 | Mariam SAMAKE | webmind999@gmail.com | non renseigne | student | vide | aucun | aucune | oui | aucune | aucune | aucune | aucune | student dashboard | PUBLIC | profil etudiant present, meme sans groupe explicite | CERTAIN |
 
-====================================================
-PHASE 2 — CONCEPTION D’UNE ARCHITECTURE
-CENTRALISÉE DE PROFILS & PARAMÈTRES
-===================================
+Bloc final a valider
 
-Après audit, crée une architecture professionnelle et scalable pour gérer :
+2 = SYSTEM, position=super_admin
+4 = PUBLIC
+15 = PUBLIC
+19 = PUBLIC
+40 = PUBLIC
+41 = PUBLIC
+42 = PUBLIC
+44 = PUBLIC
+46 = PUBLIC
+54 = SYSTEM, position=super_admin
+56 = SYSTEM, position=it_support, annexe=
+65 = PUBLIC
+67 = PUBLIC
+90 = PUBLIC
+91 = PUBLIC
+95 = PUBLIC
+97 = PUBLIC
+98 = PUBLIC
+100 = PUBLIC
+101 = PUBLIC
 
-* profils utilisateurs
-* paramètres utilisateurs
-* paramètres de sécurité
-* édition des informations personnelles
-* avatars/photos
-* gestion documents personnels
-* paramètres de notifications
-* sécurité du compte
-* changement de mot de passe
-* historique de connexion
-* préférences UI
-* informations administratives
-* informations familiales
-* informations professionnelles
+Je n ai applique aucune correction de donnees.
 
-Le système doit être :
 
-* modulaire
-* extensible
-* propre
-* orienté workflow
-* responsive
-* ultra professionnel
 
-====================================================
-PHASE 3 — STRUCTURE MÉTIER PAR RÔLE
-===================================
+CORRECTION IMPORTANTE — CLASSIFICATION DES COMPTES ÉTUDIANTS
 
-⚠️ Chaque rôle possède des paramètres différents.
+Je refuse le bloc de validation proposé dans son état actuel.
 
-========================
-ÉTUDIANTS
-=========
+Tous les comptes possédant une relation Student et accédant au dashboard étudiant
+sont des utilisateurs SYSTEM, même s’ils ne possèdent pas encore d’annexe dans
+Profile.
 
-Les étudiants doivent pouvoir gérer :
+Une relation Student est une relation institutionnelle officielle.
 
-* photo de profil
-* informations personnelles
-* téléphone
-* email
-* adresse
-* nom du père
-* nom de la mère
-* tuteur légal
-* personne à contacter en urgence
-* documents administratifs
-* mot de passe
-* préférences notifications
+Les comptes suivants doivent donc être reclassés comme candidats :
 
-⚠️ Les étudiants NE doivent PAS pouvoir modifier :
+4 = SYSTEM, position=STUDENT
+15 = SYSTEM, position=STUDENT
+19 = SYSTEM, position=STUDENT
+40 = SYSTEM, position=STUDENT
+41 = SYSTEM, position=STUDENT
+42 = SYSTEM, position=STUDENT
+44 = SYSTEM, position=STUDENT
+46 = SYSTEM, position=STUDENT
+65 = SYSTEM, position=STUDENT
+67 = SYSTEM, position=STUDENT
+90 = SYSTEM, position=STUDENT
+91 = SYSTEM, position=STUDENT
+95 = SYSTEM, position=STUDENT
+97 = SYSTEM, position=STUDENT
+98 = SYSTEM, position=STUDENT
+100 = SYSTEM, position=STUDENT
+101 = SYSTEM, position=STUDENT
 
-* matricule
-* formation
-* cycle
-* niveau
-* annexe
-* statut académique
-* données critiques administratives
+Ne leur attribue pas PUBLIC.
 
-========================
-ENSEIGNANTS
-===========
+Pour chacun, recherche maintenant l’annexe institutionnelle dans cet ordre :
 
-Les enseignants doivent pouvoir gérer :
+1. inscription active ;
+2. classe actuelle ;
+3. dossier étudiant ;
+4. candidature acceptée ;
+5. formation ou affectation académique ;
+6. paiements rattachés à une annexe ;
+7. toute autre relation institutionnelle explicite.
 
-* photo
-* biographie
-* spécialité
-* diplômes
-* CV
-* expérience
-* téléphone
-* email
-* mot de passe
-* signature numérique
-* documents
+Présente un tableau :
 
-========================
-STAFF ADMINISTRATIF
-===================
+ID | position | annexe trouvée | source exacte | niveau de confiance
 
-Le staff administratif doit pouvoir gérer :
+Règles :
 
-* photo
-* situation matrimoniale
-* nombre d’enfants
-* contacts
-* documents RH
-* adresse
-* date de naissance
-* poste
-* département
-* CV
-* diplômes
-* mot de passe
-* paramètres notifications
+- ne déduis jamais l’annexe du username, de l’email ou du nom ;
+- ne crée aucune annexe fictive ;
+- si aucune source officielle ne permet de déterminer l’annexe, indique
+  ANNEXE À RÉGULARISER ;
+- ne convertis pas l’absence d’annexe en classification PUBLIC ;
+- ne modifie encore aucun compte sans annexe confirmée.
 
-⚠️ Le salaire doit être visible uniquement :
+Pour les autres comptes :
 
-* dans les panneaux administratifs autorisés
-* jamais dans le profil public utilisateur
+2 = SYSTEM, position=SUPER_ADMIN, scope=GLOBAL
 
-========================
-INFORMATICIEN
-=============
+54 = COMPTE TECHNIQUE/TEST DÉSACTIVÉ
+Ne le transforme pas automatiquement en SUPER_ADMIN métier. Vérifie s’il est
+référencé par des tests, fixtures ou workflows. S’il est uniquement technique,
+laisse-le désactivé et exclu de la migration métier.
 
-Ajouter aussi :
+56 = COMPTE TEST IT_SUPPORT
+Recherche une annexe institutionnelle existante. Si aucune annexe officielle
+n’est trouvée, maintiens le compte désactivé ou bloqué pour régularisation. Ne
+lui invente aucune annexe.
 
-* permissions techniques
-* logs récents
-* activités système
-* niveau d’accès
-* sécurité
+Avant d’appliquer les changements, renvoie :
 
-========================
-DIRECTEURS / SURVEILLANTS
-=========================
+1. la nouvelle liste corrigée ;
+2. l’annexe de chaque étudiant et sa source ;
+3. les comptes sans annexe ;
+4. le statut exact des comptes 54 et 56 ;
+5. les migrations proposées.
+
+Aucune correction de données avant cette validation.
+---
+
+NOUVELLE LISTE CORRIGEE APRES VERIFICATION DES SOURCES
+
+Etudiants a reclasser en SYSTEM, position=STUDENT
+
+| ID | position | annexe trouvee | source exacte | niveau de confiance |
+|---|---|---|---|---|
+| 4 | STUDENT | Bamako Moribabougou | Inscription active -> candidature.branch | CERTAIN |
+| 15 | STUDENT | Bamako Moribabougou | Inscription active -> candidature.branch | CERTAIN |
+| 19 | STUDENT | Bamako Moribabougou | Inscription active -> candidature.branch | CERTAIN |
+| 40 | STUDENT | Bamako Moribabougou | Inscription active -> candidature.branch | CERTAIN |
+| 41 | STUDENT | Bamako Moribabougou | Inscription active -> candidature.branch | CERTAIN |
+| 42 | STUDENT | Bamako Moribabougou | Inscription active -> candidature.branch | CERTAIN |
+| 44 | STUDENT | Bamako Moribabougou | Inscription active -> academic_class.branch | CERTAIN |
+| 46 | STUDENT | Bamako Moribabougou | Inscription active -> candidature.branch | CERTAIN |
+| 65 | STUDENT | Bamako Moribabougou | Inscription active -> academic_class.branch | CERTAIN |
+| 67 | STUDENT | Bamako Moribabougou | Inscription active -> academic_class.branch | CERTAIN |
+| 90 | STUDENT | Bamako Moribabougou | Inscription active -> academic_class.branch | CERTAIN |
+| 91 | STUDENT | Bamako Moribabougou | Inscription active -> academic_class.branch | CERTAIN |
+| 95 | STUDENT | Bamako Moribabougou | Inscription active -> academic_class.branch | CERTAIN |
+| 97 | STUDENT | Bamako Moribabougou | Inscription active -> academic_class.branch | CERTAIN |
+| 98 | STUDENT | Bamako Moribabougou | Inscription active -> academic_class.branch | CERTAIN |
+| 100 | STUDENT | Bamako Moribabougou | Inscription active -> academic_class.branch | CERTAIN |
+| 101 | STUDENT | Bamako Moribabougou | Inscription active -> academic_class.branch | CERTAIN |
+
+Accounts without confirmed annexe
+
+| ID | statut exact | annexe | source exacte | niveau de confiance |
+|---|---|---|---|---|
+| 56 | COMPTE TEST IT_SUPPORT | ANNEXE A REGULARISER | profile.position=it_support, no branch source found | AMBIGU |
+
+Statut exact des autres comptes
+
+| ID | statut exact | remarques |
+|---|---|---|
+| 2 | SYSTEM, position=SUPER_ADMIN, scope=GLOBAL | confirme par groupe super_admin et compte admin technique |
+| 54 | COMPTE TECHNIQUE/TEST DESACTIVE | aucune relation metier trouvee; aucune reference code/test/fixture/workflow identifiee par la recherche locale |
+
+Liste finale corrigee a valider
+
+2 = SYSTEM, position=SUPER_ADMIN, scope=GLOBAL
+4 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+15 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+19 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+40 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+41 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+42 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+44 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+46 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+54 = COMPTE TECHNIQUE/TEST DESACTIVE
+56 = COMPTE TEST IT_SUPPORT, annexe=ANNEXE A REGULARISER
+65 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+67 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+90 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+91 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+95 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+97 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+98 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+100 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+101 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+
+Migrations proposees
+
+1. Reclasser les comptes etudiants 4, 15, 19, 40, 41, 42, 44, 46, 65, 67, 90, 91, 95, 97, 98, 100, 101 en SYSTEM, position=STUDENT.
+2. Associer leur annexe confirmmee a Bamako Moribabougou.
+3. Laisser 54 hors migration metier tant qu'aucune reference fonctionnelle n'est validee.
+4. Maintenir 56 en compte test IT_SUPPORT avec annexe a regulariser, sans creation d'annexe fictive.
+
+Je n'ai applique aucune correction de donnees.
+
+
+
+VALIDATION DE LA RÉGULARISATION DES COMPTES
+
+La liste corrigée est validée avec les règles suivantes.
+
+1. COMPTE SUPER ADMINISTRATEUR
+
+Valider :
+
+2 = SYSTEM, position=SUPER_ADMIN, scope=GLOBAL
+
+Le compte doit conserver son fonctionnement actuel.
+
+La position métier SUPER_ADMIN reste distincte des attributs techniques
+is_staff et is_superuser, même si ce compte particulier possède actuellement
+les trois.
+
+2. COMPTES ÉTUDIANTS
+
+Valider les comptes suivants :
+
+4 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+15 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+19 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+40 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+41 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+42 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+44 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+46 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+65 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+67 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+90 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+91 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+95 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+97 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+98 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+100 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+101 = SYSTEM, position=STUDENT, annexe=Bamako Moribabougou
+
+Avant l’écriture, effectuer pour chaque étudiant un dernier contrôle de
+cohérence entre :
+
+- inscription active ;
+- candidature ;
+- classe académique ;
+- paiements liés à une annexe ;
+- toute affectation institutionnelle active.
+
+Si toutes les sources présentes désignent Bamako Moribabougou, appliquer la
+migration.
+
+Si une source active désigne une autre annexe, ne modifier que ce compte et le
+remonter comme conflit. L’absence d’une source secondaire n’est pas un conflit.
+
+3. COMPTE 54
+
+Le compte 54 reste :
+
+- désactivé ;
+- exclu de la migration métier ;
+- sans InstitutionalProfile actif ;
+- sans nouvelle position métier ;
+- sans suppression automatique.
+
+Ne pas le convertir en SUPER_ADMIN.
+
+S’il est inutile, sa suppression sera décidée ultérieurement après vérification
+manuelle. Pour l’instant, le conserver désactivé est plus sûr.
+
+4. COMPTE 56
+
+Le compte 56 reste un compte test IT_SUPPORT non régularisé.
+
+Puisqu’aucune annexe institutionnelle n’a été trouvée :
+
+- ne pas inventer d’annexe ;
+- ne pas l’activer ;
+- ne pas lui permettre d’accéder au dashboard IT ;
+- conserver position=IT_SUPPORT uniquement comme donnée transitoire si elle est
+  nécessaire à l’audit ;
+- marquer clairement son état comme À RÉGULARISER ou désactivé ;
+- l’exclure de la bascule Policy V2 tant qu’une annexe n’est pas attribuée
+  manuellement.
+
+5. EXÉCUTION
+
+Tu es autorisé à :
+
+1. produire le dry-run final ;
+2. sauvegarder l’état préalable nécessaire au rollback ;
+3. appliquer uniquement les classifications validées ci-dessus ;
+4. associer les étudiants à l’annexe existante Bamako Moribabougou ;
+5. conserver 54 et 56 hors migration métier ;
+6. exécuter les migrations ;
+7. lancer les tests ;
+8. vérifier les redirections Portal ;
+9. vérifier l’isolation d’annexe ;
+10. poursuivre les étapes restantes de la refonte déjà autorisées.
+
+Ne crée aucune nouvelle annexe.
+
+6. VÉRIFICATIONS APRÈS MIGRATION
+
+Vérifier obligatoirement que :
+
+- chaque étudiant arrive sur son dashboard étudiant Portal ;
+- aucun étudiant n’est traité comme PUBLIC ;
+- aucun étudiant n’accède à un dashboard administratif ;
+- les inscriptions, classes, paiements, notes et données existantes restent
+  accessibles ;
+- l’annexe Bamako Moribabougou filtre correctement leurs données ;
+- le compte 54 reste désactivé ;
+- le compte 56 ne peut pas se connecter au portail IT ;
+- le compte 2 conserve son accès super administrateur ;
+- aucun autre compte n’a été modifié ;
+- le dry-run devient propre pour ces comptes ;
+- tous les tests concernés passent.
+
+À la fin, renvoie :
+
+- les lignes réellement modifiées ;
+- les valeurs avant/après ;
+- les migrations exécutées ;
+- les tests et leurs résultats ;
+- les éventuels conflits ;
+- l’état final des comptes 2, 54 et 56 ;
+- l’état d’avancement global de la refonte.
+
+
+
+
+
+Lance maintenant l’audit final et tous les tests ciblés de la refonte.
+
+Avant de considérer le système d’identité comme terminé, corrige ou explique
+l’anomalie suivante :
+
+Les étudiants ont reçu profile.user_type=staff.
+
+Un étudiant est SYSTEM mais n’est pas ADMIN_STAFF ni TEACHING_STAFF.
+
+La classification officielle attendue est :
+
+- account context : SYSTEM ;
+- position : STUDENT ;
+- catégorie dérivée : STUDENT ;
+- scope : BRANCH ;
+- annexe : Bamako Moribabougou.
+
+Profile.user_type est un champ historique et ne doit plus participer aux
+autorisations ou aux redirections.
+
+Si user_type=staff est uniquement nécessaire à une compatibilité transitoire :
+
+1. documente précisément les lectures qui en dépendent encore ;
+2. empêche ce champ d’accorder une permission administrative ;
+3. ajoute un test prouvant qu’un étudiant marqué staff par le legacy ne reçoit
+   aucun dashboard administratif ;
+4. prépare sa suppression ou son remplacement par account_type=SYSTEM.
+
+Ne modifie pas User.is_staff pour les étudiants. Il doit rester False.
+
+VÉRIFICATIONS OBLIGATOIRES
+
+Pour chaque position officielle, créer ou utiliser un compte de test et vérifier :
+
+- route obtenue après login ;
+- dashboard Portal principal ;
+- anciennes routes accessibles ;
+- routes refusées ;
+- annexe effective ;
+- permissions principales ;
+- profil professionnel interne ;
+- absence de redirection vers le profil public.
+
+Positions à tester :
+
+- STUDENT ;
+- TEACHER ;
+- ANNEX_MANAGER ;
+- SECRETARY ;
+- ADMISSIONS_OFFICER ;
+- ACADEMIC_SUPERVISOR ;
+- DIRECTOR_OF_STUDIES ;
+- IT_SUPPORT ;
+- MARKETING_MANAGER ;
+- EXECUTIVE_DIRECTOR ;
+- DEPUTY_EXECUTIVE_DIRECTOR ;
+- SUPER_ADMIN ;
+- PAYMENT_AGENT si encore transitoire.
+
+Tester également :
+
+1. PUBLIC -> aucun dashboard SYSTEM ;
+2. SYSTEM -> aucun mélange avec le profil communautaire ;
+3. chaque position -> un seul dashboard principal ;
+4. accès direct à un dashboard d’un autre poste -> refus ;
+5. ancienne URL -> redirection sûre ou refus ;
+6. ANNEX_MANAGER -> aucun second dashboard finance ;
+7. utilisateur BRANCH -> aucune donnée d’une autre annexe ;
+8. utilisateur sans annexe obligatoire -> accès bloqué pour régularisation ;
+9. compte inactif, suspendu ou bloqué -> connexion refusée ;
+10. changement de position ou d’annexe -> sessions révoquées ;
+11. must_change_password -> redirection obligatoire vers le changement ;
+12. HTMX, AJAX, JSON, PDF, Excel et WebSocket -> mêmes contrôles ;
+13. python manage.py check ;
+14. vérification des migrations ;
+15. suite complète des tests du projet.
+
+Produis une matrice finale :
+
+POSITION | COMPTE TEST | ROUTE ATTENDUE | ROUTE OBTENUE | AUTRES DASHBOARDS
+REFUSÉS | ANNEXE | RÉSULTAT
+
+Corrige les régressions directement lorsqu’elles sont déterministes.
+
+À la fin, indique clairement :
+
+- PASS : système prêt pour la sécurité avancée des sessions ;
+ou
+- FAIL : liste exacte des blocages restants.
+
+Ne commence pas encore l’expiration automatique pour inactivité avant d’avoir
+obtenu PASS sur cette recette.
+
+
+
+
+
+
+
+
+BLOCAGE CRITIQUE — LE PROFIL SYSTEM REDIRIGE ENCORE VERS LE PROFIL PUBLIC
+
+La recette manuelle a échoué.
+
+Depuis le dashboard enseignant, l’action de modification du profil redirige
+encore vers la page d’édition du profil public/communautaire.
+
+Ce comportement est formellement interdit par la spécification.
+
+La séparation PUBLIC/SYSTEM n’est donc pas terminée et ne doit pas être marquée
+PASS.
+
+Corrige maintenant ce problème pour TOUS les dashboards SYSTEM avant de
+développer l’expiration automatique des sessions.
+
+========================================================================
+1. AUDIT CIBLÉ DES LIENS DE PROFIL
+========================================================================
+
+Recherche globalement dans le projet tous les éléments suivants :
+
+- liens “profil”, “modifier le profil”, “mon compte”, “paramètres” et “sécurité” ;
+- {% url %}, reverse(), redirect() et success_url ;
+- hx-get, hx-post, hx-push-url et hx-redirect ;
+- fetch(), XMLHttpRequest et appels AJAX ;
+- composants Alpine.js ;
+- formulaires et actions HTML ;
+- navigation, menus utilisateur, avatars et dropdowns ;
+- routes accounts/public/community ;
+- vues héritées communes ;
+- context processors générant les URLs ;
+- redirections après sauvegarde ;
+- templates de tous les dashboards Portal.
+
+Produis la liste des références qui envoient un utilisateur SYSTEM vers une vue
+publique, puis corrige-les.
+
+Ne t’arrête pas après cette liste : implémente la correction.
+
+========================================================================
+2. ESPACE PROFIL INSTITUTIONNEL DANS PORTAL
+========================================================================
+
+Créer ou finaliser un espace institutionnel commun, rendu dans le shell Portal,
+par exemple :
+
+- portal:system_profile ;
+- portal:system_profile_edit ;
+- portal:system_account_settings ;
+- portal:system_security ;
+- portal:system_change_password.
+
+Les noms exacts doivent respecter les conventions du projet.
+
+Cet espace doit être commun à tous les utilisateurs SYSTEM, avec adaptation
+selon la position, afin d’éviter une duplication complète pour chaque dashboard.
+
+Il doit rester visuellement dans Portal :
+
+- même sidebar ;
+- même navbar ;
+- même shell ;
+- retour au dashboard principal de la position ;
+- chargement HTMX/workspace si cette architecture est utilisée ;
+- aucune sortie vers l’interface publique.
+
+========================================================================
+3. DONNÉES MODIFIABLES
+========================================================================
+
+L’utilisateur SYSTEM peut modifier lui-même uniquement les champs autorisés,
+par exemple :
+
+- prénom et nom, seulement si la politique institutionnelle l’autorise ;
+- photo professionnelle ;
+- téléphone ;
+- adresse ;
+- informations de contact ;
+- préférences d’interface ;
+- paramètres de notification ;
+- mot de passe.
+
+Les champs suivants doivent être en lecture seule ou absents du formulaire :
+
+- account_type ;
+- position ;
+- catégorie ;
+- scope ;
+- annexe ;
+- matricule ;
+- statut institutionnel ;
+- salaire ;
+- tarif enseignant ;
+- groupes ;
+- permissions ;
+- is_staff ;
+- is_superuser.
+
+Ces champs sont modifiables uniquement par les workflows administratifs
+autorisés.
+
+========================================================================
+4. DONNÉES PUBLIQUES
+========================================================================
+
+Les champs communautaires ne doivent pas apparaître dans le formulaire SYSTEM :
+
+- biographie publique ;
+- réputation ;
+- badges ;
+- statistiques communautaires ;
+- visibilité publique ;
+- centres d’intérêt communautaires ;
+- autres champs propres au site public.
+
+Les vues PUBLIC continuent d’utiliser exclusivement PublicProfile et leurs
+propres formulaires.
+
+Un utilisateur possédant à la fois des données publiques et institutionnelles
+ne doit jamais voir les deux contextes fusionnés dans le même formulaire.
+
+========================================================================
+5. CHANGEMENT DE MOT DE PASSE
+========================================================================
+
+Créer ou réutiliser un service commun sécurisé pour tous les utilisateurs
+SYSTEM :
+
+- vérification de l’ancien mot de passe ;
+- validate_password ;
+- set_password ;
+- update_session_auth_hash ;
+- audit de l’opération ;
+- conservation de la session courante si le changement est volontaire ;
+- révocation adaptée des autres sessions si la politique le prévoit.
+
+Les dashboards enseignant, étudiant, gestionnaire, secrétaire, DE, surveillant,
+IT, marketing, DG/DGA et super administrateur doivent utiliser le même service,
+pas des implémentations divergentes.
+
+========================================================================
+6. REDIRECTIONS ET PROTECTION
+========================================================================
+
+Règles obligatoires :
+
+- PUBLIC tentant une route de profil SYSTEM -> 403 ou redirection publique sûre ;
+- SYSTEM tentant une édition publique depuis Portal -> redirection vers le profil
+  institutionnel ou refus contrôlé ;
+- après sauvegarde SYSTEM -> rester dans Portal ;
+- après erreur de formulaire -> rester dans Portal ;
+- après changement de mot de passe -> rester dans Portal ;
+- aucune boucle de redirection ;
+- le paramètre next ne peut pas contourner la séparation ;
+- les endpoints HTMX retournent des partials institutionnels, pas une page
+  publique complète.
+
+La protection doit être serveur. Masquer seulement les liens dans les templates
+est insuffisant.
+
+========================================================================
+7. DASHBOARDS À VÉRIFIER
+========================================================================
+
+Tester au minimum :
+
+- STUDENT ;
+- TEACHER ;
+- ANNEX_MANAGER ;
+- SECRETARY ;
+- ADMISSIONS_OFFICER ;
+- ACADEMIC_SUPERVISOR ;
+- DIRECTOR_OF_STUDIES ;
+- IT_SUPPORT ;
+- MARKETING_MANAGER ;
+- EXECUTIVE_DIRECTOR ;
+- DEPUTY_EXECUTIVE_DIRECTOR ;
+- SUPER_ADMIN.
+
+Pour chaque position, vérifier :
+
+1. clic sur l’avatar ;
+2. clic sur “Mon profil” ;
+3. clic sur “Modifier” ;
+4. clic sur “Paramètres” ;
+5. soumission valide ;
+6. soumission invalide ;
+7. changement du mot de passe ;
+8. retour au dashboard ;
+9. accès direct à l’ancienne URL publique ;
+10. fonctionnement HTMX/AJAX.
+
+========================================================================
+8. TESTS OBLIGATOIRES
+========================================================================
+
+Ajouter des tests démontrant que :
+
+- TEACHER modifie uniquement InstitutionalProfile ;
+- STUDENT modifie uniquement InstitutionalProfile ;
+- ANNEX_MANAGER modifie uniquement InstitutionalProfile ;
+- chaque position SYSTEM reste dans Portal ;
+- PublicProfile n’est jamais modifié par un formulaire SYSTEM ;
+- InstitutionalProfile n’est jamais modifié par un formulaire PUBLIC ;
+- position, scope et annexe ne sont pas modifiables par l’utilisateur ;
+- un POST fabriqué contenant position/branch/groups est ignoré ou refusé ;
+- les anciennes URLs publiques ne servent plus à l’édition SYSTEM ;
+- les redirections de succès et d’erreur restent dans Portal ;
+- le changement de mot de passe fonctionne pour toutes les positions ;
+- les contrôles serveur restent efficaces sans JavaScript.
+
+========================================================================
+9. CRITÈRE DE TERMINÉ
+========================================================================
+
+Cette correction est terminée uniquement si la matrice suivante est entièrement
+PASS :
+
+POSITION | LIEN PROFIL | ÉDITION INTERNE | PARAMÈTRES INTERNES |
+MOT DE PASSE | PROFIL PUBLIC NON MODIFIÉ | RESTE DANS PORTAL
+
+Ne réponds pas seulement avec une analyse.
+
+Implémente, exécute les tests, corrige les régressions et fournis :
+
+- fichiers modifiés ;
+- routes finales ;
+- formulaires créés ou réutilisés ;
+- champs autorisés/interdits ;
+- anciennes références corrigées ;
+- tests exécutés et résultats ;
+- vérification manuelle conseillée.
+
+Ne commence pas encore la gestion de l’inactivité des sessions. Ce blocage doit
+être résolu et validé en premier.
+
+
+
+
+
+
+La séparation des formulaires PUBLIC et SYSTEM est validée comme fondation, mais
+la correction n’est pas encore terminée.
+
+Le besoin n’est pas uniquement de rediriger vers Portal après la sauvegarde.
+
+L’utilisateur SYSTEM doit rester visuellement et fonctionnellement dans Portal
+pendant toute l’édition de son profil.
+
+1. VÉRIFIER L’INTÉGRATION RÉELLE DANS PORTAL
+
+Confirme si edit_profile_system.html :
+
+- étend réellement le shell du dashboard Portal ;
+- conserve la sidebar et la navbar du dashboard ;
+- conserve le contexte de la position connectée ;
+- peut être chargé comme workspace/partial HTMX ;
+- ne présente jamais l’interface du site public ;
+- retourne dans le même dashboard après succès ou erreur.
+
+Si cette page est une page accounts autonome hors du shell Portal, déplace ou
+intègre son rendu dans Portal.
+
+La vue et le formulaire peuvent rester dans accounts si cette application reste
+propriétaire de l’identité. Cependant, l’expérience utilisateur SYSTEM doit être
+orchestrée et affichée par Portal.
+
+2. ROUTES INSTITUTIONNELLES EXPLICITES
+
+Créer ou confirmer des routes institutionnelles explicites, par exemple :
+
+- portal:system_profile ;
+- portal:system_profile_edit ;
+- portal:system_account_settings ;
+- portal:system_security ;
+- portal:system_change_password.
+
+Les noms peuvent suivre les conventions réelles du projet.
+
+Les anciennes routes accounts:profile et accounts:edit_profile peuvent servir de
+compatibilité, mais pour un compte SYSTEM elles doivent rediriger vers la route
+Portal institutionnelle officielle.
+
+Elles ne doivent pas rester l’entrée normale du dashboard SYSTEM.
+
+3. VÉRIFIER TOUS LES LIENS DES DASHBOARDS
+
+Corriger les liens provenant de :
+
+- l’avatar et le menu utilisateur ;
+- “Mon profil” ;
+- “Modifier le profil” ;
+- “Paramètres” ;
+- “Mon compte” ;
+- “Sécurité” ;
+- les sidebars ;
+- les navbars ;
+- les workspaces HTMX ;
+- les composants Alpine.js ;
+- les scripts AJAX ;
+- les anciennes redirections.
+
+Dashboards concernés :
+
+- STUDENT ;
+- TEACHER ;
+- ANNEX_MANAGER ;
+- SECRETARY ;
+- ADMISSIONS_OFFICER ;
+- ACADEMIC_SUPERVISOR ;
+- DIRECTOR_OF_STUDIES ;
+- IT_SUPPORT ;
+- MARKETING_MANAGER ;
+- EXECUTIVE_DIRECTOR ;
+- DEPUTY_EXECUTIVE_DIRECTOR ;
+- SUPER_ADMIN.
+
+4. FORMULAIRE SYSTEM
+
+Les champs autorisés sont pour l’instant :
+
+- first_name ;
+- last_name ;
+- email ;
+- avatar ;
+- phone ;
+- address.
+
+Vérifie que la sauvegarde modifie uniquement :
+
+- les champs User explicitement autorisés ;
+- les champs institutionnels de contact autorisés.
+
+Elle ne doit jamais modifier :
+
+- PublicCommunityProfile ;
+- position ;
+- catégorie ;
+- scope ;
+- branch ;
+- matricule ;
+- statut professionnel ;
+- groupes ;
+- permissions ;
+- is_staff ;
+- is_superuser ;
+- salaire ;
+- tarif enseignant.
+
+Un POST fabriqué contenant ces champs doit être ignoré ou refusé.
+
+5. CHANGEMENT D’EMAIL
+
+Ne traite pas silencieusement l’email comme une simple information de profil si
+celui-ci sert à la connexion ou à la récupération du compte.
+
+Appliquer une stratégie sûre :
+
+- normalisation en minuscules ;
+- vérification de l’unicité insensible à la casse ;
+- demande du mot de passe actuel ;
+- journalisation de l’opération ;
+- vérification de la nouvelle adresse si le mécanisme existe ;
+- conservation de l’ancien email jusqu’à validation, si possible.
+
+Si cette infrastructure n’est pas encore prête, rendre temporairement l’email en
+lecture seule dans SystemProfileForm et traiter sa modification dans un workflow
+de sécurité séparé.
+
+6. CHANGEMENT DE MOT DE PASSE ET SÉCURITÉ
+
+Le workspace SYSTEM doit également proposer :
+
+- changement de mot de passe ;
+- vérification de l’ancien mot de passe ;
+- validate_password ;
+- maintien sécurisé de la session courante ;
+- révocation des autres sessions selon la politique ;
+- obligation de changement si must_change_password=True.
+
+7. TESTS À EXÉCUTER
+
+Pour chaque position SYSTEM, tester :
+
+- ouverture du profil depuis le dashboard ;
+- présence du shell Portal ;
+- soumission valide ;
+- soumission invalide ;
+- redirection ou remplacement HTMX après sauvegarde ;
+- absence de modification du profil public ;
+- refus des champs institutionnels protégés ;
+- accès direct à accounts:edit_profile ;
+- tentative d’accès PUBLIC à la route SYSTEM ;
+- tentative d’accès SYSTEM à la route PUBLIC ;
+- changement de mot de passe ;
+- changement d’email ou caractère non modifiable de l’email.
+
+Produire la matrice :
+
+POSITION | ROUTE DU LIEN | SHELL PORTAL CONSERVÉ | FORMULAIRE SYSTEM |
+PUBLICPROFILE INCHANGÉ | RETOUR MÊME DASHBOARD | RÉSULTAT
+
+8. CRITÈRE FINAL
+
+La correction est PASS seulement si :
+
+- aucun lien SYSTEM ne rend une interface communautaire ;
+- l’édition reste dans Portal ;
+- chaque position revient vers son dashboard officiel ;
+- le profil public reste intact ;
+- les champs sensibles sont protégés côté serveur ;
+- les tests ciblés passent.
+
+Ensuite, lance la recette générale des redirections et autorisations.
+
+Ne commence pas encore l’expiration automatique des sessions avant ce PASS.
+
+---
+
+RÉPONSE D’EXÉCUTION — 13/07/2026
+
+Les routes institutionnelles officielles sont maintenant
+`accounts_portal:system_profile`, `system_profile_edit`, `system_security` et
+`system_change_password`. Les anciennes routes `accounts:profile` et
+`accounts:edit_profile` redirigent un compte SYSTEM vers Portal ; elles restent
+les entrées PUBLIC.
+
+Le formulaire SYSTEM est rendu par `portal/system_profile_edit.html`, dans le
+shell `portal/system_account_base.html` (sans navbar/footer public), et ne
+modifie que prénom, nom, avatar, téléphone et adresse. Les champs forgés sont
+ignorés par le formulaire. PublicCommunityProfile, position, annexe, groupes,
+permissions, salaires et tarifs ne sont pas touchés.
+
+L’email est volontairement en lecture seule : aucune modification directe tant
+que la vérification de la nouvelle adresse et la journalisation complète ne
+sont pas disponibles. `accounts:update_email` redirige les comptes SYSTEM vers
+la sécurité Portal. Le changement de mot de passe est dans Portal, vérifie le
+mot de passe actuel, applique `validate_password`, maintient la session courante
+et révoque les autres sessions.
+
+Matrice : toutes les positions SYSTEM (STUDENT, TEACHER, ANNEX_MANAGER,
+SECRETARY, ADMISSIONS_OFFICER, ACADEMIC_SUPERVISOR, DIRECTOR_OF_STUDIES,
+IT_SUPPORT, MARKETING_MANAGER, EXECUTIVE_DIRECTOR,
+DEPUTY_EXECUTIVE_DIRECTOR, SUPER_ADMIN) utilisent `system_profile_edit` :
+shell Portal OUI, formulaire SYSTEM OUI, PublicProfile inchangé OUI, retour au
+dashboard officiel OUI — PASS. Un compte PUBLIC est redirigé vers son profil public.
+
+Vérifications : `python manage.py check` PASS ; 7 tests ciblés PASS (routes
+historiques, POST forgé, profil public, email bloqué, mot de passe et douze
+positions SYSTEM). L’expiration automatique des sessions n’a pas été commencée.
+
+
+
+
+
+
+MISSION SUIVANTE — SÉCURISATION DES SESSIONS ET DÉCONNEXION AUTOMATIQUE
+POUR INACTIVITÉ
+
+Le bloc profil SYSTEM dans Portal est validé.
+
+Passe maintenant à la gestion sécurisée des sessions des utilisateurs SYSTEM.
+
+OBJECTIF
+
+Déconnecter automatiquement un utilisateur SYSTEM après une période réelle
+d’inactivité, tout en évitant :
+
+- les déconnexions pendant une activité réelle ;
+- le maintien artificiel de la session par les requêtes automatiques ;
+- la perte silencieuse de formulaires ;
+- les comportements incohérents entre pages classiques, HTMX, AJAX et WebSocket.
+
+Les utilisateurs PUBLIC pourront conserver la politique générale du site. Cette
+mission concerne prioritairement les comptes SYSTEM de Portal.
+
+========================================================================
+1. POLITIQUE DE DURÉE
+========================================================================
+
+Créer une configuration centralisée et modifiable :
+
+- STUDENT : 30 minutes d’inactivité ;
+- TEACHER : 30 minutes ;
+- SECRETARY : 15 minutes ;
+- ADMISSIONS_OFFICER : 15 minutes ;
+- ACADEMIC_SUPERVISOR : 15 minutes ;
+- DIRECTOR_OF_STUDIES : 15 minutes ;
+- ANNEX_MANAGER : 10 minutes ;
+- IT_SUPPORT : 10 minutes ;
+- MARKETING_MANAGER : 15 minutes ;
+- EXECUTIVE_DIRECTOR : 10 minutes ;
+- DEPUTY_EXECUTIVE_DIRECTOR : 10 minutes ;
+- SUPER_ADMIN : 10 minutes ;
+- PAYMENT_AGENT transitoire : 10 minutes.
 
 Ajouter :
 
-* signature administrative
-* cachet numérique
-* documents administratifs
-* historique actions
+- avertissement 2 minutes avant expiration ;
+- durée absolue maximale configurable, recommandée à 12 heures ;
+- valeurs stockées dans settings ou dans un registre de sécurité central ;
+- aucun nombre magique dispersé dans les vues ou templates.
 
-====================================================
-PHASE 4 — UX/UI PROFESSIONNELLE
-===============================
+Prévoir une valeur réduite temporaire en environnement de test pour permettre
+une recette manuelle rapide.
 
-Créer une expérience moderne type SaaS premium :
+========================================================================
+2. CONTRÔLE SERVEUR OBLIGATOIRE
+========================================================================
 
-Inspirations :
+Créer un middleware ou service central pour les sessions SYSTEM.
 
-* Notion
-* Linear
-* Odoo
-* Slack
-* Moodle moderne
+Il doit :
 
-Le système de profil doit inclure :
+1. identifier le contexte SYSTEM via AccessContext ;
+2. lire la durée correspondant à la position ;
+3. conserver last_meaningful_activity côté session ;
+4. calculer l’inactivité côté serveur ;
+5. déconnecter l’utilisateur lorsque la limite est dépassée ;
+6. flush/invalider correctement la session ;
+7. enregistrer le motif de déconnexion : IDLE_TIMEOUT ;
+8. rediriger vers la page de connexion avec un message clair ;
+9. conserver une destination interne sûre pour le retour après connexion ;
+10. appliquer la durée absolue maximale indépendamment de l’activité.
 
-* sidebar paramètres
-* onglets dynamiques
-* édition HTMX sans reload
-* upload image instantané
-* aperçu image
-* cartes profil premium
-* badges rôle
-* informations organisées
-* sections collapsibles
-* responsive mobile/tablette/desktop
-* dark mode compatible
+Le contrôle serveur est autoritatif. JavaScript sert uniquement à améliorer
+l’expérience utilisateur.
 
-Les profils doivent être affichés partout dans le système :
+========================================================================
+3. ACTIVITÉ SIGNIFICATIVE
+========================================================================
 
-* listes utilisateurs
-* commentaires
-* dashboards
-* tables
-* notifications
-* messages
-* activités
-* workflow administratifs
+Ne pas considérer toutes les requêtes comme une activité utilisateur.
 
-⚠️ Toujours afficher :
+Doivent normalement compter :
 
-* photo
-* nom complet
-* rôle
-* annexe si nécessaire
+- navigation volontaire ;
+- clic utilisateur ;
+- soumission de formulaire ;
+- action HTMX déclenchée volontairement ;
+- action AJAX déclenchée par l’utilisateur ;
+- saisie clavier signalée de manière limitée ;
+- modification d’un workspace ;
+- opération métier volontaire.
 
-====================================================
-PHASE 5 — CENTRALISATION TECHNIQUE
-==================================
+Ne doivent pas prolonger automatiquement la session :
 
-Créer une architecture réutilisable :
+- polling HTMX ;
+- rafraîchissements automatiques de widgets ;
+- requêtes de notifications ;
+- heartbeats WebSocket ;
+- chargement d’images ou fichiers statiques ;
+- vérifications périodiques en arrière-plan ;
+- requêtes lancées sans intervention humaine ;
+- onglet simplement laissé ouvert.
 
-Exemples possibles :
+Créer un endpoint d’activité protégé qui n’est appelé que lorsqu’une interaction
+réelle a été détectée.
 
-* accounts/
-* profiles/
-* settings/
-* preferences/
-* user_documents/
+Limiter les appels : ne pas envoyer une requête à chaque mouvement de souris ou
+frappe clavier. Utiliser debounce/throttle, par exemple une synchronisation au
+maximum toutes les 30 à 60 secondes pendant une activité réelle.
 
-Créer :
+========================================================================
+4. INTERFACE PORTAL
+========================================================================
 
-* services dédiés
-* selectors dédiés
-* composants HTMX
-* composants UI réutilisables
-* partials
-* forms modulaires
-* upload manager
-* image manager
+Ajouter un gestionnaire commun dans le shell Portal pour tous les dashboards
+SYSTEM.
 
-====================================================
-PHASE 6 — SÉCURITÉ
-==================
+Il doit :
+
+- détecter clics, clavier, formulaires et navigation volontaire ;
+- synchroniser l’activité entre plusieurs onglets ;
+- afficher un modal deux minutes avant expiration ;
+- afficher un compte à rebours ;
+- proposer “Continuer ma session” ;
+- proposer “Se déconnecter” ;
+- fermer le modal si un autre onglet prolonge la session ;
+- rediriger tous les onglets vers la connexion après expiration ;
+- rester compatible avec Alpine.js, HTMX et AJAX.
+
+Utiliser BroadcastChannel si compatible, avec fallback localStorage pour
+synchroniser les onglets.
+
+Ne pas dupliquer ce script dans chaque dashboard. L’intégrer une seule fois dans
+le shell Portal commun.
+
+========================================================================
+5. FORMULAIRES NON ENREGISTRÉS
+========================================================================
+
+Avant expiration :
+
+- avertir clairement l’utilisateur ;
+- ne pas prétendre avoir sauvegardé des données non enregistrées ;
+- permettre de prolonger la session avant la fin du délai ;
+- ne pas envoyer automatiquement des formulaires sensibles ;
+- après expiration, refuser tout POST avec la session expirée.
+
+Pour les formulaires longs, prévoir ultérieurement un brouillon métier si
+nécessaire. Ne pas stocker automatiquement des informations sensibles dans
+localStorage.
+
+========================================================================
+6. HTMX, AJAX ET JSON
+========================================================================
+
+Lorsqu’une session expire :
+
+- page classique : redirection vers le login ;
+- requête HTMX : réponse adaptée avec HX-Redirect ;
+- requête AJAX/JSON : réponse 401 structurée ;
+- POST : aucune opération métier ne doit être exécutée après expiration ;
+- téléchargement/export : refus contrôlé ;
+- le paramètre next doit rester interne et validé.
+
+Créer une gestion cliente commune des réponses 401/403 liées à la session.
+
+Ne pas renvoyer une page HTML complète de connexion à l’intérieur d’un partial
+HTMX.
+
+========================================================================
+7. WEBSOCKET
+========================================================================
+
+À l’expiration ou à la révocation de la session :
+
+- fermer les connexions WebSocket de l’utilisateur ;
+- ne pas considérer le heartbeat WebSocket comme une activité ;
+- refuser une nouvelle connexion avec session expirée ;
+- diffuser si nécessaire un événement de déconnexion aux sockets actives ;
+- vérifier is_active, suspension et état du compte à la connexion.
+
+========================================================================
+8. HISTORIQUE ET AUDIT
+========================================================================
+
+Journaliser au minimum :
+
+- connexion réussie ;
+- déconnexion volontaire ;
+- expiration pour inactivité ;
+- expiration absolue ;
+- révocation administrative ;
+- changement de mot de passe ;
+- suspension/blocage ;
+- changement de position ;
+- changement d’annexe.
+
+Ne jamais enregistrer :
+
+- mot de passe ;
+- PIN ;
+- cookie de session ;
+- token complet ;
+- contenu sensible des formulaires.
+
+Enregistrer raisonnablement :
+
+- utilisateur ;
+- date et heure ;
+- type d’événement ;
+- méthode de connexion ;
+- adresse IP normalisée si la politique le permet ;
+- navigateur/système sous forme limitée ;
+- identifiant opaque de session, jamais la clé brute ;
+- raison de fin de session.
+
+========================================================================
+9. SESSIONS MULTIPLES ET APPAREILS
+========================================================================
+
+Préparer une structure permettant prochainement :
+
+- afficher les sessions actives ;
+- afficher navigateur, système, date et dernière activité ;
+- révoquer une session ;
+- “Déconnecter les autres appareils” ;
+- révoquer toutes les sessions après compromission.
+
+Ne tente pas d’obtenir un numéro de série matériel, MAC address ou identifiant
+physique inaccessible au navigateur.
+
+Utiliser uniquement des informations raisonnablement disponibles :
+
+- user-agent analysé ;
+- adresse IP ;
+- première et dernière activité ;
+- identifiant opaque généré par le serveur ;
+- nom d’appareil éventuellement donné par l’utilisateur.
+
+Cette préparation ne doit pas bloquer la déconnexion par inactivité.
+
+========================================================================
+10. EXCEPTIONS CONTRÔLÉES
+========================================================================
+
+Prévoir une liste minimale de routes qui ne doivent pas provoquer de boucle :
+
+- login ;
+- logout ;
+- changement obligatoire de mot de passe ;
+- ressources statiques ;
+- endpoints publics ;
+- endpoint d’état de session lorsque nécessaire.
+
+Un utilisateur avec must_change_password reste limité au workflow de changement
+de mot de passe. Il ne doit pas utiliser cette exception pour atteindre le reste
+du dashboard.
+
+========================================================================
+11. TESTS OBLIGATOIRES
+========================================================================
+
+Tester :
+
+1. STUDENT actif avant et après 30 minutes ;
+2. TEACHER actif avant et après 30 minutes ;
+3. ANNEX_MANAGER avant et après 10 minutes ;
+4. SECRETARY avant et après 15 minutes ;
+5. SUPER_ADMIN avant et après 10 minutes ;
+6. expiration absolue malgré une activité continue ;
+7. polling automatique ne prolonge pas la session ;
+8. interaction réelle prolonge la session ;
+9. plusieurs onglets restent synchronisés ;
+10. expiration dans un onglet déconnecte les autres ;
+11. page classique redirigée correctement ;
+12. HTMX reçoit HX-Redirect ;
+13. AJAX/JSON reçoit 401 ;
+14. POST expiré n’exécute aucune opération ;
+15. WebSocket fermé ou refusé ;
+16. logout volontaire correctement journalisé ;
+17. suspension/révocation interrompt la session ;
+18. must_change_password reste fonctionnel ;
+19. utilisateurs PUBLIC non cassés par le middleware SYSTEM ;
+20. aucune boucle de redirection ;
+21. next externe toujours refusé.
+
+Utiliser des durées très courtes et une horloge simulée dans les tests. Ne pas
+introduire de sleep réel.
+
+========================================================================
+12. RECETTE MANUELLE
+========================================================================
+
+Ajouter un réglage de développement permettant temporairement :
+
+- timeout SYSTEM : 3 minutes ;
+- avertissement : 1 minute avant expiration.
+
+Ce réglage sert uniquement au test manuel local.
+
+Il ne doit jamais être la valeur de production par défaut.
+
+Scénario :
+
+1. connecter un utilisateur SYSTEM ;
+2. ne faire aucune action ;
+3. vérifier le modal après 2 minutes ;
+4. laisser expirer ;
+5. vérifier la redirection login ;
+6. se reconnecter ;
+7. refaire le test en cliquant sur “Continuer ma session” ;
+8. vérifier que le délai repart ;
+9. vérifier un formulaire ouvert ;
+10. vérifier un endpoint HTMX.
+
+========================================================================
+13. CRITÈRE DE TERMINÉ
+========================================================================
+
+La mission est PASS seulement si :
+
+- l’expiration est imposée côté serveur ;
+- l’activité réelle est distinguée du polling ;
+- le modal fonctionne dans tous les dashboards Portal ;
+- HTMX/AJAX sont correctement traités ;
+- les WebSockets ne survivent pas à une révocation ;
+- les événements sont audités ;
+- les valeurs sont configurables ;
+- les utilisateurs PUBLIC ne sont pas affectés ;
+- les tests passent ;
+- python manage.py check passe.
+
+Implémente directement, corrige les régressions déterministes et fournis :
+
+- architecture retenue ;
+- fichiers modifiés ;
+- paramètres ajoutés ;
+- migrations éventuelles ;
+- événements d’audit ;
+- tests exécutés et résultats ;
+- procédure de recette manuelle ;
+- risques résiduels.
+
+---
+
+RÉPONSE D’EXÉCUTION — SESSIONS SYSTEM — 13/07/2026
+
+STATUT : PASS POUR L’IMPLÉMENTATION SERVEUR ET LES TESTS AUTOMATISÉS CIBLÉS.
+
+ARCHITECTURE RETENUE
+
+- `SystemSessionSecurityMiddleware` contrôle toute requête SYSTEM avant la vue
+  métier. Il impose le délai d’inactivité et le maximum absolu côté serveur.
+- `accounts/session_policy.py` centralise la politique, les horodatages,
+  l’activité significative, l’identifiant UUID opaque et l’audit.
+- `/portal/session/status/` consulte l’état sans prolonger la session.
+- `/portal/session/activity/` est le seul endpoint client de prolongation ; il
+  est appelé après une interaction réelle avec limitation côté navigateur.
+- le gestionnaire visuel est inclus une seule fois dans `templates/base.html`,
+  ancêtre commun réel de tous les dashboards SYSTEM. Les pages PUBLIC ne le
+  chargent pas.
+- BroadcastChannel synchronise les onglets ; localStorage sert uniquement de
+  fallback. Les messages sont limités à l’UUID opaque de la session.
+- chaque socket rejoint un groupe utilisateur et un groupe UUID de session.
+  Une expiration ciblée ferme uniquement cette session ; suspension,
+  désactivation ou changement d’affectation ferme globalement les sockets.
+
+PARAMÈTRES AJOUTÉS
+
+- `SYSTEM_SESSION_IDLE_TIMEOUTS` : STUDENT/TEACHER 30 min ; SECRETARY,
+  ADMISSIONS, ACADEMIC_SUPERVISOR, DIRECTOR_OF_STUDIES et MARKETING_MANAGER
+  15 min ; ANNEX_MANAGER, IT_SUPPORT, EXECUTIVE_DIRECTOR,
+  DEPUTY_EXECUTIVE_DIRECTOR, SUPER_ADMIN, PAYMENT_AGENT et FINANCE_MANAGER
+  10 min.
+- `SYSTEM_SESSION_WARNING_SECONDS=120`.
+- `SYSTEM_SESSION_ABSOLUTE_TIMEOUT=43200` (12 heures).
+- `SYSTEM_SESSION_ACTIVITY_THROTTLE_SECONDS=30`.
+- `SYSTEM_SESSION_MANUAL_TEST_MODE=True` donne localement 3 minutes avec
+  avertissement à 1 minute ; la valeur par défaut reste False.
+- en production avec WebSocket activé, REDIS_URL est désormais obligatoire
+  afin que les révocations fonctionnent entre plusieurs workers.
+
+MIGRATIONS
+
+- `0026_account_session_security` : AccountSessionRecord et
+  AccountSecurityEvent.
+- `0027_session_expiry_and_security_actor` : échéance absolue indexée et acteur
+  administratif nullable.
+- migrations appliquées avec succès sur la base locale.
+
+AUDIT
+
+Événements couverts : LOGIN_SUCCESS avec méthode password/student_card,
+LOGOUT_VOLUNTARY, IDLE_TIMEOUT, ABSOLUTE_TIMEOUT, ADMIN_REVOKED,
+PASSWORD_CHANGED, ACCOUNT_SUSPENDED, ACCOUNT_BLOCKED, ACCOUNT_DEACTIVATED,
+POSITION_CHANGED et BRANCH_CHANGED.
+
+Le journal ne conserve jamais la clé Django brute. Les clés metadata contenant
+password, PIN, token, cookie, authorization, session_key ou secret sont
+filtrées récursivement. L’IP est normalisée, le user-agent est limité et la
+session est représentée uniquement par un UUID opaque.
+
+COMPORTEMENTS VALIDÉS
+
+- requête classique expirée : redirection login avec `next` interne ;
+- HTMX expiré : 401 avec `HX-Redirect`, sans page login dans un partial ;
+- AJAX/JSON expiré : JSON 401 structuré ;
+- POST expiré : vue métier non exécutée ;
+- polling GET et heartbeat WebSocket : aucune prolongation ;
+- interaction réelle : prolongation ;
+- délai absolu prioritaire sur l’activité ;
+- formulaire modifié : avertissement sans sauvegarde automatique ;
+- must_change_password : seuls mot de passe, logout et endpoints session sont
+  accessibles ;
+- PUBLIC : politique SYSTEM non appliquée ;
+- socket sans métadonnées, expirée ou révoquée : refus/fermeture 4401 ;
+- fermeture 4401/4403 : aucune boucle de reconnexion WebSocket.
+
+TESTS EXÉCUTÉS
+
+- `python manage.py makemigrations accounts --check --dry-run` : PASS, aucune
+  modification détectée.
+- `python manage.py check` : PASS, 0 erreur.
+- recette sessions/audit/auth/WebSocket : 32/32 PASS.
+- régression générale authentification + sécurité temps réel + cartes étudiant :
+  87/87 PASS.
+- `npm run build:css` : PASS ; le modal commun est inclus dans l’asset Tailwind
+  compilé.
+
+RECETTE MANUELLE LOCALE
+
+1. définir `SYSTEM_SESSION_MANUAL_TEST_MODE=True` dans `.env`, puis redémarrer
+   Django/Daphne ;
+2. connecter un compte SYSTEM et ouvrir deux onglets du Portal ;
+3. ne rien faire pendant 2 minutes : vérifier modal et compte à rebours ;
+4. modifier un formulaire sans sauvegarder : vérifier l’avertissement ;
+5. cliquer « Continuer ma session » dans un onglet : le modal doit disparaître
+   dans les deux onglets et le délai repartir ;
+6. refaire le test sans prolonger : les deux onglets doivent aller au login ;
+7. vérifier un workspace HTMX et un appel JSON pendant/après expiration ;
+8. vérifier dans AccountSecurityEvent le motif IDLE_TIMEOUT ;
+9. remettre `SYSTEM_SESSION_MANUAL_TEST_MODE=False` après la recette.
+
+RISQUES RÉSIDUELS
+
+- la synchronisation multi-onglets et le rendu du modal sont couverts par tests
+  structurels/serveur, mais nécessitent encore la recette manuelle dans un vrai
+  navigateur ;
+- tout futur POST automatique devra envoyer
+  `X-ESFE-Automated-Request: 1` pour ne pas prolonger la session ; le POST
+  automatique étudiant connu est déjà marqué ;
+- les impressions/PDF autonomes n’affichent pas le modal, mais restent protégés
+  par le middleware serveur ;
+- les anciennes sessions sans métadonnées sont initialisées à leur prochaine
+  requête HTTP et sont refusées par WebSocket tant que cette initialisation n’a
+  pas eu lieu (comportement fail-closed).
+
+
+
+
+Effectue maintenant la recette visuelle manuelle complète avec :
+
+SYSTEM_SESSION_MANUAL_TEST_MODE=True
+
+Utilise les durées réduites prévues uniquement pour l’environnement local.
+
+Vérifie au minimum avec :
+
+- un étudiant ;
+- un enseignant ;
+- une gestionnaire ANNEX_MANAGER ;
+- un utilisateur administratif supplémentaire ;
+- un super administrateur.
+
+SCÉNARIO 1 — EXPIRATION NORMALE
+
+1. Connecter le compte SYSTEM.
+2. Vérifier qu’il arrive sur son dashboard Portal officiel.
+3. Ne réaliser aucune interaction.
+4. Vérifier l’apparition du modal au moment prévu.
+5. Vérifier le compte à rebours.
+6. Ne pas prolonger.
+7. Vérifier la déconnexion automatique.
+8. Vérifier la redirection vers le login.
+9. Vérifier le message indiquant l’expiration pour inactivité.
+10. Vérifier qu’une ancienne page ne reste pas exploitable avec le bouton retour.
+
+SCÉNARIO 2 — PROLONGATION
+
+1. Reconnecter le compte.
+2. Attendre l’avertissement.
+3. Cliquer sur “Continuer ma session”.
+4. Vérifier la fermeture du modal.
+5. Vérifier le redémarrage réel du délai côté serveur.
+6. Vérifier que l’utilisateur peut continuer à travailler.
+7. Vérifier qu’une simple fermeture visuelle du modal sans appel serveur ne
+   prolonge pas la session.
+
+SCÉNARIO 3 — ACTIVITÉ RÉELLE
+
+1. Interagir normalement avec le dashboard.
+2. Naviguer entre plusieurs workspaces.
+3. Utiliser une action HTMX.
+4. Utiliser un formulaire.
+5. Vérifier que l’activité réelle prolonge la session.
+6. Vérifier qu’aucune requête excessive n’est envoyée à chaque frappe ou
+   mouvement de souris.
+
+SCÉNARIO 4 — INACTIVITÉ MALGRÉ LE POLLING
+
+1. Ouvrir un dashboard contenant notifications ou widgets automatiques.
+2. Ne réaliser aucune interaction humaine.
+3. Vérifier que les pollings HTMX/AJAX et heartbeats WebSocket ne prolongent pas
+   la session.
+4. Vérifier l’expiration normale.
+
+SCÉNARIO 5 — PLUSIEURS ONGLETS
+
+1. Ouvrir le même compte dans deux ou trois onglets.
+2. Vérifier la synchronisation du compte à rebours.
+3. Prolonger depuis un onglet.
+4. Vérifier la mise à jour des autres onglets.
+5. Laisser ensuite expirer la session.
+6. Vérifier que tous les onglets reviennent vers la connexion.
+7. Vérifier qu’aucun onglet ne peut encore exécuter une action.
+
+SCÉNARIO 6 — FORMULAIRE NON ENREGISTRÉ
+
+1. Commencer à remplir un formulaire.
+2. Attendre l’avertissement.
+3. Vérifier que le message prévient du risque de perte.
+4. Prolonger et vérifier que les champs restent présents.
+5. Refaire le test en laissant expirer.
+6. Vérifier qu’aucun POST n’est exécuté après expiration.
+7. Vérifier qu’aucune donnée sensible n’est stockée automatiquement dans
+   localStorage.
+
+SCÉNARIO 7 — HTMX ET AJAX
+
+1. Laisser expirer la session.
+2. Déclencher une action HTMX.
+3. Vérifier HX-Redirect vers le login.
+4. Déclencher une action AJAX/JSON.
+5. Vérifier la réponse 401 structurée.
+6. Vérifier qu’aucune page de login complète n’est injectée dans un partial.
+
+SCÉNARIO 8 — WEBSOCKET
+
+1. Vérifier la connexion WebSocket pendant la session.
+2. Laisser expirer la session.
+3. Vérifier la fermeture ou l’invalidation de la socket.
+4. Vérifier qu’une reconnexion avec la session expirée est refusée.
+5. Vérifier qu’un heartbeat ne maintient pas artificiellement la session.
+
+SCÉNARIO 9 — PROFIL SYSTEM
+
+Pour chaque compte testé :
+
+1. ouvrir “Mon profil” ;
+2. vérifier que l’interface reste dans Portal ;
+3. vérifier que le profil public n’apparaît pas ;
+4. effectuer une modification autorisée ;
+5. vérifier le retour vers le bon dashboard ;
+6. vérifier que la session continue correctement après l’opération.
+
+SCÉNARIO 10 — JOURNAL D’AUDIT
+
+Vérifier la présence des événements :
+
+- connexion ;
+- prolongation significative si elle est auditée ;
+- déconnexion volontaire ;
+- expiration pour inactivité ;
+- expiration absolue ;
+- révocation administrative.
+
+Confirmer qu’aucun journal ne contient :
+
+- mot de passe ;
+- PIN ;
+- cookie ;
+- clé de session brute ;
+- token complet ;
+- contenu de formulaire sensible.
+
+RAPPORT ATTENDU
+
+Produis la matrice :
+
+COMPTE/POSITION | MODAL | COMPTE À REBOURS | PROLONGATION |
+MULTI-ONGLETS | HTMX/AJAX | WEBSOCKET | REDIRECTION | AUDIT | RÉSULTAT
+
+Corrige immédiatement les défauts déterministes constatés.
+
+Après validation :
+
+1. remettre SYSTEM_SESSION_MANUAL_TEST_MODE=False ;
+2. vérifier les délais de production ;
+3. relancer python manage.py check ;
+4. relancer les tests ciblés de session ;
+5. confirmer qu’aucune valeur courte de test ne reste active ;
+6. indiquer clairement PASS ou FAIL.
+
+
+---
+
+RÉPONSE D’EXÉCUTION — RECETTE VISUELLE SESSIONS SYSTEM — 13/07/2026
+
+STATUT FINAL : PASS.
+
+La recette a été exécutée dans Chromium avec les vrais dashboards Portal, le
+middleware serveur, HTMX/AJAX et les WebSockets. Le mode court a été limité à
+des processus QA isolés avec une base SQLite temporaire. Le passage principal a
+duré 358,1 secondes ; un complément ciblé a vérifié le formulaire non
+enregistré, le bouton Retour et la reconnexion WebSocket après expiration.
+
+MATRICE
+
+| COMPTE/POSITION | MODAL | COMPTE À REBOURS | PROLONGATION | MULTI-ONGLETS | HTMX/AJAX | WEBSOCKET | REDIRECTION | AUDIT | RÉSULTAT |
+|---|---|---|---|---|---|---|---|---|---|
+| Étudiant / student | PASS | PASS | PASS | N/A* | PASS | PASS | PASS | PASS | PASS |
+| Enseignant / teacher | PASS | PASS | PASS | N/A* | PASS | PASS | PASS | PASS | PASS |
+| Gestionnaire / annex_manager | PASS | PASS | PASS | PASS, 3 onglets | PASS | PASS | PASS | PASS | PASS |
+| Administratif / academic_supervisor | PASS | PASS | PASS | N/A* | PASS | PASS | PASS | PASS | PASS |
+| Super administrateur / super_admin | PASS | PASS | PASS | N/A* | PASS | PASS | PASS | PASS | PASS |
+
+* Le mécanisme commun multi-onglets a été exercé sur le compte gestionnaire :
+prolongation propagée puis expiration et redirection des trois onglets.
+
+SCÉNARIOS VALIDÉS
+
+- expiration normale : modal, décompte, déconnexion, login et message clair
+  d’expiration pour inactivité ; une ancienne page atteinte avec Retour ne peut
+  plus appeler une ressource protégée (401) ;
+- prolongation : fermeture du modal et nouveau délai serveur d’au moins 165 s
+  sur 180 s ; masquer seulement le modal ne prolonge rien ;
+- activité réelle : session active conservée avec seulement 7 appels
+  d’activité pendant 358 s, donc aucune requête par frappe ;
+- polling : widgets, statuts et heartbeats ne maintiennent pas les cinq
+  sessions inactives ;
+- formulaire : avertissement visible, champ conservé après prolongation, aucun
+  POST automatique et aucune valeur du formulaire dans localStorage ;
+- HTMX : 401 + HX-Redirect, corps vide, aucune page login injectée ;
+- AJAX : JSON 401 structuré session_expired ;
+- WebSocket : fermeture à l’expiration et nouvelle connexion refusée avant
+  acceptation (`opened=false`, Chromium 1006, journal serveur
+  `WebSocket REJECT`) ;
+- profils SYSTEM : shell Portal correct pour les cinq rôles, profil public
+  absent, modification autorisée et retour dashboard corrects ;
+- audit : LOGIN_SUCCESS, LOGOUT_VOLUNTARY, IDLE_TIMEOUT, ABSOLUTE_TIMEOUT et
+  ADMIN_REVOKED présents ; aucun secret, cookie, PIN, token complet, clé de
+  session brute ou contenu sensible de formulaire dans les métadonnées.
+
+DÉFAUT CORRIGÉ PENDANT LA RECETTE
+
+La connexion ne rendait pas le message Django créé à l’expiration. La page
+était correcte mais ambiguë. `PortalLoginView` fournit maintenant un message
+issu d’une liste fermée de motifs, et `registration/login.html` affiche une
+alerte explicite. Un test vérifie également qu’un motif inconnu n’est jamais
+réfléchi dans le HTML. La capture finale affiche : « Votre session a expiré
+après une période d’inactivité. Reconnectez-vous pour continuer. »
+
+VALIDATION FINALE
+
+- `python manage.py check` : PASS, 0 erreur ;
+- `python manage.py makemigrations accounts --check --dry-run` : PASS, aucune
+  modification ;
+- tests ciblés authentification/session/WebSocket : 66/66 PASS ;
+- `npm run build:css` : PASS ;
+- rapport principal JSON : `test_artifacts/session_visual_qa/report.json`,
+  passed=true ;
+- complément JSON : `test_artifacts/session_visual_qa/edge_report.json`,
+  passed=true ;
+- rapport lisible complet : `rapport_recette_visuelle_sessions.md`.
+
+RETOUR PRODUCTION
+
+- `SYSTEM_SESSION_MANUAL_TEST_MODE=False` est chargé ; la variable est absente
+  de `.env`, donc aucune valeur courte n’est active ;
+- étudiant/enseignant : 30 min ; profils intermédiaires : 15 min ; profils
+  sensibles : 10 min ; avertissement : 120 s ; maximum absolu : 12 h ;
+- serveur QA arrêté, port 8010 fermé, bases QA temporaires supprimées ;
+- comptes et candidatures temporaires `__qa_session_*` : 0 restant.
+
+PREUVES
+
+- `test_artifacts/session_visual_qa/*_warning.png` ;
+- `test_artifacts/session_visual_qa/*_expired_login.png` ;
+- `test_artifacts/session_visual_qa/student_unsaved_warning.png` ;
+- `test_artifacts/session_visual_qa/student_back_after_expiry.png`.
+
+
+
+
+
+MISSION D’AUDIT — SYSTÈME DE NOTIFICATIONS ET DE COMMUNICATION ESFE CORE
+
+Le chantier d’authentification et de sécurisation des dashboards est terminé.
+
+Nous ouvrons maintenant le chantier du système de notifications et de
+communication.
+
+IMPORTANT
+
+Le projet possède déjà un système de notifications et de communication
+relativement développé.
+
+Ne reconstruis rien et ne modifie aucun fichier pendant cette mission.
+
+Cette phase est exclusivement un audit factuel et approfondi destiné à :
+
+1. comprendre l’architecture existante ;
+2. mesurer ce qui est réellement fonctionnel ;
+3. identifier ce qui n’est pas encore branché aux dashboards ;
+4. relever les doublons, incohérences et risques ;
+5. proposer une architecture professionnelle à partir de l’existant ;
+6. préparer un plan d’intégration dans tous les dashboards.
+
+========================================================================
+1. PÉRIMÈTRE À ANALYSER
+========================================================================
+
+Analyser entièrement les applications et fichiers liés directement ou
+indirectement à :
+
+- communication ;
+- notifications ;
+- messages internes ;
+- événements métier ;
+- WebSocket ;
+- Django Channels ;
+- Redis ;
+- emails ;
+- SMS éventuels ;
+- Brevo ou autres fournisseurs ;
+- compteurs de notifications ;
+- navbar et menus utilisateurs ;
+- préférences de communication ;
+- journalisation et audit ;
+- tâches asynchrones ;
+- signaux Django ;
+- services et dispatchers ;
+- templates de messages ;
+- campagnes internes ;
+- campagnes marketing ;
+- notifications système ;
+- annonces institutionnelles.
+
+Rechercher également les implémentations historiques ou parallèles présentes
+dans d’autres applications :
+
+- accounts ;
+- portal ;
+- students ;
+- academics ;
+- admissions ;
+- inscriptions ;
+- payments ;
+- secretary ;
+- shop ;
+- marketing ;
+- superadmin ;
+- branches ;
+- blog ;
+- news ;
+- community ;
+- toute autre application émettant ou affichant des notifications.
+
+Ne pas limiter l’analyse aux fichiers dont le nom contient “notification”.
+
+========================================================================
+2. CARTOGRAPHIE DE L’ARCHITECTURE EXISTANTE
+========================================================================
+
+Documenter précisément :
+
+- modèles de données ;
+- enums et statuts ;
+- relations entre notifications, messages, événements et utilisateurs ;
+- services d’émission ;
+- event bus ;
+- dispatcher ;
+- notification service ;
+- email service ;
+- SMS service éventuel ;
+- providers externes ;
+- signaux ;
+- tâches asynchrones ;
+- consumers WebSocket ;
+- groupes Channels ;
+- routage WebSocket ;
+- configuration Redis ;
+- context processors ;
+- endpoints HTMX/AJAX/JSON ;
+- vues classiques ;
+- templates et partials ;
+- composants Alpine.js ;
+- compteurs dans les navbars ;
+- centre de notifications existant ;
+- préférences utilisateur ;
+- commandes de gestion ;
+- administration Django ;
+- tests existants.
+
+Pour chaque composant, indiquer :
+
+- fichier ;
+- responsabilité ;
+- producteurs ;
+- consommateurs ;
+- état réel ;
+- dépendances ;
+- niveau de réutilisation ;
+- problèmes constatés.
+
+========================================================================
+3. INVENTAIRE DES TYPES DE COMMUNICATION
+========================================================================
+
+Identifier tous les canaux réellement présents :
+
+- notification interne dans Portal ;
+- message privé ;
+- conversation ou fil de discussion ;
+- annonce générale ;
+- alerte système ;
+- notification temps réel ;
+- email transactionnel ;
+- email de masse ;
+- SMS ;
+- notification communautaire ;
+- campagne marketing ;
+- rappel automatique ;
+- notification administrative ;
+- notification académique ;
+- notification financière.
+
+Pour chaque canal, préciser :
+
+- actif et fonctionnel ;
+- partiellement développé ;
+- non branché ;
+- simulé ;
+- historique ;
+- abandonné ;
+- manquant.
+
+========================================================================
+4. CYCLE DE VIE D’UNE NOTIFICATION
+========================================================================
+
+Reconstituer le parcours complet :
+
+Événement métier
+-> création de l’événement
+-> sélection des destinataires
+-> création de la notification
+-> choix des canaux
+-> envoi
+-> livraison
+-> affichage dans Portal
+-> lecture
+-> action éventuelle
+-> archivage ou expiration
+-> audit.
+
+Vérifier l’existence et la fiabilité de statuts comme :
+
+- pending ;
+- queued ;
+- sent ;
+- delivered ;
+- failed ;
+- unread ;
+- read ;
+- archived ;
+- expired ;
+- cancelled.
+
+Déterminer si les statuts représentent réellement :
+
+- l’état d’une notification interne ;
+- l’état de livraison par canal ;
+- ou plusieurs notions mélangées.
+
+Vérifier si les échecs sont réessayés, journalisés et consultables.
+
+========================================================================
+5. ÉVÉNEMENTS MÉTIER EXISTANTS
+========================================================================
+
+Inventorier tous les événements déjà émis ou prévus, notamment :
+
+Admissions :
+- candidature reçue ;
+- dossier incomplet ;
+- candidature acceptée ;
+- candidature refusée ;
+- admission avec réserve.
+
+Inscriptions :
+- inscription créée ;
+- paiement attendu ;
+- inscription activée ;
+- dossier à régulariser.
+
+Paiements et finance :
+- paiement enregistré ;
+- paiement validé ou rejeté ;
+- reçu disponible ;
+- échéance proche ;
+- retard de paiement ;
+- caisse ouverte ou clôturée ;
+- dépense sensible ;
+- versement en banque ;
+- salaire ou honoraire disponible.
+
+Académique :
+- cours planifié ;
+- cours déplacé ou annulé ;
+- évaluation programmée ;
+- note importée ;
+- résultats validés ;
+- résultats publiés ;
+- bulletin disponible ;
+- rattrapage programmé ;
+- absence enregistrée ;
+- cahier de texte non rempli ;
+- anomalie académique détectée.
+
+Administration :
+- compte créé ;
+- compte suspendu ;
+- mot de passe temporaire ;
+- changement obligatoire du mot de passe ;
+- changement de fonction ou d’annexe ;
+- session révoquée ;
+- incident ou demande de support.
+
+Secrétariat :
+- rendez-vous ;
+- visiteur ;
+- document disponible ;
+- transfert ;
+- appel étudiant ;
+- paiement transmis à la gestionnaire.
+
+Boutique :
+- commande ;
+- paiement ;
+- remise d’article ;
+- stock faible ;
+- rupture de stock.
+
+Communication :
+- message reçu ;
+- réponse reçue ;
+- annonce institutionnelle ;
+- événement ;
+- campagne interne ;
+- communication urgente.
+
+Pour chaque événement, préciser :
+
+- existe dans le code ;
+- crée effectivement une notification ;
+- sélectionne correctement les destinataires ;
+- apparaît dans le bon dashboard ;
+- envoie un WebSocket ;
+- déclenche un email/SMS ;
+- possède des tests ;
+- manque totalement ou partiellement.
+
+========================================================================
+6. DESTINATAIRES ET CIBLAGE
+========================================================================
+
+Vérifier si le système sait cibler correctement :
+
+- un utilisateur ;
+- plusieurs utilisateurs ;
+- une position ;
+- une catégorie ;
+- un groupe de permissions ;
+- une annexe ;
+- plusieurs annexes ;
+- une classe ;
+- un niveau ;
+- une formation ;
+- un cycle ;
+- une année académique ;
+- tous les étudiants ;
+- tous les enseignants ;
+- tout le staff administratif ;
+- les utilisateurs globaux ;
+- toute l’institution.
+
+Vérifier les règles de sécurité :
+
+- aucune notification d’une autre annexe sans autorisation ;
+- aucun ciblage fondé uniquement sur des alias historiques ;
+- utilisation de la nouvelle identité SYSTEM ;
+- distinction PUBLIC/SYSTEM ;
+- exclusion des comptes désactivés ou suspendus ;
+- pas de fuite d’informations dans le titre ou l’aperçu ;
+- contrôle des liens et objets associés.
+
+Déterminer si le ciblage est calculé au moment de l’émission ou conservé sous
+forme de destinataires explicites.
+
+========================================================================
+7. INTÉGRATION DANS PORTAL ET LES DASHBOARDS
+========================================================================
+
+Auditer séparément chaque dashboard :
+
+- STUDENT ;
+- TEACHER ;
+- ANNEX_MANAGER ;
+- SECRETARY ;
+- ADMISSIONS_OFFICER ;
+- ACADEMIC_SUPERVISOR ;
+- DIRECTOR_OF_STUDIES ;
+- IT_SUPPORT ;
+- MARKETING_MANAGER ;
+- EXECUTIVE_DIRECTOR ;
+- DEPUTY_EXECUTIVE_DIRECTOR ;
+- SUPER_ADMIN ;
+- PAYMENT_AGENT transitoire, s’il existe encore.
+
+Pour chacun, vérifier :
+
+- présence d’une cloche dans la navbar ;
+- compteur de notifications non lues ;
+- mise à jour en temps réel ;
+- liste ou aperçu dans un dropdown ;
+- centre complet de notifications ;
+- filtres par type et statut ;
+- marquage lu/non lu ;
+- action “tout marquer comme lu” ;
+- archivage ou suppression ;
+- pagination ou chargement progressif ;
+- lien vers la ressource métier concernée ;
+- affichage mobile ;
+- états vides ;
+- gestion des erreurs ;
+- préférences ;
+- messages internes ;
+- annonces institutionnelles ;
+- cohérence visuelle ;
+- compatibilité HTMX/AJAX/Alpine.js ;
+- fonctionnement après expiration/reconnexion de session ;
+- reconnexion WebSocket.
+
+Produire une matrice :
+
+DASHBOARD | CLOCHE | COMPTEUR | DROPDOWN | CENTRE COMPLET |
+TEMPS RÉEL | ACTIONS | PRÉFÉRENCES | ÉTAT
+
+Classer chaque élément :
+
+- COMPLET ;
+- PARTIEL ;
+- NON BRANCHÉ ;
+- ABSENT ;
+- DÉFAILLANT ;
+- HISTORIQUE.
+
+========================================================================
+8. CENTRE DE NOTIFICATIONS
+========================================================================
+
+Analyser le centre existant, s’il existe :
+
+- route officielle ;
+- emplacement dans Portal ;
+- interface ;
+- tabs ou filtres ;
+- recherche ;
+- catégories ;
+- priorité ;
+- date ;
+- pagination ;
+- lecture ;
+- archivage ;
+- suppression ;
+- action directe ;
+- groupement de notifications similaires ;
+- notifications urgentes ;
+- historique ;
+- responsive ;
+- accessibilité.
+
+Vérifier s’il existe plusieurs centres concurrents ou plusieurs compteurs ne
+lisant pas les mêmes données.
+
+Déterminer si le système différencie correctement :
+
+- notification ;
+- message ;
+- annonce ;
+- alerte ;
+- tâche à effectuer ;
+- événement calendrier.
+
+========================================================================
+9. TEMPS RÉEL ET WEBSOCKET
+========================================================================
+
+Auditer :
+
+- AuthMiddlewareStack ;
+- consumers ;
+- groupes par utilisateur ;
+- groupes par annexe ou rôle ;
+- reconnexion automatique ;
+- déconnexion après expiration de session ;
+- changement de compteur ;
+- insertion de notification dans le dropdown ;
+- synchronisation entre onglets ;
+- doublons après reconnexion ;
+- validation du payload ;
+- autorisation de l’objet ;
+- fuite inter-utilisateurs ou inter-annexes ;
+- comportement lorsque Redis est indisponible ;
+- fallback sans WebSocket ;
+- performance avec plusieurs milliers d’utilisateurs.
+
+Vérifier que le WebSocket transporte seulement les informations nécessaires et
+ne divulgue pas des données sensibles.
+
+========================================================================
+10. PRÉFÉRENCES UTILISATEUR
+========================================================================
+
+Vérifier si l’utilisateur peut choisir :
+
+- notifications internes ;
+- email ;
+- SMS ;
+- annonces ;
+- messages ;
+- notifications académiques ;
+- notifications financières ;
+- rappels ;
+- campagnes marketing.
+
+Distinguer :
+
+- notifications obligatoires de sécurité ;
+- notifications obligatoires institutionnelles ;
+- notifications optionnelles ;
+- communications marketing désactivables.
+
+Les notifications critiques ne doivent pas pouvoir être désactivées.
+
+Vérifier si les préférences sont différentes entre PUBLIC et SYSTEM et si elles
+restent dans leur espace respectif.
+
+========================================================================
+11. MESSAGES INTERNES ET COMMUNICATION
+========================================================================
+
+Analyser le système de messagerie séparément des notifications :
+
+- conversations ;
+- participants ;
+- messages ;
+- pièces jointes ;
+- statut lu/non lu ;
+- réponses ;
+- recherche ;
+- suppression/archivage ;
+- permissions ;
+- signalement ;
+- limitations ;
+- pièces jointes sécurisées ;
+- temps réel ;
+- ciblage ;
+- historique ;
+- audit.
+
+Déterminer clairement :
+
+- ce qui relève d’une notification automatique ;
+- ce qui relève d’un message humain ;
+- ce qui relève d’une annonce institutionnelle ;
+- ce qui relève d’une campagne marketing.
+
+Ne pas proposer de fusionner ces concepts s’ils ont des responsabilités
+différentes.
+
+========================================================================
+12. EMAIL, SMS ET FOURNISSEURS
+========================================================================
 
 Vérifier :
 
-* permissions
-* accès par rôle
-* accès par annexe
-* protection upload fichiers
-* validation formats images
-* validation documents
-* sécurisation changement mot de passe
-* audit accès profils
+- configuration Brevo ;
+- séparation développement/production ;
+- templates ;
+- variables ;
+- gestion des erreurs ;
+- quotas ;
+- retries ;
+- webhooks de livraison ;
+- désabonnement lorsque nécessaire ;
+- emails obligatoires non désabonnables ;
+- expéditeur ;
+- reply-to ;
+- validation des adresses ;
+- déduplication ;
+- protection contre les envois multiples ;
+- absence de secrets dans le code ;
+- journalisation sans contenu sensible.
 
-====================================================
-PHASE 7 — LIVRABLES ATTENDUS
-============================
+Pour les SMS, distinguer clairement :
 
-À la fin :
+- fonctionnalité réelle ;
+- abstraction prévue ;
+- fournisseur configuré ;
+- simple placeholder.
 
-1. Produire un audit détaillé
-2. Identifier les dashboards prêts et non prêts
-3. Identifier les problèmes structurels
-4. Proposer l’architecture finale
-5. Commencer l’implémentation progressivement
-6. Commencer par la base commune profils + paramètres
-7. Puis intégrer rôle par rôle proprement
+========================================================================
+13. QUALITÉ, PERFORMANCE ET VOLUMÉTRIE
+========================================================================
 
-⚠️ IMPORTANT :
+Évaluer la capacité du système pour environ :
 
-* Ne pas coder brutalement.
-* Commencer par analyser complètement le projet.
-* Comprendre toute l’architecture actuelle.
-* Identifier les composants existants réutilisables.
-* Réduire la duplication.
-* Respecter les workflows métier ESFE.
-* Garder le système ultra maintenable et scalable.
+- 4 500 à 5 000 étudiants ;
+- environ 1 000 enseignants ;
+- plusieurs annexes ;
+- notifications de masse ;
+- événements simultanés.
 
-Travaille proprement, étape par étape, avec une vision long terme de plateforme universitaire professionnelle haut de gamme.
+Rechercher :
 
-====================================================================
-DESIGN PROPOSAL — DASHBOARD ENSEIGNANT (Juin 2026)
-====================================================================
+- requêtes N+1 ;
+- création d’une notification par utilisateur dans une boucle lente ;
+- absence de bulk_create ;
+- absence de pagination ;
+- compteurs recalculés trop souvent ;
+- payloads WebSocket trop lourds ;
+- absence d’index ;
+- tables susceptibles de grossir rapidement ;
+- absence de purge ou archivage ;
+- appels synchrones aux fournisseurs externes ;
+- transaction métier bloquée par un email ;
+- absence de file de tâches ;
+- duplication d’événements.
 
-Problème #1 : Le dashboard actuel utilise ses propres couleurs
-(`--school-primary: #2563eb`, CSS variables maison) au lieu du thème
-Tailwind du projet (primary: #1e4f6f, secondary: #1db5b0, accent: #f39c12).
-Il est incohérent avec le reste de l'app (manager, secretary, student).
+Préciser si Celery, Huey, RQ ou un autre mécanisme asynchrone existe réellement.
+Ne pas recommander un nouvel outil sans vérifier les dépendances actuelles.
 
-------------------------------------------------------------
-Design A — "Harmonisation" (RECOMMANDÉ)
-------------------------------------------------------------
-Reprendre la charte existante du projet :
-  Primary  → #1e4f6f (bleu foncé) — sidebar, headers
-  Secondary → #1db5b0 (teal) — boutons, accents, badges
-  Accent   → #f39c12 (amber) — highlights, alertes
+========================================================================
+14. FIABILITÉ ET IDEMPOTENCE
+========================================================================
 
-Changements :
-  • Sidebar : fond bg-primary-900 (comme manager/secretary)
-  • KPI cards : border-t-4 border-secondary avec icône teal
-  • Boutons : bg-secondary au lieu de bg-blue-600
-  • Badges : tons success/primary/warning/danger du projet
-  • Réutiliser les composants existants : {% component "dashboard_card" %},
-    {% component "metric_card" %}, {% component "button" %}
+Vérifier :
 
-------------------------------------------------------------
-Design B — "Clean & Moderne"
-------------------------------------------------------------
-Même base que A mais plus épuré :
-  • Supprimer le fond gradient de la sidebar → fond bg-primary-950 uni
-  • KPI cards repensées : chiffre géant + étiquette en dessous, sans icône,
-    avec barre verticale colorée à gauche
-  • Tableaux sans border : divide-none + row-hover subtil
-  • Modale latérale plus large (max-w-3xl → max-w-4xl)
-  • Espacement plus aéré (gap-8 au lieu de gap-5)
-  • Section "Accueil" : style dashboard "insights" façon Notion
+- déduplication ;
+- idempotency key ;
+- émission multiple par signaux et services ;
+- reprises après erreur ;
+- atomicité ;
+- transaction.on_commit ;
+- retries ;
+- dead-letter ou journal des échecs ;
+- cohérence entre notification interne, email, SMS et WebSocket ;
+- suppression d’un objet métier lié ;
+- liens devenus invalides ;
+- notifications expirées.
 
-------------------------------------------------------------
-Design C — "Rapid" (changements minimaux)
-------------------------------------------------------------
-  Avant                    | Après
-  -------------------------|-----------------------------
-  #2563eb (blue-600)       | #1db5b0 (secondary)
-  Sidebar gradient custom  | Sidebar bg-primary-900
-  teacher-icon 18px         | w-5 h-5 standard
-  border-slate-200         | border-primary-200/20
-  Dark mode !important     | Classes dark: Tailwind
+Identifier les situations pouvant envoyer deux ou plusieurs fois la même
+notification.
 
-------------------------------------------------------------
-AUTRES PROBLÈMES IDENTIFIÉS (à corriger quel que soit le design)
-------------------------------------------------------------
-1. build_teacher_dashboard_context() fait 350 lignes → découper
-2. week_end incohérent (7j vs 6j) → corriger le off-by-one
-3. Recherche = "Find in Page" seulement → vraie recherche
-4. Input recherche inactif dans Cahier de texte → supprimer ou brancher
-5. Code commenté (lignes 543-572) → supprimer
-6. Étudiants limités à 80 sans pagination → pagination HTMX
-7. Pas de spinner/loading HTMX → améliorer UX
-8. Pas de vue honoraires pour l'enseignant → ajouter
+========================================================================
+15. SÉCURITÉ ET CONFIDENTIALITÉ
+========================================================================
 
-====================================================================
-DESIGN MINIMALISTE — DASHBOARD ENSEIGNANT "CLEAN SLATE"
-====================================================================
+Vérifier :
 
-Philosophie : "Less is more". Pas de fioritures, pas de gradients,
-pas d'icônes superflues. Le contenu est le roi.
+- autorisation de consulter chaque notification ;
+- isolation d’annexe ;
+- protection des endpoints mark-read/archive/delete ;
+- impossibilité de modifier la notification d’un autre utilisateur ;
+- validation des URLs d’action ;
+- prévention des liens externes dangereux ;
+- échappement des contenus ;
+- prévention XSS ;
+- pièces jointes privées ;
+- absence de données financières ou médicales sensibles dans les aperçus ;
+- audit des campagnes massives ;
+- permissions d’envoi ;
+- approbation éventuelle avant diffusion globale ;
+- limitation de débit ;
+- prévention du spam interne.
 
-------------------------------------------------------------
-Layout global
-------------------------------------------------------------
-  • Sidebar réduite à 64px icônes (toujours collapsed par défaut)
-    - Fond blanc avec border-right subtile
-    - Icônes uniquement (tooltip au hover)
-    - En bas : avatar + logout
-  • Main area : fond gris très clair (#f8fafc)
-    - Pas de header sticky complexe
-    - Simplement : date + nom enseignant en haut à droite
-  • Pas de breadcrumbs
-  • Pas de bouton dark mode visible
+========================================================================
+16. TESTS EXISTANTS
+========================================================================
 
-------------------------------------------------------------
-Accueil (Overview)
-------------------------------------------------------------
-  • 4 KPI cards en ligne : juste le chiffre + label, sans icône,
-    sans ombre, bordure fine
-  • En dessous : une simple liste des cours du jour (heure + nom +
-    classe), sans boutons — juste du texte
-  • "Prochains cours" : même liste en dessous
-  • Pas de priorites/insights, pas de bouton paramètres, pas de CTA
+Inventorier les tests concernant :
 
-------------------------------------------------------------
-Mes classes
-------------------------------------------------------------
-  • Table simple : Classe | Programme | Effectif | Matières
-  • Pas d'icônes dans le tableau
-  • Au clic sur une ligne → ouvre la modale latérale
-  • Filtre par classe en haut (select dropdown simple)
+- création ;
+- ciblage ;
+- lecture ;
+- compteur ;
+- temps réel ;
+- isolation par annexe ;
+- permissions ;
+- email ;
+- SMS ;
+- retries ;
+- préférences ;
+- centre de notifications ;
+- messages ;
+- campagnes ;
+- session expirée ;
+- WebSocket ;
+- performance.
 
-------------------------------------------------------------
-Planning
-------------------------------------------------------------
-  • Table semaine : Jour | Horaire | Cours | Classe | Salle
-  • Texte seul, pas de badges, pas de couleurs
-  • Bouton "Cahier" discret en fin de ligne
+Indiquer :
 
-------------------------------------------------------------
-Cahier de texte
-------------------------------------------------------------
-  • Liste des cours passés sans cahier saisi (prioritaire)
-  • Formulaire minimal : statut (select) + contenu (textarea)
-  • Bouton "Enregistrer" uniquement
+- tests présents ;
+- tests réussis ;
+- comportements non couverts ;
+- tests obsolètes ;
+- matrice de tests manquante.
 
-------------------------------------------------------------
-Palette
-------------------------------------------------------------
-  • Sidebar icônes : #475569 (slate-600)
-  • Sidebar active : #1e4f6f (primary) + bg slate-50
-  • Texte corps : #334155 (slate-700)
-  • Titres : #0f172a (slate-900)
-  • Cards : bg-white, border #e2e8f0, border-radius 12px
-  • Liens/actions : underline au hover, pas de couleur bleue
-  • Pas de teal (#1db5b0), pas d'amber (#f39c12)
-  • Seule couleur = #1e4f6f (primary) pour les rares boutons
+Pour cette phase, les tests peuvent être exécutés s’ils sont non destructifs,
+mais ne modifie pas encore le code.
 
-------------------------------------------------------------
-Règles strictes
-------------------------------------------------------------
-  1. Pas d'icônes dans les cards KPI
-  2. Pas de badges colorés (statut en texte simple)
-  3. Pas de gradient nulle part
-  4. Pas d'ombre portée (box-shadow: none)
-  5. Un seul bouton par section max
-  6. Police système (Roboto), pas de Poppins
-  7. Pas d'Alpine.js sauf si strictement nécessaire
-  8. Chaque section = une question : "Quel est mon prochain cours ?"
-     "Quels sont mes étudiants ?" "Qu'ai-je enseigné ?"
+========================================================================
+17. LIVRABLE OBLIGATOIRE
+========================================================================
+
+Produire un rapport structuré contenant :
+
+1. résumé exécutif ;
+2. cartographie complète de l’existant ;
+3. modèles, services et flux ;
+4. canaux disponibles ;
+5. événements métier déjà branchés ;
+6. événements existants mais non branchés ;
+7. événements importants manquants ;
+8. couverture dashboard par dashboard ;
+9. état du centre de notifications ;
+10. état de la messagerie interne ;
+11. état WebSocket/Redis ;
+12. état email/SMS ;
+13. préférences ;
+14. ciblage et multi-annexes ;
+15. sécurité ;
+16. performance et volumétrie ;
+17. doublons et architecture historique ;
+18. tests existants ;
+19. risques critiques ;
+20. améliorations recommandées ;
+21. plan d’intégration progressif ;
+22. éléments à conserver absolument ;
+23. éléments à consolider ;
+24. éléments à déprécier ;
+25. décisions métier à soumettre.
+
+Ajouter trois matrices :
+
+A. Couverture des dashboards
+
+DASHBOARD | CLOCHE | COMPTEUR | DROPDOWN | CENTRE | WEBSOCKET |
+MESSAGES | PRÉFÉRENCES | ÉTAT
+
+B. Couverture des événements
+
+ÉVÉNEMENT | PRODUCTEUR | DESTINATAIRES | INTERNE | WEBSOCKET |
+EMAIL | SMS | DASHBOARDS | TESTS | ÉTAT
+
+C. Architecture technique
+
+COMPOSANT | FICHIER | RESPONSABILITÉ | UTILISÉ PAR | QUALITÉ |
+PROBLÈME | RECOMMANDATION
+
+========================================================================
+18. CONTRAINTES DE CETTE PHASE
+========================================================================
+
+- Aucun fichier métier ne doit être modifié.
+- Aucune migration ne doit être créée.
+- Aucun modèle ne doit être supprimé.
+- Aucun service ne doit être réécrit.
+- Aucun nouveau centre ne doit être développé.
+- Ne pas remplacer l’existant avant de l’avoir compris.
+- Ne pas déclarer une fonctionnalité opérationnelle uniquement parce que son
+  modèle existe.
+- Vérifier le parcours complet jusqu’au dashboard.
+- Distinguer le code présent du code réellement utilisé.
+- Signaler les ambiguïtés au lieu de les résoudre arbitrairement.
+
+Tu peux ajouter le rapport dans un nouveau fichier :
+
+audit_notifications_communication_esfe_core.md
+
+À la fin, donne un verdict honnête :
+
+- SOLIDE ET BIEN INTÉGRÉ ;
+- SOLIDE MAIS PARTIELLEMENT BRANCHÉ ;
+- FONCTIONNEL MAIS FRAGMENTÉ ;
+- INCOMPLET ;
+- À RECONSTRUIRE PARTIELLEMENT.
+
+Ne commence aucune implémentation après l’audit sans validation.
+
+
+
+
+
+MISSION D’EXÉCUTION — CONSOLIDATION PROFESSIONNELLE DES NOTIFICATIONS
+ET DE LA COMMUNICATION ESFE CORE
+
+L’audit est validé.
+
+Verdict retenu : FONCTIONNEL MAIS FRAGMENTÉ.
+
+Le noyau notifier doit être conservé comme source officielle. Ne reconstruis pas
+le moteur de notifications.
+
+L’objectif est maintenant :
+
+1. unifier l’expérience dans Portal ;
+2. brancher tous les dashboards ;
+3. centraliser les événements et les audiences ;
+4. ajouter les préférences ;
+5. fiabiliser les livraisons ;
+6. préparer la suppression du legacy community.Notification.
+
+=======================================================================
+1. ARCHITECTURE OFFICIELLE
+=======================================================================
+
+Conserver :
+
+- NotificationBus ;
+- NotificationEvent ;
+- NotificationMessage ;
+- DeliveryAttempt ;
+- Dispatcher ;
+- notification_center ;
+- WebSocket authentifié ;
+- provider Brevo ;
+- transaction.on_commit.
+
+Notifier devient l’unique moteur officiel.
+
+Community.Notification est désormais legacy :
+
+- aucune nouvelle fonctionnalité ne doit l’utiliser ;
+- aucune nouvelle écriture directe ne doit y être ajoutée ;
+- les appels historiques doivent passer par la façade officielle ;
+- sa suppression viendra seulement après inventaire et rapprochement.
+
+=======================================================================
+2. COMPOSANT UNIFIÉ DANS PORTAL
+=======================================================================
+
+Créer ou finaliser un composant commun utilisé par tous les dashboards SYSTEM :
+
+- cloche ;
+- compteur non lu ;
+- dropdown des notifications récentes ;
+- centre complet ;
+- marquer comme lu ;
+- tout marquer comme lu ;
+- archivage ;
+- filtres ;
+- pagination ;
+- liens d’action ;
+- états vides ;
+- erreurs ;
+- affichage responsive ;
+- mise à jour WebSocket.
+
+Ne duplique pas ce composant dans chaque dashboard.
+
+Il doit être intégré dans le shell Portal commun et rester compatible avec :
+
+- HTMX ;
+- AJAX ;
+- Alpine.js ;
+- WebSocket ;
+- expiration et reconnexion des sessions ;
+- responsive mobile.
+
+Les interfaces spécialisées existantes doivent être réutilisées ou migrées vers
+ce composant commun sans perdre leurs fonctionnalités.
+
+=======================================================================
+3. DASHBOARDS À BRANCHER
+=======================================================================
+
+Brancher et tester :
+
+- STUDENT ;
+- TEACHER ;
+- ANNEX_MANAGER ;
+- SECRETARY ;
+- ADMISSIONS_OFFICER ;
+- ACADEMIC_SUPERVISOR ;
+- DIRECTOR_OF_STUDIES ;
+- IT_SUPPORT ;
+- MARKETING_MANAGER ;
+- EXECUTIVE_DIRECTOR ;
+- DEPUTY_EXECUTIVE_DIRECTOR ;
+- SUPER_ADMIN ;
+- PAYMENT_AGENT transitoire si encore actif.
+
+Pour chaque dashboard, fournir :
+
+- cloche ;
+- compteur ;
+- dropdown ;
+- centre complet ;
+- temps réel ;
+- liens vers les ressources autorisées ;
+- préférences ;
+- tests d’isolation.
+
+Le dashboard étudiant est prioritaire, car l’audit n’y a pas trouvé
+d’intégration complète.
+
+=======================================================================
+4. DISTINCTION DES CONCEPTS
+=======================================================================
+
+Conserver quatre notions distinctes :
+
+1. Notification automatique
+   - générée par un événement métier.
+
+2. Message interne
+   - envoyé volontairement par un utilisateur.
+
+3. Annonce institutionnelle
+   - diffusée à une audience officielle.
+
+4. Campagne marketing
+   - communication optionnelle soumise aux préférences.
+
+Ne fusionne pas ces quatre concepts dans un seul modèle si leurs responsabilités
+sont différentes.
+
+Le centre Portal peut les présenter dans une expérience cohérente, avec des
+onglets ou filtres distincts.
+
+=======================================================================
+5. REGISTRE OFFICIEL DES ÉVÉNEMENTS
+=======================================================================
+
+Créer un registre fermé et documenté pour chaque event_type :
+
+- code ;
+- catégorie ;
+- priorité ;
+- canaux par défaut ;
+- audiences autorisées ;
+- caractère obligatoire ou optionnel ;
+- durée de conservation ;
+- template ;
+- URL d’action autorisée ;
+- données minimales du payload.
+
+Ajouter un test qui échoue lorsqu’un producteur utilise un événement absent du
+registre.
+
+Aucun override de canal ne doit pouvoir contourner une notification obligatoire
+ou une préférence de sécurité.
+
+=======================================================================
+6. ÉVÉNEMENTS PRIORITAIRES À VÉRIFIER
+=======================================================================
+
+Admissions :
+- candidature reçue ;
+- dossier incomplet ;
+- acceptation ;
+- refus ;
+- admission avec réserve.
+
+Inscriptions et paiements :
+- inscription créée ;
+- paiement attendu ;
+- paiement partiel ;
+- paiement validé ;
+- inscription activée ;
+- reçu disponible ;
+- échéance proche ;
+- retard.
+
+Académique :
+- changement de planning ;
+- cours annulé ou déplacé ;
+- évaluation programmée ;
+- import de notes terminé ;
+- anomalie de notes ;
+- résultats validés ;
+- résultats publiés ;
+- bulletin disponible ;
+- rattrapage ;
+- absence ;
+- cahier de texte incomplet.
+
+Gestionnaire :
+- caisse ouverte ou clôturée ;
+- dépense sensible ;
+- stock faible ;
+- versement banque ;
+- salaire ;
+- honoraire ;
+- alerte financière.
+
+Sécurité :
+- compte créé ;
+- mot de passe temporaire ;
+- changement obligatoire ;
+- suspension ;
+- nouvelle connexion importante ;
+- sessions révoquées ;
+- changement de position ou d’annexe.
+
+Secrétariat :
+- rendez-vous ;
+- document disponible ;
+- transfert ;
+- tâche ;
+- paiement transmis.
+
+Pour chaque événement, tester le parcours complet :
+
+producteur -> bus -> destinataire -> message -> WebSocket/email ->
+dashboard -> lecture -> action.
+
+=======================================================================
+7. CIBLAGE ET MULTI-ANNEXES
+=======================================================================
+
+Centraliser les audiences autorisées :
+
+- utilisateur ;
+- position ;
+- catégorie ;
+- annexe ;
+- plusieurs annexes ;
+- classe ;
+- niveau ;
+- formation ;
+- année académique ;
+- audience globale autorisée.
+
+Le bus ou un service central doit imposer les règles d’annexe.
+
+Ne pas dépendre uniquement du producteur pour éviter les fuites inter-annexes.
+
+Règles :
+
+- BRANCH ne cible que son annexe ;
+- GLOBAL exerce seulement ses permissions autorisées ;
+- PUBLIC et SYSTEM restent distincts ;
+- comptes désactivés ou suspendus exclus ;
+- audiences globales réservées aux capacités autorisées ;
+- aucune déduction à partir d’anciens groupes ou alias.
+
+=======================================================================
+8. PRÉFÉRENCES
+=======================================================================
+
+Créer des préférences centralisées par catégorie et canal.
+
+Notifications obligatoires, non désactivables :
+
+- sécurité ;
+- compte ;
+- admission importante ;
+- paiement et reçu ;
+- résultats et bulletin ;
+- communication administrative urgente.
+
+Notifications optionnelles :
+
+- communauté ;
+- actualités ordinaires ;
+- rappels de confort ;
+- campagnes marketing ;
+- emails complémentaires non critiques ;
+- SMS marketing futur.
+
+Les utilisateurs SYSTEM gèrent leurs préférences dans Portal.
+
+Les utilisateurs PUBLIC utilisent leurs préférences publiques séparées.
+
+Une préférence ne doit pas masquer une notification institutionnelle obligatoire.
+
+=======================================================================
+9. IDEMPOTENCE ET FIABILITÉ
+=======================================================================
+
+Ajouter une clé d’idempotence contrôlée pour empêcher les doublons.
+
+Elle doit pouvoir combiner selon l’événement :
+
+- event_type ;
+- objet métier ;
+- destinataire ;
+- canal ;
+- version ou transition métier.
+
+Les appels répétés ne doivent pas créer plusieurs notifications identiques.
+
+Rendre les livraisons rejouables :
+
+- statuts clairs ;
+- nombre de tentatives ;
+- dernière erreur nettoyée ;
+- prochaine tentative ;
+- backoff ;
+- état définitivement échoué ;
+- reprise manuelle autorisée ;
+- journal des échecs.
+
+Ne jamais bloquer une transaction métier sur un appel email externe.
+
+=======================================================================
+10. LIVRAISON ASYNCHRONE
+=======================================================================
+
+Après stabilisation du centre et des événements, introduire une file durable.
+
+Redis existe déjà pour Channels. Choisir un mécanisme adapté au projet après
+vérification des dépendances et contraintes de déploiement.
+
+La file doit assurer :
+
+- persistance ;
+- retries ;
+- backoff ;
+- idempotence ;
+- observabilité ;
+- reprise après redémarrage ;
+- limitation de débit ;
+- traitement par lots ;
+- arrêt propre.
+
+Ne remplace pas immédiatement le chemin synchrone sans feature flag et tests.
+
+Prévoir un mode fallback contrôlé pour le développement.
+
+=======================================================================
+11. PERFORMANCE
+=======================================================================
+
+Optimiser :
+
+- select_related/prefetch_related ;
+- compteur non lu ;
+- cache invalidé après création/lecture ;
+- pagination ;
+- bulk_create pour les campagnes ;
+- traitement par lots ;
+- audiences sous forme de querysets ;
+- payloads WebSocket minimaux ;
+- index nécessaires ;
+- archivage des historiques.
+
+Tester des volumes représentatifs :
+
+- 5 000 étudiants ;
+- 1 000 enseignants ;
+- plusieurs annexes ;
+- campagne globale ;
+- campagne par annexe ;
+- événements simultanés.
+
+Le context processor ne doit pas exécuter une requête lourde sur chaque requête
+authentifiée si le cache ou le contexte Portal peut éviter ce coût.
+
+=======================================================================
+12. EMAIL ET SMS
+=======================================================================
+
+Email :
+
+- respecter le provider configuré ;
+- ne pas sélectionner Brevo quel que soit le nom du provider ;
+- minimiser les données personnelles dans les logs ;
+- gérer erreurs et retries ;
+- protéger les secrets ;
+- vérifier templates et variables ;
+- éviter les doublons.
+
+SMS :
+
+- conserver sms_future désactivé ;
+- ne pas simuler un envoi réussi ;
+- ne pas choisir de fournisseur dans cette phase ;
+- documenter les événements candidats et besoins de consentement ;
+- aucune interface ne doit annoncer que le SMS fonctionne réellement.
+
+=======================================================================
+13. CONSERVATION ET SUPPRESSION
+=======================================================================
+
+Mettre en place une politique configurable :
+
+- notifications ordinaires archivables après 12 mois ;
+- suppression ou anonymisation envisageable après 24 mois ;
+- événements de sécurité et livraisons sensibles conservés séparément selon la
+  politique d’audit ;
+- les notifications ne remplacent pas les archives financières ou académiques.
+
+Éviter la disparition silencieuse des preuves de livraison importantes lors de
+la suppression d’un User.
+
+Proposer une migration sûre de CASCADE vers une conservation minimale ou
+anonymisée, sans effectuer de suppression destructive non validée.
+
+=======================================================================
+14. OBSERVABILITÉ ET ADMINISTRATION
+=======================================================================
+
+Créer un espace d’administration sécurisé permettant de consulter :
+
+- événements créés ;
+- messages par canal ;
+- livraisons réussies ;
+- échecs ;
+- retries ;
+- volumes ;
+- latence ;
+- événements sans destinataire ;
+- notifications dupliquées ;
+- provider actif ;
+- état de Redis/worker ;
+- campagnes en cours.
+
+Limiter cet espace aux positions et permissions autorisées.
+
+Ne jamais afficher de secret, token ou contenu personnel excessif.
+
+=======================================================================
+15. TESTS OBLIGATOIRES
+=======================================================================
+
+Ajouter des tests pour :
+
+- chaque dashboard ;
+- chaque événement obligatoire ;
+- ciblage par annexe ;
+- refus inter-annexes ;
+- PUBLIC/SYSTEM ;
+- compteur ;
+- lecture ;
+- tout marquer comme lu ;
+- archivage ;
+- URL d’action ;
+- WebSocket ;
+- reconnexion ;
+- préférences ;
+- notification obligatoire ;
+- idempotence ;
+- retries ;
+- provider en échec ;
+- campagne de masse ;
+- suppression/anonymisation ;
+- session expirée ;
+- payload sécurisé ;
+- legacy community ;
+- absence de SMS réel.
+
+Créer des tests contractuels :
+
+ÉVÉNEMENT -> DESTINATAIRES -> CANAUX -> INTERFACE.
+
+=======================================================================
+16. ORDRE D’EXÉCUTION
+=======================================================================
+
+PHASE 1
+- composant Portal unifié ;
+- intégration de tous les dashboards ;
+- priorité étudiant ;
+- tests UI et isolation.
+
+PHASE 2
+- registre officiel des événements ;
+- audit des producteurs ;
+- événements métier manquants ;
+- tests contractuels.
+
+PHASE 3
+- audiences centralisées ;
+- règles multi-annexes ;
+- préférences ;
+- sécurité des URLs et payloads.
+
+PHASE 4
+- idempotence ;
+- retries ;
+- observabilité ;
+- optimisation des requêtes.
+
+PHASE 5
+- file asynchrone durable ;
+- campagnes par lots ;
+- tests de volumétrie ;
+- fallback et rollback.
+
+PHASE 6
+- gel des écritures legacy ;
+- rapprochement des données ;
+- migration ;
+- retrait progressif de community.Notification.
+
+PHASE 7
+- recette visuelle ;
+- recette multi-annexes ;
+- tests réels Brevo contrôlés ;
+- documentation finale.
+
+Après chaque phase, fournir :
+
+- fichiers modifiés ;
+- migrations ;
+- tests ;
+- résultats ;
+- risques ;
+- rollback ;
+- prochaine étape.
+
+Tu peux poursuivre automatiquement lorsque les règles sont déterministes.
+
+Arrête-toi avant :
+
+- une suppression destructive ;
+- le choix d’un fournisseur SMS ;
+- une modification irréversible de conservation ;
+- un envoi réel de masse ;
+- un test réel Brevo vers des destinataires externes ;
+- une décision métier nouvelle non validée.
+
+=======================================================================
+17. CRITÈRE FINAL
+=======================================================================
+
+La mission sera PASS lorsque :
+
+- tous les dashboards utilisent le composant Portal officiel ;
+- tous les événements prioritaires suivent le bus officiel ;
+- le ciblage respecte les annexes ;
+- les préférences sont centralisées ;
+- les notifications obligatoires restent obligatoires ;
+- les doublons sont empêchés ;
+- les échecs sont rejouables ;
+- les campagnes ne bloquent pas les transactions ;
+- WebSocket et email sont observables ;
+- le legacy ne reçoit plus de nouvelles écritures ;
+- les tests et la recette visuelle passent ;
+- la documentation est complète.
+
+Commence par la PHASE 1.
+
+Ne réécris pas notifier et ne crée pas un deuxième centre de notifications.
+
+
+
 

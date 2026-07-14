@@ -1,0 +1,116 @@
+SPRINT 5 - BACKEND PILOTAGE ACADEMIQUE
+
+1. Resume des changements
+- Lecture et execution de instructions.txt pour le Sprint 5.
+- Creation du moteur backend de pilotage academique du Directeur des Etudes.
+- Aucun nouveau modele cree.
+- Aucun changement dans :
+  - le moteur de calcul des notes ;
+  - l'import Excel ;
+  - le dashboard Informaticien ;
+  - les bulletins ;
+  - les moyennes.
+- Le service agregateur controle uniquement les donnees existantes.
+- Le Directeur des Etudes ne calcule pas les notes : le service verifie seulement import/completude/validation.
+
+2. Fichiers crees
+- academics/services/academic_readiness_service.py
+- academics/selectors/academic_readiness_selectors.py
+- academics/test_academic_readiness.py
+- sprint5_pilotage_academique.txt
+
+3. Fichiers modifies
+- Aucun modele modifie pour Sprint 5.
+- academics/services/academic_readiness_service.py a ete nettoye apres execution des tests.
+
+4. Fonctionnalites ajoutees
+- Calcul d'etat de preparation pedagogique pour :
+  - semestre ;
+  - classe ;
+  - programme / formation.
+- Structure retournee avec :
+  - formation ;
+  - classe ;
+  - semestre ;
+  - etat general ;
+  - programme ;
+  - enseignants ;
+  - calendrier ;
+  - emploi du temps ;
+  - suivi pedagogique ;
+  - examens ;
+  - notes ;
+  - bulletins ;
+  - validation.
+- Chaque section retourne :
+  - status ;
+  - color ;
+  - message ;
+  - action.
+- La validation retourne :
+  - answer = OUI ou NON ;
+  - can_publish ;
+  - blocking_anomalies.
+
+5. Controles couverts
+- Structure pedagogique :
+  - programme complet ;
+  - UE completes ;
+  - EC completes ;
+  - credits coherents.
+- Enseignants :
+  - EC sans enseignant ;
+  - conflits de creneaux hebdomadaires enseignant ;
+  - affectations incompletes.
+- Calendrier :
+  - calendrier publie ;
+  - periode d'enseignement publiee ;
+  - examens planifies ;
+  - rattrapages planifies.
+- Emplois du temps :
+  - presence d'un planning hebdomadaire ;
+  - EC sans creneau ;
+  - conflits.
+- Suivi pedagogique :
+  - cahiers de texte ouverts ;
+  - seances non realisees ;
+  - seances annulees.
+- Notes :
+  - notes importees ;
+  - notes completes ;
+  - notes validees par l'informaticien ;
+  - bulletins provisoires existants.
+
+6. Permissions
+- Directeur des Etudes : acces limite a son annexe.
+- DG / DGA / Super Admin : vision globale.
+
+7. Tests ajoutes
+- programme incomplet ;
+- EC manquants ;
+- enseignant manquant ;
+- calendrier absent ;
+- emploi du temps absent ;
+- examens absents ;
+- notes non importees ;
+- validation impossible ;
+- validation autorisee ;
+- refus acces inter-annexes directeur.
+
+8. Commandes de test executees
+- python manage.py check
+  Resultat : OK.
+- python manage.py makemigrations --check --dry-run academics
+  Resultat : OK, aucun changement de migration.
+- python manage.py test --settings=config.settings_test_local academics.test_academic_readiness --keepdb
+  Resultat : OK, 9 tests.
+- python manage.py test --settings=config.settings_test_local academics --keepdb
+  Resultat : OK, 71 tests.
+
+9. Preparation Sprint 6
+- Brancher ce moteur sur le dashboard Directeur des Etudes.
+- Ajouter une vue ou endpoint backend de lecture readiness si necessaire.
+- Ajouter un affichage des anomalies bloquantes et actions conseillees.
+- Decider si les warnings doivent bloquer certaines publications.
+- Ajouter un journal d'audit lors d'une publication academique.
+- Connecter le workflow final de publication sans donner au Directeur le calcul des notes.

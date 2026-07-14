@@ -1,0 +1,41 @@
+Sprint 6 — Affectation pédagogique des enseignants
+
+Statut: exécuté et validé.
+
+Ce qui a été fait:
+- Ajout du service backend d'affectation des enseignants.
+- Ajout des selecteurs dédiés aux affectations.
+- Ajout des permissions pour le pilotage par annexe et par rôle.
+- Renforcement du modèle `DirectorTeacherAssignment`:
+  - affectation par classe, semestre, UE ou EC
+  - volume horaire
+  - dates de début / fin
+  - statuts actif / suspendu / archivé
+  - archivage logique au lieu de suppression physique
+- Intégration du flux dans l'interface directeur des études.
+- Intégration du flux de création initiale des enseignants.
+- Ajout d'une migration pour le nouveau schéma.
+
+Fichiers principaux:
+- `academics/services/teacher_assignment_service.py`
+- `academics/selectors/teacher_assignment_selectors.py`
+- `academics/permissions/teacher_assignment_permissions.py`
+- `academics/test_teacher_assignment.py`
+- `portal/models.py`
+- `portal/views/views.py`
+- `portal/services/director/teacher_management_service.py`
+- `portal/migrations/0017_remove_directorteacherassignment_portal_unique_director_teacher_assignment_and_more.py`
+
+Validations:
+- `python manage.py check`
+- `python manage.py test --settings=config.settings_test_local academics.test_teacher_assignment -v 2 --keepdb`
+- `python manage.py test --settings=config.settings_test_local accounts.tests.PortalPhaseOneTests.test_director_can_create_teacher_with_initial_room_assignment --keepdb -v 2`
+- `python manage.py test --settings=config.settings_test_local accounts.tests.PortalPhaseOneTests.test_director_teacher_assignment_requires_matching_class_room_and_ec --keepdb -v 2`
+
+Résultat:
+- Les tests ciblés passent.
+- La cohérence classe / semestre / UE / EC est désormais refusée si elle est incohérente.
+- Les affectations incohérentes ne sont plus silencieusement réassignées sur une autre classe.
+
+Préparation sprint suivant:
+- base propre pour étendre les écrans ou ajouter d'autres règles de gestion des affectations.

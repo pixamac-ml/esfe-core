@@ -141,6 +141,8 @@ def build_branch_xlsx_report(
         ("Candidatures refusees", admissions_stats.get("candidatures_rejected", 0)),
         ("Nouvelles inscriptions", admissions_stats.get("inscriptions_total", 0)),
         ("Inscriptions actives", admissions_stats.get("inscriptions_active", 0)),
+        ("Coupons appliques", admissions_stats.get("coupon_redemptions", 0)),
+        ("Total remises coupons (FCFA)", admissions_stats.get("coupon_discount_total", 0)),
     ]
     for label, val in admissions_rows:
         _write_cell(ws, row, 1, label, font=BOLD_FONT)
@@ -194,7 +196,7 @@ def build_branch_xlsx_report(
     return wb
 
 
-def export_branch_report_xlsx(*, branch, report_period, branch_staff_profiles, branch_teacher_profiles):
+def export_branch_report_xlsx(*, branch, report_period, branch_staff_profiles, branch_teacher_profiles, cash_type="", cash_source=""):
     from datetime import date, timedelta
     from django.db.models import Q, Sum
     from accounts.models import BranchCashMovement, BranchExpense, PayrollEntry, TeacherHonorariumEntry
@@ -211,6 +213,10 @@ def export_branch_report_xlsx(*, branch, report_period, branch_staff_profiles, b
         movement_date__gte=report_period["start"],
         movement_date__lte=report_period["end"],
     ).order_by("-movement_date")
+    if cash_type:
+        report_movements_qs = report_movements_qs.filter(movement_type=cash_type)
+    if cash_source:
+        report_movements_qs = report_movements_qs.filter(source=cash_source)
 
     report_total_entries = report_movements_qs.filter(
         movement_type=BranchCashMovement.TYPE_IN
@@ -236,6 +242,9 @@ def export_branch_report_xlsx(*, branch, report_period, branch_staff_profiles, b
     report_honorarium = report_movements_qs.filter(
         movement_type=BranchCashMovement.TYPE_OUT, source=BranchCashMovement.SOURCE_HONORARIUM
     ).aggregate(total=Sum("amount"))["total"] or 0
+    report_bank_transfers = report_movements_qs.filter(
+        movement_type=BranchCashMovement.TYPE_OUT, source=BranchCashMovement.SOURCE_BANK_TRANSFER
+    ).aggregate(total=Sum("amount"))["total"] or 0
 
     report_movements = report_movements_qs[:200]
 
@@ -248,6 +257,7 @@ def export_branch_report_xlsx(*, branch, report_period, branch_staff_profiles, b
         {"label": "Depenses", "amount": report_expenses},
         {"label": "Salaires", "amount": report_salaries},
         {"label": "Honoraires enseignants", "amount": report_honorarium},
+        {"label": "Versements bancaires", "amount": report_bank_transfers},
         {"label": "Solde net", "amount": report_total_entries - report_total_exits},
     ]
 
@@ -271,19 +281,17 @@ def export_branch_report_xlsx(*, branch, report_period, branch_staff_profiles, b
     salary_paid_month = payroll_entries_qs.aggregate(total=Sum("paid_amount"))["total"] or 0
     honorarium_paid_month = honorarium_entries_qs.aggregate(total=Sum("paid_amount"))["total"] or 0
 
-    expenses_paid = BranchExpense.objects.filter(branch=branch, expense_date__gte=start_of_month, status=BranchExpense.STATUS_PAID).aggregate(total=Sum("amount"))["total"] or 0
-    total_revenue = report_student_payments + report_shop_sales + report_donations
     period_summary = {
         "student_revenue": report_student_payments,
         "shop_revenue": report_shop_sales,
         "donation_revenue": report_donations,
-        "total_revenue": total_revenue,
-        "expenses_paid": expenses_paid,
-        "salary_paid": salary_paid_month,
-        "honorarium_paid": honorarium_paid_month,
-        "charges_paid": expenses_paid + salary_paid_month + honorarium_paid_month,
-        "net_result": total_revenue - expenses_paid - salary_paid_month - honorarium_paid_month,
-        "estimated_cash": cash_in_month - cash_out_month,
+        "total_revenue": report_total_entries,
+        "expenses_paid": report_expenses,
+        "salary_paid": report_salaries,
+        "honorarium_paid": report_honorarium,
+        "charges_paid": report_total_exits,
+        "net_result": report_total_entries - report_total_exits,
+        "estimated_cash": get_branch_cash_balance(branch),
     }
 
     payroll_stats = {
@@ -326,6 +334,17 @@ def export_branch_report_xlsx(*, branch, report_period, branch_staff_profiles, b
         "inscriptions_total": period_inscriptions.count(),
         "inscriptions_active": period_inscriptions.filter(status=Inscription.STATUS_ACTIVE).count(),
     }
+    from coupons.models import CouponRedemption
+
+    coupon_redemptions = CouponRedemption.objects.filter(
+        inscription__candidature__branch=branch,
+        applied_at__date__gte=report_period["start"],
+        applied_at__date__lte=report_period["end"],
+    )
+    admissions_stats["coupon_redemptions"] = coupon_redemptions.count()
+    admissions_stats["coupon_discount_total"] = (
+        coupon_redemptions.aggregate(total=Sum("discount_amount"))["total"] or 0
+    )
 
     wb = build_branch_xlsx_report(
         branch=branch,

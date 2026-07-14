@@ -4,11 +4,45 @@ Lance avec : python manage.py test students.tests_carte --settings=config.settin
 """
 
 from datetime import date, timedelta
+from types import SimpleNamespace
 from unittest.mock import patch
 
-from django.test import TestCase, override_settings
+from django.contrib.sessions.middleware import SessionMiddleware
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 
 FAKE_KEY = "test-signing-key-esfe-2026"
+
+
+@override_settings(CARD_SIGNING_KEY=FAKE_KEY)
+class CardLoginChallengeTests(SimpleTestCase):
+    def setUp(self):
+        self.request = RequestFactory().post("/students/carte/pin/verify/")
+        SessionMiddleware(lambda request: None).process_request(self.request)
+        self.card = SimpleNamespace(pk=42)
+
+    def test_challenge_is_signed_and_single_use(self):
+        from students.views_carte import (
+            _consume_card_login_challenge,
+            _issue_card_login_challenge,
+        )
+
+        challenge = _issue_card_login_challenge(self.request, self.card)
+
+        self.assertNotEqual(challenge, "42")
+        self.assertEqual(_consume_card_login_challenge(self.request, challenge), 42)
+        self.assertIsNone(_consume_card_login_challenge(self.request, challenge))
+
+    def test_tampered_challenge_is_rejected(self):
+        from students.views_carte import (
+            _consume_card_login_challenge,
+            _issue_card_login_challenge,
+        )
+
+        challenge = _issue_card_login_challenge(self.request, self.card)
+
+        self.assertIsNone(
+            _consume_card_login_challenge(self.request, f"{challenge}tampered")
+        )
 
 
 @override_settings(CARD_SIGNING_KEY=FAKE_KEY)
@@ -109,6 +143,7 @@ class CarteEtudiantModelTests(TestCase):
         inscription = Inscription.objects.create(
             candidature=candidature,
             status="active",
+            amount_due=1,
         )
         student = Student.objects.create(
             user=user,
@@ -172,7 +207,7 @@ class StudentPinTests(TestCase):
             birth_place="Bamako", gender="male", phone="00000000",
             email="pin_test@esfe.ml", status="accepted",
         )
-        inscription = Inscription.objects.create(candidature=candidature, status="active")
+        inscription = Inscription.objects.create(candidature=candidature, status="active", amount_due=1)
         return Student.objects.create(user=user, inscription=inscription, matricule="ESFE-PIN-001")
 
     def test_no_pin_par_defaut(self):

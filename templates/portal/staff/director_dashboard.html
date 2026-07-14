@@ -5,42 +5,47 @@
 {% block public_footer %}{% endblock %}
 {% block public_floating_widget %}{% endblock %}
 
-{% block title %}Dashboard Direction des Etudes{% endblock %}
+{% block title %}Dashboard Direction des Études{% endblock %}
 
 {% block extra_head %}
 <script defer src="{% static 'vendor/chartjs/chart.umd.min.js' %}"></script>
 <style>
   [x-cloak] { display: none !important; }
-  body { font-family: Inter, system-ui, sans-serif; }
-  .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
-  .scrollbar-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
-  .de-btn {
-    display: inline-flex; align-items: center; justify-content: center;
-    min-height: 44px; border-radius: 14px; padding: 0.7rem 1rem;
-    font-size: 0.875rem; font-weight: 700; transition: 0.16s ease; white-space: nowrap;
+
+  /* ── Transitions HTMX ── */
+  #director-workspace {
+    transition: opacity 0.15s ease, transform 0.15s ease;
   }
-  .de-btn:hover { transform: translateY(-1px); }
-  .de-btn-primary { background:#2563eb; color:#fff; border:1px solid #2563eb; }
-  .de-btn-primary:hover { background:#1d4ed8; border-color:#1d4ed8; }
-  .de-btn-secondary { background:#fff; color:#334155; border:1px solid #cbd5e1; }
-  .de-btn-secondary:hover { background:#f8fafc; }
-  .de-btn-danger { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
-  .de-btn-danger:hover { background:#fee2e2; }
-  .de-kpi { border:1px solid #e2e8f0; background:linear-gradient(180deg,#fff 0%,#f8fafc 100%); border-radius:1.35rem; padding:1.1rem 1.2rem; box-shadow:0 8px 24px rgba(15,23,42,.05); }
-  .de-card { background:#fff; border:1px solid #e2e8f0; border-radius:1.6rem; box-shadow:0 8px 24px rgba(15,23,42,.05); }
-  .de-section-label { font-size:0.7rem; font-weight:900; text-transform:uppercase; letter-spacing:0.18em; color:#94a3b8; }
-  .de-table { width:100%; border-collapse:separate; border-spacing:0; border:1px solid #e2e8f0; border-radius:1.2rem; overflow:hidden; background:#fff; }
-  .de-table thead { background:#f8fafc; }
-  .de-table th, .de-table td { padding:0.9rem 1rem; text-align:left; border-bottom:1px solid #e2e8f0; }
-  .de-table thead th { font-size:0.7rem; font-weight:900; text-transform:uppercase; letter-spacing:0.12em; color:#64748b; }
-  .de-table tbody tr:last-child td { border-bottom:0; }
-  .de-empty { border:1px dashed #cbd5e1; background:#f8fafc; border-radius:1rem; padding:2rem 1rem; text-align:center; color:#64748b; font-weight:700; }
-  .de-badge-draft { background:#fef9c3; color:#854d0e; font-size:.7rem; font-weight:800; padding:.25rem .65rem; border-radius:999px; }
-  .de-badge-published { background:#dcfce7; color:#166534; font-size:.7rem; font-weight:800; padding:.25rem .65rem; border-radius:999px; }
-  .de-badge-ready { background:#dbeafe; color:#1e40af; font-size:.7rem; font-weight:800; padding:.25rem .65rem; border-radius:999px; }
-  .de-badge-warning { background:#fef3c7; color:#b45309; font-size:.7rem; font-weight:800; padding:.25rem .65rem; border-radius:999px; }
-  .de-badge-danger { background:#fee2e2; color:#b91c1c; font-size:.7rem; font-weight:800; padding:.25rem .65rem; border-radius:999px; }
-  @media (max-width: 1024px) { .de-grid-2, .de-grid-3 { grid-template-columns: 1fr !important; } }
+  #director-workspace.htmx-swapping {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  #director-workspace.htmx-settling {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  #director-drawer-content {
+    transition: opacity 0.12s ease;
+  }
+  #director-drawer-content.htmx-swapping {
+    opacity: 0;
+  }
+
+  /* ── Bouton en cours de requête ── */
+  [data-de-loading] {
+    opacity: 0.65;
+    pointer-events: none;
+    cursor: wait;
+  }
+
+  /* ── Animation d'entrée sections ── */
+  @keyframes de-fade-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .de-section-enter {
+    animation: de-fade-in 0.2s ease forwards;
+  }
 </style>
 {% endblock %}
 
@@ -48,252 +53,135 @@
 <div
   x-data="deDashboard()"
   x-init="init()"
-  @keydown.window.escape="closeDrawer(); closeModal()"
+  @keydown.window.escape="$dispatch('academic-drawer-close'); $dispatch('academic-modal-close')"
   x-cloak
-  class="min-h-screen bg-slate-50 text-slate-900"
+  class="min-h-screen bg-[color:var(--surface)] text-[color:var(--text)]"
 >
   <div class="flex min-h-screen overflow-hidden">
 
-    <!-- SIDEBAR -->
-    <aside
-      :class="sidebarOpen ? 'w-72' : 'w-20'"
-      class="bg-[#061B34] text-white transition-all duration-300 flex flex-col shrink-0"
-    >
-      <!-- Logo -->
-      <div class="h-20 px-5 flex items-center gap-3 border-b border-white/10">
-        <div class="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center shrink-0">
-          <i data-lucide="graduation-cap" class="w-7 h-7"></i>
-        </div>
-        <div x-show="sidebarOpen" x-transition>
-          <h1 class="font-bold text-lg leading-tight">ESFE Mali</h1>
-          <p class="text-xs text-slate-300">Direction des Etudes</p>
-        </div>
-      </div>
+    {% component "academic_sidebar"
+      brand_title="ESFE Mali"
+      brand_subtitle="Direction des Études"
+      user_name=request.user.get_full_name|default:"Directeur"
+      user_role="Direction des Études"
+      user_initial=request.user.first_name|first|default:"D"
+      active_key=director_active_section|default:"home"
+      items=sidebar_items
+    %}{% endcomponent %}
 
-      <!-- Nav -->
-      <nav class="flex-1 px-3 py-5 overflow-y-auto scrollbar-thin space-y-1">
-        <p x-show="sidebarOpen" class="px-3 mb-3 text-[10px] uppercase tracking-widest text-slate-400 font-bold">
-          Modules principaux
-        </p>
-        <template x-for="mod in modules" :key="mod.key">
-          <button
-            type="button"
-            @click="openModule(mod.key)"
-            :class="activeModule === mod.key
-              ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30'
-              : 'hover:bg-white/10 text-slate-200'"
-            class="w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all text-left"
-          >
-            <i :data-lucide="mod.icon" class="w-5 h-5 shrink-0"></i>
-            <div x-show="sidebarOpen" x-transition class="min-w-0">
-              <p class="text-sm font-bold leading-tight" x-text="mod.label"></p>
-              <p class="text-[10px] text-slate-400 mt-0.5 leading-tight" x-text="mod.sub" x-show="activeModule === mod.key"></p>
-            </div>
-          </button>
-        </template>
-      </nav>
+    <main class="flex-1 min-w-0 flex flex-col overflow-hidden bg-[color:var(--surface)]">
 
-      <!-- User bottom -->
-      <div class="p-4 border-t border-white/10">
+      <header class="flex h-16 shrink-0 items-center justify-between border-b border-[color:var(--line)] bg-[color:var(--card)] px-4 lg:px-6">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center shrink-0 font-bold text-sm">
-            {{ request.user.first_name|first|default:"D"|upper }}
-          </div>
-          <div x-show="sidebarOpen" x-transition class="min-w-0">
-            <p class="text-sm font-bold truncate">{{ request.user.get_full_name|default:"Directeur" }}</p>
-            <p class="text-xs text-slate-400">Direction des Etudes</p>
-          </div>
-        </div>
-      </div>
-    </aside>
-
-    <!-- MAIN -->
-    <main class="flex-1 min-w-0 flex flex-col overflow-y-auto">
-
-      <!-- Header -->
-      <header class="h-20 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-40 shrink-0">
-        <div class="flex items-center gap-4">
-          <button @click="sidebarOpen = !sidebarOpen"
-            class="w-11 h-11 rounded-xl border border-slate-200 flex items-center justify-center hover:bg-slate-100 transition">
-            <i data-lucide="menu" class="w-5 h-5"></i>
+          <button @click="sidebarOpen = !sidebarOpen" class="flex h-9 w-9 items-center justify-center rounded-lg border border-[color:var(--line)] text-[color:var(--muted)] transition hover:bg-[color:var(--surface)] hover:text-[color:var(--text)]">
+            <i data-lucide="menu" class="h-5 w-5"></i>
           </button>
-          <div>
-            <h2 class="text-xl font-black text-slate-900" x-text="activeTitle()"></h2>
-            <p class="text-xs text-slate-500" x-text="activeSubtitle()"></p>
+          <div class="hidden md:block">
+            <template x-if="activeModule === 'home'">
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">Dashboard</p>
+                <h1 class="text-lg font-black leading-tight text-[color:var(--text)]">Direction des Études</h1>
+              </div>
+            </template>
+            <template x-if="activeModule !== 'home'">
+              <div>
+                <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]" x-text="activeTitle()"></p>
+                <h1 class="text-lg font-black leading-tight text-[color:var(--text)]" x-text="activeSubtitle()"></h1>
+              </div>
+            </template>
           </div>
         </div>
 
-        <div class="flex items-center gap-3">
-          <button type="button" @click="openModule('home')"
-            class="h-10 px-4 rounded-xl bg-white border border-slate-200 text-sm font-semibold flex items-center gap-2 hover:bg-slate-50">
-            <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
-            <span class="hidden md:inline">Accueil</span>
-          </button>
-
-          <a href="{% url 'accounts:edit_profile' %}"
-            class="h-10 w-10 rounded-xl border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition">
-            <i data-lucide="user-cog" class="w-4 h-4"></i>
+        <div class="flex items-center gap-2">
+          <div data-portal-notification-slot></div>
+          {% component "academic_button" label="Accueil" icon="layout-dashboard" variant="outline" size="sm" extra_class="hidden md:inline-flex" attrs='@click="openModule(\'home\')"' %}{% endcomponent %}
+          <a href="{% url 'accounts:edit_profile' %}" class="flex h-9 w-9 items-center justify-center rounded-lg border border-[color:var(--line)] text-[color:var(--muted)] transition hover:bg-[color:var(--surface)] hover:text-[color:var(--text)]" title="Mon profil">
+            <i data-lucide="user-cog" class="h-4 w-4"></i>
           </a>
-
           <form method="post" action="{% url 'accounts:logout' %}" class="inline-flex">
             {% csrf_token %}
-            <button type="submit"
-              class="h-10 px-4 rounded-xl border border-red-200 bg-red-50 text-red-700 text-sm font-semibold flex items-center gap-2 hover:bg-red-100 transition">
-              <i data-lucide="log-out" class="w-4 h-4"></i>
-              <span class="hidden lg:inline">Deconnexion</span>
-            </button>
+            {% component "academic_button" label="Déconnexion" icon="log-out" variant="danger" size="sm" type="submit" extra_class="hidden lg:inline-flex" %}{% endcomponent %}
           </form>
         </div>
       </header>
 
-      <!-- Content -->
-      <section class="flex-1 p-6 space-y-6">
+      <section class="flex-1 overflow-y-auto p-4 lg:p-6">
 
-        <!-- === ACCUEIL === -->
-        <section x-show="activeModule === 'home'" x-transition class="space-y-6">
+        <section x-show="activeModule === 'home'" x-transition class="space-y-5">
 
-          <!-- Bienvenue -->
-          <div class="de-card px-6 py-5">
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          {% component "academic_card" title="" icon="" padding="none" extra_class="overflow-hidden" %}
+            <div class="relative flex flex-col gap-4 bg-gradient-to-r from-[color:var(--school-primary)] to-[color:var(--esfe-light)] p-5 text-white sm:flex-row sm:items-center sm:justify-between lg:p-6">
               <div>
-                <p class="de-section-label">Direction des etudes · {{ branch.name|default:"Annexe" }}</p>
-                <h3 class="mt-2 text-2xl font-black text-slate-900">Bonjour, {{ request.user.first_name|default:"Directeur" }}</h3>
-                <p class="mt-1 text-sm font-semibold text-slate-500">Aujourd'hui le {{ today|date:"l d F Y" }} · Vue generale de vos activites.</p>
+                <p class="text-[10px] font-black uppercase tracking-widest text-white/70">Direction des études · {{ branch.name|default:"Annexe" }}</p>
+                <h2 class="mt-1 text-2xl font-black lg:text-3xl">Bonjour, {{ request.user.first_name|default:"Directeur" }}</h2>
+                <p class="mt-1 text-sm font-semibold text-white/90">{{ today|date:"l d F Y" }} · Vue générale de vos activités.</p>
               </div>
               <div class="flex flex-wrap gap-2">
-                <a href="{% url 'accounts:edit_profile' %}" class="de-btn de-btn-secondary">Mon profil</a>
-                <a href="{% url 'accounts:edit_preferences' %}" class="de-btn de-btn-secondary">Preferences</a>
-                <button type="button" @click="window.location.reload()" class="de-btn de-btn-primary">
-                  <i data-lucide="refresh-cw" class="w-4 h-4 mr-2"></i>Actualiser
-                </button>
+                {% component "academic_button" label="Mon profil" variant="secondary" size="sm" hx_get="{% url 'accounts:edit_profile' %}" hx_target="#director-workspace" extra_class="bg-white/10 text-white border-white/20 hover:bg-white/20" %}{% endcomponent %}
+                {% component "academic_button" label="Préférences" variant="secondary" size="sm" hx_get="{% url 'accounts:edit_preferences' %}" hx_target="#director-workspace" extra_class="bg-white/10 text-white border-white/20 hover:bg-white/20" %}{% endcomponent %}
+                {% component "academic_button" label="Actualiser" icon="refresh-cw" variant="primary" size="sm" attrs='@click="openModule(activeModule)"' %}{% endcomponent %}
               </div>
             </div>
-          </div>
+          {% endcomponent %}
 
-          <!-- Alertes / taches -->
           {% if tasks_center %}
-          <div class="de-card overflow-hidden">
-            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 class="font-black text-slate-900">Taches en attente</h3>
-              <span class="de-badge-warning">{{ tasks_center|length }} point(s)</span>
-            </div>
-            <div class="divide-y divide-slate-100">
-              {% for task in tasks_center %}
-              <div class="px-6 py-4 flex items-center justify-between gap-4 hover:bg-slate-50">
-                <div class="flex items-center gap-3">
-                  <span class="rounded-full w-8 h-8 flex items-center justify-center text-xs font-black
-                    {% if task.level == 'critical' %}bg-rose-100 text-rose-700{% elif task.level == 'warning' %}bg-amber-100 text-amber-700{% else %}bg-blue-100 text-blue-700{% endif %}">
-                    {{ task.count }}
-                  </span>
-                  <p class="text-sm font-semibold text-slate-700">{{ task.message }}</p>
-                </div>
-                <button type="button" class="de-btn de-btn-secondary shrink-0 !min-h-0 !py-2 !px-3 !text-xs"
-                  @click="openModule('{{ task.target }}')">{{ task.action_label }}</button>
-              </div>
-              {% endfor %}
-            </div>
-          </div>
+            {% component "academic_alert" level="warning" title="Tâches en attente" message=tasks_center_message|default:"" %}{% endcomponent %}
           {% endif %}
 
-          <!-- KPIs -->
-          <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
-            {% component "metric_card" label="Classes" value=total_classes|default:0 icon="school" hint="Actives" %}{% endcomponent %}
-            {% component "metric_card" label="Enseignants" value=teachers_total|default:0 icon="users" hint="Affectés" %}{% endcomponent %}
-            {% component "metric_card" label="Semestres" value=total_semesters|default:0 icon="calendar-range" hint="Suivis" %}{% endcomponent %}
-            {% component "metric_card" label="À publier" value=ready_to_publish|length|default:0 icon="send" hint="Résultats prêts" %}{% endcomponent %}
-            {% component "metric_card" label="Anomalies" value=assignments_alerts_count|default:0 icon="triangle-alert" hint="À corriger" %}{% endcomponent %}
-            {% component "metric_card" label="Documents" value=admin_doc_published_count|default:0 icon="file-check" hint="Publiés" %}{% endcomponent %}
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            {% component "academic_stat_card" label="Classes" value=total_classes|default:0 icon="school" hint="Actives" extra_class="border-l-4 border-[color:var(--school-primary)]" %}{% endcomponent %}
+            {% component "academic_stat_card" label="Enseignants" value=teachers_total|default:0 icon="users" hint="Affectés" extra_class="border-l-4 border-[color:var(--esfe-light)]" %}{% endcomponent %}
+            {% component "academic_stat_card" label="Semestres" value=total_semesters|default:0 icon="calendar-range" hint="Suivis" extra_class="border-l-4 border-[color:var(--school-accent)]" %}{% endcomponent %}
+            {% component "academic_stat_card" label="À publier" value=ready_to_publish|length|default:0 icon="send" hint="Résultats prêts" extra_class="border-l-4 border-[color:var(--success)]" %}{% endcomponent %}
+            {% component "academic_stat_card" label="Anomalies" value=teacher_unassigned_count|default:0 icon="triangle-alert" hint="Sans affectation" extra_class="border-l-4 border-[color:var(--danger)]" %}{% endcomponent %}
+            {% component "academic_stat_card" label="Documents" value=admin_doc_published_count|default:0 icon="file-check" hint="Publiés" extra_class="border-l-4 border-[color:var(--info)]" %}{% endcomponent %}
           </div>
 
-          <!-- Actions rapides -->
-          <div class="de-card px-6 py-5">
-            <h3 class="font-black text-slate-900 mb-5">Acces rapide</h3>
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+          {% component "academic_card" title="Accès rapide" icon="zap" %}
+            <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
               <template x-for="action in quickActions" :key="action.label">
-                <button type="button" @click="openModule(action.key)"
-                  class="rounded-2xl border border-slate-200 p-5 hover:bg-slate-50 hover:border-blue-200 text-center transition group">
-                  <i :data-lucide="action.icon" class="w-8 h-8 mx-auto" :class="action.color"></i>
-                  <p class="text-sm font-bold mt-3 text-slate-700 group-hover:text-slate-900" x-text="action.label"></p>
+                <button type="button" @click="openModule(action.key)" class="group flex flex-col items-center justify-center gap-3 rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 text-center transition hover:-translate-y-1 hover:border-[color:var(--school-primary)] hover:shadow-lg">
+                  <div class="grid h-12 w-12 place-items-center rounded-2xl bg-[color:var(--surface)] transition group-hover:bg-[color:var(--school-primary-soft)]">
+                    <i :data-lucide="action.icon" class="h-6 w-6" :class="action.color"></i>
+                  </div>
+                  <p class="text-sm font-bold text-[color:var(--text)]" x-text="action.label"></p>
                 </button>
               </template>
             </div>
-          </div>
+          {% endcomponent %}
 
-          <!-- Tableau classes + dernières activites -->
-          <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <div class="de-card overflow-hidden">
-              <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h3 class="font-black text-slate-900">Classes actives</h3>
-                <button type="button" @click="openModule('programme')" class="text-sm text-blue-600 font-semibold hover:underline">Voir tout</button>
-              </div>
-              <div class="overflow-x-auto">
-                <table class="de-table">
-                  <thead>
-                    <tr>
-                      <th>Classe</th>
-                      <th>Etudiants</th>
-                      <th>Progression</th>
-                      <th>Statut</th>
-                    </tr>
-                  </thead>
-                  <tbody class="text-sm">
-                    {% for item in class_cards|slice:":6" %}
-                    <tr class="hover:bg-slate-50">
-                      <td class="font-semibold">{{ item.class.display_name }}</td>
-                      <td>{{ item.student_count }}</td>
-                      <td>
-                        <div class="flex items-center gap-2">
-                          <div class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                            <div class="h-full bg-blue-600 rounded-full" style="width:{{ item.progress }}%"></div>
-                          </div>
-                          <span class="text-xs font-bold text-slate-500">{{ item.progress }}%</span>
-                        </div>
-                      </td>
-                      <td>
-                        {% if item.workflow_bucket == "ready" %}
-                          <span class="de-badge-ready">Prete</span>
-                        {% elif item.workflow_bucket == "rejected" %}
-                          <span class="de-badge-danger">A revoir</span>
-                        {% else %}
-                          <span class="de-badge-warning">En cours</span>
-                        {% endif %}
-                      </td>
-                    </tr>
-                    {% empty %}
-                    <tr><td colspan="4" class="py-8 text-center text-sm font-semibold text-slate-400">Aucune classe.</td></tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+          <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
+            {% component "academic_card" title="Classes actives" icon="school" extra_class="lg:col-span-2" %}
+              {% component "academic_table"
+                id="director-classes-table"
+                headers="Classe,Étudiants,Progression,Statut"
+                rows=class_table_rows
+                empty_message="Aucune classe active."
+              %}{% endcomponent %}
+            {% endcomponent %}
 
-            <div class="de-card overflow-hidden">
-              <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h3 class="font-black text-slate-900">Dernieres activites</h3>
-                <button type="button" @click="openModule('evaluations')" class="text-sm text-blue-600 font-semibold hover:underline">Voir tout</button>
-              </div>
-              <div class="divide-y divide-slate-100">
+            {% component "academic_card" title="Dernières activités" icon="activity" %}
+              <div class="divide-y divide-[color:var(--line)]">
                 {% for log in recent_lesson_logs|slice:":6" %}
-                <div class="px-6 py-4 flex items-center gap-3 hover:bg-slate-50">
-                  <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-                    <i data-lucide="file-check-2" class="w-5 h-5"></i>
+                  <div class="flex items-center gap-3 px-2 py-3 transition hover:bg-[color:var(--surface)]">
+                    <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[color:var(--success-soft)] text-[color:var(--success)]">
+                      <i data-lucide="file-check-2" class="h-5 w-5"></i>
+                    </div>
+                    <div class="min-w-0">
+                      <p class="text-sm font-semibold text-[color:var(--text)] truncate">{{ log.academic_class.display_name }} · {{ log.ec.title }}</p>
+                      <p class="mt-0.5 text-xs text-[color:var(--muted)]">{{ log.date|date:"d/m/Y" }} · {{ log.start_time|time:"H:i" }}</p>
+                    </div>
                   </div>
-                  <div class="min-w-0">
-                    <p class="text-sm font-semibold truncate">{{ log.academic_class.display_name }} · {{ log.ec.title }}</p>
-                    <p class="text-xs text-slate-400 mt-0.5">{{ log.date|date:"d/m/Y" }} · {{ log.start_time|time:"H:i" }}</p>
-                  </div>
-                </div>
                 {% empty %}
-                <div class="px-6 py-8 text-center text-sm font-semibold text-slate-400">Aucune activite recente.</div>
+                  {% component "academic_empty_state" title="Aucune activité" message="Aucune activité récente." icon="inbox" %}{% endcomponent %}
                 {% endfor %}
               </div>
-            </div>
+            {% endcomponent %}
           </div>
 
         </section>
 
-        <!-- === WORKSPACE HTMX (autres sections) === -->
-        <section x-show="activeModule !== 'home'" x-transition>
+        <section x-show="activeModule !== 'home'" x-transition class="min-h-[50vh]">
           <div id="director-workspace">
             {% if director_active_section != "home" %}
               {% include "portal/staff/director/partials/workspace.html" %}
@@ -305,83 +193,148 @@
     </main>
   </div>
 
-  <!-- DRAWER OVERLAY -->
-  <div x-show="drawerOpen" x-transition class="fixed inset-0 z-50 bg-black/40" @click="closeDrawer()"></div>
-  <aside
-    x-show="drawerOpen"
-    x-transition:enter="transition duration-300"
-    x-transition:enter-start="translate-x-full"
-    x-transition:enter-end="translate-x-0"
-    x-transition:leave="transition duration-300"
-    x-transition:leave-start="translate-x-0"
-    x-transition:leave-end="translate-x-full"
-    class="fixed right-0 top-0 z-[60] h-screen w-full max-w-2xl bg-white shadow-2xl flex flex-col"
-  >
-    <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between shrink-0">
-      <h3 class="text-lg font-black">Details</h3>
-      <button type="button" @click="closeDrawer()" class="w-10 h-10 rounded-xl hover:bg-slate-100 flex items-center justify-center">
-        <i data-lucide="x" class="w-5 h-5"></i>
-      </button>
-    </div>
-    <div id="director-drawer-content" class="flex-1 overflow-y-auto p-5 text-sm text-slate-600">
-      <p class="text-sm font-semibold text-slate-400">Selectionnez un element pour afficher les details.</p>
-    </div>
-  </aside>
+  {% component "academic_drawer" id="director-drawer" content_id="director-drawer-content" kicker="Détail" title="Élément sélectionné" icon="panel-right-open" open_event="academic-drawer-open" close_event="academic-drawer-close" %}{% endcomponent %}
 
-  <!-- MODAL -->
-  <div x-show="modalOpen" x-transition class="fixed inset-0 z-[70] bg-black/40 p-4 flex items-center justify-center" @click.self="closeModal()">
-    <section class="w-full max-w-3xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-      <div class="px-6 py-5 border-b border-slate-200 flex items-center justify-between shrink-0">
-        <h3 class="text-xl font-black text-slate-900">Formulaire</h3>
-        <button type="button" @click="closeModal()" class="w-10 h-10 rounded-xl hover:bg-slate-100 flex items-center justify-center">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
+  {% component "academic_modal" id="director-modal" title="Formulaire" show_footer=False %}
+    {% fill "trigger" %}{% endfill %}
+    {% fill "content" %}
+      <div id="director-modal-content" class="text-sm text-[color:var(--muted)]">
+        <p>Sélectionnez une action pour ouvrir le formulaire.</p>
       </div>
-      <div id="director-modal-content" class="flex-1 overflow-y-auto p-6 text-sm text-slate-600">
-        <p class="text-sm font-semibold text-slate-400">Selectionnez une action pour ouvrir le formulaire.</p>
-      </div>
-    </section>
-  </div>
+    {% endfill %}
+  {% endcomponent %}
 </div>
 
 <script>
 function deDashboard() {
   return {
     sidebarOpen: true,
-    drawerOpen: false,
-    modalOpen: false,
     activeModule: '{{ director_active_section|default:"home"|escapejs }}',
 
     modules: [
-      { key: 'home',           label: 'Accueil',              sub: 'Vue generale',           icon: 'layout-dashboard',   title: 'Tableau de bord',          subtitle: 'Vue generale des activites de la direction' },
-      { key: 'planification',  label: 'Planification',        sub: 'Calendrier & EDT',       icon: 'calendar-range',     title: 'Planification academique', subtitle: 'Calendrier academique et emplois du temps par classe' },
-      { key: 'programme',      label: 'Programme',            sub: 'UE, EC & Classes',       icon: 'book-open',          title: 'Programme academique',     subtitle: 'Gestion des UE, EC et suivi des classes' },
-      { key: 'correspondances',label: 'Correspondances',      sub: 'Documents & Lettres',    icon: 'mail',               title: 'Correspondances & Documents', subtitle: 'Redaction et generation des documents administratifs' },
-      { key: 'enseignants',    label: 'Enseignants',          sub: 'Recrutement & Contrats', icon: 'user-check',         title: 'Personnel enseignant',     subtitle: 'Recrutement, affectations, contrats et documents' },
-      { key: 'evaluations',    label: 'Evaluations',          sub: 'Notes & PV',             icon: 'clipboard-check',    title: 'Evaluations & Resultats',  subtitle: 'Calendrier examens, validation et publication des resultats' },
+      { key: 'home',                 label: 'Accueil',           sub: 'Vue generale',           icon: 'layout-dashboard',  title: 'Tableau de bord',            subtitle: 'Vue generale des activites de la direction' },
+      { key: 'calendrier',           label: 'Calendrier',        sub: 'Annee & Evenements',     icon: 'calendar-days',     title: 'Calendrier academique',      subtitle: 'Initialiser et gerer le calendrier de l annexe' },
+      { key: 'evaluations_calendar', label: 'Sessions examens',  sub: 'Planifier & Publier',    icon: 'clipboard-check',   title: 'Sessions d evaluations',     subtitle: 'Creer et publier les sessions d examens et de rattrapage' },
+      { key: 'evaluations',          label: 'Resultats & Notes', sub: 'Notes & PV',             icon: 'bar-chart-2',       title: 'Resultats & Notes',          subtitle: 'Validation et publication des notes par semestre' },
+      { key: 'enseignants',          label: 'Enseignants',       sub: 'Recrutement & Suivi',    icon: 'user-check',        title: 'Personnel enseignant',       subtitle: 'Recrutement, affectations, contrats et suivi pedagogique' },
+      { key: 'programme',            label: 'Programmes',        sub: 'UE, EC & Classes',       icon: 'book-open',         title: 'Programmes academiques',     subtitle: 'Gestion des UE, EC et suivi des classes' },
+      { key: 'planification',        label: 'Emploi du temps',   sub: 'Grille & Creneaux',      icon: 'calendar-range',    title: 'Emploi du temps',            subtitle: 'Creer et publier les grilles horaires par classe' },
+      { key: 'correspondances',      label: 'Documents',         sub: 'Avis & Correspondances', icon: 'mail',              title: 'Documents & Correspondances', subtitle: 'Redaction, publication et dispatch des documents administratifs' },
     ],
 
     quickActions: [
-      { key: 'planification',   label: 'Emploi du temps',    icon: 'calendar-range',     color: 'text-indigo-600' },
-      { key: 'programme',       label: 'Gerer les classes',  icon: 'book-open',          color: 'text-blue-600' },
-      { key: 'correspondances', label: 'Nouveau document',   icon: 'file-plus-2',        color: 'text-violet-600' },
-      { key: 'enseignants',     label: 'Enseignants',        icon: 'user-check',         color: 'text-emerald-600' },
-      { key: 'evaluations',     label: 'Publier resultats',  icon: 'clipboard-check',    color: 'text-amber-600' },
+      { key: 'calendrier',           label: 'Calendrier',        icon: 'calendar-days',      color: 'text-[color:var(--school-primary)]' },
+      { key: 'evaluations_calendar', label: 'Sessions examens',  icon: 'clipboard-check',    color: 'text-[color:var(--esfe-light)]' },
+      { key: 'enseignants',          label: 'Enseignants',       icon: 'user-check',         color: 'text-[color:var(--success)]' },
+      { key: 'planification',        label: 'Emploi du temps',   icon: 'calendar-range',     color: 'text-[color:var(--school-accent)]' },
+      { key: 'correspondances',      label: 'Nouveau document',  icon: 'file-plus-2',        color: 'text-[color:var(--warning)]' },
     ],
 
     init() {
-      this.$nextTick(() => {
-        this.renderIcons();
+      this.$nextTick(() => { this.renderIcons(); });
+      window.deOpenDrawer  = () => window.dispatchEvent(new CustomEvent('academic-drawer-open'));
+      window.deCloseDrawer = () => window.dispatchEvent(new CustomEvent('academic-drawer-close'));
+      window.deOpenModal   = () => window.dispatchEvent(new CustomEvent('academic-modal-open'));
+      window.deCloseModal  = () => window.dispatchEvent(new CustomEvent('academic-modal-close'));
+      if (window.htmx) {
+        window.htmx.config.defaultSwapStyle = 'innerHTML';
+        window.htmx.config.globalViewTransitions = false;
+        window.htmx.config.refreshOnHistoryMiss = false;
+        window.htmx.config.indicatorClass = 'htmx-request-hidden';
+        window.htmx.config.swapDelay = 0;
+        window.htmx.config.settleDelay = 80;
+      }
+
+      /* ── Skeletons ── */
+      const _skeletonRow = (w) => `<div class="h-3 ${w} rounded-lg bg-[color:var(--line)]"></div>`;
+      const _skeletonCard = () =>
+        `<div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 animate-pulse space-y-3">` +
+        _skeletonRow('w-1/3') + _skeletonRow('w-2/3') + _skeletonRow('w-1/2') + `</div>`;
+      const _skeletonKpi = () =>
+        `<div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 animate-pulse">` +
+        `<div class="h-2 w-1/2 rounded bg-[color:var(--line)] mb-3"></div>` +
+        `<div class="h-8 w-1/3 rounded-lg bg-[color:var(--surface)]"></div></div>`;
+      window._buildWorkspaceSkeleton = () => {
+        let s = `<div class="space-y-6 de-section-enter">`;
+        s += `<div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] px-6 py-5 animate-pulse">` +
+             `<div class="h-2 w-1/4 rounded bg-[color:var(--line)] mb-3"></div>` +
+             `<div class="h-6 w-1/2 rounded-lg bg-[color:var(--line)] mb-2"></div>` +
+             `<div class="h-3 w-2/3 rounded bg-[color:var(--surface)]"></div></div>`;
+        s += `<div class="grid grid-cols-2 sm:grid-cols-4 gap-4">`;
+        for (let i = 0; i < 4; i++) s += _skeletonKpi();
+        s += `</div>`;
+        s += _skeletonCard() + _skeletonCard();
+        s += `</div>`;
+        return s;
+      };
+      const _drawerSkeleton =
+        `<div class="space-y-5 animate-pulse">` +
+        `<div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5">` +
+        `<div class="h-2 w-1/3 rounded bg-[color:var(--line)] mb-3"></div>` +
+        `<div class="h-5 w-2/3 rounded-lg bg-[color:var(--line)] mb-2"></div>` +
+        `<div class="h-3 w-1/2 rounded bg-[color:var(--surface)]"></div></div>` +
+        `<div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5">` +
+        `<div class="h-3 w-full rounded bg-[color:var(--surface)] mb-2"></div>` +
+        `<div class="h-3 w-4/5 rounded bg-[color:var(--surface)] mb-2"></div>` +
+        `<div class="h-3 w-3/5 rounded bg-[color:var(--surface)]"></div></div>` +
+        `<div class="h-24 rounded-2xl bg-[color:var(--surface)]"></div>` +
+        `</div>`;
+      const _modalSkeleton =
+        `<div class="space-y-4 animate-pulse p-1">` +
+        `<div class="h-4 w-1/2 rounded-lg bg-[color:var(--line)]"></div>` +
+        `<div class="h-3 w-3/4 rounded bg-[color:var(--surface)]"></div>` +
+        `<div class="h-10 rounded-xl bg-[color:var(--surface)]"></div>` +
+        `<div class="h-10 rounded-xl bg-[color:var(--surface)]"></div>` +
+        `<div class="h-10 rounded-xl bg-[color:var(--surface)]"></div>` +
+        `</div>`;
+
+      /* ── Gestion loading boutons ── */
+      const _setLoading = (elt, on) => {
+        if (!elt) return;
+        if (on) elt.setAttribute('data-de-loading', '1');
+        else elt.removeAttribute('data-de-loading');
+      };
+
+      /* ── Événements HTMX ── */
+      document.body.addEventListener('htmx:beforeRequest', (evt) => {
+        const elt = evt.detail && evt.detail.elt;
+        const targetId = elt && elt.getAttribute && elt.getAttribute('hx-target');
+        _setLoading(elt, true);
+        if (targetId === '#director-drawer-content') {
+          const dc = document.getElementById('director-drawer-content');
+          if (dc) dc.innerHTML = _drawerSkeleton;
+          window.deOpenDrawer();
+        }
+        if (targetId === '#director-modal-content') {
+          const mc = document.getElementById('director-modal-content');
+          if (mc) mc.innerHTML = _modalSkeleton;
+          window.deOpenModal();
+        }
+        if (targetId === '#director-workspace') {
+          const ws = document.getElementById('director-workspace');
+          if (ws && window._buildWorkspaceSkeleton) ws.innerHTML = window._buildWorkspaceSkeleton();
+        }
       });
-      document.body.addEventListener('htmx:afterSwap', () => {
+      document.body.addEventListener('htmx:afterRequest', (evt) => {
+        _setLoading(evt.detail && evt.detail.elt, false);
+      });
+      document.body.addEventListener('htmx:afterSwap', (evt) => {
         this.syncSectionFromWorkspace();
         this.renderIcons();
+        const target = evt.detail && evt.detail.target;
+        if (!target) return;
+        if (target.id === 'director-workspace') {
+          target.querySelectorAll('section, [data-director-section] > *').forEach(el => {
+            el.classList.add('de-section-enter');
+          });
+        }
+        if (target.id === 'director-drawer-content' && target.innerHTML.trim()) {
+          window.deOpenDrawer();
+        }
+        if (target.id === 'director-modal-content' && target.innerHTML.trim()) {
+          window.deOpenModal();
+        }
       });
-      window.deOpenDrawer  = () => { this.drawerOpen = true; };
-      window.deCloseDrawer = () => { this.closeDrawer(); };
-      window.deOpenModal   = () => { this.modalOpen = true; };
-      window.deCloseModal  = () => { this.closeModal(); };
-      document.body.addEventListener('director-modal-close', () => this.closeModal());
     },
 
     activeTitle() {
@@ -395,11 +348,7 @@ function deDashboard() {
 
     openModule(key) {
       this.activeModule = key || 'home';
-      if (this.activeModule === 'home') {
-        this.closeDrawer();
-        this.closeModal();
-        return;
-      }
+      if (this.activeModule === 'home') { this.closeDrawer(); this.closeModal(); return; }
       const url = '{% url "accounts_portal:director_workspace" %}?section=' + encodeURIComponent(this.activeModule);
       this.openWorkspaceUrl(url);
     },
@@ -410,34 +359,40 @@ function deDashboard() {
       if (section) this.activeModule = section;
       this.closeDrawer();
       this.closeModal();
-      if (window.htmx) {
-        window.htmx.ajax('GET', url, '#director-workspace');
+      /* Skeleton instantané avant la requête */
+      const ws = document.getElementById('director-workspace');
+      if (ws && window._buildWorkspaceSkeleton) {
+        ws.innerHTML = window._buildWorkspaceSkeleton();
       }
+      if (window.htmx) { window.htmx.ajax('GET', url, '#director-workspace'); }
       this.$nextTick(() => this.renderIcons());
     },
 
     syncSectionFromWorkspace() {
       const el = document.querySelector('#director-workspace [data-director-section]');
-      if (el && el.dataset.directorSection) {
-        this.activeModule = el.dataset.directorSection;
-      }
+      if (el && el.dataset.directorSection) { this.activeModule = el.dataset.directorSection; }
     },
 
+    openDrawer() {
+      window.dispatchEvent(new CustomEvent('academic-drawer-open'));
+      this.$nextTick(() => this.renderIcons());
+    },
     closeDrawer() {
-      this.drawerOpen = false;
+      window.dispatchEvent(new CustomEvent('academic-drawer-close'));
       const el = document.getElementById('director-drawer-content');
-      if (el) el.innerHTML = '<p class="text-sm font-semibold text-slate-400">Selectionnez un element pour afficher les details.</p>';
+      if (el) el.innerHTML = '<p class="text-sm font-semibold text-[color:var(--muted-2)]">Selectionnez un element pour afficher les details.</p>';
+    },
+    openModal() {
+      window.dispatchEvent(new CustomEvent('academic-modal-open'));
     },
     closeModal() {
-      this.modalOpen = false;
+      window.dispatchEvent(new CustomEvent('academic-modal-close'));
       const el = document.getElementById('director-modal-content');
-      if (el) el.innerHTML = '<p class="text-sm font-semibold text-slate-400">Selectionnez une action pour ouvrir le formulaire.</p>';
+      if (el) el.innerHTML = '<p class="text-sm font-semibold text-[color:var(--muted-2)]">Selectionnez une action pour ouvrir le formulaire.</p>';
     },
 
     renderIcons() {
-      if (window.lucide && typeof window.lucide.createIcons === 'function') {
-        window.lucide.createIcons();
-      }
+      if (window.lucide && typeof window.lucide.createIcons === 'function') { window.lucide.createIcons(); }
     },
   };
 }

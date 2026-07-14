@@ -22,21 +22,21 @@
         <p class="mt-1 text-sm font-semibold text-slate-500">{{ result_panel_subtitle }}</p>
       </div>
       <div class="flex flex-wrap gap-2">
-        <form method="post" hx-post="{% url 'accounts_portal:director_results_action' %}" hx-target="#director-workspace" hx-on="htmx:afterRequest: window.deCloseDrawer && window.deCloseDrawer()">
+        <form hx-post="{% url 'accounts_portal:director_results_action' %}" hx-target="#director-workspace" hx-on::after-request="window.deCloseDrawer && window.deCloseDrawer()">
           {% csrf_token %}
           <input type="hidden" name="class_id" value="{{ selected_class.id }}">
           <input type="hidden" name="semester_id" value="{{ selected_semester.id }}">
           <input type="hidden" name="action" value="validate">
           <button class="director-btn director-btn-primary {% if not selected_semester_row.can_validate %}opacity-40{% endif %}" {% if not selected_semester_row.can_validate %}disabled{% endif %}>Valider</button>
         </form>
-        <form method="post" hx-post="{% url 'accounts_portal:director_results_action' %}" hx-target="#director-workspace" hx-on="htmx:afterRequest: window.deCloseDrawer && window.deCloseDrawer()">
+        <form hx-post="{% url 'accounts_portal:director_results_action' %}" hx-target="#director-workspace" hx-on::after-request="window.deCloseDrawer && window.deCloseDrawer()">
           {% csrf_token %}
           <input type="hidden" name="class_id" value="{{ selected_class.id }}">
           <input type="hidden" name="semester_id" value="{{ selected_semester.id }}">
           <input type="hidden" name="action" value="reject">
-          <button class="director-btn director-btn-secondary border-rose-200 bg-rose-50 text-rose-700">Rejeter</button>
+          <button class="director-btn director-btn-secondary border-[color:var(--danger-soft)] bg-[color:var(--danger-soft)] text-[color:var(--danger)]">Rejeter</button>
         </form>
-        <form method="post" hx-post="{% url 'accounts_portal:director_results_action' %}" hx-target="#director-workspace" hx-on="htmx:afterRequest: window.deCloseDrawer && window.deCloseDrawer()">
+        <form hx-post="{% url 'accounts_portal:director_results_action' %}" hx-target="#director-workspace" hx-on::after-request="window.deCloseDrawer && window.deCloseDrawer()">
           {% csrf_token %}
           <input type="hidden" name="class_id" value="{{ selected_class.id }}">
           <input type="hidden" name="semester_id" value="{{ selected_semester.id }}">
@@ -52,7 +52,7 @@
       <p class="portal-section-kicker">Autres semestres de la classe</p>
       <div class="mt-4 flex flex-wrap gap-2">
         {% for row in selected_class_rows %}
-          <button type="button" class="rounded-full border px-3 py-2 text-xs font-bold transition {% if selected_semester_row and row.semester.id == selected_semester_row.semester.id %}border-blue-300 bg-blue-50 text-blue-700{% else %}border-slate-200 bg-white text-slate-700 hover:bg-slate-50{% endif %}" hx-get="{% url 'accounts_portal:director_drawer' %}?panel=result&class_id={{ selected_class.id }}&semester_id={{ row.semester.id }}" hx-target="#director-drawer-content" hx-swap="innerHTML" hx-on="htmx:afterOnLoad: window.deOpenDrawer && window.deOpenDrawer()">
+          <button type="button" class="rounded-full border px-3 py-2 text-xs font-bold transition {% if selected_semester_row and row.semester.id == selected_semester_row.semester.id %}border-[color:var(--school-primary)] bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]{% else %}border-[color:var(--line)] bg-[color:var(--card)] text-[color:var(--text)] hover:bg-[color:var(--surface)]{% endif %}" hx-get="{% url 'accounts_portal:director_drawer' %}?panel=result&class_id={{ selected_class.id }}&semester_id={{ row.semester.id }}" hx-target="#director-drawer-content" hx-swap="innerHTML">
             S{{ row.semester.number }} - {{ row.state }}
           </button>
         {% endfor %}

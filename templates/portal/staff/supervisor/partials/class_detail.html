@@ -1,85 +1,94 @@
-{% if toast %}
-<div class="banner {% if toast.level == 'success' %}ok{% else %}warn{% endif %}">{{ toast.message }}</div>
-{% endif %}
-
+{% load component_tags %}
 {% if academic_class %}
-<div class="card" style="margin-bottom:16px">
-  <div class="card-h">
-    <div>
-      <span class="src-badge">⤿ Classe</span>
-      <h3 style="margin-top:6px">{{ academic_class.display_name }}</h3>
-      <span class="hint">{{ academic_class.programme.title }} · {{ academic_class.student_count|default:0 }} étudiants</span>
-    </div>
-    <span>
-      <span class="chip mute">{{ schedule.week_start|date:"d/m/Y" }}</span>
-      <span class="chip mute">{{ branch.name }}</span>
-    </span>
-  </div>
-</div>
+  <div class="space-y-4">
+    {% component "page_header" title=academic_class.display_name subtitle=academic_class.programme.title %}
+      {% fill "actions" %}
+        {% component "status_badge" label=academic_class.student_count|default:0 tone="neutral" icon="users" %}{% endcomponent %}
+        {% component "status_badge" label=schedule.week_start|date:"d/m/Y" tone="info" icon="calendar" %}{% endcomponent %}
+        <span class="btn ghost cursor-default">{{ branch.name }}</span>
+      {% endfill %}
+    {% endcomponent %}
 
-<div class="grid cards-2">
-  <div class="card">
-    <div class="card-h"><h3>Emploi du temps — semaine</h3></div>
-    <div class="card-b" style="padding:12px;overflow:auto">
-      {% include "portal/staff/supervisor/partials/sg_schedule_week_grid.html" %}
+    <div class="grid gap-3 sm:grid-cols-2">
+      {% component "widget_card" label="Étudiants" value=academic_class.student_count|default:0 icon="users" tone="primary" %}{% endcomponent %}
+      {% component "widget_card" label="Semaine" value=schedule.week_start|date:"d/m/Y" icon="calendar" tone="info" %}{% endcomponent %}
     </div>
-  </div>
 
-  <div class="card">
-    <div class="card-h"><h3>Étudiants de la classe</h3></div>
-    <div class="card-b">
-      {% for student in students %}
-      <div class="row">
-        <div class="main"><b>{{ student.full_name }}</b><span>{{ student.matricule|default:"—" }}</span></div>
-        <span class="tail"><span class="chip ok">OK</span></span>
-      </div>
-      {% empty %}
-      <div class="empty"><p>Aucun étudiant rattaché à cette classe.</p></div>
-      {% endfor %}
+    <div class="grid gap-4 xl:grid-cols-2">
+      {% component "dashboard_card" padding="none" %}
+        {% fill "default" %}
+          <div class="card-h"><h3>Emploi du temps - semaine</h3></div>
+          <div class="overflow-auto p-3">
+            {% include "portal/staff/supervisor/partials/sg_schedule_week_grid.html" %}
+          </div>
+        {% endfill %}
+      {% endcomponent %}
+
+      {% component "dashboard_card" padding="none" %}
+        {% fill "default" %}
+          <div class="card-h"><h3>Étudiants de la classe</h3></div>
+          <div class="card-b">
+            {% for student in students %}
+              <div class="row">
+                <div class="main"><b>{{ student.full_name }}</b><span>{{ student.matricule|default:"—" }}</span></div>
+                <span class="tail">{% component "status_badge" label="OK" tone="success" %}{% endcomponent %}</span>
+              </div>
+            {% empty %}
+              {% component "empty_state" icon="users" title="Aucun étudiant rattaché" message="Aucun étudiant rattaché à cette classe." %}{% endcomponent %}
+            {% endfor %}
+          </div>
+        {% endfill %}
+      {% endcomponent %}
     </div>
-  </div>
-</div>
 
-<div class="card" style="margin-top:16px">
-  <div class="card-h"><h3>Ajouter un cours</h3></div>
-  <div class="card-b" style="padding:18px">
-    <form
-      method="post"
-      action="{% url 'accounts_portal:supervisor_create_schedule_event' academic_class.id %}"
-      hx-post="{% url 'accounts_portal:supervisor_create_schedule_event' academic_class.id %}"
-      hx-target="#supervisor-class-detail"
-      hx-swap="innerHTML"
-    >
-      {% csrf_token %}
-      <input type="hidden" name="week_start" value="{{ schedule.week_start|date:'Y-m-d' }}">
-      <div style="display:flex;gap:10px">
-        <div style="flex:1"><label class="f-l" style="margin-top:0">Date</label><input name="date" type="date" required value="{{ schedule.week_start|date:'Y-m-d' }}" class="f-i"></div>
-        <div style="flex:1"><label class="f-l" style="margin-top:0">Salle (optionnel)</label><input name="location" type="text" placeholder="Ex : Salle 2" class="f-i"></div>
-      </div>
-      <div style="display:flex;gap:10px">
-        <div style="flex:1"><label class="f-l">Heure début</label><input name="start_time" type="time" required class="f-i"></div>
-        <div style="flex:1"><label class="f-l">Heure fin</label><input name="end_time" type="time" required class="f-i"></div>
-      </div>
-      <label class="f-l">Matière (EC)</label>
-      <select name="ec_id" required class="f-i">
-        <option value="">Choisir un EC</option>
-        {% for ec in ecs %}
-        <option value="{{ ec.id }}">{{ ec.title }}</option>
-        {% endfor %}
-      </select>
-      <label class="f-l">Enseignant</label>
-      <select name="teacher_id" required class="f-i">
-        <option value="">Choisir un enseignant</option>
-        {% for teacher in teachers %}
-        <option value="{{ teacher.id }}">{{ teacher.get_full_name|default:teacher.username }}</option>
-        {% endfor %}
-      </select>
-      <div style="display:flex;justify-content:flex-end;margin-top:18px">
-        <button type="submit" class="btn primary">Programmer</button>
-      </div>
-    </form>
+    {% component "dashboard_card" padding="none" %}
+      {% fill "default" %}
+        <div class="card-h"><h3>Ajouter un cours</h3></div>
+        <div class="card-b p-4">
+          <form
+            method="post"
+            action="{% url 'accounts_portal:supervisor_create_schedule_event' academic_class.id %}"
+            hx-post="{% url 'accounts_portal:supervisor_create_schedule_event' academic_class.id %}"
+            hx-target="#supervisor-class-detail"
+            hx-swap="innerHTML"
+            class="space-y-3"
+          >
+            {% csrf_token %}
+            <input type="hidden" name="week_start" value="{{ schedule.week_start|date:'Y-m-d' }}">
+            <div class="grid gap-3 sm:grid-cols-2">
+              <label class="block"><span class="f-l mt-0">Date</span><input name="date" type="date" required value="{{ schedule.week_start|date:'Y-m-d' }}" class="f-i"></label>
+              <label class="block"><span class="f-l mt-0">Salle (optionnel)</span><input name="location" type="text" placeholder="Ex : Salle 2" class="f-i"></label>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <label class="block"><span class="f-l">Heure début</span><input name="start_time" type="time" required class="f-i"></label>
+              <label class="block"><span class="f-l">Heure fin</span><input name="end_time" type="time" required class="f-i"></label>
+            </div>
+            <label class="block">
+              <span class="f-l">Matière (EC)</span>
+              <select name="ec_id" required class="f-i">
+                <option value="">Choisir un EC</option>
+                {% for ec in ecs %}
+                  <option value="{{ ec.id }}">{{ ec.title }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="block">
+              <span class="f-l">Enseignant</span>
+              <select name="teacher_id" required class="f-i">
+                <option value="">Choisir un enseignant</option>
+                {% for teacher in teachers %}
+                  <option value="{{ teacher.id }}">{{ teacher.get_full_name|default:teacher.username }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <div class="flex justify-end">
+              <button type="submit" class="btn primary">Programmer</button>
+            </div>
+          </form>
+        </div>
+      {% endfill %}
+    {% endcomponent %}
   </div>
-</div>
 {% else %}
-<div class="empty"><p>Classe introuvable.</p></div>
+  {% component "empty_state" icon="layout-grid" title="Classe introuvable" message="La classe demandée n'a pas été trouvée." %}{% endcomponent %}
 {% endif %}

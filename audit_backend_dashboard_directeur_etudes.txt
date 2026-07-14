@@ -1,0 +1,486 @@
+# Audit Backend — Dashboard Directeur des Études
+
+Date de l’audit : 7 juillet 2026
+Périmètre : lecture statique du dépôt ESFE Core. Aucun code métier, modèle, vue ou template n’a été modifié.
+
+## 1. Résumé global
+
+Le projet possède déjà un socle académique substantiel et un dashboard Directeur des Études réellement branché sur les données. Les fonctions les plus avancées sont : structure classes/semestres/UE/EC, affectation des enseignants, emploi du temps récurrent et daté, détection des conflits, notes semestrielles, publication protégée par OTP, génération de bulletins, correspondances administratives et export Excel pédagogique.
+
+Le dashboard n’est cependant pas encore le poste de contrôle pédagogique complet décrit dans le besoin. Il expose seulement six sections : accueil, planification, programme, correspondances, enseignants et évaluations. Les onze modules métier attendus sont donc regroupés de manière trop large ou absents. Les principales lacunes sont le calendrier académique institutionnel, les sessions d’examens ordinaires, un workflow explicite d’import/validation des notes, les PV de délibération, les relevés pilotés depuis le dashboard, l’archivage accessible au Directeur des Études et un vrai centre d’alertes pédagogiques.
+
+La règle d’isolation par annexe est globalement appliquée, mais plusieurs chemins autorisent un comportement global lorsque l’utilisateur n’a aucune annexe. Pour le rôle Directeur des Études, cette situation doit être refusée systématiquement, jamais interprétée comme « toutes les annexes ». C’est le risque fonctionnel et de confidentialité prioritaire.
+
+La dette technique principale est la concentration de la construction du dashboard et de nombreuses actions dans portal/views/views.py. Le fichier mélange contexte, orchestration, mutations métier, OTP, PDF, Excel et endpoints HTMX. Des services existent déjà, mais leur découpage est incomplet.
+
+## 2. Apps Django concernées
+
+- academics : cœur académique (années, classes, inscriptions académiques, semestres, UE, EC, notes, emplois du temps, cahiers de texte, bulletins, diplômes, décisions et dettes académiques).
+- portal : dashboard Directeur des Études, affectations enseignants, documents enseignants, correspondances, transferts, vues HTMX et services propres au directeur.
+- academic_cycle : cycle annuel par annexe, clôture, délibération, archivage, réinscription, promotion, corrections post-publication, audit et export pédagogique.
+- accounts : profils, positions, rôles, résolution d’annexe, contrôle d’accès et redirection vers les dashboards.
+- formations : cycles, filières, programmes et années de programme.
+- students : étudiants, présence étudiants/enseignants, alertes d’assiduité, cas étudiants et enseignants.
+- inscriptions : source des inscriptions administratives et rattachement initial au cursus.
+- branches : modèle Branch, base de l’isolation obligatoire par annexe.
+- notifier / notification_center : infrastructure de notifications, utilisable pour les alertes et publications.
+- ui : composants réutilisables de notes, résultats, planning et alertes.
+
+## 3. Modèles existants réutilisables
+
+### Structure académique
+
+- academics.models.AcademicYear : année académique.
+- academics.models.AcademicClass : classe reliée à Programme, AcademicYear et Branch.
+- academics.models.AcademicEnrollment : inscription académique d’un étudiant dans une classe et une année.
+- academics.models.Semester : semestre rattaché à une classe, avec statut de workflow.
+- formations.models.Cycle, Filiere, Programme, ProgrammeYear : catalogue et niveaux de formation.
+- academics.models.UE et EC : unités d’enseignement et éléments constitutifs, rattachés au semestre.
+- academics.models.ECChapter, ECContent, StudentContentProgress : contenu pédagogique et progression.
+
+### Enseignants et affectations
+
+- auth.User + accounts.models.Profile : identité, position, annexe et rôle des enseignants.
+- portal.models.DirectorTeacherAssignment : affectation enseignant/classe/EC/annexe, salle et volume horaire prévu.
+- portal.models.TeacherDocument : pièces, diplômes, CV et contrats enseignants.
+- students.models.TeacherAttendance et TeacherCase : assiduité et cas de suivi enseignant.
+
+### Planification et suivi des cours
+
+- academics.models.WeeklyScheduleSlot : grille hebdomadaire récurrente.
+- academics.models.AcademicScheduleEvent : séance datée (cours et autres types d’événements), enseignant, EC, classe, annexe, année, salle et statut.
+- academics.models.AcademicScheduleChangeLog et AcademicScheduleExecutionLog : historique des modifications et exécutions.
+- academics.models.LessonLog : cahier de texte, contenu réalisé, devoirs, observations et validation.
+- students.models.StudentAttendance et TeacherAttendance : présence aux séances.
+
+### Évaluations, notes et résultats
+
+- academics.models.ECGrade : notes par EC et sessions, score final.
+- academics.models.AcademicBulletin : bulletin semestriel ou annuel, snapshot, statut et fichier PDF.
+- academics.models.AcademicDiplomaAward : décision et délivrance de diplôme.
+- academics.models.AcademicDecisionLog : journal des décisions académiques.
+- academic_cycle.models.GradeModificationRequest et AcademicCorrectionRequest : modification sécurisée et correction post-publication.
+- academic_cycle.models.AcademicDebtEvaluationSession et AcademicDebtEvaluation : uniquement pour les évaluations de dettes académiques, pas pour le dispositif normal d’examens.
+
+### Documents, alertes et archivage
+
+- portal.models.AdministrativeDocument : note de service, avis, lettre, convocation, fiche de transfert ou de fréquentation, avec brouillon/publication et annexe.
+- students.models.AttendanceAlert, StudentCase et TeacherCase : alertes et dossiers de suivi exploitables.
+- academic_cycle.models.BranchAcademicCycle, ClassCycleStatus, AcademicClosureReport, AcademicAuditLog : pilotage et clôture annuelle par annexe.
+- portal.models.ArchiveBatch : lot d’archivage de classe ou d’année.
+- notifier.models : événements, messages et livraisons de notifications.
+
+### Modèles absents ou insuffisants
+
+- Aucun modèle dédié de calendrier académique institutionnel (rentrée, congés, examens, jurys, publication, clôture).
+- Aucun modèle général de session d’examen/évaluation ordinaire avec salles, surveillants, convocations et planning ; les modèles AcademicDebtEvaluation* ne couvrent que les dettes.
+- Aucun modèle explicite de PV de jury/délibération.
+- Aucun modèle distinct de relevé de notes : le relevé est construit à partir des résultats publiés.
+- Aucun objet unifié d’alerte pédagogique multi-source avec gravité, responsable, échéance, accusé de prise en charge et résolution.
+
+## 4. Vues existantes
+
+Le dashboard principal est construit dans portal/views/views.py :
+
+- _render_director_dashboard et _build_director_workspace_context : page et contexte central.
+- director_workspace et director_drawer : navigation HTMX et panneaux de détail.
+- director_programme_action : mutations UE/EC.
+- director_correspondance_create, publish et pdf.
+- director_results_action et director_results_confirm_otp : actions sur résultats et publication sécurisée.
+- director_bulletin_action : génération/publication de bulletins.
+- director_export_report_xlsx : rapport pédagogique Excel.
+- director_teacher_create, assign, contract_download, document_upload, documents_modal et document_review.
+- director_transfer_create et director_transfer_review.
+- director_planner_hub, planner_view_workspace, planner_workspace, weekly_slots_workspace, weekly_slot_save, week_materialize, month_materialize et create_schedule_event.
+- schedule_class_print et schedule_teacher_print.
+
+Vues académiques complémentaires :
+
+- portal/views/admin_grades.py : grille de notes, saisie, OTP, publication, vue Excel et feuille de notes PDF/imprimable.
+- academics/views.py : téléchargement de relevés semestriels, sélection ZIP et relevés de classe.
+- portal/views/it_grades_import.py et portal/views/admin_grades.py : briques d’import/administration de notes, aujourd’hui orientées IT/admin et non intégrées comme workflow Directeur des Études.
+- academic_cycle/views et services : readiness, clôture, corrections, réinscription et pilotage annuel.
+
+## 5. URLs existantes
+
+Les routes Directeur sont déclarées dans portal/urls.py sous director/ :
+
+- portail et workspace : director/, director/workspace/, director/drawer/ ;
+- enseignants : création, affectation, contrat, dépôt/consultation/validation de documents ;
+- programme : director/programme/action/ ;
+- correspondances : création, PDF et publication ;
+- transferts : création et revue ;
+- résultats : action, confirmation OTP, actions bulletins et export XLSX ;
+- planning : hub, vue, workspace, créneaux hebdomadaires, matérialisation semaine/mois et création de séance ;
+- impressions : emplois du temps par classe et enseignant.
+
+Les routes existent pour les fonctions déjà implémentées, mais il n’existe pas de routes Directeur dédiées au calendrier académique, aux examens, à l’import de notes, aux relevés, aux PV, à l’archivage ni à la gestion d’alertes pédagogiques.
+
+## 6. Templates existants
+
+Templates Directeur dans le dossier global templates/ :
+
+- templates/portal/staff/director_dashboard.html
+- templates/portal/staff/director/partials/workspace.html
+- templates/portal/staff/director/partials/_pagination.html
+- templates/portal/staff/director/partials/results_otp_modal.html
+- templates/portal/staff/director/partials/panels/*
+- templates/portal/staff/director/partials/drawers/*
+- templates/portal/staff/director/modals/teacher_create_modal.html
+- templates/portal/staff/director/modals/teacher_assign_modal.html
+- templates/portal/staff/director/modals/teacher_document_upload_modal.html
+- templates/portal/staff/director/modals/teacher_documents_modal.html
+- templates/portal/staff/director/modals/transfer_create_modal.html
+- templates/portal/staff/director/teacher_contract.html
+- templates/portal/staff/shared/prints/class_schedule_print.html
+- templates/portal/staff/shared/prints/teacher_schedule_print.html
+- templates/portal/admin/correspondances/pdf.html
+
+Templates académiques réutilisables :
+
+- portal/templates/portal/admin/grades/* : dashboard/grille de notes, sélecteurs et OTP.
+- academics/templates/academics/reports/* : bulletin, bulletin ESFE, relevé semestriel, rapports semestriel/annuel, feuille de classe, diplôme.
+- ui/templates/notes/* et ui/templates/components/result_* : composants spécialisés.
+
+Le workspace Directeur ne distingue aujourd’hui que six sections. Plusieurs anciens noms sont remappés vers ces sections dans _parse_director_section, ce qui masque l’absence de modules autonomes.
+
+## 7. Services métier existants
+
+### Services propres au Directeur
+
+- portal/services/director/teacher_management_service.py : création compte enseignant, normalisation des affectations et contrat PDF.
+- teacher_assignment_service.py : contexte de charge et affectations.
+- planning_assignment_service.py : contexte de planification.
+- classroom_ops_service.py : contexte opérationnel des classes.
+- document_workflow_service.py : dépôt et validation des documents enseignants.
+- transfer_workflow_service.py : création et revue des transferts.
+- tasks_center.py : centre de tâches synthétique calculé depuis les semestres, affectations et anomalies.
+
+### Services académiques réutilisables
+
+- academics/services/schedule_service.py : conflits, création/modification/report/annulation/démarrage/fin des séances, grilles et statistiques.
+- timetable_service.py : payload d’emploi du temps.
+- lesson_log_service.py : création, mise à jour, contrôles qualité et cahiers manquants.
+- grading.py, semester.py, ue.py et year.py : calculs de notes, résultats, crédits et décisions.
+- workflow.py : permissions et complétude des semestres.
+- documents.py : bulletins semestriels/annuels et diplômes.
+- reporting.py : relevés et rapports étudiant/classe.
+- analytics_service.py : progression de classe, assiduité et snapshot pédagogique d’annexe.
+- academics/imports/* : modèles et traitement d’import de notes.
+- academic_cycle/services/* : activation d’année, readiness, délibération, clôture, archivage, promotion, corrections et audit.
+- notifier/services/* : émission et livraison de notifications.
+
+Les services sont riches mais le dashboard n’en orchestre qu’une partie. Les services de cycle annuel, analytics, import de notes, corrections et alertes doivent être exposés sans dupliquer leur logique.
+
+## 8. Permissions existantes
+
+- accounts/access.py fournit can_access(), get_user_scope(), get_user_role(), get_user_position() et le mapping director_of_studies → directeur_etudes.
+- La permission (view_dashboard, director_studies) n’autorise pas la portée globale.
+- portal/permissions.py gère le rôle de portail et les redirections.
+- portal/views/views.py utilise _position_required avec director_of_studies, parfois DG adjoints/DG et super_admin.
+- academics/permissions.py et academic_cycle/permissions.py fournissent des contrôles spécialisés pour notes, bulletins et cycle.
+- get_user_branch() est utilisé comme source de l’annexe dans les vues du dashboard.
+
+Points à corriger :
+
+- Plusieurs querysets font « filtre par branch si branch existe, sinon toutes les données ». Cette convention convient éventuellement au super-admin, mais ne doit jamais s’appliquer à director_of_studies.
+- director_export_report_xlsx accepte branch=None et produit explicitement « Toutes annexes ».
+- Certaines vérifications de branche sont conditionnelles (`if branch and ...`) : un Directeur sans annexe pourrait donc traverser ces garde-fous.
+- Les ensembles de positions autorisées ne sont pas uniformes : director_bulletin_action est plus restrictif que les actions résultats ; BULLETIN_MANAGEMENT_POSITIONS doit être la source unique.
+- Les mutations devraient combiner position, permission métier, annexe obligatoire, méthode HTTP et état du workflow.
+
+## 9. Exports existants
+
+- Excel pédagogique : academic_cycle/services/academic_excel_reports.py, exposé par director_export_report_xlsx. Il contient classe, programme, semestre, statut, effectif, moyenne, taux de réussite et désinscriptions.
+- PDF de correspondance : template portal/admin/correspondances/pdf.html avec WeasyPrint si disponible.
+- PDF de contrat enseignant : portal/services/director/teacher_management_service.py.
+- Impression des emplois du temps classe/enseignant.
+- PDF/print de feuille de notes de classe via portal/views/admin_grades.py.
+- Bulletins et diplômes PDF via academics/services/documents.py et academics/templates/academics/reports/.
+- Relevés individuels et ZIP de classe/sélection via academics/views.py.
+
+Manques : PV de délibération, calendrier académique exportable, planning d’examens, rapport de suivi des cours, registre d’alertes et dossier d’archivage complet. L’export Directeur actuel est utile mais trop synthétique pour constituer le rapport pédagogique complet.
+
+## 10. Analyse module par module
+
+### 10.1 Accueil académique
+
+Existe : indicateurs d’annexe, aperçu planning, score qualité, alertes calculées, centre de tâches, classes, résultats et cahiers récents. Fichiers principaux : portal/views/views.py, portal/services/director/tasks_center.py, academics/services/schedule_service.py et director_dashboard.html.
+
+Manque : vision structurée du workflow annuel, échéances, examens, notes en attente, PV, publications, incidents et actions assignées. Le centre de tâches est calculé à la volée et n’a ni responsable, ni échéance, ni statut durable.
+
+À réutiliser : schedule overview, analytics_service, readiness_service, tasks_center et notification_center.
+
+À corriger : refuser l’accueil si l’annexe du Directeur est absente ; séparer les KPI des tâches actionnables ; donner accès aux onze modules.
+
+À éviter : ajouter des statistiques décoratives sans lien vers une action ou un dossier filtré.
+
+### 10.2 Planification académique
+
+Existe : AcademicYear, BranchAcademicCycle, Semester, statuts, classes, activation/clôture annuelle et planning hebdomadaire. Le dashboard permet surtout la planification des cours.
+
+Manque : calendrier académique institutionnel, jalons, congés, périodes d’inscription, examens, jurys, publication, responsables et dépendances. La planification de l’année/cycle n’est pas pilotable depuis ce dashboard.
+
+À réutiliser : AcademicYear, BranchAcademicCycle, Semester, activation_service, branch_cycle_service, closure_service et AcademicScheduleEvent pour certains événements datés.
+
+À corriger : distinguer calendrier académique, périodes pédagogiques et emplois du temps ; ne pas surcharger AcademicScheduleEvent avec tous les concepts institutionnels sans vérifier ses invariants obligatoires (classe, EC, enseignant).
+
+À éviter : représenter les congés et jurys comme de faux cours avec un EC et un enseignant artificiels.
+
+### 10.3 Programmes UE / EC
+
+Existe : Programme/ProgrammeYear, classes, semestres, UE, EC, contenus et actions de création/modification/suppression via director_programme_action. Le workspace affiche l’état de complétude.
+
+Manque : versionnage par année/annexe, statut brouillon/validé/publié, historique d’approbation, règles de crédits/cohérence globales et duplication contrôlée d’une maquette vers une nouvelle année.
+
+À réutiliser : academics.models, academic_structure_service.py et academics/services/ue.py.
+
+À corriger : déplacer les mutations de portal/views/views.py vers un service transactionnel ; protéger la suppression si notes, affectations ou séances existent ; vérifier systématiquement classe/semestre/UE/EC dans la même annexe.
+
+À éviter : supprimer physiquement une structure déjà utilisée ; modifier rétroactivement une maquette publiée.
+
+### 10.4 Affectation enseignants
+
+Existe : DirectorTeacherAssignment, création enseignant, affectation classe/EC, salle, volume prévu, documents et contrat. Des validations empêchent EC hors classe et volume non positif.
+
+Manque : période de validité, année académique explicite sur l’affectation, statut proposé/validé/terminé, remplacements, disponibilité, qualification et traçabilité des changements.
+
+À réutiliser : teacher_management_service, teacher_assignment_service, TeacherDocument et contrôles de charge de schedule_service.
+
+À corriger : la contrainte unique n’inclut ni annexe ni année ; une affectation historique peut bloquer une nouvelle année. `academic_class` et `ec` sont nullable alors que le workflow normal exige les deux. La suppression d’affectation est physique. Vérifier également que l’enseignant, la classe, l’EC et l’affectation appartiennent tous à la même annexe.
+
+À éviter : confondre affectation pédagogique et contrat RH ; créer une seconde source d’affectations concurrente.
+
+### 10.5 Emplois du temps
+
+Existe : WeeklyScheduleSlot, matérialisation semaine/mois, AcademicScheduleEvent, conflits enseignant/classe/salle, plafonds de volume, impressions et logs de changements. C’est le module le plus mûr.
+
+Manque : workflow de validation/publication, notifications automatiques de changement, gestion explicite des salles/ressources, indisponibilités enseignants, duplication de période et export PDF officiel.
+
+À réutiliser : schedule_service.py, timetable_service.py, modèles de logs et templates partagés superviseur/directeur.
+
+À corriger : les templates du planner Directeur réutilisent les partials `portal/staff/supervisor`, ce qui crée un couplage UI et métier. Clarifier la propriété des composants partagés. Vérifier l’isolation d’annexe dans chaque endpoint par identifiant.
+
+À éviter : créer un troisième moteur d’emploi du temps ; contourner get_schedule_conflicts().
+
+### 10.6 Suivi des cours
+
+Existe : LessonLog, statut séance, contenu, devoirs, observations, validation, assiduité enseignants/étudiants, contrôles qualité et séances sans cahier.
+
+Manque : module Directeur autonome avec progression prévue/réalisée par EC, retard sur volume, cours annulés/non rattrapés, validation du cahier, plans de rattrapage et historique des relances.
+
+À réutiliser : lesson_log_service.py, session_service.py, analytics_service.py, TeacherAttendance et TeacherCase.
+
+À corriger : intégrer les données déjà calculées au dashboard au lieu de limiter le suivi aux derniers cahiers et alertes génériques.
+
+À éviter : calculer la progression uniquement sur le nombre de séances ; utiliser également durées/volumes et contenu prévu.
+
+### 10.7 Évaluations / examens
+
+Existe : sessions de notes dans ECGrade/Semester, workflow de semestre et évaluations spéciales de dettes académiques.
+
+Manque majeur : modèle et workflow général d’examen (type, session, matière, classe, date, salle, durée, surveillants, barème, convocation, présence, incident, copie et statut). Aucun module Directeur dédié.
+
+À réutiliser : AcademicScheduleEvent seulement pour la dimension temporelle si ses contraintes sont adaptées, schedule conflict engine, GradeModificationRequest et notifier.
+
+À corriger : séparer organisation d’examen et résultat de note. Définir les états brouillon → planifié → confirmé → réalisé → corrigé → clôturé.
+
+À éviter : utiliser AcademicDebtEvaluationSession comme session d’examen ordinaire ; elle répond à un cas métier différent.
+
+### 10.8 Notes / résultats
+
+Existe : grille de saisie, calculs centralisés, sessions normal/rattrapage, publication, OTP, anomalies, modification sécurisée, import dans academics/imports et vues IT, décisions semestrielles/annuelles.
+
+Manque : parcours Directeur complet d’import, prévisualisation, rejets ligne par ligne, validation par enseignant, verrouillage, approbation, publication et correction. L’import n’est pas intégré au dashboard Directeur.
+
+À réutiliser : academics/imports, grading.py, semester.py, workflow.py, admin_grades.py et grade_modifications.py.
+
+À corriger : ne pas maintenir deux interfaces de notes indépendantes (admin/IT et Directeur). Centraliser les permissions et transitions. Rendre explicite qui saisit, qui valide et qui publie. Ajouter une traçabilité complète des imports et validations.
+
+À éviter : recalculer les moyennes dans les vues ou exports ; utiliser les services existants.
+
+### 10.9 Bulletins / relevés / PV
+
+Existe : AcademicBulletin semestriel/annuel, génération en masse, publication, PDF, relevés PDF/ZIP, rapports classe/étudiant, diplôme et décision log.
+
+Manque : PV de délibération, registre des jurys/signataires, numérotation officielle, signature, scellement, version et révocation. Les relevés existent hors du workspace Directeur et ne sont pas un objet persistant distinct.
+
+À réutiliser : academics/services/documents.py, reporting.py, templates reports et AcademicDecisionLog.
+
+À corriger : exposer les relevés dans le workflow Directeur, lier génération à la publication validée, conserver snapshot/version, harmoniser les positions autorisées et intégrer la clôture académique.
+
+À éviter : générer un PV depuis le HTML du bulletin sans modèle de décision et participants au jury.
+
+### 10.10 Correspondances administratives
+
+Existe : AdministrativeDocument, six types, brouillon/publication, liste, création et PDF filtrés par annexe.
+
+Manque : référence fiable et unique, destinataires structurés, pièces jointes, signature, accusé de réception, versions, archivage, notification et audit de publication.
+
+À réutiliser : modèle actuel, notifier, moteur PDF et éventuellement AccountingDocumentSequence comme inspiration de numérotation (sans coupler les domaines).
+
+À corriger : `reference` n’est ni obligatoire ni unique ; publication modifie seulement un statut, sans published_by/published_at. Ajouter un service métier au lieu de muter directement dans la vue.
+
+À éviter : conserver les destinataires exclusivement en texte libre pour les notifications et le suivi.
+
+### 10.11 Alertes pédagogiques
+
+Existe : alertes calculées par schedule_service, tâches calculées par tasks_center, AttendanceAlert, StudentCase, TeacherCase et infrastructure notifier.
+
+Manque : agrégateur Directeur, priorités harmonisées, attribution, échéance, statut, commentaire, escalade, résolution, déduplication et lien vers l’objet source.
+
+À réutiliser : AttendanceAlert et Case pour les alertes persistantes, notifier pour diffusion, tasks_center pour les règles de détection et analytics_service pour les indicateurs.
+
+À corriger : décider quelles alertes sont des événements éphémères, quelles alertes ouvrent un dossier persistant et qui en est responsable. Brancher les cas escaladés au Directeur.
+
+À éviter : créer une nouvelle table d’alerte qui duplique AttendanceAlert, StudentCase et TeacherCase sans stratégie d’agrégation.
+
+## 11. Écarts entre l’existant et le besoin métier
+
+- Navigation : 6 sections techniques au lieu de 11 modules métier.
+- Workflow annuel : objets disponibles mais non orchestrés du début d’année à l’archivage.
+- Calendrier académique : absent.
+- Examens : absence d’un domaine métier ordinaire.
+- Notes : fonctions avancées mais dispersées entre dashboard Directeur, admin grades et import IT.
+- Validation : publication OTP présente, mais étapes de saisie/import, contrôle, validation et verrouillage insuffisamment explicites.
+- Documents : bulletins et relevés existent ; PV absent.
+- Archivage : modèles/services existent ailleurs, non accessibles depuis le dashboard Directeur.
+- Alertes : sources multiples, pas de centre de traitement unifié.
+- Correspondances : fonctionnelles au niveau minimal, sans cycle documentaire robuste.
+- Pilotage : beaucoup d’agrégats sont construits dans une vue monolithique plutôt que par selectors/services testables.
+
+## 12. Risques techniques
+
+1. Critique — fuite inter-annexes si branch=None : plusieurs querysets deviennent globaux et l’export annonce « Toutes annexes ».
+2. Élevé — vue monolithique : portal/views/views.py concentre trop de responsabilités, ce qui augmente les régressions et rend les permissions difficiles à auditer.
+3. Élevé — doublons métier : portal.TransferRequest et academic_cycle.TransferRequest coexistent ; deux services de transfert existent. Leur finalité et source de vérité doivent être clarifiées.
+4. Élevé — doublons d’inscription académique : enrollment_service.py et enrollment_serviceclaude.py indiquent une implémentation parallèle à supprimer ou officiellement déprécier après audit.
+5. Élevé — affectations non versionnées : DirectorTeacherAssignment n’a pas d’année explicite et sa contrainte unique traverse potentiellement les années.
+6. Élevé — mutations destructrices : suppression physique possible d’UE/EC et d’affectations, incompatible avec l’exigence d’historique si ces objets sont utilisés.
+7. Moyen — sections incohérentes : certaines vues réinjectent d’anciens noms (`teachers`, `documents`, `publications`) alors que le template attend `enseignants` ou `evaluations`; cela peut rendre un workspace vide selon le chemin de réponse.
+8. Moyen — couplage Directeur/Surveillant : le planner Directeur rend des partials du superviseur.
+9. Moyen — logique d’export : utilisation de fonctions privées `_auto_width`, `_style_header_row`, `_write_cell` de accounts.services.excel_reports.
+10. Moyen — performances : _build_director_workspace_context calcule beaucoup de données et résultats à chaque requête HTMX ; risque N+1 et temps de réponse croissant.
+11. Moyen — audit incomplet des correspondances et publications : peu de champs d’auteur/date de publication et absence de journal métier dédié.
+12. Moyen — couverture de tests inégale : les emplois du temps et affectations sont bien testés dans accounts/tests.py, mais les correspondances, PV, imports, alertes et workflow complet le sont peu ou pas comme parcours Directeur.
+
+## 13. Recommandations backend
+
+1. Imposer une fonction de garde unique `require_director_branch_scope` : un Directeur sans annexe reçoit une erreur explicite ; seuls les rôles globaux autorisés peuvent demander plusieurs annexes.
+2. Extraire le dashboard en package portal/views/director/ et séparer selectors, context builders et command services. Garder les URLs stables.
+3. Définir une machine d’état du workflow académique annuel par annexe : préparation, planification, enseignement, évaluations, validation, publication, clôture et archivage.
+4. Créer le domaine manquant de calendrier académique, après définition précise des événements et portées année/annexe/programme/classe.
+5. Concevoir le domaine examens avant l’interface : sessions, épreuves, salles, surveillants, candidats, incidents et états.
+6. Unifier l’import/saisie/validation/publication des notes autour des services academics existants et d’un journal d’opérations.
+7. Ajouter un vrai modèle de PV lié à une classe, une période, un jury, une décision snapshotée et des signataires.
+8. Versionner les maquettes UE/EC et affectations par année académique ; archiver plutôt que supprimer les éléments déjà utilisés.
+9. Construire un read model d’alertes qui agrège AttendanceAlert, StudentCase, TeacherCase, anomalies de notes, retards de cours et conflits de planning sans dupliquer les sources.
+10. Renforcer AdministrativeDocument : numérotation, published_by/at, destinataires structurés, pièces jointes, versions et audit.
+11. Réutiliser academic_cycle pour readiness, clôture et archive au lieu de recréer ces fonctions dans portal.
+12. Ajouter des tests systématiques de non-visibilité inter-annexes pour chaque GET, POST, export et téléchargement.
+
+## 14. Ordre d’implémentation conseillé
+
+1. Sécurité d’annexe et matrice de permissions ; tests de non-régression inter-annexes.
+2. Découpage interne du backend Directeur sans changement fonctionnel, avec selectors/services et tests.
+3. Workflow annuel et intégration de BranchAcademicCycle/AcademicYear/Semester au dashboard.
+4. Versionnement programmes UE/EC et affectations enseignants.
+5. Stabilisation du module emplois du temps et intégration des notifications.
+6. Module suivi des cours et progression pédagogique.
+7. Modèle de calendrier académique.
+8. Modèle et workflow examens/évaluations.
+9. Workflow unifié import/saisie/validation/publication des notes.
+10. Bulletins/relevés puis modèle de PV et jury.
+11. Centre d’alertes pédagogiques et escalades.
+12. Correspondances renforcées, clôture et archivage complet.
+13. Exports consolidés et optimisation des performances.
+
+## 15. Liste précise des fichiers à modifier plus tard
+
+### Sécurité et accès
+
+- accounts/access.py
+- accounts/tests.py
+- portal/permissions.py
+- portal/views/views.py (puis remplacement progressif par un package dédié)
+- academics/permissions.py
+- academic_cycle/permissions.py
+
+### Dashboard Directeur
+
+- portal/urls.py
+- portal/views/views.py
+- portal/services/director/__init__.py
+- portal/services/director/tasks_center.py
+- portal/services/director/classroom_ops_service.py
+- portal/services/director/planning_assignment_service.py
+- portal/services/director/teacher_assignment_service.py
+- portal/services/director/teacher_management_service.py
+- portal/services/director/document_workflow_service.py
+- portal/services/director/transfer_workflow_service.py
+- templates/portal/staff/director_dashboard.html
+- templates/portal/staff/director/partials/workspace.html
+- templates/portal/staff/director/partials/panels/*
+- templates/portal/staff/director/partials/drawers/*
+- templates/portal/staff/director/modals/*
+
+### Modèles et services académiques
+
+- academics/models.py
+- academics/forms.py
+- academics/urls.py
+- academics/views.py
+- academics/services/schedule_service.py
+- academics/services/lesson_log_service.py
+- academics/services/analytics_service.py
+- academics/services/workflow.py
+- academics/services/grading.py
+- academics/services/semester.py
+- academics/services/year.py
+- academics/services/documents.py
+- academics/services/reporting.py
+- academics/imports/import_service.py
+- academics/imports/template_service.py
+- academics/tests.py
+- nouvelles migrations academics, seulement après validation de la conception.
+
+### Cycle, clôture et archivage
+
+- academic_cycle/models.py
+- academic_cycle/urls.py
+- academic_cycle/views.py ou ses modules de vues existants
+- academic_cycle/services/readiness_service.py
+- academic_cycle/services/closure_service.py
+- academic_cycle/services/audit_service.py
+- academic_cycle/services/academic_excel_reports.py
+- academic_cycle/tests/*
+- portal/models.py
+- portal/services/archive_service.py
+- migrations portal/academic_cycle nécessaires après conception.
+
+### Alertes et notifications
+
+- students/models.py
+- portal/services/director/tasks_center.py
+- academics/services/analytics_service.py
+- notifier/services/notifications.py
+- notifier/services/dispatcher.py
+- notification_center/selectors.py
+- templates/notification_center/* si l’interface commune est retenue.
+
+### Exports et documents
+
+- templates/portal/admin/correspondances/pdf.html
+- academics/templates/academics/reports/*
+- portal/views/admin_grades.py
+- accounts/services/excel_reports.py (uniquement pour exposer une API publique de styles/helpers, pas pour y mettre la logique académique)
+- academic_cycle/services/academic_excel_reports.py
+
+### Fichiers à clarifier avant modification
+
+- academics/services/enrollment_serviceclaude.py : doublon apparent de enrollment_service.py.
+- academic_cycle/services/transfer_service.py et portal/services/director/transfer_workflow_service.py.
+- academic_cycle.models.TransferRequest et portal.models.TransferRequest.
+- templates/portal/staff/supervisor/partials/planner_*.html utilisés par les routes Directeur.
+
+Conclusion : le backend actuel fournit environ la moitié à deux tiers des briques techniques nécessaires, mais pas encore leur orchestration métier complète. La priorité n’est pas d’ajouter immédiatement des écrans : il faut d’abord verrouiller l’annexe, fixer les sources de vérité, formaliser les états du cycle académique et combler les domaines calendrier/examens/PV.

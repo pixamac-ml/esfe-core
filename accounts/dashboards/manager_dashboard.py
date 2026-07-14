@@ -1,17 +1,20 @@
 from datetime import date, timedelta
 
 from django.contrib.auth.decorators import login_required
+from django.conf import settings
 from django.core.paginator import Paginator
 from django.db import OperationalError, ProgrammingError
 from django.db.models import Count, F, Q, Sum
 from django.shortcuts import redirect, render
 from django.utils import timezone
+from django.views.decorators.http import require_GET
 
 from admissions.models import Candidature
 from accounts.forms import BranchBankTransferForm, BranchCashMovementForm, BranchExpenseForm, BranchMonthlyClosureForm, DonationForm
 from accounts.models import BranchBankTransfer, BranchCashMovement, BranchExpense, BranchMonthlyClosure, Donation, PayrollEntry, Profile, TeacherHonorariumEntry
 from accounts.services.manager_intelligence import build_manager_intelligence_context
 from accounts.services.manager_intelligence import get_branch_cash_balance
+from accounts.services.financial_reports import build_manager_financial_report_context, resolve_financial_report_period
 from shop.forms import ShopCounterOrderForm, ShopProductForm, ShopStockInForm
 from shop.services.shop_cash_session import manager_shop_sessions_for_agent
 from shop.services.shop_service import get_manager_shop_context
@@ -34,6 +37,16 @@ def manager_required(view_func):
     """Verifie l'acces gestionnaire et injecte l'annexe dans la requete."""
 
     def wrapper(request, *args, **kwargs):
+        if settings.AUTH_POLICY_V2_ENABLED:
+            from accounts.access_context import get_request_access_context
+            from accounts.policy_v2 import decide
+
+            context = get_request_access_context(request)
+            decision = decide(context, allowed_positions={"annex_manager"})
+            if not decision.allowed:
+                return render(request, "core/errors/403.html", status=403)
+            request.branch = context.branch
+            return view_func(request, *args, **kwargs)
         if not is_manager(request.user):
             return redirect("accounts:dashboard_redirect")
         branch = get_user_branch(request.user)
@@ -51,39 +64,7 @@ def _paginate(request, queryset, *, param_name, per_page=20):
 
 
 def _resolve_report_period(request, today):
-    preset = (request.GET.get("report_period") or "month").strip()
-    start_raw = (request.GET.get("report_start") or "").strip()
-    end_raw = (request.GET.get("report_end") or "").strip()
-
-    period_map = {
-        "today": (today, today, "Aujourd'hui"),
-        "week": (today - timedelta(days=6), today, "Cette semaine glissante"),
-        "two_weeks": (today - timedelta(days=13), today, "Deux semaines"),
-        "month": (today.replace(day=1), today, "Ce mois"),
-        "three_months": (today - timedelta(days=89), today, "Trois mois"),
-        "semester": (today - timedelta(days=179), today, "Semestre"),
-        "year": (today.replace(month=1, day=1), today, "Cette annee"),
-    }
-
-    if preset == "custom":
-        try:
-            start_date = date.fromisoformat(start_raw)
-            end_date = date.fromisoformat(end_raw)
-        except ValueError:
-            start_date = today.replace(day=1)
-            end_date = today
-            preset = "month"
-        if start_date > end_date:
-            start_date, end_date = end_date, start_date
-        return {
-            "preset": preset,
-            "start": start_date,
-            "end": end_date,
-            "label": "Periode personnalisee",
-        }
-
-    start_date, end_date, label = period_map.get(preset, period_map["month"])
-    return {"preset": preset, "start": start_date, "end": end_date, "label": label}
+    return resolve_financial_report_period(request, today=today)
 
 
 def _get_manager_agent(user, branch):
@@ -398,65 +379,9 @@ def _manager_context(request, active_section="overview"):
             1,
         )
 
-    report_period = _resolve_report_period(request, today)
-    report_movements = BranchCashMovement.objects.filter(
-        branch=branch,
-        movement_date__gte=report_period["start"],
-        movement_date__lte=report_period["end"],
-    )
-    report_total_entries = report_movements.filter(
-        movement_type=BranchCashMovement.TYPE_IN
-    ).aggregate(total=Sum("amount"))["total"] or 0
-    report_total_exits = report_movements.filter(
-        movement_type=BranchCashMovement.TYPE_OUT
-    ).aggregate(total=Sum("amount"))["total"] or 0
-    report_student_payments = report_movements.filter(
-        movement_type=BranchCashMovement.TYPE_IN,
-        source=BranchCashMovement.SOURCE_STUDENT_PAYMENT,
-    ).aggregate(total=Sum("amount"))["total"] or 0
-    report_shop_sales = report_movements.filter(
-        movement_type=BranchCashMovement.TYPE_IN,
-        source=BranchCashMovement.SOURCE_SHOP,
-    ).aggregate(total=Sum("amount"))["total"] or 0
-    report_expenses = report_movements.filter(
-        movement_type=BranchCashMovement.TYPE_OUT,
-        source=BranchCashMovement.SOURCE_EXPENSE,
-    ).aggregate(total=Sum("amount"))["total"] or 0
-    report_salaries = report_movements.filter(
-        movement_type=BranchCashMovement.TYPE_OUT,
-        source=BranchCashMovement.SOURCE_PAYROLL,
-    ).aggregate(total=Sum("amount"))["total"] or 0
-    report_other_charges = report_movements.filter(
-        movement_type=BranchCashMovement.TYPE_OUT,
-    ).exclude(
-        source__in=[BranchCashMovement.SOURCE_EXPENSE, BranchCashMovement.SOURCE_PAYROLL, BranchCashMovement.SOURCE_HONORARIUM]
-    ).aggregate(total=Sum("amount"))["total"] or 0
-    report_other_entries = report_movements.filter(
-        movement_type=BranchCashMovement.TYPE_IN,
-    ).exclude(
-        source__in=[BranchCashMovement.SOURCE_STUDENT_PAYMENT, BranchCashMovement.SOURCE_SHOP]
-    ).aggregate(total=Sum("amount"))["total"] or 0
-    report_honorarium = report_movements.filter(
-        movement_type=BranchCashMovement.TYPE_OUT,
-        source=BranchCashMovement.SOURCE_HONORARIUM,
-    ).aggregate(total=Sum("amount"))["total"] or 0
-    report_rows = [
-        {"label": "Total entrees", "amount": report_total_entries, "tone": "emerald"},
-        {"label": "Total sorties", "amount": report_total_exits, "tone": "rose"},
-        {"label": "Paiements scolaires", "amount": report_student_payments, "tone": "blue"},
-        {"label": "Ventes boutique", "amount": report_shop_sales, "tone": "violet"},
-        {"label": "Depenses", "amount": report_expenses, "tone": "amber"},
-        {"label": "Salaires", "amount": report_salaries, "tone": "slate"},
-        {"label": "Honoraires enseignants", "amount": report_honorarium, "tone": "indigo"},
-        {"label": "Autres charges", "amount": report_other_charges, "tone": "rose"},
-        {"label": "Autres entrees", "amount": report_other_entries, "tone": "emerald"},
-        {"label": "Solde net", "amount": report_total_entries - report_total_exits, "tone": "dark"},
-        {
-            "label": "Gain reel annexe",
-            "amount": (report_student_payments + report_shop_sales + report_other_entries) - (report_expenses + report_salaries + report_honorarium + report_other_charges),
-            "tone": "primary",
-        },
-    ]
+    financial_report = build_manager_financial_report_context(branch=branch, request=request, today=today)
+    report_period = financial_report["report_period"]
+    report_rows = financial_report["report_summary_rows"]
 
     expense_status = request.GET.get("expense_status", "").strip()
     expense_category = request.GET.get("expense_category", "").strip()
@@ -869,6 +794,7 @@ def _manager_context(request, active_section="overview"):
             "transfer_date": today,
             "amount": 0,
         }),
+        **financial_report,
         "manager_intelligence": intelligence,
         "monthly_closures": BranchMonthlyClosure.objects.filter(branch=branch).order_by("-period_month", "-created_at")[:12],
         "bank_transfers": BranchBankTransfer.objects.filter(branch=branch).select_related("closure").order_by("-transfer_date", "-created_at")[:12],
@@ -902,24 +828,28 @@ def _render_manager_dashboard(request, active_section):
 
 
 @manager_required
+@require_GET
 def manager_dashboard(request):
     section = request.GET.get("section", "overview").strip() or "overview"
-    allowed_sections = {"overview", "candidatures", "inscriptions", "paiements", "salaires", "depenses", "caisse", "rapport", "cloture", "boutique", "dons"}
+    allowed_sections = {"overview", "candidatures", "inscriptions", "paiements", "salaires", "depenses", "caisse", "rapport", "cloture", "boutique", "dons", "settings"}
     if section not in allowed_sections:
         section = "overview"
     return _render_manager_dashboard(request, section)
 
 
 @manager_required
+@require_GET
 def manager_candidatures(request):
     return _render_manager_dashboard(request, "candidatures")
 
 
 @manager_required
+@require_GET
 def manager_inscriptions(request):
     return _render_manager_dashboard(request, "inscriptions")
 
 
 @manager_required
+@require_GET
 def manager_paiements(request):
     return _render_manager_dashboard(request, "paiements")

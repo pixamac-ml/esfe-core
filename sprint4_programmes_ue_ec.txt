@@ -1,0 +1,93 @@
+SPRINT 4 - BACKEND PROGRAMMES / UE / EC ESFE
+
+1. Resume des changements
+- Audit rapide effectue sur le module existant :
+  - Mutations UE/EC existantes dans portal/services/academic_structure_service.py.
+  - Vues utilisees : portal/views/views.py et portal/views/it_workflows.py.
+  - Risque identifie : delete_ec faisait une suppression physique si l'EC n'etait pas detecte comme utilise.
+  - Annexe deja filtree dans plusieurs vues, mais sans service metier central dans academics.
+- Ajout d'un service metier central : academics/services/programme_structure_service.py.
+- Ajout d'un statut pedagogique minimal sur UE et EC :
+  - draft
+  - complete
+  - validated
+  - published
+  - archived
+- Les actions portal save_ue/save_ec/delete_ec deleguent maintenant au service metier academics.
+- delete_ec devient un archivage logique via structure_status=archived, et refuse l'action si l'EC est deja utilise.
+- Validations ajoutees :
+  - UE obligatoire avec semestre.
+  - EC obligatoire avec UE.
+  - credit EC > 0.
+  - coefficient EC > 0.
+  - total credits UE <= 6.
+  - total credits semestre <= total_required_credits.
+  - refus de rattacher un EC a une UE d'une autre classe.
+  - refus mutation inter-annexes pour directeur des etudes.
+  - acces global autorise pour DG/DGA/Super Admin.
+- Selectors ajoutes :
+  - structure complete d'une classe.
+  - UE par semestre.
+  - EC par UE.
+  - etat de completude semestre.
+  - EC sans enseignant.
+  - EC sans note.
+  - UE incompletes.
+  - total credits semestre.
+
+2. Fichiers crees
+- academics/services/programme_structure_service.py
+- academics/selectors/programme_structure_selectors.py
+- academics/permissions/programme_structure_permissions.py
+- academics/test_programme_structure.py
+- sprint4_programmes_ue_ec.txt
+
+3. Fichiers modifies
+- academics/models.py
+- portal/services/academic_structure_service.py
+- portal/views/views.py
+- portal/views/it_workflows.py
+
+4. Migration
+- academics/migrations/0025_ec_archived_at_ec_structure_status_ue_archived_at_and_more.py
+  - ajoute structure_status et archived_at sur UE.
+  - ajoute structure_status et archived_at sur EC.
+
+5. Tests ajoutes
+- creation UE valide.
+- creation EC valide.
+- rejet EC deplace vers UE d'une autre classe.
+- rejet credit/coefficient invalides.
+- refus mutation inter-annexes directeur.
+- acces global DG valide.
+- refus archivage/suppression EC utilise.
+- calcul completude semestre.
+- total credits semestre.
+- refus depassement credits semestre.
+
+6. Commandes de test executees
+- python manage.py check
+  Resultat : OK.
+- python manage.py makemigrations --check --dry-run academics
+  Resultat : OK, aucun changement non migre.
+- python manage.py test --settings=config.settings_test_local academics.test_programme_structure --keepdb -v 2
+  Resultat : OK, 8 tests.
+- python manage.py test --settings=config.settings_test_local academics --keepdb
+  Resultat : OK, 62 tests.
+- python manage.py test --settings=config.settings_test_local accounts.tests.PortalPhaseOneTests.test_director_cannot_mutate_programme_from_another_branch --keepdb
+  Resultat : OK.
+- python manage.py test --settings=config.settings_test_local accounts.tests.PortalPhaseOneTests.test_director_teacher_assignment_requires_matching_class_room_and_ec --keepdb
+  Resultat : OK.
+- python manage.py test --settings=config.settings_test_local accounts.tests --keepdb
+  Resultat : ECHEC hors perimetre Sprint 4.
+  Causes observees :
+    - NameError payroll_entry dans accounts/dashboards/htmx_salaires.py.
+    - contrainte "Une seule annee academique peut etre active" dans un test portail.
+    - assertion "Recettes annee" manquante dans un test rapport gestionnaire.
+
+7. Points a traiter au Sprint 5
+- Ajouter endpoints/API backend explicites pour workflow validated/published si necessaire.
+- Ajouter actions d'archivage UE explicites cote directeur.
+- Decider si les EC archives doivent etre caches partout dans les rapports pedagogiques.
+- Ajouter un audit log metier pour les modifications UE/EC.
+- Etendre les selectors pour produire un diagnostic complet par programme et par annexe.

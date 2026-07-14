@@ -1,0 +1,157 @@
+<div id="esfe-session-modal" class="fixed inset-0 hidden items-center justify-center bg-slate-950/65 p-4" style="z-index:10000" role="dialog" aria-modal="true" aria-labelledby="esfe-session-title">
+  <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+    <p class="text-xs font-bold uppercase tracking-widest text-amber-600">Session institutionnelle</p>
+    <h2 id="esfe-session-title" class="mt-2 text-xl font-bold text-slate-900">Votre session va expirer</h2>
+    <p class="mt-3 text-sm text-slate-600">Sans interaction, vous serez deconnecte dans <strong id="esfe-session-countdown">--:--</strong>.</p>
+    <p id="esfe-session-dirty-warning" class="mt-3 hidden rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Un formulaire contient des modifications non enregistrees. Elles ne seront pas sauvegardees automatiquement.</p>
+    <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+      <form id="esfe-session-logout-form" method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button type="submit" class="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700">Se deconnecter</button></form>
+      <button id="esfe-session-continue" type="button" class="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white">Continuer ma session</button>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  'use strict';
+  const statusUrl = "{% url 'accounts_portal:system_session_status' %}";
+  const activityUrl = "{% url 'accounts_portal:system_session_activity' %}";
+  const loginUrl = "{% url 'accounts:login' %}";
+  const modal = document.getElementById('esfe-session-modal');
+  const countdown = document.getElementById('esfe-session-countdown');
+  const dirtyWarning = document.getElementById('esfe-session-dirty-warning');
+  const continueButton = document.getElementById('esfe-session-continue');
+  const logoutForm = document.getElementById('esfe-session-logout-form');
+  const channel = 'BroadcastChannel' in window ? new BroadcastChannel('esfe-system-session') : null;
+  const storageKey = 'esfe-system-session-event';
+  let deadline = 0;
+  let warningSeconds = 120;
+  let lastActivitySent = 0;
+  let expired = false;
+  let activityInFlight = false;
+  let expiryCheckInFlight = false;
+  let sessionIdentifier = '';
+  let activityThrottleMs = 30000;
+
+  function csrfToken() {
+    const item = document.cookie.split('; ').find(row => row.startsWith('csrftoken='));
+    return item ? decodeURIComponent(item.split('=').slice(1).join('=')) : '';
+  }
+  function publish(payload) {
+    payload.sessionIdentifier = sessionIdentifier;
+    payload.sentAt = Date.now();
+    if (channel) channel.postMessage(payload);
+    else { try { localStorage.setItem(storageKey, JSON.stringify(payload)); } catch (_) {} }
+  }
+  function loginDestination(reason) {
+    const next = window.location.pathname + window.location.search;
+    return loginUrl + '?next=' + encodeURIComponent(next) + '&session_expired=' + encodeURIComponent(reason || 'idle_timeout');
+  }
+  function redirectExpired(reason, broadcast) {
+    if (expired) return;
+    expired = true;
+    if (broadcast !== false) publish({type: 'expired', reason: reason || 'IDLE_TIMEOUT'});
+    window.location.assign(loginDestination(reason));
+  }
+  function applyState(data, broadcast) {
+    if (!data || data.active !== true) return;
+    warningSeconds = Number(data.warning_seconds) || 120;
+    sessionIdentifier = String(data.session_identifier || sessionIdentifier);
+    activityThrottleMs = Math.max(1000, Number(data.activity_throttle_seconds || 30) * 1000);
+    deadline = Date.now() + Math.max(0, Number(data.remaining_seconds) || 0) * 1000;
+    expired = false;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    if (broadcast) publish({type: 'activity', remainingSeconds: Number(data.remaining_seconds) || 0, warningSeconds: warningSeconds});
+  }
+  function hasDirtyForm() {
+    return Boolean(document.querySelector('form[data-esfe-dirty="1"]'));
+  }
+  async function confirmExpiry() {
+    if (expiryCheckInFlight || expired) return;
+    expiryCheckInFlight = true;
+    try {
+      const response = await originalFetch(statusUrl, {credentials: 'same-origin', headers: {'Accept': 'application/json'}});
+      if (response.status === 401) return redirectExpired('IDLE_TIMEOUT', true);
+      if (response.ok) applyState(await response.json(), true);
+    } catch (_) {
+      deadline = Date.now() + 5000;
+    } finally { expiryCheckInFlight = false; }
+  }
+  function tick() {
+    if (!deadline || expired) return;
+    const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+    const minutes = String(Math.floor(remaining / 60)).padStart(2, '0');
+    const seconds = String(remaining % 60).padStart(2, '0');
+    countdown.textContent = minutes + ':' + seconds;
+    if (remaining <= warningSeconds && remaining > 0) {
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      dirtyWarning.classList.toggle('hidden', !hasDirtyForm());
+    }
+    if (remaining <= 0) confirmExpiry();
+  }
+  async function extendSession(force) {
+    const now = Date.now();
+    if (activityInFlight || (!force && now - lastActivitySent < activityThrottleMs)) return;
+    lastActivitySent = now;
+    activityInFlight = true;
+    try {
+      const response = await fetch(activityUrl, {
+        method: 'POST', credentials: 'same-origin',
+        keepalive: true,
+        headers: {'X-CSRFToken': csrfToken(), 'Accept': 'application/json', 'X-ESFE-Meaningful-Activity': '1'}
+      });
+      if (response.status === 401) return redirectExpired('IDLE_TIMEOUT', true);
+      if (response.ok) applyState(await response.json(), true);
+    } catch (_) {} finally { activityInFlight = false; }
+  }
+  function receive(payload) {
+    if (!payload) return;
+    if (sessionIdentifier && payload.sessionIdentifier && payload.sessionIdentifier !== sessionIdentifier) return;
+    if (payload.type === 'expired') return redirectExpired(payload.reason, false);
+    if (payload.type === 'activity') {
+      warningSeconds = Number(payload.warningSeconds) || warningSeconds;
+      const elapsed = Math.max(0, Date.now() - Number(payload.sentAt || Date.now()));
+      deadline = Date.now() + Math.max(0, Number(payload.remainingSeconds) * 1000 - elapsed);
+      modal.classList.add('hidden'); modal.classList.remove('flex'); expired = false;
+    }
+  }
+
+  if (channel) channel.onmessage = event => receive(event.data);
+  window.addEventListener('storage', event => { if (event.key === storageKey && event.newValue) { try { receive(JSON.parse(event.newValue)); } catch (_) {} } });
+  document.addEventListener('click', event => { if (event.isTrusted && !event.target.closest('#esfe-session-continue, #esfe-session-logout-form')) extendSession(false); }, {capture: true});
+  document.addEventListener('keydown', event => { if (event.isTrusted) extendSession(false); }, {capture: true});
+  document.addEventListener('submit', event => { if (event.isTrusted && event.target !== logoutForm) extendSession(false); }, {capture: true});
+  document.addEventListener('input', event => { if (!event.isTrusted) return; const form = event.target.closest('form'); if (form && form !== logoutForm) form.dataset.esfeDirty = '1'; }, {capture: true});
+  document.addEventListener('change', event => { if (!event.isTrusted) return; const form = event.target.closest('form'); if (form && form !== logoutForm) form.dataset.esfeDirty = '1'; }, {capture: true});
+  document.body.addEventListener('htmx:beforeRequest', event => { if (event.detail && event.detail.elt && event.detail.elt.dataset && event.detail.elt.dataset.sessionActivity === 'true') extendSession(false); });
+  document.addEventListener('htmx:responseError', event => {
+    const xhr = event.detail && event.detail.xhr;
+    if (xhr && xhr.status === 401 && (xhr.getResponseHeader('X-ESFE-Session-Expired') || xhr.getResponseHeader('HX-Redirect'))) {
+      event.stopImmediatePropagation();
+      window.location.assign(xhr.getResponseHeader('HX-Redirect') || loginDestination('IDLE_TIMEOUT'));
+    }
+  }, {capture: true});
+  document.body.addEventListener('htmx:afterRequest', event => { if (event.detail && event.detail.successful) { const form = event.detail.elt && event.detail.elt.closest('form'); if (form) form.dataset.esfeDirty = '0'; } });
+  document.body.addEventListener('notifier.notification', event => { if (event.detail && event.detail.type === 'session.expired') redirectExpired(event.detail.reason, true); });
+  continueButton.addEventListener('click', () => extendSession(true));
+  logoutForm.addEventListener('submit', () => publish({type: 'expired', reason: 'VOLUNTARY_LOGOUT'}));
+
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = async function () {
+    const response = await originalFetch.apply(window, arguments);
+    if (response.redirected && new URL(response.url, window.location.origin).pathname === loginUrl) {
+      redirectExpired('SESSION_REQUIRED', true);
+      return response;
+    }
+    if (response.status === 401 && response.headers.get('content-type') && response.headers.get('content-type').includes('application/json')) {
+      response.clone().json().then(data => { if (data && data.error === 'session_expired') redirectExpired(data.reason, true); }).catch(() => {});
+    }
+    return response;
+  };
+  originalFetch(statusUrl, {credentials: 'same-origin', headers: {'Accept': 'application/json'}})
+    .then(response => response.status === 401 ? redirectExpired('IDLE_TIMEOUT', true) : response.json())
+    .then(data => applyState(data, false)).catch(() => {});
+  window.setInterval(tick, 1000);
+})();
+</script>

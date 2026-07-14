@@ -1,0 +1,79 @@
+SPRINT 4 — BACKEND PROGRAMMES UE / EC Projet : ESFE Core Destinataire :
+Codex
+
+OBJECTIF Consolider le module Programmes pédagogiques du dashboard
+Directeur des Études.
+
+CONTEXTE Le Directeur des Études doit pouvoir structurer, contrôler et
+valider les programmes pédagogiques : - Formations - Classes -
+Semestres - UE - EC - Crédits - Coefficients - Volumes horaires -
+Cohérence pédagogique
+
+IMPORTANT Ce sprint est backend uniquement. Aucun frontend. Aucun
+template. Aucun HTMX. Aucune refonte UI.
+
+MISSION PRINCIPALE Auditer puis consolider le backend existant des
+Programmes UE / EC sans casser les modèles académiques existants.
+
+FICHIERS À ANALYSER EN PRIORITÉ - academics/models.py -
+academics/services/ue.py - academics/services/semester.py -
+academics/services/workflow.py - portal/views/views.py -
+portal/services/director/* - portal/urls.py - academics/tests.py -
+accounts/tests.py
+
+TACHE 1 — AUDIT RAPIDE DU MODULE EXISTANT Identifier : - vues existantes
+liées aux UE/EC - actions existantes de
+création/modification/suppression - services existants réutilisables -
+validations déjà présentes - risques de suppression destructive -
+problèmes d’annexe - problèmes de cohérence classe/semestre/UE/EC
+
+TACHE 2 — SERVICE METIER Créer ou renforcer un service dédié, par
+exemple : academics/services/programme_structure_service.py ou
+academics/services/academic_structure_service.py
+
+Le service doit gérer : - création UE - modification UE - création EC -
+modification EC - désactivation/archivage logique si nécessaire -
+contrôle de cohérence du semestre - contrôle des crédits - contrôle des
+coefficients - contrôle annexe/classe/semestre
+
+Aucune mutation métier UE/EC ne doit rester directement dans une vue si
+elle peut être déplacée dans le service.
+
+TACHE 3 — VALIDATIONS METIER Empêcher : - UE sans semestre - EC sans
+UE - EC rattaché à une UE d’une autre classe - crédit EC <= 0 -
+coefficient EC <= 0 - crédits UE > 6 si cette règle est déjà appliquée
+dans le projet - crédits semestre incohérents - suppression physique
+d’une UE/EC déjà utilisée par : - notes - affectations enseignants -
+emplois du temps - cahiers de texte - bulletins
+
+TACHE 4 — STATUT DE STRUCTURE PEDAGOGIQUE Préparer un workflow simple
+: - brouillon - complet - validé - publié - archivé
+
+Si les modèles existants ne permettent pas encore ce workflow, proposer
+la modification minimale nécessaire. Ne pas faire de grosse migration
+non justifiée.
+
+TACHE 5 — SELECTORS Créer ou renforcer des selectors permettant de
+récupérer : - structure complète d’une classe - UE par semestre - EC par
+UE - état de complétude d’un semestre - EC sans enseignant - EC sans
+note - UE incomplètes - total crédits par semestre
+
+TACHE 6 — PERMISSIONS Garantir : - Directeur des Études : uniquement son
+annexe - DG / Super Admin : accès global autorisé - aucun accès
+inter-annexes pour création/modification/suppression
+
+TACHE 7 — TESTS Ajouter des tests couvrant : - création UE valide -
+création EC valide - rejet EC incohérent - rejet crédit/coefficient
+invalide - refus inter-annexes - refus suppression UE/EC utilisée -
+calcul complétude semestre - total crédits semestre
+
+CONTRAINTES - Ne pas casser les bulletins. - Ne pas casser les notes. -
+Ne pas casser l’emploi du temps. - Ne pas casser les affectations
+enseignants. - Ne pas créer une deuxième source de vérité pour UE/EC. -
+Réutiliser les modèles existants UE et EC.
+
+LIVRABLE 1. Résumé des changements. 2. Fichiers créés. 3. Fichiers
+modifiés. 4. Migrations si nécessaires. 5. Tests ajoutés. 6. Commandes
+de test. 7. Points à traiter au Sprint 5.
+
+FIN DU SPRINT 4

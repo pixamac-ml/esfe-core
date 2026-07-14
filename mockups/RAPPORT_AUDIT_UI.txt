@@ -1,0 +1,449 @@
+================================================================================
+RAPPORT D'AUDIT UI — ESFE CORE
+Mission : audit et enrichissement de l'application UI (mockups/devin.txt)
+Date    : 2026-07-08
+Auteur  : Devin (Cascade)
+================================================================================
+
+Ce document livre les réponses demandées par mockups/devin.txt :
+  1. Rapport d'audit UI
+  2. Liste des composants existants
+  3. Liste des nouveaux composants proposés
+  4. Liste des composants améliorés
+  5. Arborescence finale recommandée de l'application UI
+  6. Début de l'implémentation des composants réutilisables
+
+================================================================================
+1. RAPPORT D'AUDIT UI — SYNTHÈSE
+================================================================================
+
+1.1 Périmètre audité
+--------------------
+Apps / dossiers inspectés :
+  - ui/                          (app Django dédiée aux composants)
+  - ui/components/               (composants django-components)
+  - ui/templates/                (templates des composants)
+  - templates/                   (templates globaux des dashboards)
+  - static/                      (CSS, JS, assets)
+  - accounts/dashboards/         (logique dashboard gestionnaire)
+  - secretary/templates/         (dashboard secrétaire)
+  - portal/student/              (dashboard étudiant)
+  - templates/portal/teacher.html (dashboard enseignant)
+
+Technologies concernées :
+  - Django Components (django-components)
+  - HTMX
+  - Alpine.js
+  - Tailwind CSS
+  - Lucide icons
+  - Chart.js (déclaré en dépendance)
+
+1.2 Métriques mesurées
+----------------------
+  - Composants django-components enregistrés : ~115
+  - Templates dans ui/templates/             : ~55+
+  - Fichiers Python de composants dans ui/components/ : 55+
+  - Tests UI existants                       : 4 (tous passent)
+  - python manage.py test ui                 : OK (4 tests)
+  - python manage.py check                   : OK (0 issues)
+  - Tailwind config                          : scanne .py et templates
+
+1.3 Verdict global
+------------------
+L'application UI possède une base solide : une app ui dédiée, un catalogue
+important de composants, une charte graphique tokenisée et des tests UI qui
+passent. Elle n'est cependant pas encore une bibliothèque canonique fiable pour
+tous les dashboards. Les axes prioritaires sont :
+  - standardiser les composants "academic" réutilisables pour tous les dashboards ;
+  - éviter les duplications entre les familles dashboard/teacher/student/secretary ;
+  - renforcer accessibilité, états (loading/error/empty) et responsive ;
+  - documenter la galerie et maintenir les tests.
+
+================================================================================
+2. LISTE DES COMPOSANTS EXISTANTS
+================================================================================
+
+Les composants sont enregistrés dans ui/components/__init__.py (app ui) et
+catégorisés comme suit.
+
+2.1 Atomes (atoms/)
+-------------------
+  - icon          : Icône Lucide (taille, couleur, nom)
+  - label         : Libellé de formulaire
+  - avatar        : Avatar initiales/photo
+  - avatar_group  : Groupe d'avatars
+  - badge         : Pastille sémantique (dot/texte/icône/dismissible)
+  - pill          : Étiquette ronde
+  - spinner       : Indicateur de chargement
+  - skeleton      : Placeholder de chargement
+  - tooltip       : Infobulle Alpine
+  - divider       : Séparateur
+
+2.2 Formulaires (forms/)
+------------------------
+  - input
+  - textarea
+  - select
+  - checkbox
+  - radio_group
+  - switch
+  - amount_input
+  - combobox
+  - date_picker
+  - form_actions
+  - form_section
+  - stepper
+  - upload_zone (dropzone)
+
+2.3 Cartes & conteneurs (cards/, dashboard/)
+---------------------------------------------
+  - base_card
+  - formation_card
+  - related_article_card
+  - share_card
+  - dashboard_card
+  - widget_card
+  - metric_card
+  - stat_card
+  - mini_stat
+  - chart_card
+  - glass_card
+  - skeleton_card
+  - panel
+
+2.4 Affichage de données (dashboard/)
+-------------------------------------
+  - data_table
+  - pagination
+  - filter_bar
+  - search_bar
+  - empty_state
+  - info_field
+  - status_badge
+  - status_cell
+  - amount_cell
+  - actions_cell
+  - avatar_name_cell
+  - progress_bar
+  - progress_ring
+  - timeline
+  - schedule
+  - kpi_row
+
+2.5 Navigation & layout
+-----------------------
+  - navbar
+  - footer
+  - breadcrumb
+  - section
+  - section_header
+  - hero
+  - tabs
+  - page_header
+  - toolbar
+  - modal
+  - drawer
+  - popover
+  - dropdown
+  - accordion
+  - step_indicator
+  - button
+
+2.6 Dashboards métier spécifiques
+-----------------------------------
+  - secretary_sidebar / secretary_topbar
+  - supervisor_sidebar / supervisor_topbar / supervisor_workspace
+  - teacher_sidebar / teacher_topbar
+  - teacher_overview_section / teacher_sections (classes/logs/notifications/salary/schedule/settings/supports/workspace)
+
+2.7 Notes & informaticien
+-------------------------
+  - notes_actions, notes_actions_bar, notes_anomaly_panel, notes_grid,
+    notes_header, notes_progress, notes_state, notes_state_banner,
+    notes_table, notes_validation_panel, notes_workflow, notes_workflow_bar,
+    student_identity_column, ec_note_cell, ec_note_cell_live, semester_summary
+  - audit_log_table, import_panel, settings_panel, supervision_panel, support_panel
+
+2.8 Admission & formation
+---------------------------
+  - admission_hero, admission_form_card, step_indicator, split_admission_layout
+  - formation_hero, formation_overview, formation_learning_outcomes,
+    formation_career_opportunities, formation_finance, formation_documents,
+    formation_trust_block, formation_admission_card, programme_card,
+    programme_filters, programme_grid
+
+2.9 Blog / news
+---------------
+  - article_card, article_meta, article_share_bar, blog_sidebar,
+    category_badge, comment_block, comment_form, reaction_bar, related_articles
+  - news_article_card, news_hero, news_important_block, news_sidebar_categories
+
+2.10 Autres
+------------
+  - alerts_panel, attendance_workflow, result_badge, result_card,
+    result_sidebar, timetable_view
+
+================================================================================
+3. ANALYSE — DUPLICATIONS, INCOMPLÉTUDES, MANQUES
+================================================================================
+
+3.1 Duplications détectées
+----------------------------
+  a) Deux familles de barres/cartes indicateurs :
+       - widget_card / metric_card / stat_card / mini_stat / kpi_row
+       Tous affichent des chiffres clés. Leur interface varie légèrement.
+       Recommandation : unifier autour d'un AcademicStatCard paramétrable.
+
+  b) Sidebars et topbars spécifiques par rôle :
+       - secretary_sidebar / supervisor_sidebar / teacher_sidebar
+       - secretary_topbar / supervisor_topbar / teacher_topbar
+       Mêmes patterns (logo, navigation, profil, notifications). Une base
+       unique AcademicSidebar / AcademicTopbar pourrait les factoriser.
+
+  c) Section headers répétés en dur dans plusieurs dashboards (teacher,
+     student, secretary). Recommandation : utiliser systematiquement
+     AcademicSectionHeader / page_header.
+
+  d) Onglets : tabs (générique) + step_indicator / stepper (admission).
+       Recommandation : AcademicTabs pour les dashboards, AcademicStepper
+       pour les workflows linéaires.
+
+3.2 Composants incomplets ou peu réutilisables
+-----------------------------------------------
+  a) chart_card : dépend d'une librairie non unifiée (Chart.js déclaré mais
+     graphes potentiellement variés). Pas de contrat de données clair.
+
+  b) data_table : fonctionnel mais complexe (édition inline, tri, sélection).
+     Manque de documentation d'utilisation dans la galerie.
+
+  c) combobox / date_picker / upload_zone : basés sur Alpine ; nécessitent
+     une validation manuelle cross-navigateur.
+
+  d) Teacher/student dashboards contiennent beaucoup de HTML inline et de
+     JavaScript embarqué dans les templates. Cela réduit la réutilisabilité.
+
+3.3 Composants manquants pour unifier les dashboards
+----------------------------------------------------
+  Par rapport à la mission devin.txt, les composants ci-dessous sont absents
+  ou sont des doublons implicites. Ils seront créés sous le préfixe Academic*
+  afin de ne pas casser les composants existants :
+
+  - AcademicCard
+  - AcademicStatCard
+  - AcademicAlert
+  - AcademicTable
+  - AcademicFilterBar
+  - AcademicToolbar
+  - AcademicDrawer
+  - AcademicModal
+  - AcademicTimeline
+  - AcademicCalendar
+  - AcademicQuickAction
+  - AcademicBadge
+  - AcademicProgress
+  - AcademicStepper
+  - AcademicEmptyState
+  - AcademicSectionHeader
+  - AcademicTabs
+  - AcademicPageHeader
+  - AcademicPageLayout
+
+3.4 Observations sur la charte graphique
+------------------------------------------
+  - Tokens Tailwind définis dans tailwind.config.js : primary (#1e4f6f),
+    secondary (#1db5b0), accent (#f39c12), soft (#f4fbfb).
+  - Variables CSS supplémentaires dans static/public/css/esfe_theme.css.
+  - Police : Poppins / Roboto.
+  - Pas de couleur en dur autorisée pour les nouveaux composants.
+
+3.5 Accessibilité & responsive
+------------------------------
+  - Points forts : aria-label sur badge, focus ring sur inputs, tables
+    overflow-x-auto.
+  - Points à renforcer : contrastes des badges warning, états disabled sur les
+    boutons, labels ARIA sur les tableaux de données complexes.
+
+================================================================================
+4. LISTE DES NOUVEAUX COMPOSANTS PROPOSÉS
+================================================================================
+
+Ces composants seront créés dans ui/components/academic/ et enregistrés
+sous les noms academic_* . Ils encapsulent les composants dashboard existants
+avec une interface orientée "écran scolaire".
+
+| Composant             | Rôle                                                        | Base existante              |
+|-----------------------|-------------------------------------------------------------|-----------------------------|
+| AcademicCard          | Conteneur de contenu académique                            | dashboard_card              |
+| AcademicStatCard      | Chiffre clé + tendance + icône                              | stat_card / widget_card     |
+| AcademicAlert         | Message inline (info/succès/attention/erreur)               | alert                       |
+| AcademicTable         | Tableau de données avec slots actions/filtres               | data_table                  |
+| AcademicFilterBar     | Barre de filtres HTMX                                       | filter_bar / search_bar     |
+| AcademicToolbar       | Barre d'actions (titre + boutons)                           | toolbar / page_header       |
+| AcademicDrawer        | Panneau latéral HTMX                                        | drawer                      |
+| AcademicModal         | Fenêtre modale HTMX                                         | modal                       |
+| AcademicTimeline      | Fil chronologique (inscriptions, paiements, validations)    | timeline                    |
+| AcademicCalendar      | Vue calendrier scolaire / emploi du temps                   | schedule / timetable_view   |
+| AcademicQuickAction   | Boutons d'action rapide                                     | button + icône              |
+| AcademicBadge         | Pastille métier (statut, niveau, rôle)                      | badge / status_badge        |
+| AcademicProgress      | Barre/anneau de progression                                 | progress_bar / progress_ring|
+| AcademicStepper       | Étapes d'un workflow (admission, inscription, notes)        | step_indicator / stepper    |
+| AcademicEmptyState    | Écran vide réutilisable                                     | empty_state                 |
+| AcademicSectionHeader | Titre de section + action                                   | section_header / page_header|
+| AcademicTabs          | Onglets de section                                          | tabs                        |
+| AcademicPageHeader    | En-tête de page (titre, breadcrumb, actions)                | page_header                 |
+| AcademicPageLayout    | Gabarit de page (header + grille + slots)                   | split_admission_layout      |
+
+================================================================================
+5. LISTE DES COMPOSANTS AMÉLIORÉS
+================================================================================
+
+Les composants suivants vont être améliorés par encapsulation sans modification
+de leur code existant :
+
+  - data_table    → AcademicTable (interface simplifiée + slots)
+  - filter_bar    → AcademicFilterBar (format standardisé)
+  - empty_state   → AcademicEmptyState (variantes icon/title/message)
+  - alert         → AcademicAlert (tones ajustés + icônes)
+  - modal         → AcademicModal (centrage mobile + loader)
+  - drawer        → AcademicDrawer (tailles fixed + backdrop)
+  - timeline      → AcademicTimeline (alignement + états)
+  - progress_bar  → AcademicProgress (hauteur/thresholds)
+  - step_indicator → AcademicStepper (vertical/horizontal)
+
+Aucun composant existant ne sera supprimé ni modifié directement ; les
+Academic* sont des wrappers à part.
+
+================================================================================
+6. ARBORESCENCE FINALE RECOMMANDÉE
+================================================================================
+
+ui/
+├── apps.py
+├── __init__.py
+├── tests.py
+├── views.py                      # galerie + playground
+├── components/
+│   ├── __init__.py               # imports publics + academic
+│   ├── academic/                 # NOUVEAU : wrappers dashboard scolaire
+│   │   ├── academic_card.py
+│   │   ├── academic_stat_card.py
+│   │   ├── academic_alert.py
+│   │   ├── academic_table.py
+│   │   ├── academic_filter_bar.py
+│   │   ├── academic_toolbar.py
+│   │   ├── academic_drawer.py
+│   │   ├── academic_modal.py
+│   │   ├── academic_timeline.py
+│   │   ├── academic_calendar.py
+│   │   ├── academic_quick_action.py
+│   │   ├── academic_badge.py
+│   │   ├── academic_progress.py
+│   │   ├── academic_stepper.py
+│   │   ├── academic_empty_state.py
+│   │   ├── academic_section_header.py
+│   │   ├── academic_tabs.py
+│   │   ├── academic_page_header.py
+│   │   └── academic_page_layout.py
+│   ├── atoms/
+│   ├── forms/
+│   ├── cards/
+│   ├── dashboard/                # existant, inchangé
+│   ├── layout/
+│   ├── interactive/
+│   ├── notes/
+│   ├── informaticien/
+│   ├── admission/
+│   ├── formation_*/
+│   └── ...
+└── templates/
+    ├── academic/                   # NOUVEAU : templates des Academic*
+    │   ├── academic_card.html
+    │   ├── academic_stat_card.html
+    │   └── ...
+    ├── atoms/
+    ├── forms/
+    ├── dashboard/
+    └── ...
+
+================================================================================
+7. IMPLÉMENTATION RÉALISÉE
+================================================================================
+
+7.1 Principes respectés
+-----------------------
+  - Aucune modification de backend, modèles ou vues métier.
+  - Aucun composant existant supprimé ni modifié.
+  - Utilisation exclusive des tokens CSS (var(--school-primary), var(--success),
+    var(--warning), var(--danger), var(--info), var(--text), var(--muted), etc.).
+  - Icônes Lucide uniquement (data-lucide).
+  - Composants HTMX-ready (hx-get/hx-post/hx-target/hx-swap) et Alpine-ready.
+  - Enregistrement automatique via @component.register("academic_*").
+  - Import public centralisé dans ui/components/__init__.py.
+
+7.2 Composants créés — intégralité de la liste devin.txt
+---------------------------------------------------------
+Tous sous ui/components/academic/ et ui/templates/academic/ :
+
+  - academic_card           : conteneur de contenu académique (title, subtitle, icon, slot)
+  - academic_stat_card      : indicateur chiffre clé + icône + tendance + lien
+  - academic_alert          : message alerte (info/success/warning/danger/primary)
+  - academic_table          : tableau de données scolaire (wrapper data_table)
+  - academic_filter_bar     : barre de filtres HTMX
+  - academic_toolbar        : barre d'outils (titre, compteur, actions)
+  - academic_drawer         : panneau latéral HTMX (droite/gauche)
+  - academic_modal          : fenêtre modale Alpine.js
+  - academic_timeline       : fil chronologique scolaire
+  - academic_calendar       : calendrier / emploi du temps (wrapper schedule)
+  - academic_quick_action   : bouton d'action rapide HTMX-ready
+  - academic_badge          : pastille statut/niveau/rôle (dot ou label)
+  - academic_progress       : barre de progression avec tone et taille
+  - academic_stepper        : stepper horizontal/vertical
+  - academic_empty_state    : écran vide centré avec icône + action slot
+  - academic_section_header : titre de section + badge + action slot
+  - academic_tabs           : onglets avec support HTMX
+  - academic_page_header    : en-tête de page avec breadcrumb + actions
+  - academic_page_layout    : gabarit de page (header + grille + slots)
+
+7.3 Tests ajoutés
+-----------------
+Fichier ui/tests.py enrichi de 19 tests de rendu couvrant chaque nouveau
+composant. Résultat :
+  Ran 23 tests in ~3.7s — OK
+  System check identified no issues (0 silenced).
+
+7.4 Fichiers créés / modifiés
+------------------------------
+Créés :
+  ui/components/academic/__init__.py
+  ui/components/academic/academic_*.py          (19 fichiers)
+  ui/templates/academic/academic_*.html         (19 fichiers)
+
+Modifiés :
+  ui/components/__init__.py                     (imports publics)
+  ui/tests.py                                     (tests de rendu Academic)
+
+================================================================================
+8. REMARQUES
+================================================================================
+
+  - Aucun backend, modèle ou vue métier modifié.
+  - Tous les composants existants sont intacts ; les Academic* sont des wrappers.
+  - Le build CSS (npm run build:css) n'a pas pu être exécuté automatiquement
+    car PowerShell bloque l'exécution de scripts sur cette machine. Le build
+    doit être lancé manuellement après correction de static/src/css/input.css
+    (des @apply utilisent des classes non reconnues, ex. primary-100).
+  - Les classes Tailwind des nouveaux composants sont déjà scannées via
+    tailwind.config.js (ui/components/**/*.py + templates).
+
+================================================================================
+9. COMMANDES DE VÉRIFICATION
+================================================================================
+
+À exécuter après chaque lot :
+  c:\Users\HP\PycharmProjects\esfe-core\.venv\Scripts\python.exe c:\Users\HP\PycharmProjects\esfe-core\manage.py test ui --settings=config.settings_test_local -v 2
+  c:\Users\HP\PycharmProjects\esfe-core\.venv\Scripts\python.exe c:\Users\HP\PycharmProjects\esfe-core\manage.py check --settings=config.settings_test_local
+  npm run build:css
+
+================================================================================
+FIN DU RAPPORT
+================================================================================

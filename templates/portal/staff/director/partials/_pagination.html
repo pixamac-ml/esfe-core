@@ -1,15 +1,31 @@
 {% if page_obj and page_obj.paginator.num_pages > 1 %}
-<div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+{% with pname=page_param|default:"classes_page" htmx_target=target_id|default:"#director-workspace" htmx_select=hx_select|default:"" %}
+<div class="flex flex-wrap items-center justify-between gap-3 border-t border-[color:var(--line)] px-6 py-3">
   <div>
     {% if page_obj.has_previous %}
-      <button type="button" class="director-btn director-btn-secondary" hx-get="{% url 'accounts_portal:director_workspace' %}?{{ extra_qs }}&{{ page_param }}={{ page_obj.previous_page_number }}" hx-target="#director-workspace" hx-swap="innerHTML">Precedent</button>
+    <button type="button"
+      hx-get="{% url 'accounts_portal:director_workspace' %}?{{ query_suffix }}&{{ pname }}={{ page_obj.previous_page_number }}"
+      hx-target="{{ htmx_target }}" hx-swap="outerHTML"
+      {% if htmx_select %}hx-select="{{ htmx_select }}"{% endif %}
+      hx-disabled-elt="this"
+      class="inline-flex items-center justify-center rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2 text-sm font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface)]">
+      <i data-lucide="chevron-left" class="w-4 h-4 mr-1"></i>Precedent
+    </button>
     {% endif %}
   </div>
-  <p class="text-xs font-black uppercase tracking-wide text-slate-400">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} ({{ page_obj.paginator.count }} resultat(s))</p>
+  <p class="text-xs font-black text-[color:var(--muted)]">Page {{ page_obj.number }}/{{ page_obj.paginator.num_pages }} · {{ page_obj.paginator.count }} element(s)</p>
   <div>
     {% if page_obj.has_next %}
-      <button type="button" class="director-btn director-btn-secondary" hx-get="{% url 'accounts_portal:director_workspace' %}?{{ extra_qs }}&{{ page_param }}={{ page_obj.next_page_number }}" hx-target="#director-workspace" hx-swap="innerHTML">Suivant</button>
+    <button type="button"
+      hx-get="{% url 'accounts_portal:director_workspace' %}?{{ query_suffix }}&{{ pname }}={{ page_obj.next_page_number }}"
+      hx-target="{{ htmx_target }}" hx-swap="outerHTML"
+      {% if htmx_select %}hx-select="{{ htmx_select }}"{% endif %}
+      hx-disabled-elt="this"
+      class="inline-flex items-center justify-center rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2 text-sm font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface)]">
+      Suivant<i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i>
+    </button>
     {% endif %}
   </div>
 </div>
+{% endwith %}
 {% endif %}

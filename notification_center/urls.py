@@ -11,5 +11,7 @@ urlpatterns = [
     path("<int:pk>/detail/", views.notification_detail, name="notification_detail"),
     path("<int:pk>/read/", views.mark_notification_read, name="mark_notification_read"),
     path("<int:pk>/unread/", views.mark_notification_unread, name="mark_notification_unread"),
+    path("<int:pk>/archive/", views.archive_notification, name="archive_notification"),
+    path("<int:pk>/unarchive/", views.unarchive_notification, name="unarchive_notification"),
     path("read-all/", views.mark_all_notifications_read, name="mark_all_notifications_read"),
 ]

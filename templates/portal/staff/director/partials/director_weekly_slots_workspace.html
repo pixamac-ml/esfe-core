@@ -1,0 +1,236 @@
+{% if toast %}
+<div class="mb-4 rounded-xl border px-4 py-3 text-sm font-semibold
+  {% if toast.level == 'success' %}border-[color:var(--success-soft)] bg-[color:var(--success-soft)] text-[color:var(--success)]
+  {% else %}border-[color:var(--danger-soft)] bg-[color:var(--danger-soft)] text-[color:var(--danger)]{% endif %}">
+  {{ toast.message }}
+</div>
+{% endif %}
+
+{% if academic_class %}
+<div class="space-y-5" data-director-section="planification">
+
+  <!-- En-tête -->
+  <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] px-6 py-5 shadow-sm">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div>
+        <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">Grille hebdomadaire</p>
+        <h3 class="mt-2 text-xl font-black text-slate-900">{{ academic_class.display_name }}</h3>
+        <p class="mt-1 text-sm text-slate-500">
+          {{ academic_class.programme.title }} — créneaux récurrents par jour de semaine.
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <button type="button"
+          onclick="document.getElementById('de-modal-gen-week').classList.remove('hidden')"
+          class="inline-flex items-center justify-center rounded-lg border border-[color:var(--school-primary)] bg-[color:var(--school-primary)] px-4 py-2 text-sm font-bold text-white transition hover:opacity-90">
+          <i data-lucide="calendar-check" class="w-4 h-4 mr-2"></i>Générer la semaine
+        </button>
+        <button type="button"
+          onclick="document.getElementById('de-modal-gen-month').classList.remove('hidden')"
+          class="inline-flex items-center justify-center rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2 text-sm font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface)]">
+          <i data-lucide="calendar-range" class="w-4 h-4 mr-2"></i>Générer le mois
+        </button>
+        <button type="button"
+          hx-get="{% url 'accounts_portal:director_workspace' %}?section=planification"
+          hx-target="#director-workspace" hx-swap="innerHTML"
+          class="inline-flex items-center justify-center rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2 text-sm font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface)]">
+          <i data-lucide="arrow-left" class="w-4 h-4 mr-2"></i>Retour
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tableau des créneaux + bouton ajout -->
+  <div class="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_280px]">
+
+    <!-- Tableau -->
+    <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm overflow-hidden">
+      <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+        <h4 class="font-black text-slate-900">Créneaux actifs</h4>
+        <span class="inline-flex items-center rounded-full bg-[color:var(--school-primary-soft)] px-2.5 py-0.5 text-xs font-bold text-[color:var(--school-primary)]">
+          {{ weekly_slot_rows|length }} créneau(x)
+        </span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-slate-100 bg-slate-50 text-xs font-black uppercase tracking-wide text-slate-500">
+              <th class="px-5 py-3 text-left">Jour</th>
+              <th class="px-5 py-3 text-left">Horaires</th>
+              <th class="px-5 py-3 text-left">Matière (EC)</th>
+              <th class="px-5 py-3 text-left">Enseignant</th>
+              <th class="px-5 py-3 text-left">Salle</th>
+              <th class="px-5 py-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for row in weekly_slot_rows %}
+            <tr class="hover:bg-slate-50 transition">
+              <td class="px-5 py-3 font-semibold text-slate-900">{{ row.weekday_label }}</td>
+              <td class="px-5 py-3 text-slate-600">{{ row.start_time }} – {{ row.end_time }}</td>
+              <td class="px-5 py-3 text-slate-800">{{ row.ec_title }}</td>
+              <td class="px-5 py-3 text-slate-600">{{ row.teacher_name }}</td>
+              <td class="px-5 py-3 text-slate-500">{{ row.room|default:"—" }}</td>
+              <td class="px-5 py-3">
+                <div class="flex items-center justify-end gap-2">
+                  <button type="button"
+                    hx-get="{% url weekly_slots_workspace_url academic_class.id %}?week_start={{ schedule.week_start|date:'Y-m-d' }}&edit={{ row.id }}&drawer_form=1"
+                    hx-target="#director-drawer-content" hx-swap="innerHTML"
+                    class="inline-flex items-center rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-1.5 text-xs font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface)]">
+                    <i data-lucide="pencil" class="w-3.5 h-3.5 mr-1"></i>Modifier
+                  </button>
+                  <button type="button"
+                    onclick="document.getElementById('de-modal-del-{{ row.id }}').classList.remove('hidden')"
+                    class="inline-flex items-center rounded-lg border border-[color:var(--danger-soft)] bg-[color:var(--danger-soft)] px-3 py-1.5 text-xs font-semibold text-[color:var(--danger)] transition hover:opacity-80">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5 mr-1"></i>Retirer
+                  </button>
+                </div>
+
+                <!-- Modal suppression -->
+                <div id="de-modal-del-{{ row.id }}"
+                     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 hidden"
+                     role="dialog" aria-modal="true">
+                  <div class="w-full max-w-sm rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-6 shadow-2xl">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--danger)]">Confirmation</p>
+                    <h3 class="mt-2 text-lg font-black text-slate-900">Retirer le créneau</h3>
+                    <p class="mt-2 mb-5 text-sm text-slate-600">
+                      {{ row.weekday_label }} {{ row.start_time }}–{{ row.end_time }} · {{ row.ec_title }} · {{ row.teacher_name }}
+                    </p>
+                    <form hx-post="{% url weekly_slot_save_url academic_class.id %}"
+                          hx-target="#director-workspace" hx-swap="innerHTML"
+                          hx-on::after-request="document.getElementById('de-modal-del-{{ row.id }}')?.classList.add('hidden')"
+                          class="flex flex-wrap items-center justify-end gap-3">
+                      {% csrf_token %}
+                      <input type="hidden" name="week_start" value="{{ schedule.week_start|date:'Y-m-d' }}" />
+                      <input type="hidden" name="action" value="delete" />
+                      <input type="hidden" name="slot_id" value="{{ row.id }}" />
+                      <button type="button"
+                              onclick="document.getElementById('de-modal-del-{{ row.id }}').classList.add('hidden')"
+                              class="inline-flex items-center justify-center rounded-lg border border-[color:var(--line)] px-4 py-2 text-sm font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface)]">
+                        Annuler
+                      </button>
+                      <button type="submit"
+                              class="inline-flex items-center justify-center rounded-lg border border-[color:var(--danger)] bg-[color:var(--danger)] px-4 py-2 text-sm font-bold text-white transition hover:opacity-90">
+                        Confirmer le retrait
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" class="px-5 py-10 text-center text-sm font-semibold text-slate-400">
+                Aucun créneau hebdomadaire défini pour cette classe.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Panneau latéral -->
+    <div class="space-y-4">
+      <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm p-5">
+        <h4 class="font-black text-slate-900 mb-1">Actions</h4>
+        <p class="text-xs text-slate-500 mb-4">Gérer les créneaux récurrents de cette classe.</p>
+        <button type="button"
+          hx-get="{% url weekly_slots_workspace_url academic_class.id %}?week_start={{ schedule.week_start|date:'Y-m-d' }}&drawer_form=1"
+          hx-target="#director-drawer-content" hx-swap="innerHTML"
+          class="w-full inline-flex items-center justify-center rounded-lg border border-[color:var(--school-primary)] bg-[color:var(--school-primary)] px-4 py-2.5 text-sm font-bold text-white transition hover:opacity-90">
+          <i data-lucide="plus" class="w-4 h-4 mr-2"></i>Ajouter un créneau
+        </button>
+      </div>
+
+      <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm p-5 space-y-2">
+        <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Rappel</p>
+        <ul class="space-y-2 text-xs text-slate-600">
+          <li class="flex items-start gap-2">
+            <i data-lucide="info" class="w-3.5 h-3.5 mt-0.5 shrink-0 text-[color:var(--school-primary)]"></i>
+            Les créneaux définissent le modèle hebdomadaire récurrent.
+          </li>
+          <li class="flex items-start gap-2">
+            <i data-lucide="zap" class="w-3.5 h-3.5 mt-0.5 shrink-0 text-[color:var(--school-primary)]"></i>
+            Utilisez <strong>"Générer"</strong> pour créer les cours datés à partir de ce modèle.
+          </li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal : Générer la semaine -->
+<div id="de-modal-gen-week"
+     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 hidden"
+     role="dialog" aria-modal="true">
+  <div class="w-full max-w-md rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-6 shadow-2xl">
+    <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">Génération</p>
+    <h3 class="mt-2 text-lg font-black text-slate-900">Générer la semaine</h3>
+    <p class="mt-2 mb-5 text-sm text-slate-600">
+      Créer les cours datés de la semaine en cours à partir des créneaux hebdomadaires.
+    </p>
+    <form hx-post="{% url week_materialize_url academic_class.id %}"
+          hx-target="#director-workspace" hx-swap="innerHTML"
+          hx-on::after-request="document.getElementById('de-modal-gen-week')?.classList.add('hidden')"
+          class="flex flex-wrap items-center justify-end gap-3">
+      {% csrf_token %}
+      <input type="hidden" name="week_start" value="{{ schedule.week_start|date:'Y-m-d' }}" />
+      <button type="button" onclick="document.getElementById('de-modal-gen-week').classList.add('hidden')"
+              class="inline-flex items-center justify-center rounded-lg border border-[color:var(--line)] px-4 py-2 text-sm font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface)]">
+        Annuler
+      </button>
+      <button type="submit"
+              class="inline-flex items-center justify-center rounded-lg border border-[color:var(--school-primary)] bg-[color:var(--school-primary)] px-4 py-2 text-sm font-bold text-white transition hover:opacity-90">
+        <i data-lucide="calendar-check" class="w-4 h-4 mr-2"></i>Générer
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Modal : Générer le mois -->
+<div id="de-modal-gen-month"
+     class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 hidden"
+     role="dialog" aria-modal="true">
+  <div class="w-full max-w-md rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-6 shadow-2xl">
+    <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">Génération</p>
+    <h3 class="mt-2 text-lg font-black text-slate-900">Générer le mois</h3>
+    <p class="mt-2 mb-5 text-sm text-slate-600">
+      Créer quatre semaines de cours à partir des créneaux hebdomadaires existants.
+    </p>
+    <form hx-post="{% url month_materialize_url academic_class.id %}"
+          hx-target="#director-workspace" hx-swap="innerHTML"
+          hx-on::after-request="document.getElementById('de-modal-gen-month')?.classList.add('hidden')"
+          class="flex flex-wrap items-center justify-end gap-3">
+      {% csrf_token %}
+      <input type="hidden" name="week_start" value="{{ schedule.week_start|date:'Y-m-d' }}" />
+      <button type="button" onclick="document.getElementById('de-modal-gen-month').classList.add('hidden')"
+              class="inline-flex items-center justify-center rounded-lg border border-[color:var(--line)] px-4 py-2 text-sm font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface)]">
+        Annuler
+      </button>
+      <button type="submit"
+              class="inline-flex items-center justify-center rounded-lg border border-[color:var(--school-primary)] bg-[color:var(--school-primary)] px-4 py-2 text-sm font-bold text-white transition hover:opacity-90">
+        <i data-lucide="calendar-range" class="w-4 h-4 mr-2"></i>Générer le mois
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+(function() {
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('[id^="de-modal-"]:not(.hidden)').forEach(function(m) {
+        m.classList.add('hidden');
+      });
+    }
+  });
+})();
+</script>
+
+{% else %}
+<div class="rounded-xl border border-dashed border-[color:var(--line)] p-8 text-center text-sm font-semibold text-[color:var(--muted)]">
+  Classe introuvable ou inaccessible.
+</div>
+{% endif %}

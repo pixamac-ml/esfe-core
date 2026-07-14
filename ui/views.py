@@ -4,7 +4,7 @@ from django.shortcuts import render
 def gallery(request):
     ctx = {
         # --- Avatar group ---
-        "avatars_demo": [
+        "sample_avatars": [
             {"initials": "JD"}, {"initials": "AK"},
             {"initials": "ML"}, {"initials": "SB"}, {"initials": "TR"},
         ],
@@ -93,7 +93,7 @@ def gallery(request):
             {"label": "Modifier", "icon": "pencil", "url": "#"},
             {"label": "Supprimer", "icon": "trash-2", "url": "#", "danger": True, "divider": True},
         ],
-        # --- Cell demo data ---
+        # --- Cell samples ---
         "status_cell_items": [
             {"label": "Payé", "tone": "success", "icon": "check-circle"},
             {"label": "En attente", "tone": "warning", "icon": "clock"},
@@ -101,7 +101,7 @@ def gallery(request):
             {"label": "Inscrit", "tone": "primary", "icon": "user-check"},
             {"label": "Brouillon", "tone": "neutral"},
         ],
-        # --- Schedule demo ---
+        # --- Schedule samples ---
         "schedule_slots": [
             {"day": 0, "start": 1, "end": 3, "label": "Mathématiques", "teacher": "M. Koné", "room": "101", "color": "school-primary"},
             {"day": 0, "start": 4, "end": 5, "label": "Physique", "teacher": "Mme Diallo", "room": "103", "color": "success"},
@@ -114,7 +114,7 @@ def gallery(request):
             {"day": 4, "start": 2, "end": 4, "label": "EPS", "teacher": "M. Diarra", "room": "Stade", "color": "info"},
             {"day": 4, "start": 5, "end": 7, "label": "Physique", "teacher": "Mme Diallo", "room": "103", "color": "success"},
         ],
-        "actions_cell_demo": [
+        "sample_actions": [
             {"icon": "eye", "url": "#", "title": "Voir"},
             {"divider": True},
             {"icon": "pencil", "url": "#", "title": "Modifier"},

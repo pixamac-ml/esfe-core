@@ -1,0 +1,99 @@
+PHASE FRONT — INTÉGRATION DU DASHBOARD GESTIONNAIRE
+==================================================
+
+Statut : terminée et vérifiée.
+
+Périmètre respecté
+------------------
+- Dashboard Gestionnaire uniquement.
+- Aucune modification de logique métier.
+- Aucun modèle ni migration.
+- Aucun autre dashboard modifié.
+
+Fichiers modifiés
+-----------------
+
+1. accounts/templates/accounts/dashboard/manager_dashboard.html
+- Correction complète des filtres du rapport financier.
+- Les périodes semaine, deux semaines, trimestre, semestre et année ne sont plus
+  écrasées par les champs mois/année.
+- Ajout des dates début/fin pour la période personnalisée.
+- Activation conditionnelle des champs mois, année et dates avec JavaScript.
+- Correction des liens Excel/PDF pour conserver exactement la période choisie.
+- Ajout d'une action « Réinitialiser ».
+- Affichage plus clair de la période active et du nombre d'opérations.
+- Affichage explicite des versements bancaires comme sorties de caisse.
+- Actions de dépense affichées uniquement selon l'état métier : approuver,
+  rejeter ou payer.
+- Conservation des boutons PDF contextuels sécurisés des Phases 2 et 3.
+- Amélioration responsive : barre supérieure, onglets horizontaux, filtres,
+  actions, cartes et panneaux sur tablette/mobile.
+- Réutilisation du composant UI « icon » pour les nouvelles actions.
+
+2. accounts/templates/accounts/dashboard/partials/monthly_closure_form.html
+- Correction de l'indicateur Charges : total_expenses remplace l'ancienne clé
+  inexistante charges_paid.
+- Correction de la valeur total_exits affichée dans le formulaire.
+- Ajout d'un bloc visible « Clôture bloquée » avec les anomalies financières.
+- Désactivation du bouton de préparation lorsque des anomalies bloquantes existent.
+- Ajout d'un accès direct vers les alertes du rapport financier.
+- Libellé corrigé en « Préparer la clôture » : cette action crée un brouillon,
+  elle ne clôture pas immédiatement la période.
+- Correction des icônes cassées des champs banque, référence, date, justificatif
+  et commentaire.
+
+3. accounts/test_manager_workflows.py
+- Ajout de tests frontend sur les périodes non mensuelles.
+- Ajout de tests sur la période personnalisée.
+- Ajout d'un test d'affichage des versements bancaires comme sorties.
+- Ajout d'un test de blocage visuel de la clôture en cas d'anomalie.
+
+Éléments frontend vérifiés
+--------------------------
+- Fiche d'inscription PDF : bouton contextuel présent.
+- Reçu étudiant PDF : bouton affiché seulement si disponible.
+- Fiche de paie PDF : bouton affiché seulement si la fiche existe.
+- Bordereau d'honoraires PDF : bouton affiché seulement si la fiche existe.
+- Reçu de don PDF : bouton présent.
+- Pièce justificative de dépense : bouton seulement pour un PDF disponible.
+- Bordereau bancaire : bouton seulement pour un PDF disponible.
+- État financier PDF et export Excel : accessibles avec les filtres actifs.
+- Alertes financières : visibles dans Rapports et reprises dans Clôture.
+- Liens médias privés directs : aucun dans les templates Gestionnaire contrôlés.
+
+Routes résolues et vérifiées
+----------------------------
+- /accounts/manager/
+- /accounts/manager/inscription/<id>/fiche/
+- /accounts/manager/payment/<id>/receipt/
+- /accounts/manager/payroll/<id>/sheet/
+- /accounts/manager/honorarium/<id>/statement/
+- /accounts/manager/donation/<id>/receipt/
+- /accounts/manager/expense/<id>/supporting-document/
+- /accounts/manager/bank-transfer/<id>/slip/
+- /accounts/manager/export/report/pdf/
+- /accounts/manager/export/report/xlsx/
+
+Composants UI réutilisés
+------------------------
+- Composant Django « icon » de l'app ui.
+- Classes dashboard existantes pour boutons, panneaux, tableaux, badges et formulaires.
+- HTMX existant pour les actions du Gestionnaire.
+- Aucun nouveau système visuel parallèle créé.
+
+Vérifications techniques
+------------------------
+- python manage.py check --settings=config.settings_test_local : OK
+- Compilation des templates Gestionnaire concernés : OK
+- Résolution des 10 routes principales : OK
+- 12 tests ciblés Phases 2, 3 et frontend : OK
+- Recherche de liens directs receipt/proof/media privés : aucun résultat
+
+Limites restantes
+-----------------
+- Payment ne possède toujours pas de facture étudiant existante : aucun faux bouton
+  « Facture » n'a été ajouté.
+- Les justificatifs de dépense ou banque non PDF restent volontairement sans bouton PDF.
+- La validation responsive a été faite sur la structure CSS et le rendu Django automatisé ;
+  aucun test visuel automatisé par navigateur n'est configuré dans le projet.
+

@@ -1,0 +1,29 @@
+{% load component_tags %}
+<div class="{{ class_str }}">
+  {% if breadcrumb_items %}
+    <nav class="mb-2 flex flex-wrap items-center gap-1.5 text-xs font-semibold text-[color:var(--muted-2)]">
+      {% for item in breadcrumb_items %}
+        {% if item.url %}
+          <a href="{{ item.url }}" class="transition hover:text-[color:var(--text)]">{{ item.label }}</a>
+          <i data-lucide="chevron-right" style="width:12px;height:12px;"></i>
+        {% else %}
+          <span class="text-[color:var(--muted)]">{{ item.label }}</span>
+        {% endif %}
+      {% endfor %}
+    </nav>
+  {% endif %}
+  {% if kicker %}
+    <span class="mb-1 inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-[0.18em] text-[color:var(--school-primary)]">
+      {{ kicker }}
+    </span>
+  {% endif %}
+  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div class="min-w-0">
+      <h1 class="text-xl font-black tracking-tight text-[color:var(--text)] sm:text-2xl">{{ title }}</h1>
+      {% if subtitle %}<p class="mt-1 text-sm text-[color:var(--muted-2)]">{{ subtitle }}</p>{% endif %}
+    </div>
+    <div class="flex shrink-0 flex-wrap items-center gap-2">
+      {% slot "actions" %}{% endslot %}
+    </div>
+  </div>
+</div>

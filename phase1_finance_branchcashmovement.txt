@@ -1,0 +1,58 @@
+Phase 1 finance - BranchCashMovement
+
+Modifications appliquees
+- `accounts/models.py`
+  - Ajout de `BranchCashMovement.SOURCE_BANK_TRANSFER` et de sa valeur lisible.
+
+- `accounts/services/manager_intelligence.py`
+  - Ajout de `sync_donation_cash_movement()`.
+  - Ajout de `sync_bank_transfer_cash_movement()`.
+  - Ajout de `branch_financial_orphan_report()`.
+  - Ajout de `reconcile_branch_financial_movements()`.
+  - Conservation de `sync_student_payment_cash_movements()` pour la compatibilite.
+
+- `accounts/dashboards/htmx_depenses.py`
+  - `donation_create()` cree maintenant Donation + BranchCashMovement dans une transaction.
+  - `monthly_closure_create()` cree/synchronise le mouvement de versement bancaire.
+  - `monthly_closure_validate()` bloque la validation si des mouvements financiers sont orphelins.
+  - `monthly_closure_close()` bloque la cloture si des mouvements financiers sont orphelins.
+
+- `accounts/dashboards/htmx_caisse.py`
+  - `cash_sync()` appelle maintenant la reconciliation financiere globale.
+
+- `accounts/test_manager_workflows.py`
+  - Test donation liee a son mouvement de caisse.
+  - Test versement bancaire via cloture.
+  - Test blocage de cloture sur don orphelin.
+  - Test de reconciliation financiere.
+
+Fonctions creees
+- `sync_donation_cash_movement(donation, user=None)`
+- `sync_bank_transfer_cash_movement(transfer, user=None)`
+- `branch_financial_orphan_report(branch, period_month=None)`
+- `reconcile_branch_financial_movements(branch, user=None, period_month=None, repair=True)`
+
+Regles metier appliquees
+- Toute donation cree un mouvement de caisse entree et reste liee a ce mouvement.
+- Tout versement bancaire cree un mouvement de caisse sortie.
+- Les operations sensibles restent atomiques.
+- Le filtrage par annexe est conserve sur tous les flux modifies.
+- La cloture mensuelle est bloquee s'il existe des operations financieres orphelines.
+- La reconciliation peut reparer sans dupliquer les mouvements.
+
+Routes touchees
+- `accounts:htmx_manager_donation_create`
+- `accounts:htmx_manager_monthly_closure_create`
+- `accounts:htmx_manager_monthly_closure_validate`
+- `accounts:htmx_manager_monthly_closure_close`
+- `accounts:htmx_manager_cash_sync`
+
+Verification
+- `python -m py_compile ...` : OK
+- `python manage.py check --settings=config.settings_test_local` : OK
+- `python manage.py test ...` : timeout sur l'environnement, non termine
+
+Risques restants
+- Les tests Django complets n'ont pas pu aller au bout dans le temps alloue.
+- Les versements bancaires sont maintenant journalises comme sorties de caisse, mais ils restent comptabilises dans les totaux de caisse existants.
+- La recreation d'un fichier de piece de caisse deja generee n'est pas rerendue automatiquement si le montant change apres coup.

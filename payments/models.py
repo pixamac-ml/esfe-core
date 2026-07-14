@@ -444,6 +444,7 @@ class FinancialLog(models.Model):
     ACTION_EXPENSE = "expense"
     ACTION_EXPORT = "export"
     ACTION_PRINT = "print"
+    ACTION_COUPON_APPLIED = "coupon_applied"
 
     ACTION_CHOICES = (
         (ACTION_PAYMENT_CREATED, "Paiement cree"),
@@ -453,6 +454,7 @@ class FinancialLog(models.Model):
         (ACTION_EXPENSE, "Depense"),
         (ACTION_EXPORT, "Export"),
         (ACTION_PRINT, "Impression"),
+        (ACTION_COUPON_APPLIED, "Coupon applique"),
     )
 
     branch = models.ForeignKey(

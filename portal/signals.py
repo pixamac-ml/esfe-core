@@ -1,12 +1,46 @@
 """Notifications pedagogiques pour le Directeur des Etudes (cf.
 CAHIER_DES_CHARGES_DIRECTEUR_ETUDES.md, 2.4). Suit le meme pattern que
 `academics/signals.py` (post_save -> NotificationService)."""
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 
 from notifier.models import NotificationMessage
 from notifier.services import NotificationBus
-from portal.models import TeacherDocument, TransferRequest
+from portal.models import AccountSupportState, TeacherDocument, TransferRequest
+
+
+@receiver(pre_save, sender=AccountSupportState)
+def remember_account_restrictions(sender, instance, **kwargs):
+    if not instance.pk:
+        instance._previous_restrictions = None
+        return
+    instance._previous_restrictions = (
+        sender.objects.filter(pk=instance.pk)
+        .values_list("is_suspended", "is_blocked")
+        .first()
+    )
+
+
+@receiver(post_save, sender=AccountSupportState)
+def revoke_sessions_when_account_is_restricted(sender, instance, created, **kwargs):
+    previous = getattr(instance, "_previous_restrictions", None)
+    suspended_started = instance.is_suspended and not bool(previous and previous[0])
+    blocked_started = instance.is_blocked and not bool(previous and previous[1])
+    if not suspended_started and not blocked_started:
+        return
+    from accounts.models import AccountSecurityEvent, AccountSessionRecord
+    from accounts.session_policy import log_security_event
+    from accounts.session_security import revoke_user_sessions
+
+    if suspended_started:
+        log_security_event(user=instance.user, actor=instance.updated_by, event_type=AccountSecurityEvent.ACCOUNT_SUSPENDED)
+    if blocked_started:
+        log_security_event(user=instance.user, actor=instance.updated_by, event_type=AccountSecurityEvent.ACCOUNT_BLOCKED)
+    revoke_user_sessions(
+        instance.user,
+        reason=AccountSessionRecord.END_ACCOUNT_RESTRICTED,
+        global_scope=True,
+    )
 
 
 def _directors_of_studies_for_branch(branch):

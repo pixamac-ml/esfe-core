@@ -71,6 +71,34 @@
     </div>
     <div class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
       {% for event in timetable.events %}
+        {% if event.event_type == 'exam' or event.event_type == 'practical' %}
+        <article class="rounded-lg border-2 px-3 py-2.5 {% if event.event_type == 'exam' %}border-red-400 bg-red-50{% else %}border-amber-400 bg-amber-50{% endif %}">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="mb-1 flex items-center gap-1.5">
+                <i data-lucide="{% if event.event_type == 'exam' %}file-check{% else %}pen-line{% endif %}" style="width:13px;height:13px;" class="{% if event.event_type == 'exam' %}text-red-600{% else %}text-amber-600{% endif %} shrink-0"></i>
+                <span class="text-[10px] font-black uppercase tracking-wide {% if event.event_type == 'exam' %}text-red-600{% else %}text-amber-600{% endif %}">{% if event.event_type == 'exam' %}Examen{% else %}Devoir / TP{% endif %}</span>
+              </div>
+              <strong class="block truncate text-sm font-black text-[color:var(--text)]">{{ event.title }}</strong>
+              <p class="mt-1 text-xs font-bold {% if event.event_type == 'exam' %}text-red-700{% else %}text-amber-700{% endif %}">{{ event.weekday_label }} — {{ event.time_range }}</p>
+            </div>
+            <span class="shrink-0 rounded-full px-2 py-1 text-[10px] font-bold {% if event.event_type == 'exam' %}bg-red-100 text-red-700{% else %}bg-amber-100 text-amber-700{% endif %}">
+              {{ event.status_label }}
+            </span>
+          </div>
+          <div class="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold text-[color:var(--muted)]">
+            <span class="inline-flex items-center gap-1.5">
+              <i data-lucide="map-pin" style="width:12px;height:12px;"></i>
+              {{ event.location }}
+            </span>
+          </div>
+          {% if event.description %}
+          <p class="mt-2 rounded-lg bg-white/70 px-2 py-1.5 text-[11px] text-[color:var(--muted)]">
+            <span class="font-black text-[color:var(--text)]">Programme :</span> {{ event.description }}
+          </p>
+          {% endif %}
+        </article>
+        {% else %}
         <article class="rounded-lg border px-3 py-2.5 {% if event.status_theme == 'rose' %}border-rose-200 bg-rose-50{% elif event.status_theme == 'amber' %}border-amber-200 bg-amber-50{% elif event.status_theme == 'emerald' %}border-emerald-200 bg-emerald-50{% elif event.status_theme == 'slate' %}border-slate-200 bg-slate-50{% else %}border-sky-200 bg-sky-50{% endif %}">
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
@@ -92,6 +120,7 @@
             </span>
           </div>
         </article>
+        {% endif %}
       {% endfor %}
     </div>
   </section>
@@ -122,6 +151,20 @@
                 {% if cell.events %}
                   <div class="grid gap-2">
                     {% for event in cell.events %}
+                      {% if event.event_type == 'exam' or event.event_type == 'practical' %}
+                      <article class="rounded-lg border-2 px-3 py-2 shadow-sm {% if event.event_type == 'exam' %}border-red-400 bg-red-50{% else %}border-amber-400 bg-amber-50{% endif %}">
+                        <div class="mb-1 flex items-center gap-1">
+                          <i data-lucide="{% if event.event_type == 'exam' %}file-check{% else %}pen-line{% endif %}" style="width:11px;height:11px;" class="{% if event.event_type == 'exam' %}text-red-600{% else %}text-amber-600{% endif %} shrink-0"></i>
+                          <span class="text-[9px] font-black uppercase tracking-wide {% if event.event_type == 'exam' %}text-red-600{% else %}text-amber-600{% endif %}">{% if event.event_type == 'exam' %}Examen{% else %}Devoir{% endif %}</span>
+                        </div>
+                        <strong class="block text-xs font-black leading-4 text-[color:var(--text)]">{{ event.title }}</strong>
+                        <p class="mt-1 truncate text-[11px] text-[color:var(--muted)]">{{ event.location }}</p>
+                        <span class="mt-1.5 block text-[10px] font-bold uppercase tracking-wide {% if event.event_type == 'exam' %}text-red-700{% else %}text-amber-700{% endif %}">{{ event.time_range }}</span>
+                        {% if event.description %}
+                        <p class="mt-1 text-[10px] text-[color:var(--muted)] line-clamp-2">{{ event.description }}</p>
+                        {% endif %}
+                      </article>
+                      {% else %}
                       <article class="rounded-lg border px-3 py-2.5 shadow-sm {% if event.status_theme == 'rose' %}border-rose-200 bg-rose-50{% elif event.status_theme == 'amber' %}border-amber-200 bg-amber-50{% elif event.status_theme == 'emerald' %}border-emerald-200 bg-emerald-50{% elif event.status_theme == 'slate' %}border-slate-200 bg-slate-50{% else %}border-sky-200 bg-sky-50{% endif %}">
                         <div class="flex items-start justify-between gap-2">
                           <strong class="block text-xs font-black leading-4 text-[color:var(--text)]">{{ event.title }}</strong>
@@ -136,6 +179,7 @@
                           </span>
                         </div>
                       </article>
+                      {% endif %}
                     {% endfor %}
                   </div>
                 {% else %}

@@ -717,6 +717,23 @@ def update_settings_password(request):
     try:
         context = update_account_password(request.user, request.POST)
         update_session_auth_hash(request, request.user)
+        from accounts.models import AccountSecurityEvent, AccountSessionRecord
+        from accounts.session_policy import SESSION_ID_KEY, log_security_event
+        from accounts.session_security import revoke_user_sessions
+
+        log_security_event(
+            user=request.user,
+            event_type=AccountSecurityEvent.PASSWORD_CHANGED,
+            request=request,
+            identifier=request.session.get(SESSION_ID_KEY),
+            reason=AccountSessionRecord.END_PASSWORD_CHANGED,
+            authentication_method="self_service",
+        )
+        revoke_user_sessions(
+            request.user,
+            exclude_session_key=request.session.session_key,
+            reason=AccountSessionRecord.END_PASSWORD_CHANGED,
+        )
         context["form_success"] = "Mot de passe mis a jour."
         context["form_errors"] = {}
     except ValidationError as exc:

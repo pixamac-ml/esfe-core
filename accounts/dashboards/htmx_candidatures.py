@@ -1,13 +1,15 @@
 import json
+from pathlib import Path
 
 from django.db import transaction
-from django.http import HttpRequest, HttpResponse
+from django.http import FileResponse, Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.text import slugify
 from django.views.decorators.http import require_GET, require_POST
 
-from admissions.models import Candidature
+from admissions.models import Candidature, CandidatureDocument
 
 from accounts.dashboards.htmx_utils import manager_required
 
@@ -28,6 +30,25 @@ def candidature_detail(request: HttpRequest, pk: int) -> HttpResponse:
             "candidature": candidature,
             "documents": documents,
         },
+    )
+
+
+@manager_required
+@require_GET
+def candidature_document_download(request: HttpRequest, pk: int) -> FileResponse:
+    document = get_object_or_404(
+        CandidatureDocument.objects.select_related("candidature__branch", "document_type"),
+        pk=pk,
+        candidature__branch=request.branch,
+    )
+    if not document.file:
+        raise Http404("Document indisponible.")
+    suffix = Path(document.file.name).suffix.lower() or ".bin"
+    label = slugify(document.document_type.name) or f"document-{document.pk}"
+    return FileResponse(
+        document.file.open("rb"),
+        as_attachment=True,
+        filename=f"{label}-{document.pk}{suffix}",
     )
 
 

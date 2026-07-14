@@ -20,5 +20,6 @@ def build_notification_payload(message):
             recipient_id=message.recipient_id,
             channel=NotificationMessage.CHANNEL_IN_APP,
             read_at__isnull=True,
+            archived_at__isnull=True,
         ).count()
     return payload

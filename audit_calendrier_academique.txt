@@ -1,0 +1,248 @@
+AUDIT TECHNIQUE CIBLE — CALENDRIER ACADEMIQUE
+Projet ESFE Core
+Date de l'audit : 07/07/2026
+
+DECISION EN UNE PHRASE
+
+Il faut introduire un domaine de calendrier academique distinct, idealement un modele d'entete AcademicCalendar et des entrees AcademicCalendarEntry (ou, si un seul modele est souhaite, un modele AcademicCalendar qui represente directement une entree datee). AcademicScheduleEvent doit rester le moteur d'emploi du temps. La seule extension utile de ce dernier serait un lien optionnel vers une entree de calendrier lorsqu'un jalon, par exemple une periode d'examens, donne lieu a des seances operationnelles par classe.
+
+PERIMETRE AUDITE
+
+- academics.models.AcademicYear (academics/models.py:48)
+- academics.models.Semester (academics/models.py:349)
+- academics.models.AcademicScheduleEvent (academics/models.py:824)
+- academics.models.WeeklyScheduleSlot (academics/models.py:1098)
+- academics.services.schedule_service
+- academics.services.timetable_service
+- contexte commun du planner dans portal/services/supervisor_service.py
+- vues Directeur dans portal/views/views.py : hub, lecture, edition, grille recurrente, sauvegarde, materialisation semaine/mois, creation d'un cours, impressions classe/enseignant
+- routes correspondantes de portal/urls.py
+- templates HTMX du planner Directeur, partages avec le planner Surveillant
+- tests de workflows Directeur dans accounts/tests.py
+
+1. CE QUE LE MOTEUR ACTUEL SAIT DEJA FAIRE
+
+1.1. Grille recurrente d'emploi du temps
+
+WeeklyScheduleSlot definit un cours recurrent par classe, annexe, annee academique, EC, enseignant, jour de semaine, heures de debut/fin et salle. Il sait :
+
+- representer une grille hebdomadaire du lundi au dimanche ;
+- verifier que la fin est posterieure au debut ;
+- verifier la coherence classe/annexe, classe/annee et EC/classe ;
+- interdire deux creneaux ayant le meme debut pour une meme classe via une contrainte SQL ;
+- detecter dans le service les chevauchements de classe, enseignant et salle sur une meme annexe et une meme annee ;
+- creer, modifier et desactiver un creneau sans supprimer son historique physique ;
+- afficher la grille recurrente comme solution de repli lorsqu'aucune seance datee n'est encore materialisee.
+
+1.2. Seances datees d'emploi du temps
+
+AcademicScheduleEvent represente une seance reelle avec start_datetime et end_datetime. Ces champs sont des DateTimeField et les services utilisent timezone.localdate(), timezone.now(), timezone.make_aware() et timezone.localtime(). Le moteur sait donc manipuler de vraies dates/heures selon la timezone Django.
+
+Il prend en charge :
+
+- les types cours, examen, reunion, travaux pratiques, seminaire et autre ;
+- les statuts brouillon, planifie, en cours, termine, reporte et annule ;
+- les seances en salle ou en ligne ;
+- la creation et la mise a jour transactionnelles ;
+- le report avec motif obligatoire ;
+- l'annulation avec motif obligatoire ;
+- le demarrage et la cloture d'une seance avec journal d'execution ;
+- un historique des creations, modifications, reports, annulations et clotures ;
+- le calcul de duree ;
+- la detection des conflits de classe, enseignant, salle et EC ;
+- le respect des affectations enseignant/EC et du volume horaire planifie ;
+- la suggestion de creneaux libres dans quatre plages horaires standards ;
+- les vues hebdomadaires classe, enseignant, etudiant et annexe ;
+- des statistiques hebdomadaires, alertes, charges, taux d'annulation/realisation et score de qualite ;
+- l'impression d'une semaine ou de quatre semaines pour une classe ou un enseignant.
+
+1.3. Materialisation du recurrent vers le date
+
+materialize_week_events_from_weekly_slots transforme les WeeklyScheduleSlot actifs en AcademicScheduleEvent de type cours pour une semaine donnee. Le flux Directeur peut materialiser une semaine ou quatre semaines. Il est idempotent sur la cle logique date + heures + EC + enseignant : une seconde execution ignore les seances deja presentes.
+
+1.4. Planner Directeur
+
+Les vues sont protegees par les positions autorisees et resolvent l'annexe du Directeur. La classe, l'EC, le creneau et l'enseignant sont recherches dans cette annexe. Les principaux flux sont :
+
+- director_planner_hub : choix des actions d'une classe ;
+- director_planner_view_workspace : lecture de la semaine ;
+- director_planner_workspace : formulaire de creation/programmation ;
+- director_weekly_slots_workspace : gestion de la grille recurrente ;
+- director_weekly_slot_save : creation, modification et desactivation ;
+- director_week_materialize et director_month_materialize : generation des cours dates ;
+- director_create_schedule_event : programmation ponctuelle d'un cours ;
+- schedule_class_print et schedule_teacher_print : impressions semaine/mois.
+
+Le contexte commun build_class_detail_context impose la classe de l'annexe, fournit ses EC, les enseignants de l'annexe, la grille, les semaines precedente/suivante et le payload consolide de timetable_service. Les tests couvrent l'ouverture du hub, la generation idempotente du mois, la programmation ponctuelle, les conflits, la limite d'heures et les impressions.
+
+1.5. AcademicYear et Semester
+
+AcademicYear contient un nom unique, une date de debut, une date de fin et un indicateur actif. Il valide que la fin est posterieure au debut et qu'une seule annee est active.
+
+Semester est rattache a une classe, limite aux numeros 1 et 2, avec un statut de workflow de notes/resultats : brouillon, saisie normale, session normale terminee, rattrapage, finalise, publie. L'unicite classe + numero est garantie.
+
+2. CE QUE LE MOTEUR NE SAIT PAS FAIRE
+
+2.1. Il ne modelise pas un calendrier academique
+
+Il n'existe aucune entite capable de representer proprement :
+
+- rentree academique ;
+- debut et fin de semestre ;
+- vacances ;
+- jours feries ;
+- inscription et reinscription ;
+- periode d'examens ou de rattrapages ;
+- jury ;
+- publication des resultats ;
+- cloture academique.
+
+Le type "exam" d'AcademicScheduleEvent represente au mieux une seance d'examen precise. Il ne represente pas la periode institutionnelle des examens. Le type "other" n'est pas une taxonomie exploitable et ne couvre pas les regles de ces jalons.
+
+2.2. AcademicScheduleEvent est structurellement un objet d'emploi du temps
+
+Chaque evenement exige obligatoirement :
+
+- une classe ;
+- un EC ;
+- un enseignant ;
+- une annexe ;
+- une annee academique ;
+- un createur et un modificateur.
+
+Une vacance, un jour ferie, une periode d'inscription, un jury global ou une cloture academique n'a normalement ni EC, ni enseignant, ni classe unique. Rendre ces champs facultatifs pour accueillir le calendrier affaiblirait les invariants du moteur de cours et imposerait de modifier une grande partie des services, serialiseurs, alertes, templates et tests qui dereferencent actuellement event.ec, event.teacher et event.academic_class.
+
+2.3. Les semestres n'ont aucune borne calendaire
+
+Semester ne possede ni start_datetime ni end_datetime. Son statut concerne la saisie et la publication des resultats, pas la chronologie du semestre. Comme un Semester appartient a une classe, il existe plusieurs objets "semestre 1" pour une meme annee/annexe. Il ne peut donc pas servir seul de calendrier institutionnel de l'annexe.
+
+2.4. L'annee academique est insuffisante comme calendrier
+
+AcademicYear ne contient que des DateField, sans heures, sans annexe et sans jalons internes. Elle ne permet ni publication/version du calendrier, ni chevauchement controle des periodes, ni ciblage par programme/classe, ni distinction jour entier/creneau horaire.
+
+Le moteur ne verifie pas non plus qu'un AcademicScheduleEvent ou un WeeklyScheduleSlot materialise tombe entre start_date et end_date de l'AcademicYear. La coherence verifiee est seulement l'identite de l'annee portee par la classe.
+
+2.5. Absence de regles calendrier/emploi du temps
+
+Le moteur sait detecter des collisions entre seances, mais il ne sait pas :
+
+- bloquer ou signaler un cours pendant une vacance ou un jour ferie ;
+- suspendre la materialisation recurrente pendant une fermeture ;
+- verifier qu'un examen est dans la periode d'examens ;
+- ordonner les jalons : inscription avant rentree, debut avant fin de semestre, resultats apres jury, cloture en fin d'annee ;
+- publier un calendrier et conserver ses revisions ;
+- notifier les populations concernees ;
+- afficher une vue annuelle/mensuelle des jalons ;
+- distinguer une periode inclusive de plusieurs jours d'un evenement horaire ;
+- cibler explicitement toute une annexe, un programme, plusieurs classes ou une classe.
+
+2.6. Limites techniques du moteur actuel a ne pas recopier
+
+- Les validations fortes d'AcademicScheduleEvent vivent surtout dans schedule_service. Une creation ORM directe peut contourner les conflits car le modele ne surcharge pas save() et les collisions ne sont pas des contraintes SQL.
+- La recherche de conflits est filtree par annexe. Elle protege l'isolation fonctionnelle, mais ne detecte pas l'indisponibilite inter-annexes d'un meme enseignant si ce cas metier existe.
+- timetable_service est hebdomadaire et oriente classe/enseignant. Il ne fournit pas de vue annuelle ou mensuelle institutionnelle.
+- Les alertes sont concues pour les cours : enseignant manquant, salle manquante, surcharge, classe sans cours, report et annulation.
+- La materialisation "mois" signifie exactement quatre semaines, pas un mois civil.
+
+3. CE QUI PEUT ETRE REUTILISE SANS MODIFICATION
+
+- AcademicYear comme borne et identifiant de l'annee du calendrier.
+- Branch comme perimetre obligatoire d'isolation des donnees.
+- Semester comme cible optionnelle d'un jalon propre a une classe, et comme source du numero/statut de semestre ; il ne doit pas porter le calendrier global.
+- Les pratiques timezone de schedule_service : timezone.now/localdate/localtime et datetimes aware.
+- Les principes de services transactionnels pour creer, modifier, publier ou annuler.
+- Le controle d'acces _position_required et require_director_branch_scope.
+- Le pattern de requetes qui impose branch avant de charger une classe ou un objet modifiable.
+- Les composants d'interface generiques : badges de statut, formulaires HTMX, toast, navigation et impression.
+- AcademicScheduleEvent, WeeklyScheduleSlot, schedule_service et timetable_service tels quels pour l'emploi du temps.
+- AcademicScheduleEvent de type exam pour une seance d'examen operationnelle precise, a condition qu'elle ait bien une classe, un EC et un enseignant/surveillant conforme au modele actuel.
+
+4. CE QUI DOIT ETRE ETENDU
+
+4.1. Nouveau domaine de calendrier
+
+Architecture cible recommandee :
+
+A. AcademicCalendar, entete publiable par annexe et annee
+
+- branch obligatoire ;
+- academic_year obligatoire ;
+- statut de cycle de vie, par exemple draft/published/archived ;
+- version ou revision ;
+- created_by, updated_by, published_by et horodatages ;
+- contrainte d'unicite adaptee, par exemple une seule version publiee par annexe/annee.
+
+B. AcademicCalendarEntry, jalon ou periode
+
+- calendar obligatoire ;
+- type metier explicite couvrant les onze besoins demandes ;
+- titre et description ;
+- start_at et end_at en DateTimeField aware ;
+- indicateur all_day pour les jours/periodes sans heure metier, tout en stockant des bornes conscientes de la timezone ;
+- niveau de portee : annexe, programme, classe ou semestre ;
+- cibles optionnelles coherentes avec la portee ;
+- statut, priorite d'affichage et informations de publication ;
+- eventuellement un indicateur bloquant pour interdire la programmation de cours.
+
+Si le projet exige strictement un seul nouveau modele, AcademicCalendar peut porter directement ces champs et chaque ligne representera un jalon/periode. L'entete + entrees reste cependant preferable pour publier, versionner et archiver un calendrier complet de maniere atomique.
+
+4.2. Validations indispensables
+
+- start_at strictement anterieur a end_at ;
+- datetimes aware sous USE_TZ ;
+- bornes incluses dans l'AcademicYear associee, avec convention explicite pour la fin ;
+- annexe obligatoire sur toutes les donnees ;
+- toute classe/semestre/programme cible doit appartenir au meme perimetre d'annee et d'annexe ;
+- regles de portee : aucune classe pour un jalon global, classe obligatoire pour un jalon de classe, etc. ;
+- ordre logique des jalons structurants ;
+- politique explicite de chevauchement par type ;
+- index au minimum sur branch + academic_year + start_at, type + start_at et statut ;
+- contraintes SQL pour les invariants simples, validations de service pour les regles inter-objets.
+
+4.3. Services a ajouter, sans melanger les deux moteurs
+
+- calendar_service pour les commandes, validations, publication et archivage ;
+- calendar selectors pour lister par annexe, annee, intervalle et portee ;
+- service de conflits calendrier/planning qui consulte les entrees bloquantes avant creation ou materialisation de cours ;
+- vue de lecture unifiee qui fusionne en memoire les jalons academiques et les seances d'emploi du temps, sans les stocker dans la meme table.
+
+schedule_service peut recevoir un appel vers une politique de calendrier lors de create_schedule_event et materialize_week_events_from_weekly_slots. Le reste de ses comportements ne doit pas etre generalise aux vacances, inscriptions ou publications.
+
+4.4. Evolution limitee d'AcademicScheduleEvent
+
+Ne pas rendre academic_class, ec ou teacher facultatifs pour le calendrier. Ajouter au maximum une relation optionnelle de provenance vers AcademicCalendarEntry. Exemple fonctionnel : une entree "periode d'examens" autorise plusieurs AcademicScheduleEvent de type exam, chaque seance restant liee a sa classe et son EC. Cette relation permet tracabilite et controle sans confondre la periode et ses seances.
+
+4.5. Vues Directeur
+
+Ajouter un espace "Calendrier academique" distinct de "Emploi du temps". Il doit etre filtre des la requete par l'annexe du Directeur et par AcademicYear. Le planner actuel peut afficher les jalons en surimpression ou en alertes, mais ses formulaires de cours ne doivent pas devenir les formulaires du calendrier.
+
+5. COMPARAISON DES TROIS OPTIONS
+
+Option 1 — Ajouter uniquement AcademicCalendar
+
+Bonne base et separation correcte. Elle est suffisante si le modele represente directement chaque entree et si aucune tracabilite vers les seances d'examen n'est requise. Elle evite toute regression dans l'emploi du temps.
+
+Option 2 — Etendre uniquement AcademicScheduleEvent
+
+Option deconseillee. Elle obligerait a rendre facultatifs classe, EC et enseignant, a etendre event_type, a neutraliser des alertes/conflits inapplicables et a modifier tous les consommateurs. Elle melangerait calendrier institutionnel, seances pedagogiques, execution des cours et charge enseignant dans une seule table. Le cout de migration et le risque de regression seraient eleves.
+
+Option 3 — Combinaison controlee
+
+Option recommandee : nouveau domaine AcademicCalendar/AcademicCalendarEntry, conservation d'AcademicScheduleEvent pour l'emploi du temps, et lien optionnel entre une seance operationnelle et son jalon source. Les deux domaines peuvent etre fusionnes uniquement au niveau lecture/affichage et au niveau d'une politique de blocage.
+
+6. RECOMMANDATION FINALE
+
+Choisir la combinaison controlee.
+
+La frontiere metier est nette :
+
+- AcademicCalendar contient ce que l'institution decide et publie pour une annexe et une annee ;
+- AcademicCalendarEntry contient les jalons et periodes reels ;
+- WeeklyScheduleSlot contient le modele recurrent des cours ;
+- AcademicScheduleEvent contient les seances datees et executables ;
+- Semester conserve le workflow pedagogique des notes/resultats ;
+- AcademicYear fournit les bornes generales.
+
+Cette architecture couvre tous les evenements demandes, respecte les vraies dates/heures Django, maintient le filtrage obligatoire par annexe et evite de fragiliser un moteur d'emploi du temps deja fonctionnel et teste.
+
+Aucun code applicatif ni modele n'a ete modifie dans le cadre de cet audit.

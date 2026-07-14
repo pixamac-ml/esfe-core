@@ -1,0 +1,260 @@
+AUDIT TECHNIQUE ET FONCTIONNEL — DASHBOARD GESTIONNAIRE / CAISSE
+================================================================
+
+A. RÉSUMÉ GÉNÉRAL
+
+Le dashboard Gestionnaire/Caisse est déjà avancé et exploitable pour les candidatures, inscriptions, paiements étudiants, reçus, salaires, honoraires, dépenses, caisse, rapports Excel, boutique, dons, clôtures mensuelles et versements bancaires.
+
+Le filtrage par annexe est globalement bien appliqué grâce à manager_required, qui injecte request.branch, puis aux requêtes filtrées sur cette annexe.
+
+Les lacunes principales concernent la gestion du matériel, les achats administratifs structurés et plusieurs documents métiers demandés. Certaines générations PDF existent techniquement, mais ne sont pas exposées au gestionnaire.
+
+B. FICHIERS DÉTECTÉS
+
+Dashboard principal :
+- accounts/dashboards/manager_dashboard.py : contexte, statistiques et listes.
+- accounts/templates/accounts/dashboard/manager_dashboard.html : interface complète.
+- accounts/urls.py : routes du dashboard et actions HTMX.
+- accounts/dashboards/helpers.py
+- accounts/dashboards/permissions.py
+- accounts/dashboards/querysets.py
+
+Contrôleurs HTMX :
+- accounts/dashboards/htmx_candidatures.py
+- accounts/dashboards/htmx_inscriptions.py
+- accounts/dashboards/htmx_paiements.py
+- accounts/dashboards/htmx_caisse.py
+- accounts/dashboards/htmx_depenses.py
+- accounts/dashboards/htmx_salaires.py
+- accounts/dashboards/htmx_honoraires.py
+- accounts/dashboards/htmx_widgets.py
+- accounts/dashboards/htmx_global.py
+- accounts/dashboards/htmx_manager.py
+
+Modèles financiers principaux :
+- accounts.models.PayrollEntry
+- accounts.models.TeacherHonorariumEntry
+- accounts.models.BranchExpense
+- accounts.models.BranchCashMovement
+- accounts.models.AccountingDocumentSequence
+- accounts.models.BranchMonthlyClosure
+- accounts.models.BranchBankTransfer
+- accounts.models.Donation
+- payments.models.Payment et CashPaymentSession
+- inscriptions.models.Inscription
+- admissions.models.Candidature
+- shop.models.ShopOrder et ShopPayment
+
+Services et documents :
+- accounts/services/accounting_documents.py
+- accounts/services/payslip_pdf.py
+- accounts/services/donation_pdf.py
+- accounts/services/excel_reports.py
+- payments/pdf/receipt.py
+- shop/services/shop_service.py
+- core/pdf_documents.py
+- ui/components/documents/
+
+C. FONCTIONNALITÉS DÉJÀ PRÉSENTES
+
+Pages disponibles :
+- vue d'ensemble ;
+- candidatures ;
+- inscriptions ;
+- paiements ;
+- salaires et honoraires ;
+- dépenses ;
+- boutique ;
+- dons ;
+- caisse ;
+- rapport ;
+- clôture ;
+- réinscriptions.
+
+Les données affichées sont dynamiques. Aucun jeu de statistiques fictives n'a été détecté dans le template principal.
+
+Statistiques et tableaux :
+- candidatures par statut ;
+- inscriptions actives, partielles ou en attente ;
+- paiements validés, en attente ou annulés ;
+- recettes et soldes ;
+- salaires préparés, prêts, partiels ou payés ;
+- honoraires enseignants ;
+- dépenses par statut ;
+- mouvements et solde de caisse ;
+- résultats financiers par période ;
+- clôtures et versements bancaires ;
+- stock, commandes et paiements boutique ;
+- dons par période.
+
+Actions disponibles :
+- traiter, accepter, refuser ou demander un complément de candidature ;
+- créer/finaliser une inscription ;
+- appliquer un coupon ;
+- créer une session de paiement espèces ;
+- valider, annuler ou corriger un paiement ;
+- préparer, corriger et payer salaires et honoraires ;
+- créer, approuver, rejeter et payer une dépense ;
+- enregistrer et synchroniser des mouvements de caisse ;
+- générer une pièce de caisse ;
+- gérer produits, stock, commandes et livraisons boutique ;
+- créer et clôturer une situation mensuelle ;
+- exporter un rapport Excel.
+
+D. FONCTIONNALITÉS PARTIELLEMENT PRÉSENTES
+
+- Factures : la boutique génère un document intitulé « Facture d'achat », mais il est stocké et présenté comme reçu boutique.
+- Fiche d'inscription : le composant esfe_inscription_certificate existe, mais aucune vue ni route ne l'exploite.
+- Fiches de paie : génération disponible, mais routes réservées au salarié connecté.
+- Bordereaux d'honoraires : génération disponible, mais route réservée à l'enseignant connecté.
+- Dons : service PDF présent, mais la création d'un don ne déclenche pas ensure_donation_receipt et aucun bouton n'est exposé.
+- Banque : versements créés pendant la clôture et visibles, sans module bancaire autonome.
+- État comptable : page et export Excel présents, sans document PDF signé ou archivable.
+- Dépenses : justificatif téléversable et pièce de caisse présents, sans véritable bon de dépense distinct.
+
+E. FONCTIONNALITÉS ABSENTES
+
+Aucun modèle métier structuré n'a été trouvé pour :
+- matériel ou inventaire patrimonial ;
+- remise ou affectation de matériel ;
+- achat administratif et fournisseur ;
+- bon de commande ;
+- réception d'achat ;
+- transfert de matériel ;
+- bordereau d'envoi ;
+- décharge ;
+- fiche descriptive du matériel.
+
+Le stock de la boutique ne doit pas être assimilé à un registre de matériel administratif.
+
+La clôture journalière n'est pas réellement modélisée. La clôture existante est mensuelle.
+
+F. DOCUMENTS DÉJÀ GÉNÉRABLES
+
+- Reçu étudiant : objet Payment ; route payments:receipt_pdf ; disponible.
+- Facture/reçu boutique : objet ShopPayment ; route shop:payment_receipt ; disponible.
+- Pièce de caisse : objet BranchCashMovement ; route htmx_manager_cash_movement_receipt ; disponible.
+- Fiche de paie : objet PayrollEntry ; route accounts:payslip_download ; salarié seulement.
+- Bordereau d'honoraires : objet TeacherHonorariumEntry ; route accounts:honorarium_download ; enseignant seulement.
+- Rapport comptable Excel : données financières de l'annexe ; route manager_export_report_xlsx ; disponible.
+- Reçu de don : objet Donation ; service donation_pdf.py ; non exposé.
+- Attestation d'inscription : composant existant ; aucune route ; non exploitée.
+
+Templates PDF existants :
+- payment_receipt ;
+- shop_invoice ;
+- salary_slip ;
+- cash_receipt ;
+- donation_receipt ;
+- inscription_certificate ;
+- refund_document.
+
+G. DOCUMENTS À RATTACHER AUX WORKFLOWS EXISTANTS
+
+Priorité immédiate, sans nouveau module métier :
+1. Attestation/fiche d'inscription depuis Inscription.
+2. Fiche de paie gestionnaire depuis PayrollEntry.
+3. Bordereau d'honoraires gestionnaire depuis TeacherHonorariumEntry.
+4. Reçu de don depuis Donation.
+5. Facture boutique clairement nommée depuis ShopPayment.
+6. Pièce justificative de dépense depuis BranchExpense.
+7. État comptable PDF depuis le même contexte que l'export Excel.
+8. Bordereau de versement depuis BranchBankTransfer.
+
+Les documents concernant matériel, commandes et réceptions nécessitent d'abord de vrais objets métier.
+
+H. BOUTONS ET LIENS À CORRIGER
+
+Aucun lien statique href="#" ou javascript:void mort n'a été trouvé dans le dashboard principal.
+
+Écarts fonctionnels :
+- absence de bouton fiche d'inscription ;
+- absence de téléchargement gestionnaire des fiches de paie ;
+- absence de téléchargement gestionnaire des honoraires ;
+- absence de bouton reçu de don ;
+- absence de bordereau bancaire ;
+- certains reçus étudiants sont servis directement par payment.receipt_pdf.url, sans vue applicative contrôlée ;
+- le dashboard ne distingue pas clairement reçu boutique et facture d'achat.
+
+I. RISQUES TECHNIQUES
+
+1. Erreur latente dans accounting_documents.py : render_cash_movement_receipt_pdf utilise canvas, A4, mm, colors, Table et TableStyle sans imports visibles. Elle provoquerait une erreur si elle était appelée.
+
+2. Deux moteurs PDF coexistent : ReportLab et génération HTML/WeasyPrint. Cela augmente les risques de divergence graphique et de maintenance.
+
+3. Les liens directs vers receipt_pdf.url ne garantissent pas les contrôles d'identité et d'annexe réalisés par une vue Django.
+
+4. inscription_certificate et donation_receipt existent sans workflow complet.
+
+5. La banque est fortement couplée à la clôture mensuelle.
+
+6. Une suppression définitive de candidature rejetée est exposée. Elle doit être validée au regard des exigences de conservation historique.
+
+7. Cet audit est statique. Conformément aux instructions, aucune commande Django, migration ou suite de tests n'a été lancée.
+
+J. PLAN D'IMPLÉMENTATION RECOMMANDÉ
+
+1. Sécuriser tous les téléchargements par des vues filtrées sur l'annexe.
+2. Exposer les PDF déjà existants : inscription, paie, honoraires et don.
+3. Clarifier reçu contre facture dans la boutique.
+4. Ajouter un PDF d'état comptable basé sur le service Excel existant.
+5. Ajouter un bordereau de versement bancaire depuis BranchBankTransfer.
+6. Ajouter une pièce justificative de dépense depuis BranchExpense.
+7. Nettoyer ou retirer la fonction ReportLab incomplète après vérification d'usage.
+8. Ajouter une clôture journalière seulement si la direction confirme son workflow.
+9. Concevoir ensuite les modèles PurchaseOrder, PurchaseReceipt, MaterialAsset, MaterialTransfer et MaterialHandover.
+10. Rattacher les bons de commande, bordereaux, décharges et fiches matériel à ces objets, jamais à des pages isolées.
+
+STRUCTURE CIBLE MINIMALE
+
+Conserver le dashboard actuel, ajouter une zone « Documents » dans les pages métier concernées et introduire seulement deux sous-modules nouveaux :
+- Banque ;
+- Achats et matériel.
+
+FIN DU RAPPORT
+
+
+PHASE 1 — FICHIERS PRÉVUS AVANT IMPLÉMENTATION
+================================================
+
+Conformément à la nouvelle version de instructions.txt, aucune modification du code applicatif n'a encore été réalisée. La liste suivante est soumise à validation préalable.
+
+FICHIERS À CRÉER
+
+1. accounts/dashboards/document_downloads.py
+   Vues sécurisées pour les sept téléchargements, décorées par manager_required et filtrées systématiquement par request.branch.
+
+2. accounts/services/manager_documents.py
+   Construction des PDF manquants à partir des objets existants et du template générique esfe_document_base. Aucun modèle ni workflow ajouté.
+
+3. accounts/test_manager_document_downloads.py
+   Tests d'accès, filtrage inter-annexes, réponses PDF et utilisateurs non autorisés.
+
+FICHIERS À MODIFIER
+
+1. accounts/urls.py
+   Ajout des routes sécurisées de téléchargement.
+
+2. accounts/templates/accounts/dashboard/manager_dashboard.html
+   Boutons contextuels pour inscription, paie, honoraires, dépense, état comptable et versement bancaire.
+
+3. accounts/templates/accounts/dashboard/partials/donation_row.html
+   Bouton contextuel du reçu de don, y compris après ajout HTMX.
+
+SERVICES EXISTANTS RÉUTILISÉS SANS REMPLACEMENT
+
+- accounts/services/payslip_pdf.py
+- accounts/services/donation_pdf.py
+- core/pdf_documents.py
+- composant PDF esfe_inscription_certificate
+- template générique esfe_document_base
+
+POINT TECHNIQUE IMPORTANT
+
+Donation ne possède pas de champ receipt_pdf, bien que ensure_donation_receipt() tente de l'utiliser. Pour respecter l'interdiction de créer un modèle ou une migration, le reçu sera généré à la demande avec build_donation_receipt(), sans stockage en base.
+
+Aucune modification de modèle, migration, architecture, matériel, achats ou workflow n'est prévue.
+
+STATUT
+
+En attente de validation explicite avant écriture du code de la Phase 1.

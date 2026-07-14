@@ -1,0 +1,399 @@
+{% extends "base.html" %}
+{% load component_tags %}
+{% load humanize %}
+
+{% block title %}Calendrier académique — ESFE{% endblock %}
+
+{% block content %}
+<div
+  x-data="calendarApp({
+    listUrl: '{% url 'academics:calendar_list_create' %}',
+    calendarDetailUrlTemplate: '/academics/calendar/{calendarId}/',
+    entriesUrlTemplate: '/academics/calendar/{calendarId}/entries/',
+    entryDetailUrlTemplate: '/academics/calendar/{calendarId}/entries/{entryId}/',
+    csrf: '{{ csrf_token }}',
+    initialYear: {{ current_year }},
+    initialMonth: {{ current_month }},
+    eventTypes: {{ event_types_json|safe }},
+    statuses: {{ statuses_json|safe }}
+  })"
+  x-init="init()"
+  class="mx-auto max-w-7xl p-4 lg:p-6"
+>
+  {% component "academic_page_header" title="Calendrier académique" subtitle="Gestion des calendriers et des événements" kicker="Académique" %}
+    {% fill "actions" %}
+      <button type="button" @click="createCalendar()" class="inline-flex items-center gap-2 rounded-lg bg-[color:var(--school-primary)] px-3 py-2 text-xs font-bold text-white transition hover:opacity-90">
+        <i data-lucide="plus" style="width:14px;height:14px;"></i> Nouveau calendrier
+      </button>
+    {% endfill %}
+  {% endcomponent %}
+
+  <div class="mt-5 grid gap-5 lg:grid-cols-4">
+    {# Sidebar : liste des calendriers + timeline #}
+    <aside class="space-y-5 lg:col-span-1">
+      {% component "academic_card" title="Calendriers" icon="calendar" %}
+        <div class="space-y-2">
+          <template x-for="cal in calendars" :key="cal.id">
+            <button
+              type="button"
+              @click="selectCalendar(cal.id)"
+              class="w-full rounded-lg border px-3 py-2 text-left transition"
+              :class="cal.id === calendarId ? 'border-[color:var(--school-primary)] bg-[color:var(--school-primary-soft)]' : 'border-[color:var(--line)] bg-[color:var(--card)] hover:bg-[color:var(--surface)]'"
+            >
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-black text-[color:var(--text)]" x-text="'Calendrier v' + cal.version"></span>
+                <span class="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase" :class="statusClass(cal.status)" x-text="cal.status"></span>
+              </div>
+              <span class="block text-[10px] text-[color:var(--muted)]" x-text="cal.academic_year_label || ''"></span>
+            </button>
+          </template>
+          <p x-show="calendars.length === 0" class="text-xs text-[color:var(--muted)]">Aucun calendrier.</p>
+        </div>
+      {% endcomponent %}
+
+      {% component "academic_card" title="Fil chronologique" icon="clock" %}
+        <div class="space-y-3">
+          <template x-for="item in timelineEntries" :key="item.id">
+            <div class="flex gap-3">
+              <span class="mt-1 h-2 w-2 shrink-0 rounded-full" :style="'background:' + (item.color || 'var(--school-primary)')"></span>
+              <div>
+                <strong class="block text-xs font-black text-[color:var(--text)]" x-text="item.title"></strong>
+                <span class="text-[10px] text-[color:var(--muted)]" x-text="item.date"></span>
+                <p class="text-[10px] text-[color:var(--muted-2)] line-clamp-2" x-text="item.description"></p>
+              </div>
+            </div>
+          </template>
+          <p x-show="timelineEntries.length === 0" class="text-xs text-[color:var(--muted)]">Aucun événement.</p>
+        </div>
+      {% endcomponent %}
+    </aside>
+
+    {# Main : grille mensuelle/annuelle + détail #}
+    <section class="space-y-5 lg:col-span-3">
+      {% component "academic_toolbar" title="Vue calendrier" %}
+        {% fill "actions" %}
+          <div class="inline-flex rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] p-1">
+            <button type="button" @click="view = 'month'" :class="view === 'month' ? 'bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]' : 'text-[color:var(--muted)]'" class="rounded px-3 py-1 text-xs font-bold transition">Mois</button>
+            <button type="button" @click="view = 'year'" :class="view === 'year' ? 'bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]' : 'text-[color:var(--muted)]'" class="rounded px-3 py-1 text-xs font-bold transition">Année</button>
+            <button type="button" @click="view = 'list'" :class="view === 'list' ? 'bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]' : 'text-[color:var(--muted)]'" class="rounded px-3 py-1 text-xs font-bold transition">Liste</button>
+          </div>
+          <div class="flex items-center gap-2 rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-1 text-xs font-bold text-[color:var(--text)]">
+            <button type="button" @click="prevMonth()" class="text-[color:var(--muted)] hover:text-[color:var(--text)]"><i data-lucide="chevron-left" style="width:14px;height:16px;"></i></button>
+            <span x-text="monthLabel + ' ' + year" class="w-28 text-center"></span>
+            <button type="button" @click="nextMonth()" class="text-[color:var(--muted)] hover:text-[color:var(--text)]"><i data-lucide="chevron-right" style="width:16px;height:16px;"></i></button>
+          </div>
+          <button type="button" @click="openEntryForm()" :disabled="!calendarId" class="inline-flex items-center gap-2 rounded-lg bg-[color:var(--school-primary)] px-3 py-2 text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-50"><i data-lucide="plus" style="width:14px;height:14px;"></i> Entrée</button>
+        {% endfill %}
+      {% endcomponent %}
+
+      <div class="space-y-4">
+        {# Vue mois #}
+        <div x-show="view === 'month'" class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
+          <div class="mb-2 grid grid-cols-7 gap-1 text-center">
+            <template x-for="d in ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim']" :key="d">
+              <span class="text-[10px] font-bold uppercase tracking-wide text-[color:var(--muted-2)]" x-text="d"></span>
+            </template>
+          </div>
+          <div class="grid grid-cols-7 gap-1">
+            <template x-for="day in monthDays" :key="day.key">
+              <div class="min-h-[90px] rounded-lg border border-[color:var(--line)]/40 p-1.5 transition hover:bg-[color:var(--surface)]">
+                <span class="text-[10px] font-bold text-[color:var(--muted)]" x-text="day.number"></span>
+                <div class="mt-1 space-y-1">
+                  <template x-for="ev in day.entries" :key="ev.id">
+                    <button
+                      type="button"
+                      @click="openDrawer(ev.id)"
+                      class="block w-full truncate rounded px-1 py-0.5 text-[10px] font-bold text-left"
+                      :style="'background:' + (ev.color || 'var(--school-primary-soft)')"
+                      x-text="ev.title"
+                      :title="ev.title"
+                    ></button>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        {# Vue année #}
+        <div x-show="view === 'year'" x-cloak class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <template x-for="m in yearMonths" :key="m.index">
+            <article class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-3">
+              <h3 class="mb-2 text-xs font-black text-[color:var(--text)]" x-text="m.name"></h3>
+              <div class="grid grid-cols-7 gap-0.5 text-center">
+                <template x-for="d in ['L','M','M','J','V','S','D']" :key="d">
+                  <span class="text-[9px] font-bold text-[color:var(--muted-2)]" x-text="d"></span>
+                </template>
+                <template x-for="d in m.days" :key="d.key">
+                  <button type="button" class="aspect-square rounded text-[9px] font-semibold transition hover:bg-[color:var(--surface)]" :class="d.has_events ? 'bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]' : ''" x-text="d.number"></button>
+                </template>
+              </div>
+              <div class="mt-2 flex items-center justify-between">
+                <span class="text-[10px] font-bold text-[color:var(--muted)]"><span x-text="m.eventCount"></span> événement(s)</span>
+              </div>
+            </article>
+          </template>
+        </div>
+
+        {# Vue liste #}
+        <div x-show="view === 'list'" x-cloak class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
+          <div class="space-y-2">
+            <template x-for="ev in filteredEntries" :key="ev.id">
+              <div class="flex items-start gap-3 rounded-lg border border-[color:var(--line)] p-3 transition hover:bg-[color:var(--surface)]">
+                <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg" :style="'background:' + (ev.color || 'var(--school-primary-soft)')">
+                  <i data-lucide="calendar" style="width:16px;height:16px;"></i>
+                </span>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2">
+                    <strong class="text-sm font-black text-[color:var(--text)]" x-text="ev.title"></strong>
+                    <span class="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase" :class="statusClass(ev.status)" x-text="ev.status"></span>
+                  </div>
+                  <p class="mt-0.5 text-xs text-[color:var(--muted)]" x-text="ev.dateLabel"></p>
+                  <p x-show="ev.description" class="mt-1 text-xs text-[color:var(--muted-2)] line-clamp-2" x-text="ev.description"></p>
+                </div>
+                <div class="flex shrink-0 gap-1">
+                  <button type="button" @click="openDrawer(ev.id)" class="flex h-7 w-7 items-center justify-center rounded-lg text-[color:var(--muted)] hover:bg-[color:var(--card-soft)]"><i data-lucide="eye" style="width:14px;height:14px;"></i></button>
+                  <button type="button" @click="openEntryForm(ev.id)" class="flex h-7 w-7 items-center justify-center rounded-lg text-[color:var(--muted)] hover:bg-[color:var(--card-soft)]"><i data-lucide="pencil" style="width:14px;height:14px;"></i></button>
+                  <button type="button" @click="deleteEntry(ev.id)" class="flex h-7 w-7 items-center justify-center rounded-lg text-[color:var(--danger)] hover:bg-[color:var(--danger-soft)]"><i data-lucide="trash-2" style="width:14px;height:14px;"></i></button>
+                </div>
+              </div>
+            </template>
+            <p x-show="filteredEntries.length === 0" class="py-8 text-center text-xs text-[color:var(--muted)]">Aucun événement.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  {# Modal création/édition d'entrée #}
+  {% component "academic_modal" id="calendar-entry-modal" title="Entrée de calendrier" show_footer=False %}
+    {% fill "content" %}
+      <form @submit.prevent="saveEntry()" class="space-y-3">
+        <input type="hidden" name="csrfmiddlewaretoken" :value="csrf">
+        <div>
+          <label class="mb-1 block text-xs font-bold text-[color:var(--text)]">Titre</label>
+          <input x-model="form.title" type="text" required class="w-full rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs text-[color:var(--text)] outline-none focus:border-[color:var(--school-primary)]">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="mb-1 block text-xs font-bold text-[color:var(--text)]">Début</label>
+            <input x-model="form.start_datetime" type="datetime-local" required class="w-full rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs text-[color:var(--text)] outline-none focus:border-[color:var(--school-primary)]">
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-bold text-[color:var(--text)]">Fin</label>
+            <input x-model="form.end_datetime" type="datetime-local" required class="w-full rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs text-[color:var(--text)] outline-none focus:border-[color:var(--school-primary)]">
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="mb-1 block text-xs font-bold text-[color:var(--text)]">Type</label>
+            <select x-model="form.event_type" class="w-full rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs text-[color:var(--text)] outline-none focus:border-[color:var(--school-primary)]">
+              <template x-for="t in eventTypes" :key="t.value"><option :value="t.value" x-text="t.label"></option></template>
+            </select>
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-bold text-[color:var(--text)]">Statut</label>
+            <select x-model="form.status" class="w-full rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs text-[color:var(--text)] outline-none focus:border-[color:var(--school-primary)]">
+              <template x-for="s in statuses" :key="s.value"><option :value="s.value" x-text="s.label"></option></template>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="mb-1 block text-xs font-bold text-[color:var(--text)]">Description</label>
+          <textarea x-model="form.description" rows="3" class="w-full rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-2 text-xs text-[color:var(--text)] outline-none focus:border-[color:var(--school-primary)]"></textarea>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" @click="$dispatch('academic-modal-close')" class="rounded-lg border border-[color:var(--line)] px-4 py-2 text-xs font-bold text-[color:var(--text)]">Annuler</button>
+          <button type="submit" class="rounded-lg bg-[color:var(--school-primary)] px-4 py-2 text-xs font-bold text-white">Enregistrer</button>
+        </div>
+      </form>
+    {% endfill %}
+  {% endcomponent %}
+
+  {# Drawer détail d'entrée #}
+  {% component "academic_drawer" id="calendar-entry-drawer" content_id="calendar-entry-drawer-content" kicker="Détail de l'événement" title="Événement" icon="calendar" open_event="calendar-entry-drawer-open" close_event="calendar-entry-drawer-close" %}
+  {% endcomponent %}
+</div>
+
+<script>
+function calendarApp(config) {
+  return {
+    view: 'month',
+    year: config.initialYear,
+    month: config.initialMonth,
+    calendarId: null,
+    calendars: [],
+    entries: [],
+    form: { id: null, title: '', start_datetime: '', end_datetime: '', event_type: '', status: 'draft', description: '' },
+    csrf: config.csrf,
+    eventTypes: config.eventTypes,
+    statuses: config.statuses,
+    listUrl: config.listUrl,
+    calendarDetailUrlTemplate: config.calendarDetailUrlTemplate,
+    entriesUrlTemplate: config.entriesUrlTemplate,
+    entryDetailUrlTemplate: config.entryDetailUrlTemplate,
+
+    async init() {
+      await this.loadCalendars();
+    },
+
+    get monthLabel() {
+      return new Date(this.year, this.month - 1, 1).toLocaleString('fr-FR', { month: 'long' });
+    },
+
+    get monthDays() {
+      const days = [];
+      const first = new Date(this.year, this.month - 1, 1);
+      const last = new Date(this.year, this.month, 0);
+      const startOffset = (first.getDay() + 6) % 7;
+      for (let i = 0; i < startOffset; i++) days.push({ key: 'pad-' + i, number: '', entries: [] });
+      for (let d = 1; d <= last.getDate(); d++) {
+        const dayEntries = this.entries.filter(e => {
+          const start = new Date(e.start_datetime);
+          return start.getFullYear() === this.year && start.getMonth() + 1 === this.month && start.getDate() === d;
+        }).map(e => ({ ...e, color: this.colorFor(e) }));
+        days.push({ key: `${this.year}-${this.month}-${d}`, number: d, entries: dayEntries });
+      }
+      return days;
+    },
+
+    get yearMonths() {
+      const names = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+      return names.map((name, idx) => {
+        const monthEntries = this.entries.filter(e => {
+          const start = new Date(e.start_datetime);
+          return start.getFullYear() === this.year && start.getMonth() === idx;
+        });
+        const days = [];
+        const last = new Date(this.year, idx + 1, 0).getDate();
+        for (let d = 1; d <= last; d++) {
+          const has = monthEntries.some(e => new Date(e.start_datetime).getDate() === d);
+          days.push({ key: `${this.year}-${idx}-${d}`, number: d, has_events: has });
+        }
+        return { index: idx, name, eventCount: monthEntries.length, days };
+      });
+    },
+
+    get timelineEntries() {
+      return this.entries.slice(0, 10).map(e => ({
+        id: e.id,
+        title: e.title,
+        description: e.description || '',
+        date: new Date(e.start_datetime).toLocaleDateString('fr-FR'),
+        color: this.colorFor(e),
+      }));
+    },
+
+    get filteredEntries() {
+      return this.entries.map(e => ({ ...e, dateLabel: this.formatDateRange(e), color: this.colorFor(e) }));
+    },
+
+    async loadCalendars() {
+      const res = await fetch(this.listUrl + '?branch=&academic_year=');
+      const data = await res.json();
+      this.calendars = (data.calendars || []).map(c => ({ ...c, academic_year_label: c.academic_year_id }));
+      if (this.calendars.length && !this.calendarId) this.selectCalendar(this.calendars[0].id);
+    },
+
+    async selectCalendar(id) {
+      this.calendarId = id;
+      const url = this.calendarDetailUrlTemplate.replace('{calendarId}', id);
+      const res = await fetch(url);
+      const data = await res.json();
+      this.entries = (data.calendar && data.calendar.entries) || [];
+    },
+
+    createCalendar() {
+      const branchId = 1;
+      const yearId = 1;
+      fetch(this.listUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': this.csrf },
+        body: JSON.stringify({ branch_id: branchId, academic_year_id: yearId })
+      }).then(() => this.loadCalendars());
+    },
+
+    openEntryForm(id = null) {
+      if (id) {
+        const entry = this.entries.find(e => e.id === id);
+        this.form = { ...entry };
+      } else {
+        this.form = { id: null, title: '', start_datetime: '', end_datetime: '', event_type: this.eventTypes[0]?.value || '', status: 'draft', description: '' };
+      }
+      $dispatch('academic-modal-open');
+    },
+
+    async saveEntry() {
+      let url = this.entriesUrlTemplate.replace('{calendarId}', this.calendarId);
+      if (this.form.id) {
+        url = this.entryDetailUrlTemplate.replace('{calendarId}', this.calendarId).replace('{entryId}', this.form.id);
+      }
+      const method = this.form.id ? 'PATCH' : 'POST';
+      const body = {
+        title: this.form.title,
+        start_datetime: this.form.start_datetime,
+        end_datetime: this.form.end_datetime,
+        event_type: this.form.event_type,
+        status: this.form.status,
+        description: this.form.description,
+      };
+      await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': this.csrf },
+        body: JSON.stringify(body)
+      });
+      $dispatch('academic-modal-close');
+      await this.selectCalendar(this.calendarId);
+    },
+
+    async deleteEntry(id) {
+      if (!confirm('Supprimer cette entrée ?')) return;
+      const url = this.entryDetailUrlTemplate.replace('{calendarId}', this.calendarId).replace('{entryId}', id);
+      await fetch(url, { method: 'DELETE', headers: { 'X-CSRFToken': this.csrf } });
+      await this.selectCalendar(this.calendarId);
+    },
+
+    openDrawer(id) {
+      const entry = this.entries.find(e => e.id === id);
+      const content = document.getElementById('calendar-entry-drawer-content');
+      if (content && entry) {
+        content.innerHTML = `
+          <div class="space-y-4">
+            <div class="flex items-center gap-2">
+              <span class="rounded px-2 py-1 text-[10px] font-bold uppercase ${this.statusClass(entry.status)}">${entry.status}</span>
+              <span class="text-xs text-[color:var(--muted)]">${this.formatDateRange(entry)}</span>
+            </div>
+            <h3 class="text-lg font-black text-[color:var(--text)]">${entry.title}</h3>
+            ${entry.description ? `<p class="text-sm text-[color:var(--muted)]">${entry.description}</p>` : ''}
+            <div class="flex gap-2">
+              <button @click="$dispatch('calendar-entry-drawer-close'); openEntryForm(${entry.id})" class="rounded-lg bg-[color:var(--school-primary)] px-3 py-2 text-xs font-bold text-white">Modifier</button>
+              <button @click="deleteEntry(${entry.id})" class="rounded-lg border border-[color:var(--danger)] px-3 py-2 text-xs font-bold text-[color:var(--danger)]">Supprimer</button>
+            </div>
+          </div>
+        `;
+      }
+      $dispatch('calendar-entry-drawer-open');
+    },
+
+    prevMonth() { this.month--; if (this.month < 1) { this.month = 12; this.year--; } },
+    nextMonth() { this.month++; if (this.month > 12) { this.month = 1; this.year++; } },
+
+    formatDateRange(entry) {
+      const start = new Date(entry.start_datetime).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+      const end = new Date(entry.end_datetime).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+      return `${start} — ${end}`;
+    },
+
+    colorFor(entry) {
+      const map = { academic_start: 'var(--school-primary-soft)', academic_end: 'var(--danger-soft)', semester_start: 'var(--info-soft)', semester_end: 'var(--warning-soft)', holiday: 'var(--success-soft)', public_holiday: 'var(--success)', registration: 'var(--school-primary)', exam_session: 'var(--danger)', retake_session: 'var(--warning)', jury: 'var(--info)', result_publication: 'var(--success)', ceremony: 'var(--school-primary-soft)', meeting: 'var(--info-soft)', other: 'var(--surface-2)' };
+      return map[entry.event_type] || 'var(--school-primary-soft)';
+    },
+
+    statusClass(status) {
+      const map = { draft: 'bg-[color:var(--surface-2)] text-[color:var(--muted)]', published: 'bg-[color:var(--success-soft)] text-[color:var(--success)]', cancelled: 'bg-[color:var(--danger-soft)] text-[color:var(--danger)]', archived: 'bg-[color:var(--warning-soft)] text-[color:var(--warning)]' };
+      return map[status] || 'bg-[color:var(--surface-2)] text-[color:var(--muted)]';
+    }
+  };
+}
+</script>
+{% endblock %}

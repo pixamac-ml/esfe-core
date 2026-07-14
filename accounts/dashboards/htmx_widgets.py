@@ -185,6 +185,26 @@ def widget_active_sessions(request: HttpRequest) -> HttpResponse:
 
 @manager_required
 @require_GET
+def widget_active_coupons(request: HttpRequest) -> HttpResponse:
+    from coupons.models import Coupon
+
+    branch = request.branch
+    candidates = (
+        Coupon.objects.filter(is_active=True)
+        .filter(Q(branches__isnull=True) | Q(branches=branch))
+        .distinct()
+        .order_by("-created_at")
+    )
+    active_coupons = [coupon for coupon in candidates if coupon.is_currently_valid()][:5]
+    return render(
+        request,
+        "accounts/dashboard/partials/widget_active_coupons.html",
+        {"coupons": active_coupons},
+    )
+
+
+@manager_required
+@require_GET
 def widget_sidebar_badges(request: HttpRequest) -> HttpResponse:
     branch = request.branch
     candidatures_pending = Candidature.objects.filter(

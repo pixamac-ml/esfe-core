@@ -19,9 +19,12 @@ def build_donation_receipt(donation):
 
 
 def ensure_donation_receipt(donation):
-    if donation.receipt_pdf:
-        return donation.receipt_pdf
+    receipt_pdf = getattr(donation, "receipt_pdf", None)
+    if receipt_pdf:
+        return receipt_pdf
     pdf_bytes = build_donation_receipt(donation)
     filename = f"don-{donation.receipt_number or donation.id}.pdf"
-    donation.receipt_pdf.save(filename, ContentFile(pdf_bytes), save=True)
-    return donation.receipt_pdf
+    if hasattr(donation, "receipt_pdf"):
+        donation.receipt_pdf.save(filename, ContentFile(pdf_bytes), save=True)
+        return donation.receipt_pdf
+    return pdf_bytes

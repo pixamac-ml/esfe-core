@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 
 from accounts.dashboards.helpers import get_user_branch, is_global_viewer
 from .selectors import get_active_students, get_documents_queryset, get_registry_queryset
-from .models import Appointment, DocumentReceipt, RegistryEntry, SecretaryTask, VisitorLog
+from .models import Appointment, DocumentReceipt, Meeting, MeetingMinutes, RegistryEntry, SecretaryTask, VisitorLog
 
 User = get_user_model()
 
@@ -262,4 +262,51 @@ class SecretaryTaskForm(SecretaryBaseForm):
             "assigned_to": "Assigne a",
             "related_student": "Etudiant concerne",
             "due_date": "Date d'echeance",
+        }
+
+
+class MeetingForm(SecretaryBaseForm):
+    class Meta:
+        model = Meeting
+        fields = [
+            "title",
+            "meeting_type",
+            "scheduled_at",
+            "location",
+            "agenda",
+            "participants",
+            "secretary_present",
+        ]
+        widgets = {
+            "scheduled_at": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+            "agenda": forms.Textarea(attrs={"rows": 4}),
+            "participants": forms.Textarea(attrs={"rows": 3}),
+        }
+        labels = {
+            "title": "Titre de la réunion",
+            "meeting_type": "Type",
+            "scheduled_at": "Date et heure",
+            "location": "Lieu",
+            "agenda": "Ordre du jour",
+            "participants": "Participants (un par ligne)",
+            "secretary_present": "Secrétaire présente",
+        }
+
+    def _apply_scope(self):
+        pass
+
+
+class MeetingMinutesForm(forms.ModelForm):
+    class Meta:
+        model = MeetingMinutes
+        fields = ["content", "decisions", "next_steps"]
+        widgets = {
+            "content": forms.Textarea(attrs={"rows": 8, "class": "secretary-input"}),
+            "decisions": forms.Textarea(attrs={"rows": 4, "class": "secretary-input"}),
+            "next_steps": forms.Textarea(attrs={"rows": 4, "class": "secretary-input"}),
+        }
+        labels = {
+            "content": "Corps du procès-verbal",
+            "decisions": "Décisions prises",
+            "next_steps": "Actions à suivre",
         }

@@ -1,0 +1,30 @@
+{% load component_tags %}
+<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+  {% for month in months %}
+    <article class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-3">
+      <h3 class="mb-2 text-xs font-black text-[color:var(--text)]">{{ month.name }}</h3>
+      <div class="grid grid-cols-7 gap-0.5 text-center">
+        {% for d in "LMMJVS D" %}
+          <span class="text-[9px] font-bold text-[color:var(--muted-2)]">{{ d }}</span>
+        {% endfor %}
+        {% for day in month.days %}
+          <button
+            type="button"
+            class="aspect-square rounded text-[9px] font-semibold transition hover:bg-[color:var(--surface)]"
+            :class="{ 'bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]': {{ day.has_events|yesno:'true,false' }} }"
+          >
+            {{ day.number }}
+          </button>
+        {% endfor %}
+      </div>
+      <div class="mt-2 flex items-center justify-between">
+        <span class="text-[10px] font-bold text-[color:var(--muted)]">{{ month.event_count }} événement{{ month.event_count|pluralize }}</span>
+        {% if month.event_count > 0 %}
+          <button type="button" class="text-[10px] font-black text-[color:var(--school-primary)] hover:underline">Voir</button>
+        {% endif %}
+      </div>
+    </article>
+  {% empty %}
+    <div class="col-span-full py-8 text-center text-xs text-[color:var(--muted)]">Aucune donnée pour cette année.</div>
+  {% endfor %}
+</div>

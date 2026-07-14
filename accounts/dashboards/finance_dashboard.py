@@ -1,6 +1,7 @@
 # accounts/dashboards/finance_dashboard.py
 
 from django.shortcuts import render, redirect
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Sum, Count, Q
@@ -13,14 +14,24 @@ from inscriptions.models import Inscription
 from students.models import StudentYearDecision
 
 from .permissions import check_finance_access, is_global_viewer
-from .helpers import get_user_branch
+from .helpers import get_user_branch, is_manager
 from .querysets import get_base_queryset
 
 
 @login_required
 def finance_dashboard(request):
 
+    if (
+        settings.AUTH_PORTAL_ROUTING_V2_ENABLED
+        and request.resolver_match
+        and request.resolver_match.namespace == "accounts"
+    ):
+        return redirect("accounts_portal:portal_finance")
+
     user = request.user
+
+    if is_manager(user):
+        return redirect("accounts_portal:portal_annex_manager")
 
     if not check_finance_access(user):
         messages.error(request, "Accès refusé.")

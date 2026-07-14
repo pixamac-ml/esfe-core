@@ -943,6 +943,7 @@ def it_structure_action(request):
         elif action == "save_ue":
             ue = save_ue(
                 branch=branch,
+                actor=request.user,
                 ue_id=(request.POST.get("ue_id") or "").strip() or None,
                 semester_id=request.POST.get("semester_id"),
                 code=request.POST.get("code"),
@@ -954,6 +955,7 @@ def it_structure_action(request):
         elif action == "save_ec":
             ec = save_ec(
                 branch=branch,
+                actor=request.user,
                 ec_id=(request.POST.get("ec_id") or "").strip() or None,
                 ue_id=request.POST.get("ue_id"),
                 title=request.POST.get("title"),
@@ -964,7 +966,7 @@ def it_structure_action(request):
             section = "maquettes"
             toast = {"level": "success", "message": "EC enregistre."}
         elif action == "delete_ec":
-            delete_ec(branch=branch, ec_id=request.POST.get("ec_id"))
+            delete_ec(branch=branch, actor=request.user, ec_id=request.POST.get("ec_id"))
             section = "maquettes"
             toast = {"level": "success", "message": "EC supprime."}
         elif action == "assign_student":
@@ -1212,6 +1214,8 @@ def it_accounts_flow_action(request):
         temp_password = create_temp_password()
         target_user.set_password(temp_password)
         target_user.save(update_fields=["password"])
+        from accounts.session_security import mark_temporary_password
+        mark_temporary_password(target_user, updated_by=request.user)
         log_support_action(
             actor=request.user,
             branch=branch,

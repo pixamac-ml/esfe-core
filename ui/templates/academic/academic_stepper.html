@@ -1,0 +1,48 @@
+{% load component_tags %}
+{% if layout == 'vertical' %}
+  <ol class="relative space-y-6 {{ class_str }}" role="list">
+    {% for step in steps %}
+        <li class="relative flex gap-4">
+          <div class="flex flex-col items-center">
+            <span class="grid h-8 w-8 place-items-center rounded-full text-sm font-black
+              {% if forloop.counter < current_step %}bg-[color:var(--success)] text-white
+              {% elif forloop.counter == current_step %}bg-[color:var(--school-primary)] text-white
+              {% else %}bg-[color:var(--surface-2)] text-[color:var(--muted)]{% endif %}">
+              {% if forloop.counter < current_step %}
+                <i data-lucide="check" style="width:14px;height:14px;"></i>
+              {% else %}
+                {{ forloop.counter }}
+              {% endif %}
+            </span>
+            {% if not forloop.last %}
+              <span class="my-2 h-full min-h-[2rem] w-0.5 rounded-full bg-[color:var(--line)]"></span>
+            {% endif %}
+          </div>
+          <div class="min-w-0 pb-6">
+            <strong class="block text-sm font-black text-[color:var(--text)]">{{ step.title }}</strong>
+            {% if step.description %}<p class="mt-0.5 text-xs text-[color:var(--muted)]">{{ step.description }}</p>{% endif %}
+          </div>
+        </li>
+    {% endfor %}
+  </ol>
+{% else %}
+  <ol class="flex w-full items-center {{ class_str }}" role="list">
+    {% for step in steps %}
+      <li class="flex flex-1 items-center {% if not forloop.last %}after:mx-4 after:h-px after:w-full after:bg-[color:var(--line)] after:content-['']{% endif %}">
+        <span class="flex shrink-0 items-center gap-2">
+          <span class="grid h-8 w-8 place-items-center rounded-full text-sm font-black
+            {% if forloop.counter < current_step %}bg-[color:var(--success)] text-white
+            {% elif forloop.counter == current_step %}bg-[color:var(--school-primary)] text-white
+            {% else %}bg-[color:var(--surface-2)] text-[color:var(--muted)]{% endif %}">
+            {% if forloop.counter < current_step %}
+              <i data-lucide="check" style="width:14px;height:14px;"></i>
+            {% else %}
+              {{ forloop.counter }}
+            {% endif %}
+          </span>
+          <span class="hidden min-w-0 text-sm font-bold text-[color:var(--text)] sm:block">{{ step.title }}</span>
+        </span>
+      </li>
+    {% endfor %}
+  </ol>
+{% endif %}

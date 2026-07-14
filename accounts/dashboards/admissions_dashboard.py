@@ -1,6 +1,7 @@
 # accounts/dashboards/admissions_dashboard.py
 
 from django.shortcuts import render, redirect
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Count, Q
@@ -19,6 +20,13 @@ from .querysets import get_base_queryset
 
 @login_required
 def admissions_dashboard(request):
+
+    if (
+        settings.AUTH_PORTAL_ROUTING_V2_ENABLED
+        and request.resolver_match
+        and request.resolver_match.namespace == "accounts"
+    ):
+        return redirect("accounts_portal:portal_admissions")
 
     user = request.user
 

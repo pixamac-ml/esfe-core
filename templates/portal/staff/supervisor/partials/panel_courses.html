@@ -1,79 +1,41 @@
 {% load component_tags %}
-<div id="sg-courses">
+<div id="sg-courses" class="space-y-4">
   {% if toast %}
-    <div class="banner {% if toast.level == 'success' %}ok{% else %}warn{% endif %}"><span>{{ toast.message }}</span></div>
+    {% if toast.level == 'success' %}{% component "alert" tone="success" message=toast.message dismissible=True %}{% endcomponent %}
+    {% else %}{% component "alert" tone="warning" message=toast.message dismissible=True %}{% endcomponent %}{% endif %}
   {% endif %}
 
-  <div class="card">
-    <div class="card-h"><h3>Ajouter un cours (rapide)</h3><span class="hint">{{ selected_class.display_name }}</span></div>
-    <div class="card-b" style="padding:18px">
+  {% component "dashboard_card" %}
+    {% fill "default" %}
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-2"><h3 class="font-bold">Ajouter un cours</h3><span class="hint">{{ selected_class.display_name }}</span></div>
       {% if ecs and teachers %}
-        <form style="display:grid;gap:12px;grid-template-columns:repeat(3,1fr)"
-              method="post"
-              hx-post="{% url 'accounts_portal:supervisor_quick_course_create' %}"
-              hx-target="#supervisor-workspace" hx-swap="innerHTML">
+        <form class="grid gap-3 md:grid-cols-2 xl:grid-cols-3" method="post" hx-post="{% url 'accounts_portal:supervisor_quick_course_create' %}" hx-target="#supervisor-workspace" hx-swap="innerHTML">
           {% csrf_token %}
-          <input type="hidden" name="section" value="courses">
-          <input type="hidden" name="class_id" value="{{ selected_class.id }}">
-
-          <label><span class="f-l" style="margin-top:0">Matière</span>
-            <select name="ec_id" required class="f-i">
-              <option value="">Choisir</option>
-              {% for ec in ecs %}
-                <option value="{{ ec.id }}"{% if prefill_ec_id == ec.id %} selected{% endif %}>{{ ec.title }}</option>
-              {% endfor %}
-            </select>
-          </label>
-
-          <label><span class="f-l" style="margin-top:0">Enseignant</span>
-            <select name="teacher_id" required class="f-i">
-              <option value="">Choisir</option>
-              {% for t in teachers %}
-                <option value="{{ t.id }}"{% if prefill_teacher_id == t.id %} selected{% endif %}>{{ t.get_full_name|default:t.username }}</option>
-              {% endfor %}
-            </select>
-          </label>
-
-          <label><span class="f-l" style="margin-top:0">Date</span>
-            <input type="date" name="date" value="{% if prefill_date %}{{ prefill_date }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}" class="f-i" required>
-          </label>
-
-          <label><span class="f-l" style="margin-top:0">Heure début</span>
-            <input type="time" name="start_time" value="{{ prefill_start_time }}" class="f-i" required>
-          </label>
-
-          <label><span class="f-l" style="margin-top:0">Heure fin</span>
-            <input type="time" name="end_time" value="{{ prefill_end_time }}" class="f-i" required>
-          </label>
-
-          <label><span class="f-l" style="margin-top:0">Salle / lieu</span>
-            <input type="text" name="location" value="{{ prefill_location }}" placeholder="Ex: Salle A102" class="f-i">
-          </label>
-
-          <div style="grid-column:1 / -1;display:flex;justify-content:flex-end;gap:10px">
-            <button type="button" class="btn"
-                    hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=schedule&class_id={{ selected_class.id }}"
-                    hx-target="#supervisor-workspace" hx-swap="innerHTML">Voir planning</button>
+          <input type="hidden" name="section" value="courses"><input type="hidden" name="class_id" value="{{ selected_class.id }}">
+          <label><span class="f-l mt-0">Matière</span><select name="ec_id" required class="f-i"><option value="">Choisir</option>{% for ec in ecs %}<option value="{{ ec.id }}"{% if prefill_ec_id == ec.id %} selected{% endif %}>{{ ec.title }}</option>{% endfor %}</select></label>
+          <label><span class="f-l mt-0">Enseignant</span><select name="teacher_id" required class="f-i"><option value="">Choisir</option>{% for t in teachers %}<option value="{{ t.id }}"{% if prefill_teacher_id == t.id %} selected{% endif %}>{{ t.get_full_name|default:t.username }}</option>{% endfor %}</select></label>
+          <label><span class="f-l mt-0">Date</span><input type="date" name="date" value="{% if prefill_date %}{{ prefill_date }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}" class="f-i" required></label>
+          <label><span class="f-l mt-0">Heure de début</span><input type="time" name="start_time" value="{{ prefill_start_time }}" class="f-i" required></label>
+          <label><span class="f-l mt-0">Heure de fin</span><input type="time" name="end_time" value="{{ prefill_end_time }}" class="f-i" required></label>
+          <label><span class="f-l mt-0">Salle ou lieu</span><input type="text" name="location" value="{{ prefill_location }}" placeholder="Ex. Salle A102" class="f-i"></label>
+          <div class="flex justify-end gap-2 md:col-span-2 xl:col-span-3">
+            <button type="button" class="btn" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=schedule&class_id={{ selected_class.id }}" hx-target="#supervisor-workspace">Voir le planning</button>
             <button type="submit" class="btn primary">Ajouter</button>
           </div>
         </form>
       {% else %}
-        {% component "empty_state" icon="book-x" title="Ajout cours indisponible" message="Aucune matière ou enseignant disponible pour cette annexe/classe." %}{% endcomponent %}
+        {% component "empty_state" icon="book-x" title="Ajout indisponible" message="Aucune matière ou aucun enseignant disponible pour cette classe et cette annexe." %}{% endcomponent %}
       {% endif %}
-    </div>
-  </div>
+    {% endfill %}
+  {% endcomponent %}
 
-  <div class="card" style="margin-top:16px">
-    <div class="card-h"><h3>Matières — {{ selected_class.display_name }}</h3><span class="src-badge">⤿ Académique</span></div>
-    <div class="card-b">
-      {% for ec in ecs %}
-      <div class="row">
-        <div class="pic s-blue" style="color:#1746b3">{{ ec.title|slice:":2"|upper }}</div>
-        <div class="main"><b>{{ ec.title }}</b><span>{{ ec.ue.code }}</span></div>
+  {% component "dashboard_card" padding="none" %}
+    {% fill "default" %}
+      <div class="card-h"><h3>Matières — {{ selected_class.display_name }}</h3><span class="src-badge">Source académique</span></div>
+      <div class="card-b">
+        {% for ec in ecs %}<div class="row"><span class="pic">{{ ec.title|slice:":2"|upper }}</span><span class="main"><b>{{ ec.title }}</b><span>{{ ec.ue.code }}</span></span></div>
+        {% empty %}{% component "empty_state" icon="book" title="Aucune matière" message="Aucune matière programmée pour cette classe." compact=True %}{% endcomponent %}{% endfor %}
       </div>
-      {% empty %}
-      {% component "empty_state" icon="book" title="Aucune matière" message="Aucune matière programmée pour cette classe." compact=True %}{% endcomponent %}
-      {% endfor %}
-    </div>
-  </div>
+    {% endfill %}
+  {% endcomponent %}
 </div>

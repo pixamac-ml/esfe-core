@@ -29,7 +29,15 @@ from branches.models import Branch
 # ============================================
 
 def superuser_required(user):
-    return user.is_authenticated and user.is_superuser
+    if not user.is_authenticated:
+        return False
+    from django.conf import settings
+
+    if settings.AUTH_POLICY_V2_ENABLED:
+        from accounts.access import get_user_position
+
+        return get_user_position(user) == "super_admin"
+    return user.is_superuser
 
 
 # ============================================
@@ -1445,6 +1453,21 @@ def bulk_action(request):
             queryset.delete()
 
         messages.success(request, f'{count} article(s) traité(s).')
+
+    elif model_type == 'event':
+        from news.models import Event
+        queryset = Event.objects.filter(pk__in=selected_ids)
+
+        if action == 'publish':
+            count = queryset.update(is_published=True)
+            messages.success(request, f'{count} événement(s) publié(s).')
+        elif action == 'unpublish':
+            count = queryset.update(is_published=False)
+            messages.success(request, f'{count} événement(s) dépublié(s).')
+        elif action == 'delete':
+            count = queryset.count()
+            queryset.delete()
+            messages.success(request, f'{count} événement(s) supprimé(s).')
 
     elif model_type == 'message':
 

@@ -16,9 +16,9 @@
               <span class="text-[color:var(--muted-2)] text-xs">{{ item.target_service|default:"Accueil" }}</span>
             </div>
             <div class="flex items-center gap-2 shrink-0">
-              {% component "status_badge" label=item.get_status_display tone="neutral" %}{% endcomponent %}
+              {% if item.status == "completed" %}<span class="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-bold text-green-700">Traité</span>{% elif item.status == "pending" %}<span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">En attente</span>{% elif item.status == "in_progress" %}<span class="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">En cours</span>{% elif item.status == "transferred" %}<span class="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700">Transferé</span>{% else %}<span class="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-500">{{ item.get_status_display }}</span>{% endif %}
               <button type="button" class="flex h-7 w-7 items-center justify-center rounded-lg border border-[color:var(--line)] text-[color:var(--muted)] transition hover:bg-[color:var(--card-soft)]" hx-get="{% url 'secretary:registry_detail' item.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" title="Détail">
-                <i data-lucide="clock" style="width:12px;height:12px;"></i>
+                <i data-lucide="eye" style="width:12px;height:12px;"></i>
               </button>
               {% if item.status != "completed" and item.status != "archived" %}
                 <form method="post" hx-post="{% url 'secretary:registry_mark_processed' item.id %}" hx-target="closest div" hx-swap="outerHTML swap:180ms">{% csrf_token %}

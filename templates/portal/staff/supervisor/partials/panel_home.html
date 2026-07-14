@@ -1,63 +1,71 @@
 {% load component_tags %}
-<div style="margin-bottom:16px">{% component "kpi_row" cards=supervisor_kpi_cards columns=4 %}{% endcomponent %}</div>
 
-<div class="grid cards-2">
-  <div class="card">
-    <div class="card-h"><h3>Alertes du jour</h3><span class="hint">cliquez pour traiter</span></div>
-    <div class="card-b">
-      {% for alert in home_alerts %}
-      <div class="row clickable"
-           hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section={{ alert.section }}{% if selected_class_id %}&class_id={{ selected_class_id }}{% endif %}"
-           hx-include="#sg-class-selector" hx-target="#supervisor-workspace" hx-push-url="true">
-        <span class="dot" style="background:var(--{{ alert.level }})"></span>
-        <div class="main"><b>{{ alert.message }}</b></div>
-        <span class="tail"><svg class="i" style="color:var(--ink-3)" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></span>
-      </div>
-      {% empty %}
-      <div class="card-b">{% component "empty_state" icon="check-circle" title="Aucune alerte" message="Tout est sous contrôle pour le moment." compact=True %}{% endcomponent %}</div>
-      {% endfor %}
-    </div>
-  </div>
-  <div class="card">
-    <div class="card-h">
-      <h3>Séances du jour{% if selected_class %} — {{ selected_class.display_name }}{% endif %}</h3>
-      <span class="src-badge">⤿ Académique</span>
-    </div>
-    <div class="card-b">
-      {% for row in home_today_sessions %}
-      <div class="row clickable"
-           hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=attendance{% if selected_class_id %}&class_id={{ selected_class_id }}{% endif %}"
-           hx-include="#sg-class-selector" hx-target="#supervisor-workspace" hx-push-url="true">
-        <div class="pic" style="background:var(--bg);color:var(--ink-2)">{{ row.time_range|slice:":5" }}</div>
-        <div class="main"><b>{{ row.subject_title }}</b><span>{{ row.teacher_name }} · {{ row.room }} · {{ row.class_name }}</span></div>
-        <span class="tail"><span class="chip {% if row.course_started_flag %}ok{% else %}warn{% endif %}">{% if row.course_started_flag %}Appel fait{% else %}À faire{% endif %}</span></span>
-      </div>
-      {% empty %}
-      <div class="card-b">{% component "empty_state" icon="calendar" title="Aucune séance" message="Aucun cours programmé aujourd'hui." compact=True %}{% endcomponent %}</div>
-      {% endfor %}
-    </div>
-  </div>
-</div>
+<div class="space-y-4">
+  {% component "kpi_row" cards=supervisor_kpi_cards columns=4 %}{% endcomponent %}
 
-{% if selected_class %}
-<div class="grid cards-3" style="margin-top:16px">
-  <button type="button" class="card" style="background:var(--rail);color:#fff;text-align:left;padding:18px;border:none;cursor:pointer"
-          hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=attendance&class_id={{ selected_class_id }}"
-          hx-target="#supervisor-workspace" hx-push-url="true">
-    <span style="display:block;font-size:11px;font-weight:800;text-transform:uppercase;color:#94a3b8">Action</span>
-    <span style="display:block;margin-top:8px;font-size:16px;font-weight:800">Faire l'appel</span>
-  </button>
-  <button type="button" class="card" style="text-align:left;padding:18px;border:1px solid var(--line);background:#fff;cursor:pointer"
-          hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=schedule&class_id={{ selected_class_id }}"
-          hx-target="#supervisor-workspace" hx-push-url="true">
-    <span style="display:block;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--ink-3)">Action</span>
-    <span style="display:block;margin-top:8px;font-size:16px;font-weight:800">Voir emploi du temps</span>
-  </button>
-  <button type="button" class="card" style="text-align:left;padding:18px;border:1px solid var(--line);background:#fff;cursor:pointer"
-          hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=courses&class_id={{ selected_class_id }}"
-          hx-target="#supervisor-workspace" hx-push-url="true">
-    <span style="display:block;font-size:11px;font-weight:800;text-transform:uppercase;color:var(--ink-3)">Action</span>
-    <span style="display:block;margin-top:8px;font-size:16px;font-weight:800">Ajouter cours</span>
-  </button>
+  <div class="grid gap-4 xl:grid-cols-2">
+    {% component "dashboard_card" padding="none" %}
+      {% fill "default" %}
+        <div class="card-h">
+          <h3>Alertes du jour</h3>
+          <span class="hint">Cliquez pour traiter</span>
+        </div>
+        <div class="card-b">
+          {% for alert in home_alerts %}
+            <button type="button" class="row clickable w-full text-left"
+                    hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section={{ alert.section }}{% if selected_class_id %}&class_id={{ selected_class_id }}{% endif %}"
+                    hx-include="#sg-class-selector" hx-target="#supervisor-workspace" hx-push-url="true">
+              <span class="dot" style="background:var(--{{ alert.level }})"></span>
+              <span class="main"><b>{{ alert.message }}</b></span>
+              <span class="tail"><i data-lucide="chevron-right" class="i" aria-hidden="true"></i></span>
+            </button>
+          {% empty %}
+            {% component "empty_state" icon="check-circle" title="Aucune alerte" message="Tout est sous contrôle pour le moment." compact=True %}{% endcomponent %}
+          {% endfor %}
+        </div>
+      {% endfill %}
+    {% endcomponent %}
+
+    {% component "dashboard_card" padding="none" %}
+      {% fill "default" %}
+        <div class="card-h">
+          <h3>Séances du jour{% if selected_class %} — {{ selected_class.display_name }}{% endif %}</h3>
+          <span class="src-badge">Source académique</span>
+        </div>
+        <div class="card-b">
+          {% for row in home_today_sessions %}
+            <button type="button" class="row clickable w-full text-left"
+                    hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=attendance{% if selected_class_id %}&class_id={{ selected_class_id }}{% endif %}"
+                    hx-include="#sg-class-selector" hx-target="#supervisor-workspace" hx-push-url="true">
+              <span class="pic">{{ row.time_range|slice:":5" }}</span>
+              <span class="main"><b>{{ row.subject_title }}</b><span>{{ row.teacher_name }} · {{ row.room }} · {{ row.class_name }}</span></span>
+              <span class="tail">
+                {% if row.course_started_flag %}
+                  {% component "status_badge" label="Appel fait" tone="success" %}{% endcomponent %}
+                {% else %}
+                  {% component "status_badge" label="À faire" tone="warning" %}{% endcomponent %}
+                {% endif %}
+              </span>
+            </button>
+          {% empty %}
+            {% component "empty_state" icon="calendar" title="Aucune séance" message="Aucun cours programmé aujourd'hui." compact=True %}{% endcomponent %}
+          {% endfor %}
+        </div>
+      {% endfill %}
+    {% endcomponent %}
+  </div>
+
+  {% if selected_class %}
+    <div class="grid gap-3 md:grid-cols-3">
+      <button type="button" class="card p-4 text-left" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=attendance&class_id={{ selected_class_id }}" hx-target="#supervisor-workspace" hx-push-url="true">
+        <span class="hint">Action prioritaire</span><strong class="mt-2 block">Faire l'appel</strong>
+      </button>
+      <button type="button" class="card p-4 text-left" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=schedule&class_id={{ selected_class_id }}" hx-target="#supervisor-workspace" hx-push-url="true">
+        <span class="hint">Planning</span><strong class="mt-2 block">Voir l'emploi du temps</strong>
+      </button>
+      <button type="button" class="card p-4 text-left" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=courses&class_id={{ selected_class_id }}" hx-target="#supervisor-workspace" hx-push-url="true">
+        <span class="hint">Cours</span><strong class="mt-2 block">Ajouter un cours</strong>
+      </button>
+    </div>
+  {% endif %}
 </div>
-{% endif %}

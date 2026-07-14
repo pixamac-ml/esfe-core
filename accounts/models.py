@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.templatetags.static import static
 from django.utils import timezone
+import uuid
 
 from branches.models import Branch
 
@@ -41,6 +42,7 @@ class Profile(models.Model):
         ("executive_director", "Direction executive"),
         ("deputy_executive_director", "Direction generale adjointe"),
         ("branch_manager", "Gestionnaire annexe"),
+        ("annex_manager", "Gestionnaire d'annexe"),
         ("academic_supervisor", "Surveillant academique"),
         ("it_support", "Informaticien"),
         ("marketing_manager", "Responsable marketing digital"),
@@ -220,6 +222,164 @@ class Profile(models.Model):
     @property
     def is_teacher(self):
         return self.role == "teacher"
+
+
+class PublicCommunityProfile(models.Model):
+    """Identité publique, sans position ni permission institutionnelle."""
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="public_community_profile",
+    )
+    bio = models.TextField(blank=True)
+    location = models.CharField(max_length=120, blank=True, db_index=True)
+    website = models.URLField(blank=True)
+    main_domain = models.CharField(max_length=120, blank=True, db_index=True)
+    reputation = models.IntegerField(default=0, db_index=True)
+    total_topics = models.PositiveIntegerField(default=0)
+    total_answers = models.PositiveIntegerField(default=0)
+    total_accepted_answers = models.PositiveIntegerField(default=0)
+    total_upvotes_received = models.PositiveIntegerField(default=0)
+    total_views_generated = models.PositiveIntegerField(default=0)
+    badge_gold = models.PositiveIntegerField(default=0)
+    badge_silver = models.PositiveIntegerField(default=0)
+    badge_bronze = models.PositiveIntegerField(default=0)
+    is_public = models.BooleanField(default=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Profil public de {self.user.username}"
+
+
+class InstitutionalProfile(models.Model):
+    """Affectation SYSTEM officielle ; la catégorie et le scope sont dérivés."""
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="institutional_profile",
+    )
+    position = models.CharField(max_length=40, choices=Profile.POSITION_CHOICES, db_index=True)
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="institutional_profiles",
+    )
+    employee_code = models.CharField(max_length=30, blank=True, db_index=True)
+    salary_base = models.PositiveBigIntegerField(default=0)
+    teacher_hourly_rate = models.PositiveBigIntegerField(default=0)
+    employment_status = models.CharField(
+        max_length=20,
+        choices=Profile.EMPLOYMENT_STATUS_CHOICES,
+        default="active",
+        db_index=True,
+    )
+    hire_date = models.DateField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def definition(self):
+        from accounts.position_registry import get_position_definition
+
+        return get_position_definition(self.position)
+
+    @property
+    def category(self):
+        return self.definition.category if self.definition else None
+
+    @property
+    def scope(self):
+        return self.definition.scope if self.definition else None
+
+    def __str__(self):
+        return f"Profil institutionnel de {self.user.username}"
+
+
+class AccountSessionRecord(models.Model):
+    """Session SYSTEM opaque, sans conservation de la cle Django brute."""
+
+    END_IDLE_TIMEOUT = "IDLE_TIMEOUT"
+    END_ABSOLUTE_TIMEOUT = "ABSOLUTE_TIMEOUT"
+    END_VOLUNTARY = "VOLUNTARY_LOGOUT"
+    END_ADMIN_REVOKED = "ADMIN_REVOKED"
+    END_PASSWORD_CHANGED = "PASSWORD_CHANGED"
+    END_ACCOUNT_RESTRICTED = "ACCOUNT_RESTRICTED"
+    END_CHOICES = [
+        (END_IDLE_TIMEOUT, "Expiration pour inactivite"),
+        (END_ABSOLUTE_TIMEOUT, "Expiration absolue"),
+        (END_VOLUNTARY, "Deconnexion volontaire"),
+        (END_ADMIN_REVOKED, "Revocation administrative"),
+        (END_PASSWORD_CHANGED, "Changement de mot de passe"),
+        (END_ACCOUNT_RESTRICTED, "Compte restreint"),
+    ]
+
+    identifier = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="system_session_records")
+    position = models.CharField(max_length=40, blank=True, db_index=True)
+    started_at = models.DateTimeField(default=timezone.now, db_index=True)
+    last_activity_at = models.DateTimeField(default=timezone.now, db_index=True)
+    absolute_expires_at = models.DateTimeField(db_index=True)
+    ended_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    end_reason = models.CharField(max_length=32, choices=END_CHOICES, blank=True, db_index=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=300, blank=True)
+
+    class Meta:
+        ordering = ["-started_at"]
+        indexes = [
+            models.Index(fields=["user", "ended_at"], name="accounts_ac_user_id_8026b0_idx"),
+            models.Index(fields=["identifier", "ended_at"], name="accounts_ac_identif_8917b1_idx"),
+        ]
+
+
+class AccountSecurityEvent(models.Model):
+    """Journal de securite minimal ne contenant ni secret ni cle de session."""
+
+    LOGIN_SUCCESS = "LOGIN_SUCCESS"
+    LOGOUT_VOLUNTARY = "LOGOUT_VOLUNTARY"
+    IDLE_TIMEOUT = "IDLE_TIMEOUT"
+    ABSOLUTE_TIMEOUT = "ABSOLUTE_TIMEOUT"
+    ADMIN_REVOKED = "ADMIN_REVOKED"
+    PASSWORD_CHANGED = "PASSWORD_CHANGED"
+    ACCOUNT_SUSPENDED = "ACCOUNT_SUSPENDED"
+    ACCOUNT_BLOCKED = "ACCOUNT_BLOCKED"
+    ACCOUNT_DEACTIVATED = "ACCOUNT_DEACTIVATED"
+    POSITION_CHANGED = "POSITION_CHANGED"
+    BRANCH_CHANGED = "BRANCH_CHANGED"
+    EVENT_CHOICES = [
+        (LOGIN_SUCCESS, "Connexion reussie"),
+        (LOGOUT_VOLUNTARY, "Deconnexion volontaire"),
+        (IDLE_TIMEOUT, "Expiration pour inactivite"),
+        (ABSOLUTE_TIMEOUT, "Expiration absolue"),
+        (ADMIN_REVOKED, "Revocation administrative"),
+        (PASSWORD_CHANGED, "Changement de mot de passe"),
+        (ACCOUNT_SUSPENDED, "Suspension"),
+        (ACCOUNT_BLOCKED, "Blocage"),
+        (ACCOUNT_DEACTIVATED, "Desactivation"),
+        (POSITION_CHANGED, "Changement de position"),
+        (BRANCH_CHANGED, "Changement d'annexe"),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="security_events")
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="acted_security_events")
+    session_identifier = models.UUIDField(null=True, blank=True, db_index=True)
+    event_type = models.CharField(max_length=32, choices=EVENT_CHOICES, db_index=True)
+    reason = models.CharField(max_length=80, blank=True)
+    authentication_method = models.CharField(max_length=32, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=300, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["user", "created_at"], name="accounts_ac_user_id_d09911_idx"),
+            models.Index(fields=["event_type", "created_at"], name="accounts_ac_event_t_9d5f32_idx"),
+        ]
 
 
 class UserPreference(models.Model):
@@ -594,6 +754,7 @@ class BranchCashMovement(models.Model):
     SOURCE_HONORARIUM = "honorarium"
     SOURCE_STUDENT_PAYMENT = "student_payment"
     SOURCE_SHOP = "shop"
+    SOURCE_BANK_TRANSFER = "bank_transfer"
     SOURCE_ADJUSTMENT = "adjustment"
     SOURCE_DONATION = "donation"
 
@@ -604,6 +765,7 @@ class BranchCashMovement(models.Model):
         (SOURCE_HONORARIUM, "Honoraire enseignant"),
         (SOURCE_STUDENT_PAYMENT, "Paiement etudiant"),
         (SOURCE_SHOP, "Boutique"),
+        (SOURCE_BANK_TRANSFER, "Versement bancaire"),
         (SOURCE_ADJUSTMENT, "Ajustement caisse"),
         (SOURCE_DONATION, "Don / Donation"),
     ]

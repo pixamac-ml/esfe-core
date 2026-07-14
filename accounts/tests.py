@@ -282,7 +282,7 @@ class DashboardRedirectCompatibilityTests(TestCase):
 			fetch_redirect_response=False,
 		)
 
-	def test_dashboard_redirect_prioritizes_finance_before_manager(self):
+	def test_dashboard_redirect_prioritizes_manager_position_over_finance_capability(self):
 		user = self._create_user(
 			"redirect_finance",
 			groups=["finance_agents", "gestionnaire"],
@@ -294,7 +294,7 @@ class DashboardRedirectCompatibilityTests(TestCase):
 
 		self.assertRedirects(
 			response,
-			reverse("accounts:finance_dashboard"),
+			reverse("accounts_portal:portal_annex_manager"),
 			fetch_redirect_response=False,
 		)
 
@@ -310,7 +310,7 @@ class DashboardRedirectCompatibilityTests(TestCase):
 
 		self.assertRedirects(
 			response,
-			reverse("accounts:manager_dashboard"),
+			reverse("accounts_portal:portal_annex_manager"),
 			fetch_redirect_response=False,
 		)
 
@@ -387,7 +387,7 @@ class ManagerDashboardRegressionTests(TestCase):
 		response = self.client.get(reverse("accounts:manager_dashboard"), {"section": "rapport"})
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, "Argent genere par an")
+		self.assertContains(response, "Recettes annee")
 
 	def test_salary_ready_notifies_employee_dashboard(self):
 		employee = USER_MANAGER.create_user(
@@ -973,7 +973,7 @@ class PortalPhaseOneTests(TestCase):
 		)
 		self.client.force_login(teacher)
 
-		response = self.client.get(reverse("accounts_portal:portal_teacher"))
+		response = self.client.get(reverse("accounts_portal:portal_teacher"), {"section": "classes"})
 
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, academic_class.display_name)
@@ -1143,7 +1143,7 @@ class PortalPhaseOneTests(TestCase):
 		)
 		self.client.force_login(student_user)
 
-		response = self.client.get(reverse("portal_student:dashboard"))
+		response = self.client.get(reverse("portal_student:academics_partial"))
 
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "Ma situation academique")
@@ -1327,8 +1327,128 @@ class PortalPhaseOneTests(TestCase):
 		response = self.client.get(reverse("accounts_portal:portal_dashboard"))
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "Dashboard Direction des Etudes")
-		self.assertContains(response, "Pilotage de la qualite academique et des charges")
+		self.assertContains(response, "Vue generale de vos activites")
 		self.assertContains(response, reverse("accounts:logout"))
+
+	def test_director_dashboard_is_limited_to_its_branch(self):
+		director = self._create_user("portal_director_scoped", role="executive", position="director_of_studies")
+		_own_year, own_class, _own_ec = self._create_academic_class_bundle("S1A")
+		other_branch = Branch.objects.create(name="Annexe Hors Scope", code="AHS", slug="annexe-hors-scope")
+		other_year = AcademicYear.objects.create(
+			name="2030-2031",
+			start_date="2030-10-01",
+			end_date="2031-07-31",
+			is_active=True,
+		)
+		other_class = AcademicClass.objects.create(
+			programme=self.programme,
+			branch=other_branch,
+			academic_year=other_year,
+			level="X-SCOPE",
+			study_level="LICENCE",
+			is_active=True,
+		)
+		Semester.objects.create(academic_class=other_class, number=1)
+		self.client.force_login(director)
+
+		response = self.client.get(reverse("accounts_portal:portal_dashboard"))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, own_class.display_name)
+		self.assertNotContains(response, other_class.display_name)
+
+	def test_director_without_branch_is_forbidden_from_dashboard_and_export(self):
+		director = self._create_user("portal_director_unscoped", role="executive", position="director_of_studies")
+		director.profile.branch = None
+		director.profile.save(update_fields=["branch", "updated_at"])
+		self.client.force_login(director)
+
+		dashboard_response = self.client.get(reverse("accounts_portal:portal_dashboard"))
+		export_response = self.client.get(reverse("accounts_portal:director_export_report_xlsx"))
+
+		self.assertEqual(dashboard_response.status_code, 403)
+		self.assertEqual(export_response.status_code, 403)
+
+	def test_director_export_always_receives_its_branch(self):
+		director = self._create_user("portal_director_export_scope", role="executive", position="director_of_studies")
+		self.client.force_login(director)
+
+		with patch("portal.views.views.build_academic_report_xlsx") as build_report:
+			from openpyxl import Workbook
+			build_report.return_value = Workbook()
+			response = self.client.get(reverse("accounts_portal:director_export_report_xlsx"))
+
+		self.assertEqual(response.status_code, 200)
+		build_report.assert_called_once_with(branch=self.branch)
+		self.assertIn(self.branch.slug, response["Content-Disposition"])
+		self.assertNotIn("toutes", response["Content-Disposition"].lower())
+
+	def test_director_cannot_mutate_programme_from_another_branch(self):
+		director = self._create_user("portal_director_cross_post", role="executive", position="director_of_studies")
+		other_branch = Branch.objects.create(name="Annexe POST", code="APO", slug="annexe-post")
+		other_year = AcademicYear.objects.create(
+			name="2031-2032",
+			start_date="2031-10-01",
+			end_date="2032-07-31",
+			is_active=True,
+		)
+		other_class = AcademicClass.objects.create(
+			programme=self.programme,
+			branch=other_branch,
+			academic_year=other_year,
+			level="POST-X",
+			study_level="LICENCE",
+			is_active=True,
+		)
+		other_semester = Semester.objects.create(academic_class=other_class, number=1)
+		self.client.force_login(director)
+
+		response = self.client.post(
+			reverse("accounts_portal:director_programme_action"),
+			{
+				"action": "save_ue",
+				"semester_id": other_semester.id,
+				"code": "UE-X",
+				"title": "UE interdite",
+			},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertFalse(UE.objects.filter(semester=other_semester, code="UE-X").exists())
+		self.assertContains(response, "Semestre invalide")
+
+	def test_director_cannot_download_cross_branch_print_or_contract(self):
+		director = self._create_user("portal_director_cross_download", role="executive", position="director_of_studies")
+		other_branch = Branch.objects.create(name="Annexe PDF", code="APD", slug="annexe-pdf")
+		other_year = AcademicYear.objects.create(
+			name="2032-2033",
+			start_date="2032-10-01",
+			end_date="2033-07-31",
+			is_active=True,
+		)
+		other_class = AcademicClass.objects.create(
+			programme=self.programme,
+			branch=other_branch,
+			academic_year=other_year,
+			level="PDF-X",
+			study_level="LICENCE",
+			is_active=True,
+		)
+		other_teacher = self._create_user("portal_teacher_cross_download", role="teacher", position="teacher")
+		other_teacher.profile.branch = other_branch
+		other_teacher.profile.save(update_fields=["branch", "updated_at"])
+		self.client.force_login(director)
+
+		class_response = self.client.get(
+			reverse("accounts_portal:schedule_class_print", args=[other_class.id])
+		)
+		contract_response = self.client.get(
+			reverse("accounts_portal:director_teacher_contract_download", args=[other_teacher.id])
+		)
+
+		self.assertEqual(class_response.status_code, 403)
+		self.assertEqual(contract_response.status_code, 403)
 
 	def test_portal_dashboard_renders_dg_dashboard_from_single_entry(self):
 		dg_user = self._create_user("portal_dg", position="executive_director")
@@ -1730,7 +1850,7 @@ class PortalPhaseOneTests(TestCase):
 		response = self.client.get(reverse("accounts_portal:portal_dashboard"))
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "Dashboard Informaticien")
-		self.assertContains(response, "Support technique, acces, et sante du portail")
+		self.assertContains(response, "Support technique, accès et santé du portail")
 		self.assertContains(response, "Gestion des notes")
 		self.assertContains(response, "Inscriptions sans affectation")
 
@@ -1865,7 +1985,7 @@ class PortalPhaseOneTests(TestCase):
 		semester.refresh_from_db()
 		self.assertEqual(semester.status, Semester.STATUS_NORMAL_LOCKED)
 		self.assertContains(response, "Session normale publiee")
-		self.assertContains(response, "Ouvrir rattrapage")
+		self.assertContains(response, "Ouvrir la saisie")
 
 		modal_response = self.client.get(
 			reverse("accounts_portal:it_notes_retake_modal"),
@@ -1909,8 +2029,7 @@ class PortalPhaseOneTests(TestCase):
 			HTTP_HX_REQUEST="true",
 		)
 
-		self.assertEqual(response.status_code, 403)
-		self.assertContains(response, "Seules les matieres non validees peuvent etre modifiees au rattrapage.")
+		self.assertContains(response, "Seules les matieres non validees peuvent etre modifiees au rattrapage.", status_code=403)
 
 	def test_it_structure_workspace_renders_academic_configuration_module(self):
 		it_user = self._create_user("portal_it_structure_workspace", position="it_support")
@@ -1924,7 +2043,7 @@ class PortalPhaseOneTests(TestCase):
 		)
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, "Parametrage academique")
+		self.assertContains(response, "Paramétrage académique")
 		self.assertContains(response, "Classes, maquettes et affectations")
 		self.assertContains(response, academic_class.display_name)
 

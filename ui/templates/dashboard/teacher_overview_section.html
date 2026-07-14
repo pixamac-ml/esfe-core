@@ -1,32 +1,57 @@
-{% load humanize component_tags %}
+﻿{% load humanize component_tags %}
         <!-- =========== OVERVIEW =========== -->
         <div id="teacher-panel-overview" class="sg-section-panel {% if active_section == 'overview' %}is-active{% endif %}" data-sg-panel="overview" {% if active_section != 'overview' %}hidden{% endif %}>
           {% component "kpi_row" cards=kpi_cards columns=4 %}{% endcomponent %}
-          <div class="mt-4 grid gap-4 md:grid-cols-2">
+          <!-- HERO: Mes cours d'aujourd'hui -->
+          <div class="mt-4">
             {% component "dashboard_card" %}
               {% fill "default" %}
-                <div class="flex items-center gap-2 mb-3">
-                  <i data-lucide="clock" style="width:15px;height:15px;" class="text-[color:var(--muted)]"></i>
-                  <span class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Aujourd'hui</span>
+                <div class="flex items-center gap-2 mb-4">
+                  <i data-lucide="calendar-check" style="width:18px;height:18px;" class="text-[color:var(--school-primary)]"></i>
+                  <span class="text-xs font-bold uppercase tracking-wide text-[color:var(--muted)]">Mes cours aujourd'hui</span>
                 </div>
-                {% if today_events %}
-                  <div class="space-y-2">
-                    {% for event in today_events %}
-                    <div class="flex items-center justify-between gap-3 rounded-lg border border-[color:var(--line)] p-3 transition hover:border-[color:var(--school-primary-soft)]">
-                      <div class="min-w-0">
-                        <div class="text-sm font-bold text-[color:var(--text)]">{{ event.ec.title }}</div>
-                        <div class="text-xs font-semibold text-[color:var(--muted-2)]">{{ event.academic_class.display_name }} &middot; {{ event.start_datetime|date:"H:i" }}-{{ event.end_datetime|date:"H:i" }} &middot; {{ event.location|default:"-" }}</div>
+                {% if today_event_rows %}
+                  <div class="space-y-3">
+                    {% for row in today_event_rows %}
+                    <div class="flex flex-col gap-3 rounded-xl border border-[color:var(--line)] p-4 transition hover:border-[color:var(--school-primary-soft)] sm:flex-row sm:items-center sm:justify-between" style="border-left:4px solid {% if row.status == 'done' %}var(--success){% elif row.status == 'absent' %}var(--danger){% else %}var(--warning){% endif %};">
+                      <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <div class="text-sm font-bold text-[color:var(--text)]">{{ row.event.ec.title }}</div>
+                          {% if row.status == 'done' %}
+                            {% component "badge" label="Terminé" tone="success" size="sm" %}{% endcomponent %}
+                          {% elif row.status == 'absent' %}
+                            {% component "badge" label="Absence déclarée" tone="danger" size="sm" %}{% endcomponent %}
+                          {% else %}
+                            {% component "badge" label="À faire" tone="warning" size="sm" %}{% endcomponent %}
+                          {% endif %}
+                        </div>
+                        <div class="mt-1 text-xs font-semibold text-[color:var(--muted-2)]">
+                          {{ row.event.academic_class.display_name }} &middot; {{ row.event.start_datetime|date:"H:i" }}-{{ row.event.end_datetime|date:"H:i" }} &middot; {{ row.event.location|default:"Salle non précisée" }}
+                        </div>
+                        <div class="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-[color:var(--muted-2)]">
+                          {% if row.has_lesson_log %}<span class="inline-flex items-center gap-1"><i data-lucide="check-circle" style="width:12px;height:12px;" class="text-[color:var(--success)]"></i> Cahier</span>{% endif %}
+                          {% if row.has_attendance %}<span class="inline-flex items-center gap-1"><i data-lucide="check-circle" style="width:12px;height:12px;" class="text-[color:var(--success)]"></i> Présence</span>{% endif %}
+                          {% if row.has_support %}<span class="inline-flex items-center gap-1"><i data-lucide="check-circle" style="width:12px;height:12px;" class="text-[color:var(--success)]"></i> Support</span>{% endif %}
+                        </div>
                       </div>
-                      {% url 'accounts_portal:teacher_lesson_log_panel' event.id as lesson_log_url %}
-                      {% component "button" label="Cahier" icon="pen" variant="outline" size="sm" hx_get=lesson_log_url hx_target="#sg-drawer-content" hx_swap="innerHTML" aria_label="Ouvrir le cahier de texte" class_str="shrink-0" %}{% endcomponent %}
+                      <div class="flex flex-wrap items-center gap-2">
+                        {% component "button" label="Cahier" icon="pen" variant="outline" size="sm" hx_get=row.lesson_log_url hx_target="#sg-drawer-content" hx_swap="innerHTML" aria_label="Ouvrir le cahier de texte" %}{% endcomponent %}
+                        {% component "button" label="Support" icon="upload" variant="outline" size="sm" hx_get=row.support_url hx_target="#sg-drawer-content" hx_swap="innerHTML" aria_label="Deposer un support pour ce cours" %}{% endcomponent %}
+                        {% if row.status != 'absent' %}
+                          {% component "button" label="Absence" icon="alert-triangle" variant="danger" size="sm" hx_post=row.declare_absence_url hx_confirm="Confirmer l'absence ? Le secretariat sera informe." hx_target="this" hx_swap="none" aria_label="Declarer une absence" %}{% endcomponent %}
+                        {% endif %}
+                      </div>
                     </div>
                     {% endfor %}
                   </div>
                 {% else %}
-                  {% component "empty_state" title="Aucun cours aujourd'hui" message="Aucun cours prevu pour aujourd'hui." icon="calendar" compact=True %}{% endcomponent %}
+                  {% component "empty_state" title="Aucun cours aujourd'hui" message="Votre journee est libre. Profitez-en pour preparer vos prochains cours." icon="coffee" compact=True %}{% endcomponent %}
                 {% endif %}
               {% endfill %}
             {% endcomponent %}
+          </div>
+
+          <div class="mt-4 grid gap-4 md:grid-cols-2">
             {% component "dashboard_card" %}
               {% fill "default" %}
                 <div class="flex items-center gap-2 mb-3">
@@ -50,9 +75,24 @@
                 {% endif %}
               {% endfill %}
             {% endcomponent %}
+            {% component "dashboard_card" %}
+              {% fill "default" %}
+                <div class="flex items-center gap-2 mb-3">
+                  <i data-lucide="zap" style="width:15px;height:15px;" class="text-[color:var(--muted)]"></i>
+                  <span class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Actions rapides</span>
+                </div>
+                <div class="space-y-2">
+                  {% url 'accounts_portal:teacher_support_workspace' as support_workspace_url %}
+                  {% component "button" label="Déposer un support" icon="upload" variant="outline" full_width=True hx_get=support_workspace_url|add:"?support_target=%23sg-drawer-content" hx_target="#sg-drawer-content" hx_swap="innerHTML" class_str="justify-start" %}{% endcomponent %}
+                  {% component "button" label="Saisir mon cahier de texte" icon="pen" variant="outline" full_width=True href="?section=logs" class_str="justify-start" %}{% endcomponent %}
+                  {% component "button" label="Voir mon planning" icon="calendar" variant="outline" full_width=True href="?section=schedule" class_str="justify-start" %}{% endcomponent %}
+                  {% component "button" label="Mes honoraires" icon="wallet" variant="outline" full_width=True href="?section=salary" class_str="justify-start" %}{% endcomponent %}
+                </div>
+              {% endfill %}
+            {% endcomponent %}
           </div>
 
-          <div class="mt-4 grid gap-4 md:grid-cols-3">
+          <div class="mt-4 grid gap-4 md:grid-cols-2">
             {% component "dashboard_card" %}
               {% fill "default" %}
                 <div class="flex items-center gap-2 mb-3">
@@ -109,21 +149,6 @@
                 </div>
               {% endfill %}
             {% endcomponent %}
-            {% component "dashboard_card" %}
-              {% fill "default" %}
-                <div class="flex items-center gap-2 mb-3">
-                  <i data-lucide="zap" style="width:15px;height:15px;" class="text-[color:var(--muted)]"></i>
-                  <span class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Actions rapides</span>
-                </div>
-                <div class="space-y-2">
-                  {% url 'accounts_portal:teacher_support_workspace' as support_workspace_url %}
-                  {% component "button" label="Déposer un support" icon="upload" variant="outline" full_width=True hx_get=support_workspace_url|add:"?support_target=%23sg-drawer-content" hx_target="#sg-drawer-content" hx_swap="innerHTML" class_str="justify-start" %}{% endcomponent %}
-                  {% component "button" label="Saisir mon cahier de texte" icon="pen" variant="outline" full_width=True href="?section=logs" class_str="justify-start" %}{% endcomponent %}
-                  {% component "button" label="Voir mon planning" icon="calendar" variant="outline" full_width=True href="?section=schedule" class_str="justify-start" %}{% endcomponent %}
-                  {% component "button" label="Mes honoraires" icon="wallet" variant="outline" full_width=True href="?section=salary" class_str="justify-start" %}{% endcomponent %}
-                </div>
-              {% endfill %}
-            {% endcomponent %}
           </div>
 
           {% if teacher_insights %}
@@ -143,6 +168,31 @@
                     </div>
                     {% component "badge" label="Voir" tone=insight.tone size="sm" class_str="shrink-0" %}{% endcomponent %}
                   </a>
+                  {% endfor %}
+                </div>
+              {% endfill %}
+            {% endcomponent %}
+          </div>
+          {% endif %}
+
+          {# exam sessions widget #}
+          {% if upcoming_exam_sessions %}
+          <div class="mt-4">
+            {% component "dashboard_card" %}
+              {% fill "default" %}
+                <div class="flex items-center gap-2 mb-3">
+                  <i data-lucide="calendar-check" style="width:15px;height:15px;" class="text-[color:var(--school-primary)]"></i>
+                  <span class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Sessions d&apos;evaluations a venir</span>
+                </div>
+                <div class="space-y-2">
+                  {% for row in upcoming_exam_sessions %}
+                  <div class="flex items-center justify-between gap-3 rounded-lg border border-[color:var(--line)] p-3" style="border-left:4px solid var(--school-primary);">
+                    <div class="min-w-0">
+                      <div class="text-sm font-bold text-[color:var(--text)]">{{ row.entry.title }}</div>
+                      <div class="text-[11px] font-semibold text-[color:var(--muted-2)]">{{ row.class_label }} &middot; {{ row.entry.start_datetime|date:"d/m/Y" }} &rarr; {{ row.entry.end_datetime|date:"d/m/Y" }}</div>
+                    </div>
+                    <span class="shrink-0 rounded-full bg-[color:var(--school-primary-soft)] px-2.5 py-1 text-[10px] font-bold text-[color:var(--school-primary)]">{{ row.type_label }}</span>
+                  </div>
                   {% endfor %}
                 </div>
               {% endfill %}

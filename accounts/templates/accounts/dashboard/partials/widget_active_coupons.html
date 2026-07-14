@@ -1,0 +1,27 @@
+{% load component_tags %}
+{% load humanize %}
+<div id="widget-active-coupons"
+     class="dashboard-panel"
+     style="margin-bottom:16px;"
+     hx-get="{% url 'accounts:widget_active_coupons' %}"
+     hx-trigger="every 60s"
+     hx-swap="outerHTML">
+  <div class="dashboard-panel-title">Coupons actifs <span class="dashboard-badge-sm dashboard-badge-green">{{ coupons|length }}</span></div>
+  {% for coupon in coupons %}
+  <div class="dashboard-action-card" style="margin-bottom:4px;">
+    <div>
+      <div class="dashboard-action-label">{{ coupon.code }}</div>
+      <div class="dashboard-action-sub">
+        {% if coupon.discount_type == "percentage" %}{{ coupon.value }}%{% else %}{{ coupon.value|intcomma }} FCFA{% endif %}
+        {% if coupon.valid_until %} &middot; expire le {{ coupon.valid_until|date:"d/m/Y" }}{% endif %}
+      </div>
+    </div>
+    <span class="dashboard-badge-sm dashboard-badge-green">{{ coupon.redemptions_count }}/{{ coupon.max_redemptions|default:"∞" }}</span>
+  </div>
+  {% empty %}
+  <div class="dashboard-empty">
+    <div class="dashboard-empty-icon">{% component "icon" name="ticket-percent" %}{% endcomponent %}</div>
+    <div class="dashboard-empty-text">Aucun coupon actif pour cette annexe</div>
+  </div>
+  {% endfor %}
+</div>

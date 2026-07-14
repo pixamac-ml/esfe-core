@@ -2,6 +2,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
@@ -14,6 +15,28 @@ from notification_center.selectors import (
     get_user_in_app_messages,
     get_user_unread_count,
 )
+
+
+def _dashboard_url(request):
+    context = getattr(request, "access_context", None)
+    if not context or context.context_type != "SYSTEM":
+        return ""
+    from accounts.position_registry import get_position_definition
+
+    definition = get_position_definition(context.position)
+    if definition:
+        try:
+            return reverse(definition.dashboard_url_name)
+        except NoReverseMatch:
+            pass
+    return reverse("accounts_portal:portal_dashboard")
+
+
+def _widget_context(user):
+    return {
+        "recent_notifications": get_user_in_app_messages(user, limit=6),
+        "notification_unread_count": get_user_unread_count(user),
+    }
 
 
 @login_required
@@ -51,6 +74,8 @@ def notifications(request):
         notifications_page = paginator.page(paginator.num_pages)
 
     context = {
+        "page_title": "Centre de notifications",
+        "dashboard_url": _dashboard_url(request),
         "notifications": notifications_page,
         "page_obj": notifications_page,
         "unread_count": get_user_unread_count(request.user),
@@ -61,7 +86,13 @@ def notifications(request):
     }
     if request.headers.get("HX-Request"):
         return render(request, "notification_center/partials/list.html", context)
-    return render(request, "notification_center/index.html", context)
+    template_name = (
+        "notification_center/index_system.html"
+        if getattr(request, "access_context", None)
+        and request.access_context.context_type == "SYSTEM"
+        else "notification_center/index.html"
+    )
+    return render(request, template_name, context)
 
 
 @login_required
@@ -76,7 +107,13 @@ def notification_detail(request, pk):
         and notification.read_at is None
     ):
         NotificationBus.mark_as_read(notification)
-    return render(request, "notification_center/partials/detail.html", {"notification": notification})
+    response = render(
+        request,
+        "notification_center/partials/detail.html",
+        {"notification": notification},
+    )
+    response["HX-Trigger"] = "notification.read"
+    return response
 
 
 @login_required
@@ -90,11 +127,11 @@ def notifications_partial(request):
 
 @login_required
 def notifications_widget(request):
-    context = {
-        "recent_notifications": get_user_in_app_messages(request.user, limit=6),
-        "notification_unread_count": get_user_unread_count(request.user),
-    }
-    return render(request, "notification_center/partials/widget.html", context)
+    return render(
+        request,
+        "notification_center/partials/widget.html",
+        _widget_context(request.user),
+    )
 
 
 @login_required
@@ -105,14 +142,17 @@ def mark_notification_read(request, pk):
         pk=pk,
         recipient=request.user,
         channel=NotificationMessage.CHANNEL_IN_APP,
+        archived_at__isnull=True,
     )
     NotificationBus.mark_as_read(notification)
     if request.headers.get("HX-Request"):
-        return render(
+        response = render(
             request,
             "notification_center/partials/item.html",
             {"notification": notification},
         )
+        response["HX-Trigger"] = "notification.read"
+        return response
     return HttpResponse(status=204)
 
 
@@ -124,17 +164,55 @@ def mark_notification_unread(request, pk):
         pk=pk,
         recipient=request.user,
         channel=NotificationMessage.CHANNEL_IN_APP,
+        archived_at__isnull=True,
     )
     notification.read_at = None
     notification.status = NotificationMessage.STATUS_DELIVERED
     notification.save(update_fields=["read_at", "status", "updated_at"])
     if request.headers.get("HX-Request"):
-        return render(
+        response = render(
             request,
             "notification_center/partials/item.html",
             {"notification": notification},
         )
+        response["HX-Trigger"] = "notificationsChanged"
+        return response
     return HttpResponse(status=204)
+
+
+@login_required
+@require_POST
+def archive_notification(request, pk):
+    notification = get_object_or_404(
+        NotificationMessage,
+        pk=pk,
+        recipient=request.user,
+        channel=NotificationMessage.CHANNEL_IN_APP,
+    )
+    NotificationBus.archive(notification)
+    if request.headers.get("HX-Request"):
+        response = HttpResponse("")
+        response["HX-Trigger"] = "notificationsChanged"
+        return response
+    return redirect("notification_center:notifications")
+
+
+@login_required
+@require_POST
+def unarchive_notification(request, pk):
+    notification = get_object_or_404(
+        NotificationMessage,
+        pk=pk,
+        recipient=request.user,
+        channel=NotificationMessage.CHANNEL_IN_APP,
+        archived_at__isnull=False,
+    )
+    NotificationBus.unarchive(notification)
+    if request.headers.get("HX-Request"):
+        response = HttpResponse("")
+        response["HX-Trigger"] = "notificationsChanged"
+        return response
+    return redirect("notification_center:notifications")
 
 
 @login_required
@@ -144,6 +222,7 @@ def mark_all_notifications_read(request):
     NotificationMessage.objects.filter(
         recipient=request.user,
         read_at__isnull=True,
+        archived_at__isnull=True,
         channel=NotificationMessage.CHANNEL_IN_APP,
     ).update(
         read_at=now,
@@ -151,9 +230,9 @@ def mark_all_notifications_read(request):
         updated_at=now,
     )
     if request.headers.get("HX-Request"):
-        context = {
-            "recent_notifications": get_user_in_app_messages(request.user, limit=6),
-            "notification_unread_count": get_user_unread_count(request.user),
-        }
-        return render(request, "notification_center/partials/widget.html", context)
+        return render(
+            request,
+            "notification_center/partials/widget.html",
+            _widget_context(request.user),
+        )
     return redirect("notification_center:notifications")

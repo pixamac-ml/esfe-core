@@ -150,6 +150,57 @@ class ProfileForm(forms.ModelForm):
         return profile
 
 
+class SystemProfileForm(forms.ModelForm):
+    first_name = forms.CharField(max_length=150, required=False)
+    last_name = forms.CharField(max_length=150, required=False)
+
+    class Meta:
+        model = Profile
+        fields = [
+            "avatar",
+            "phone",
+            "address",
+        ]
+
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop("user", None)
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.user_id:
+            self.fields["first_name"].initial = self.instance.user.first_name
+            self.fields["last_name"].initial = self.instance.user.last_name
+
+        for field_name, placeholder in {
+            "first_name": "Prenom",
+            "last_name": "Nom",
+        }.items():
+            self.fields[field_name].widget.attrs.update({"class": INPUT_CLASS, "placeholder": placeholder})
+
+        self.fields["avatar"].widget.attrs.update({
+            "class": "hidden",
+            "accept": "image/jpeg,image/png,image/webp",
+            "id": "avatar-input",
+        })
+        self.fields["phone"].widget.attrs.update({
+            "class": INPUT_CLASS,
+            "placeholder": "Ex: +223 70 00 00 00",
+        })
+        self.fields["address"].widget.attrs.update({
+            "class": INPUT_CLASS,
+            "placeholder": "Ex: Adresse administrative",
+        })
+
+    def save(self, commit=True):
+        profile = super().save(commit=False)
+        user = self.user or profile.user
+        user.first_name = self.cleaned_data.get("first_name", "").strip()
+        user.last_name = self.cleaned_data.get("last_name", "").strip()
+        if commit:
+            user.save(update_fields=["first_name", "last_name"])
+            profile._skip_public_mirror = True
+            profile.save()
+        return profile
+
+
 # ==========================
 # EMAIL
 # ==========================
@@ -337,6 +388,11 @@ class BranchExpenseForm(forms.ModelForm):
 
 
 class BranchCashMovementForm(forms.ModelForm):
+    ALLOWED_MANUAL_SOURCES = {
+        BranchCashMovement.SOURCE_MANUAL,
+        BranchCashMovement.SOURCE_ADJUSTMENT,
+    }
+
     class Meta:
         model = BranchCashMovement
         fields = [
@@ -354,12 +410,25 @@ class BranchCashMovementForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["source"].choices = [
+            choice
+            for choice in BranchCashMovement.SOURCE_CHOICES
+            if choice[0] in self.ALLOWED_MANUAL_SOURCES
+        ]
         for field_name in ["movement_type", "source", "amount", "label", "movement_date"]:
             self.fields[field_name].widget.attrs.update({"class": "dg-input"})
         self.fields["notes"].widget.attrs.update({
             "class": "dg-input",
             "placeholder": "Commentaire interne sur ce mouvement...",
         })
+
+    def clean_source(self):
+        source = self.cleaned_data["source"]
+        if source not in self.ALLOWED_MANUAL_SOURCES:
+            raise forms.ValidationError(
+                "Un mouvement manuel doit utiliser la source Manuel ou Ajustement."
+            )
+        return source
 
 
 class DonationForm(forms.ModelForm):

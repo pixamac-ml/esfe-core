@@ -29,8 +29,9 @@ from .dashboards.helpers import is_manager
 from portal.models import AccountSupportState
 
 from .models import Profile, UserPreference, PayrollEntry, TeacherHonorariumEntry
-from .forms import CustomUserCreationForm, ProfileForm, EmailUpdateForm, UserPreferenceForm
+from .forms import CustomUserCreationForm, ProfileForm, SystemProfileForm, EmailUpdateForm, UserPreferenceForm
 from .services.payslip_pdf import build_payroll_pdf, build_honorarium_pdf
+from .authentication import safe_local_redirect_url
 
 from .dashboards.permissions import (
     check_admissions_access,
@@ -70,7 +71,10 @@ def register(request):
                 "Bienvenue ! Votre compte a été créé avec succès."
             )
 
-            return redirect(next_url or reverse("community:topic_list"))
+            return redirect(
+                safe_local_redirect_url(request, next_url)
+                or reverse("community:topic_list")
+            )
 
     else:
         form = CustomUserCreationForm()
@@ -109,11 +113,11 @@ def dashboard_redirect(request):
     if position == "secretary":
         return redirect("accounts_portal:portal_secretary")
 
+    if is_manager(user):
+        return redirect("accounts_portal:portal_annex_manager")
+
     if check_finance_access(user):
         return redirect("accounts:finance_dashboard")
-
-    if is_manager(user):
-        return redirect("accounts:manager_dashboard")
 
     if position == "marketing_manager":
         return redirect("marketing:dashboard")
@@ -140,6 +144,10 @@ def profile_detail(request):
     """
 
     user_obj = request.user
+    position = get_user_position(user_obj)
+
+    if position:
+        return redirect("accounts_portal:system_profile")
 
     # Garantie que le profil existe
     profile, created = Profile.objects.get_or_create(user=user_obj)
@@ -230,18 +238,22 @@ def edit_profile(request):
     Modification du profil utilisateur.
     """
 
+    position = get_user_position(request.user)
+    if position:
+        # Route historique : les comptes SYSTEM sont toujours affiches par Portal.
+        return redirect("accounts_portal:system_profile_edit")
+
     profile, _created = Profile.objects.get_or_create(user=request.user)
+    is_system_account = False
 
     if request.method == "POST":
-
         form = ProfileForm(
             request.POST,
             request.FILES,
-            instance=profile
+            **form_kwargs,
         )
 
         if form.is_valid():
-
             form.save()
 
             messages.success(
@@ -257,7 +269,11 @@ def edit_profile(request):
     return render(
         request,
         "accounts/edit_profile.html",
-        {"form": form}
+        {
+            "form": form,
+            "is_system_account": is_system_account,
+            "profile_position": position,
+        }
     )
 
 
@@ -303,6 +319,10 @@ def update_email(request):
     """
     Modification de l'email utilisateur.
     """
+
+    if get_user_position(request.user):
+        messages.info(request, "La modification d'email est geree par le workflow de securite institutionnel.")
+        return redirect("accounts_portal:system_security")
 
     if request.method == "POST":
 

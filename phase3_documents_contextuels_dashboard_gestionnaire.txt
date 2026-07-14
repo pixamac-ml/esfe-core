@@ -1,0 +1,75 @@
+PHASE 3 — DOCUMENTS CONTEXTUELS DU DASHBOARD GESTIONNAIRE
+==========================================================
+
+Statut : terminée et vérifiée.
+
+Règles de sécurité appliquées
+-----------------------------
+- Toutes les routes passent par le décorateur manager_required.
+- Chaque objet est recherché dans request.branch.
+- Une tentative d'accès à un objet d'une autre annexe retourne 404.
+- Les fichiers privés de paiement, dépense et banque passent par FileResponse.
+- Aucun nouveau lien direct vers une URL média privée n'a été ajouté.
+- Les boutons des justificatifs de dépense et de banque ne sont affichés que pour un PDF existant.
+- Aucun modèle ni aucune migration n'a été créé.
+- Aucun autre dashboard n'a été modifié.
+
+Rapport fichier par fichier
+---------------------------
+
+1. accounts/dashboards/htmx_global.py
+- Ajout de la fiche d'inscription PDF depuis Inscription.
+- Ajout du reçu étudiant sécurisé depuis Payment.
+- Ajout de la fiche de paie depuis PayrollEntry avec le service PDF existant.
+- Ajout du bordereau d'honoraires depuis TeacherHonorariumEntry avec le service PDF existant.
+- Ajout du reçu de don depuis Donation avec le service PDF existant.
+- Ajout de la pièce justificative PDF sécurisée depuis BranchExpense.
+- Ajout du bordereau PDF sécurisé depuis BranchBankTransfer.
+- Noms de fichiers harmonisés et nettoyés.
+- Nom de l'export rapport harmonisé en etat-financier-<annexe>-<periode>.pdf.
+
+2. accounts/urls.py
+- Ajout des sept routes contextuelles sécurisées : inscription, paiement, paie,
+  honoraires, don, dépense et banque.
+- La route existante de l'état financier PDF reste utilisée pour le rapport.
+
+3. accounts/templates/accounts/dashboard/manager_dashboard.html
+- Bouton « Fiche d'inscription » dans Inscriptions.
+- Bouton « Reçu » uniquement pour un paiement disposant d'un reçu PDF.
+- Bouton « Fiche de paie » uniquement lorsqu'une PayrollEntry existe.
+- Bouton « Pièce justificative » uniquement lorsqu'un justificatif PDF existe.
+- Bouton « Bordereau » uniquement lorsqu'un honoraire existe.
+- Bouton « Bordereau » uniquement lorsqu'un justificatif bancaire PDF existe.
+- Libellé « État financier » dans Rapports.
+
+4. accounts/templates/accounts/dashboard/partials/donation_row.html
+- Bouton contextuel « Reçu » pour chaque don.
+
+5. accounts/templates/accounts/dashboard/partials/payment_modal.html
+- Remplacement du lien média direct par la route Django sécurisée du reçu.
+
+6. accounts/templates/accounts/dashboard/partials/manager_payment_row.html
+- Remplacement du lien média direct par la route Django sécurisée du reçu.
+
+7. ui/templates/documents/inscription_certificate/inscription_certificate.html
+- Réutilisation du moteur PDF existant.
+- Harmonisation du titre en « Fiche d'inscription ».
+
+8. accounts/test_manager_workflows.py
+- Tests du rôle Gestionnaire.
+- Test d'isolation entre annexes.
+- Tests de génération avec les services PDF existants.
+- Test de non-disponibilité d'un justificatif absent.
+
+Facture étudiant
+----------------
+Payment ne possède actuellement ni champ facture ni service de facture étudiant.
+Conformément à « Facture si elle existe déjà », aucun bouton Facture artificiel n'a été créé.
+
+Vérifications
+-------------
+- python manage.py check --settings=config.settings_test_local : OK
+- Compilation Python des fichiers modifiés : OK
+- 8 tests ciblés (Phase 2 + Phase 3) : OK
+- Recherche de liens média directs dans les templates Gestionnaire modifiés : aucun résultat
+

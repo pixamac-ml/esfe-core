@@ -1,0 +1,21 @@
+{% load component_tags %}
+<div class="p-5 space-y-4">
+  <div class="flex items-center gap-2 mb-2">
+    <i data-lucide="calendar-range" style="width:16px;height:16px;" class="text-[color:var(--school-primary)]"></i>
+    <h2 class="text-sm font-black text-[color:var(--text)]">{{ action }}</h2>
+  </div>
+  <form method="post"
+        hx-post="{{ request.path }}"
+        hx-swap="none"
+        class="space-y-4">
+    {% csrf_token %}
+    {% include "secretary/htmx/form_fields.html" with form=form %}
+    <div class="flex items-center gap-2 pt-2 border-t border-[color:var(--line)]">
+      {% component "button" label="Enregistrer" icon_left="check" variant="primary" type="submit" %}{% endcomponent %}
+      <button type="button" onclick="document.getElementById('sg-drawer').classList.remove('open')"
+              class="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-1.5 text-xs font-bold text-[color:var(--muted)] hover:text-[color:var(--text)]">
+        Annuler
+      </button>
+    </div>
+  </form>
+</div>

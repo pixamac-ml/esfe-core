@@ -1,0 +1,39 @@
+Sprint 7 — Backend gestion des emplois du temps
+
+Statut: exécuté.
+
+Ce qui a été ajouté:
+- `academics/services/timetable_management_service.py`
+- `academics/selectors/timetable_selectors.py`
+- `academics/permissions/timetable_permissions.py`
+- `academics/test_timetable_management.py`
+
+Ce que couvre l'implémentation:
+- emplois du temps par classe
+- génération par semaine / semestre via les services existants
+- validation des conflits classe / enseignant / salle
+- contrôle de charge horaire
+- états de workflow: brouillon, validé, publié, archivé
+- archive logique sans suppression physique
+- accès directeur limité à son annexe
+- accès global DG / Super Admin
+- auto-résolution des enseignants affectés via les affectations validées
+
+Points techniques:
+- réutilisation de `AcademicScheduleEvent` et `WeeklyScheduleSlot`
+- orchestration basée sur `academics/services/schedule_service.py`
+- sélecteurs pour classe, enseignant, créneaux libres, conflits et charge
+
+Fichiers validés:
+- `academics/permissions/timetable_permissions.py`
+- `academics/selectors/timetable_selectors.py`
+- `academics/services/timetable_management_service.py`
+- `academics/test_timetable_management.py`
+
+Vérifications effectuées:
+- `python manage.py check --settings=config.settings_test_local`
+- `python -m py_compile academics/permissions/timetable_permissions.py academics/selectors/timetable_selectors.py academics/services/timetable_management_service.py academics/test_timetable_management.py`
+- `python manage.py migrate --settings=config.settings_test_local --noinput`
+
+Préparation Sprint 8:
+- base prête pour brancher une UI ou des écrans de consultation sur les nouveaux sélecteurs et sur l'orchestration du planning.

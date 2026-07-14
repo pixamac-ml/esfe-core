@@ -195,10 +195,10 @@ def get_profile_data(user):
         "must_change_password": getattr(support_state, "must_change_password", False),
         "is_blocked": getattr(support_state, "is_blocked", False),
         "is_suspended": getattr(support_state, "is_suspended", False),
-        "profile_url": reverse("accounts:profile"),
-        "edit_profile_url": reverse("accounts:edit_profile"),
-        "edit_preferences_url": reverse("accounts:edit_preferences"),
-        "password_change_url": reverse("password_change"),
+        "profile_url": reverse("accounts_portal:system_profile"),
+        "edit_profile_url": reverse("accounts_portal:system_profile_edit"),
+        "edit_preferences_url": reverse("accounts_portal:system_security"),
+        "password_change_url": reverse("accounts_portal:system_change_password"),
     }
 
     if student is None or candidature is None:

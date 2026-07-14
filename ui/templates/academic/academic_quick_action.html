@@ -1,0 +1,37 @@
+{% load component_tags %}
+{% if href %}
+  <a href="{{ href }}"
+{% else %}
+  <button type="button"
+{% endif %}
+  class="inline-flex items-center justify-center gap-2 rounded-xl font-bold transition
+    {% if size == 'sm' %}px-3 py-2 text-xs{% elif size == 'lg' %}px-5 py-3 text-sm{% else %}px-4 py-2.5 text-xs{% endif %}
+    {% if variant == 'solid' %}
+      {% if tone == 'success' %}bg-[color:var(--success)] text-white hover:bg-[color:var(--success)]/90
+      {% elif tone == 'danger' %}bg-[color:var(--danger)] text-white hover:bg-[color:var(--danger)]/90
+      {% elif tone == 'warning' %}bg-[color:var(--warning)] text-white hover:bg-[color:var(--warning)]/90
+      {% elif tone == 'info' %}bg-[color:var(--info)] text-white hover:bg-[color:var(--info)]/90
+      {% else %}bg-[color:var(--school-primary)] text-white hover:bg-[color:var(--school-primary)]/90{% endif %}
+    {% elif variant == 'ghost' %}
+      bg-transparent text-[color:var(--text)] hover:bg-[color:var(--surface-2)]
+    {% else %}
+      border bg-[color:var(--card)]
+      {% if tone == 'success' %}border-[color:var(--success)]/30 text-[color:var(--success)] hover:bg-[color:var(--success-soft)]
+      {% elif tone == 'danger' %}border-[color:var(--danger)]/30 text-[color:var(--danger)] hover:bg-[color:var(--danger-soft)]
+      {% elif tone == 'warning' %}border-[color:var(--warning)]/30 text-[color:var(--warning)] hover:bg-[color:var(--warning-soft)]
+      {% elif tone == 'info' %}border-[color:var(--info)]/30 text-[color:var(--info)] hover:bg-[color:var(--info-soft)]
+      {% else %}border-[color:var(--school-primary)]/30 text-[color:var(--school-primary)] hover:bg-[color:var(--school-primary-soft)]{% endif %}
+    {% endif %}"
+  {% if hx_get %}hx-get="{{ hx_get }}"{% endif %}
+  {% if hx_post %}hx-post="{{ hx_post }}"{% endif %}
+  {% if hx_target %}hx-target="{{ hx_target }}"{% endif %}
+  {% if hx_swap %}hx-swap="{{ hx_swap }}"{% endif %}
+  {% if hx_indicator %}hx-indicator="{{ hx_indicator }}"{% endif %}
+>
+  {% if icon %}<i data-lucide="{{ icon }}" style="{% if size == 'sm' %}width:14px;height:14px;{% else %}width:16px;height:16px;{% endif %}"></i>{% endif %}
+  {{ label }}
+{% if href %}
+  </a>
+{% else %}
+  </button>
+{% endif %}

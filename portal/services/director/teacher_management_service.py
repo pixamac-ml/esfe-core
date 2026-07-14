@@ -12,6 +12,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from academics.models import AcademicClass, EC
+from academics.services.teacher_assignment_service import create_teacher_assignment
 from accounts.dashboards.helpers import get_user_branch
 from notifier.services import NotificationBus
 from portal.models import DirectorTeacherAssignment
@@ -90,40 +91,43 @@ def _build_assignment_payloads(*, branch, classes, ecs, room_label, planned_hour
                 if ec.ue.semester.academic_class_id != academic_class.id:
                     continue
                 assignments.append(
-                    DirectorTeacherAssignment.objects.create(
-                        branch=branch,
+                    create_teacher_assignment(
+                        actor=created_by,
                         teacher=teacher,
+                        branch=branch,
                         academic_class=academic_class,
                         ec=ec,
                         room_label=room_label,
                         planned_hours=planned_hours,
                         created_by=created_by,
-                    )
+                    ).assignment
                 )
     elif classes:
         for academic_class in classes:
             assignments.append(
-                DirectorTeacherAssignment.objects.create(
-                    branch=branch,
+                create_teacher_assignment(
+                    actor=created_by,
                     teacher=teacher,
+                    branch=branch,
                     academic_class=academic_class,
                     room_label=room_label,
                     planned_hours=planned_hours,
                     created_by=created_by,
-                )
+                ).assignment
             )
     else:
         for ec in ecs:
             assignments.append(
-                DirectorTeacherAssignment.objects.create(
-                    branch=branch,
+                create_teacher_assignment(
+                    actor=created_by,
                     teacher=teacher,
+                    branch=branch,
                     academic_class=ec.ue.semester.academic_class,
                     ec=ec,
                     room_label=room_label,
                     planned_hours=planned_hours,
                     created_by=created_by,
-                )
+                ).assignment
             )
     if (classes or ecs) and not assignments:
         raise ValidationError("La matiere selectionnee ne correspond pas a la classe choisie.")

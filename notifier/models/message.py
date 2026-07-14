@@ -89,6 +89,7 @@ class NotificationMessage(models.Model):
     read_at = models.DateTimeField(null=True, blank=True)
     sent_at = models.DateTimeField(null=True, blank=True)
     delivered_at = models.DateTimeField(null=True, blank=True)
+    archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -99,6 +100,10 @@ class NotificationMessage(models.Model):
             models.Index(fields=["channel", "status", "created_at"]),
             models.Index(fields=["event_type", "created_at"]),
             models.Index(fields=["legacy_source", "legacy_object_id"]),
+            models.Index(
+                fields=["recipient", "channel", "archived_at", "created_at"],
+                name="notifier_rec_chan_arch_idx",
+            ),
         ]
 
     def __str__(self):

@@ -30,6 +30,7 @@ POSITION_TO_CANONICAL = {
     "executive_director": "directeur_general",
     "deputy_executive_director": "directeur_general",
     "branch_manager": "staff_admin",
+    "annex_manager": "staff_admin",
     "academic_supervisor": "staff_admin",
     "it_support": "staff_admin",
     "marketing_manager": "staff_admin",
@@ -90,7 +91,7 @@ ACCESS_RULES = {
     ("view_dashboard", "manager"): {
         "groups": {"gestionnaire", "manager"},
         "profile_roles": set(),
-        "positions": {"branch_manager"},
+        "positions": {"branch_manager", "annex_manager"},
         "canonical_roles": set(),
         "allow_global": False,
     },
@@ -137,6 +138,7 @@ ACCESS_RULES = {
             "executive_director",
             "deputy_executive_director",
             "branch_manager",
+            "annex_manager",
             "academic_supervisor",
             "marketing_manager",
             "super_admin",
@@ -241,6 +243,13 @@ def get_user_groups(user):
 def get_user_position(user):
     if not _is_authenticated(user):
         return None
+
+    from django.conf import settings
+    if settings.AUTH_POLICY_V2_ENABLED:
+        from accounts.position_registry import normalize_position
+
+        institutional = getattr(user, "institutional_profile", None)
+        return normalize_position(getattr(institutional, "position", None)) or None
 
     profile = _get_profile(user)
     explicit_position = _normalize_token(getattr(profile, "position", None))
@@ -419,6 +428,20 @@ def can_access(user, action, resource=None):
             resource_key,
         )
         return False
+
+    from django.conf import settings
+    if settings.AUTH_POLICY_V2_ENABLED:
+        from accounts.access_context import build_access_context
+        from accounts.policy_v2 import decide
+
+        rule = ACCESS_RULES.get((action_key, resource_key))
+        if not rule:
+            return False
+        decision = decide(
+            build_access_context(user),
+            allowed_positions=rule["positions"],
+        )
+        return decision.allowed
 
     groups = set(get_user_groups(user))
     profile_role = get_user_profile_role(user)

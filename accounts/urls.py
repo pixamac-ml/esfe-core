@@ -3,7 +3,7 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
 
-from .auth_views import PortalLoginView
+from .auth_views import PortalLoginView, PortalPasswordChangeView
 
 # Import des vues principales
 from .views import (
@@ -66,10 +66,11 @@ from .dashboards.exports import (
     export_executive_csv,
 )
 from .dashboards.manager_dashboard import *
+from portal.views.annex_manager import legacy_manager_entry
 
 
 from .dashboards.htmx_manager import *
-from .dashboards.htmx_manager import donation_create, export_report_xlsx, widget_cash_balance, widget_scope_bar, widget_alerts_badge, widget_today_payments, widget_active_sessions, widget_sidebar_badges
+from .dashboards.htmx_manager import donation_create, export_report_xlsx, export_report_pdf, widget_cash_balance, widget_scope_bar, widget_alerts_badge, widget_today_payments, widget_active_sessions, widget_sidebar_badges, widget_active_coupons
 
 
 app_name = "accounts"
@@ -91,6 +92,18 @@ urlpatterns = [
             template_name="registration/logged_out.html"
         ),
         name="logout",
+    ),
+    path(
+        "password_change/",
+        PortalPasswordChangeView.as_view(),
+        name="password_change",
+    ),
+    path(
+        "password_change/done/",
+        auth_views.PasswordChangeDoneView.as_view(
+            template_name="registration/password_change_done.html"
+        ),
+        name="password_change_done",
     ),
     path(
         "register/",
@@ -375,15 +388,33 @@ urlpatterns = [
     # =============================================
     # MANAGER DASHBOARD
     # =============================================
-    path("manager/", manager_dashboard, name="manager_dashboard"),
+    path("manager/", legacy_manager_entry, name="manager_dashboard"),
     path("manager/candidatures/", manager_candidatures, name="manager_candidatures"),
     path("manager/inscriptions/", manager_inscriptions, name="manager_inscriptions"),
     path("manager/paiements/", manager_paiements, name="manager_paiements"),
+
+    # Documents contextuels securises du dashboard gestionnaire
+    path("manager/inscription/<int:pk>/fiche/", inscription_sheet_pdf,
+         name="manager_inscription_sheet_pdf"),
+    path("manager/payment/<int:pk>/receipt/", payment_receipt_pdf,
+         name="manager_payment_receipt_pdf"),
+    path("manager/payroll/<int:pk>/sheet/", payroll_sheet_pdf,
+         name="manager_payroll_sheet_pdf"),
+    path("manager/honorarium/<int:pk>/statement/", honorarium_statement_pdf,
+         name="manager_honorarium_statement_pdf"),
+    path("manager/donation/<int:pk>/receipt/", donation_receipt_pdf,
+         name="manager_donation_receipt_pdf"),
+    path("manager/expense/<int:pk>/supporting-document/", expense_supporting_document_pdf,
+         name="manager_expense_supporting_document_pdf"),
+    path("manager/bank-transfer/<int:pk>/slip/", bank_transfer_slip_pdf,
+         name="manager_bank_transfer_slip_pdf"),
 
     # =============================================
     # HTMX ACTIONS - CANDIDATURES
     # =============================================
     path("htmx/manager/candidature/<int:pk>/detail/", candidature_detail, name="htmx_candidature_detail"),
+    path("manager/candidature-document/<int:pk>/download/", candidature_document_download,
+         name="manager_candidature_document_download"),
     path("htmx/manager/candidature/<int:pk>/under-review/", candidature_under_review, name="htmx_candidature_under_review"),
     path("htmx/manager/candidature/<int:pk>/accept/", candidature_accept, name="htmx_candidature_accept"),
     path("htmx/manager/candidature/<int:pk>/reject/", candidature_reject, name="htmx_candidature_reject"),
@@ -397,6 +428,8 @@ urlpatterns = [
     path("htmx/manager/inscription/<int:pk>/detail/", inscription_detail, name="htmx_inscription_detail"),
     path("htmx/manager/inscription/<int:pk>/positioning/", inscription_positioning_modal, name="htmx_inscription_positioning"),
     path("htmx/manager/inscription/<int:pk>/create/", inscription_create, name="htmx_inscription_create"),
+    path("htmx/manager/inscription/<int:pk>/apply-coupon/", inscription_apply_coupon, name="htmx_inscription_apply_coupon"),
+    path("htmx/manager/coupon/preview/", coupon_preview, name="htmx_coupon_preview"),
 
     # =============================================
     # HTMX ACTIONS - PAIEMENTS
@@ -456,6 +489,7 @@ urlpatterns = [
     # EXPORT
     # =============================================
     path("manager/export/report/xlsx/", export_report_xlsx, name="manager_export_report_xlsx"),
+    path("manager/export/report/pdf/", export_report_pdf, name="manager_export_report_pdf"),
 
     # =============================================
     # DONS / DONATIONS
@@ -475,5 +509,6 @@ urlpatterns = [
     path("widget/alerts-badge/", widget_alerts_badge, name="widget_alerts_badge"),
     path("widget/today-payments/", widget_today_payments, name="widget_today_payments"),
     path("widget/active-sessions/", widget_active_sessions, name="widget_active_sessions"),
+    path("widget/active-coupons/", widget_active_coupons, name="widget_active_coupons"),
     path("widget/sidebar-badges/", widget_sidebar_badges, name="widget_sidebar_badges"),
 ]

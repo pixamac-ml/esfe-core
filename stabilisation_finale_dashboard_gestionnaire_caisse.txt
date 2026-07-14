@@ -1,0 +1,279 @@
+STABILISATION FINALE — DASHBOARD GESTIONNAIRE / CAISSE
+=====================================================
+
+Statut : mission terminée et contrôlée.
+Date : 07/07/2026
+
+PÉRIMÈTRE RESPECTÉ
+------------------
+- Consolidation du dashboard Gestionnaire/Caisse existant.
+- Aucun nouveau grand module.
+- Aucun assistant financier ou bot.
+- Aucun modèle ajouté.
+- Aucune migration créée par cette mission.
+- Aucun autre dashboard refondu ou modifié visuellement.
+
+1. FICHIERS MODIFIÉS
+--------------------
+
+Sécurité et workflows Gestionnaire :
+- accounts/dashboards/manager_dashboard.py
+- accounts/dashboards/htmx_candidatures.py
+- accounts/dashboards/htmx_inscriptions.py
+- accounts/dashboards/htmx_paiements.py
+- accounts/dashboards/htmx_caisse.py
+- accounts/dashboards/htmx_depenses.py
+- accounts/dashboards/htmx_salaires.py
+- accounts/dashboards/htmx_honoraires.py
+- accounts/urls.py
+
+Services financiers et documents :
+- accounts/services/manager_intelligence.py
+- accounts/services/financial_reports.py
+- accounts/services/excel_reports.py
+- accounts/services/accounting_documents.py
+- accounts/services/donation_pdf.py
+- accounts/forms.py
+
+Coupons :
+- coupons/services/validation.py
+- coupons/services/application.py
+
+Boutique :
+- shop/views.py
+
+Frontend Gestionnaire :
+- accounts/templates/accounts/dashboard/partials/candidature_modal.html
+- accounts/templates/accounts/dashboard/partials/manager_cash_movement_form.html
+
+Tests :
+- accounts/test_manager_workflows.py
+- coupons/tests.py
+- shop/tests.py
+
+2. VUES SÉCURISÉES
+------------------
+
+Audit automatique effectué sur les vues Gestionnaire :
+- toutes les vues concernées utilisent manager_required ;
+- toutes les lectures utilisent require_GET ;
+- toutes les mutations utilisent require_POST ;
+- les quatre vues principales du dashboard sont maintenant explicitement GET-only ;
+- les objets métier sont filtrés avec request.branch ou par un objet agent déjà
+  lié à request.branch ;
+- les tentatives inter-annexes testées retournent 404 ;
+- les utilisateurs sans rôle Gestionnaire reçoivent 403 ;
+- les actions sensibles appelées en GET retournent 405.
+
+Téléchargements sécurisés :
+- ajout d'une vue sécurisée pour les pièces de candidature ;
+- remplacement du dernier lien direct doc.file.url du modal Gestionnaire ;
+- confirmation que les reçus étudiant, paie, honoraires, dons, dépenses,
+  banque et état financier passent par des vues Django contrôlées ;
+- correction du reçu Boutique : un utilisateur is_staff générique ne peut plus
+  contourner l'annexe ; seuls le propriétaire, le Gestionnaire de l'annexe ou
+  un superutilisateur sont autorisés.
+
+3. WORKFLOWS CORRIGÉS
+---------------------
+
+Caisse réelle :
+- get_branch_cash_balance retourne maintenant le solde signé réel ;
+- une caisse négative n'est plus masquée artificiellement à zéro ;
+- les alertes financières détectent réellement une caisse négative ;
+- une clôture validée ou finale refuse une caisse négative.
+
+Concurrence et atomicité :
+- ajout d'un verrouillage de l'annexe avant chaque sortie sensible ;
+- les sorties concurrentes sont sérialisées avec select_for_update en production ;
+- paiement salaire + mouvement de caisse dans une seule transaction ;
+- paiement honoraire + mouvement de caisse dans une seule transaction ;
+- avance salaire + mouvement de caisse dans une seule transaction ;
+- paiement dépense + mouvement de caisse dans une seule transaction ;
+- validation paiement étudiant + mouvement + audit dans une seule transaction ;
+- finalisation d'une session cash verrouillée pour empêcher un double encaissement ;
+- création de session cash revérifiée sous verrou pour réduire les doublons.
+
+Contrôles de solde :
+- dépense refusée si la caisse est insuffisante ;
+- salaire refusé si la caisse est insuffisante ;
+- honoraire refusé si la caisse est insuffisante ;
+- avance refusée si la caisse est insuffisante ;
+- sortie manuelle refusée si elle dépasse la caisse disponible ;
+- versement bancaire refusé s'il dépasse la caisse disponible.
+
+Intégrité des sources :
+- un mouvement saisi manuellement ne peut plus se faire passer pour un paiement,
+  un don, une dépense, un salaire, un honoraire, une vente ou un versement bancaire ;
+- seules les sources « Manuel » et « Ajustement » sont autorisées dans le formulaire ;
+- les références des retraits salaire/honoraires utilisent désormais le cumul payé,
+  ce qui évite les références identiques lors de versements répétés du même montant.
+
+Clôture :
+- création du brouillon refusée si des opérations orphelines existent ;
+- validation et clôture finale refusées si des opérations orphelines existent ;
+- correction d'un appel interne erroné vers une fonction inexistante lors du blocage ;
+- versement bancaire excessif bloqué avant création ;
+- caisse négative bloquée avant validation ou clôture finale.
+
+Boutique et dons :
+- validation Boutique déjà atomique et bien reliée à BranchCashMovement : vérifiée ;
+- création de don et synchronisation caisse : vérifiées ;
+- génération de reçu de don rendue robuste même sans champ receipt_pdf persistant.
+
+4. CORRECTIONS COUPONS / REMISES
+--------------------------------
+
+Permissions :
+- création et activation réservées au DG/DGA dans le workflow existant : vérifié ;
+- le Gestionnaire peut uniquement prévisualiser et appliquer un coupon à une
+  inscription de sa propre annexe.
+
+Sécurité et concurrence :
+- inscription verrouillée pendant l'application ;
+- coupon verrouillé pendant l'application ;
+- le dernier quota disponible ne peut plus être consommé normalement par deux
+  transactions PostgreSQL concurrentes ;
+- garde-fou branch ajouté directement au service apply_coupon ;
+- OneToOne CouponRedemption continue d'empêcher plusieurs coupons sur la même inscription.
+
+Validation :
+- code inconnu, désactivé, futur, expiré ou quota épuisé : messages explicites ;
+- restrictions annexe et formation vérifiées ;
+- inscription annulée, expirée ou totalement payée refusée ;
+- remise plafonnée au montant dû ;
+- remise après paiement partiel plafonnée au montant déjà payé.
+
+Cohérence aperçu/application :
+- l'aperçu utilise maintenant le même plancher que l'application réelle ;
+- une inscription partiellement payée peut recevoir une remise conforme au service,
+  sans descendre sous le montant déjà encaissé.
+
+Traçabilité :
+- CouponRedemption reste le journal immuable lié à l'inscription ;
+- FinancialLog contient maintenant coupon_id, redemption_id, inscription_id,
+  inscription_reference et branch_id ;
+- le rapport financier affiche le total des remises de la période ;
+- l'export Excel affiche le nombre de coupons appliqués et le total des remises ;
+- le dashboard DG existant affiche les coupons et leur compteur d'utilisations : vérifié.
+
+5. CORRECTIONS FRONTEND
+-----------------------
+
+- lien sécurisé ajouté pour télécharger une pièce de candidature ;
+- message visible lorsqu'une sortie manuelle dépasse la caisse disponible ;
+- formulaire de mouvement manuel limité aux sources autorisées ;
+- les corrections de la phase Front restent actives : filtres rapport, dates
+  personnalisées, alertes, clôture bloquée, versements bancaires en sorties,
+  responsive et boutons PDF contextuels ;
+- aucun bouton de document indisponible n'a été ajouté ;
+- aucun lien direct vers un reçu, justificatif ou document privé ne subsiste dans
+  les templates Gestionnaire contrôlés.
+
+6. TESTS AJOUTÉS OU RENFORCÉS
+-----------------------------
+
+Cas couverts :
+- accès candidature, dépense, coupon et document inter-annexes interdit ;
+- rôle non Gestionnaire interdit ;
+- mutations sensibles refusées en GET ;
+- source financière automatique impossible via saisie manuelle ;
+- dépense sans solde refusée ;
+- salaire sans solde refusé ;
+- honoraire sans solde refusé ;
+- clôture avec opération orpheline refusée dès la préparation ;
+- validation de clôture avec opération orpheline refusée ;
+- versement bancaire supérieur au solde refusé ;
+- caisse négative détectée et clôture refusée ;
+- coupon inconnu, expiré, épuisé, déjà appliqué ou hors annexe refusé ;
+- audit coupon lié à l'inscription et à l'annexe ;
+- reçu Boutique inter-annexe interdit, même pour un compte is_staff ;
+- documents PDF sécurisés ;
+- filtres rapport financier ;
+- état financier PDF ;
+- export Excel lisible et contenant Banque + Coupons.
+
+Résultats :
+- suite complète accounts.test_manager_workflows : 71 tests, OK ;
+- contrôles finaux Accès + Export après ajout du document candidature : 7 tests, OK ;
+- suite complète coupons.tests : 16 tests, OK ;
+- lot Coupons + Documents + Export + Boutique : 37 tests, OK ;
+- lot Dépenses + Salaires + Honoraires : 11 tests, OK ;
+- lot Permissions + Clôture + Rapports : 24 tests, OK.
+
+Les lots se recouvrent volontairement : ils ont servi à isoler puis confirmer les
+corrections avant le passage global.
+
+7. COMMANDES EXÉCUTÉES
+----------------------
+
+- python manage.py check --settings=config.settings_test_local
+  Résultat : OK, aucune erreur Django.
+
+- python manage.py makemigrations --check --dry-run --settings=config.settings_test_local
+  Résultat : « No changes detected ».
+
+- python manage.py test --settings=config.settings_test_local accounts.test_manager_workflows --keepdb -v 1
+  Résultat : 71 tests OK.
+
+- python manage.py test --settings=config.settings_test_local coupons.tests --keepdb -v 1
+  Résultat : 16 tests OK.
+
+- plusieurs suites ciblées Gestionnaire, Boutique, Coupons et Documents
+  Résultat : tous les lots finaux OK.
+
+- analyse AST des fichiers Python modifiés
+  Résultat : OK.
+
+- compilation Django des templates Gestionnaire concernés
+  Résultat : OK.
+
+- audit automatique des décorateurs de vues
+  Résultat : toutes les vues Gestionnaire auditées ont manager_required et une
+  restriction HTTP explicite.
+
+8. RISQUES RESTANTS
+-------------------
+
+- Les tests isolés utilisent SQLite. Les verrous select_for_update sont conçus pour
+  PostgreSQL mais leur comportement concurrent réel doit être confirmé par un test
+  de charge sur la base de production ou de préproduction PostgreSQL.
+- Si le serveur web expose directement tout MEDIA_ROOT, une URL média connue peut
+  contourner Django. En production, les répertoires de reçus, candidatures,
+  dépenses et banque doivent rester privés et être servis uniquement via les vues
+  contrôlées ou un mécanisme X-Accel/X-Sendfile sécurisé.
+- Des opérations historiques déjà orphelines peuvent subsister. Utiliser l'action
+  de synchronisation caisse, puis vérifier le rapport avant la première clôture.
+- Les justificatifs image de dépense ou banque restent consultables comme fichiers
+  métier mais aucun faux bouton PDF n'est créé : seuls les vrais PDF sont proposés
+  comme documents PDF dans le dashboard.
+
+9. POINTS À VÉRIFIER MANUELLEMENT DANS LE NAVIGATEUR
+----------------------------------------------------
+
+1. Tester à 360 px, 768 px, 1024 px et écran bureau : navigation, tableaux et modales.
+2. Parcourir toutes les sections avec un Gestionnaire réel affecté à une annexe.
+3. Valider un paiement étudiant et vérifier immédiatement le solde caisse et le reçu.
+4. Réaliser une vente Boutique comptoir et vérifier caisse, stock et reçu.
+5. Enregistrer un don et vérifier le mouvement, la référence et le reçu.
+6. Tenter une dépense, un salaire et un honoraire supérieurs à la caisse.
+7. Tester un coupon valide, expiré, épuisé et déjà utilisé depuis le modal inscription.
+8. Préparer une clôture saine, puis tester validation et clôture finale.
+9. Vérifier le rejet visible d'un versement bancaire supérieur à la caisse.
+10. Télécharger chaque document avec le bon Gestionnaire, puis tenter avec une autre annexe.
+11. Ouvrir l'état financier PDF et l'Excel avec filtres mois, semaine et période personnalisée.
+12. Vérifier sur l'Excel les lignes « Versements bancaires », « Coupons appliques »
+    et « Total remises coupons ».
+
+ROADMAP — NON IMPLÉMENTÉE DANS CETTE PHASE
+------------------------------------------
+
+- Étudier une contrainte unique base de données sur
+  (branch, source, source_reference) pour BranchCashMovement, après nettoyage des
+  éventuels doublons historiques. Cette amélioration exige une migration et une
+  procédure de reprise, donc elle n'a pas été ajoutée implicitement.
+- Ajouter des tests navigateur automatisés Playwright lorsque le projet disposera
+  d'une infrastructure de tests end-to-end.
+- Ajouter un test de concurrence PostgreSQL dédié aux sorties simultanées de caisse
+  et au dernier quota coupon.
+

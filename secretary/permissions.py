@@ -5,6 +5,12 @@ def is_secretary(user):
     if not getattr(user, "is_authenticated", False):
         return False
 
+    from django.conf import settings
+    if settings.AUTH_POLICY_V2_ENABLED:
+        from accounts.access import get_user_position
+
+        return get_user_position(user) == "secretary"
+
     if getattr(user, "is_superuser", False):
         return True
 

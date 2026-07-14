@@ -440,3 +440,103 @@ class SecretaryTask(SecretaryStatusMixin):
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
+
+
+class Meeting(models.Model):
+    STATUS_SCHEDULED = "scheduled"
+    STATUS_IN_PROGRESS = "in_progress"
+    STATUS_DONE = "done"
+    STATUS_CANCELLED = "cancelled"
+
+    STATUS_CHOICES = [
+        (STATUS_SCHEDULED, "Planifiée"),
+        (STATUS_IN_PROGRESS, "En cours"),
+        (STATUS_DONE, "Terminée"),
+        (STATUS_CANCELLED, "Annulée"),
+    ]
+
+    TYPE_INTERNAL = "internal"
+    TYPE_PARENT = "parent"
+    TYPE_EXTERNAL = "external"
+    TYPE_EMERGENCY = "emergency"
+
+    TYPE_CHOICES = [
+        (TYPE_INTERNAL, "Réunion interne"),
+        (TYPE_PARENT, "Réunion parents"),
+        (TYPE_EXTERNAL, "Réunion externe"),
+        (TYPE_EMERGENCY, "Réunion d'urgence"),
+    ]
+
+    branch = models.ForeignKey(
+        "branches.Branch",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="meetings",
+    )
+    title = models.CharField(max_length=255)
+    meeting_type = models.CharField(
+        max_length=30,
+        choices=TYPE_CHOICES,
+        default=TYPE_INTERNAL,
+        db_index=True,
+    )
+    status = models.CharField(
+        max_length=30,
+        choices=STATUS_CHOICES,
+        default=STATUS_SCHEDULED,
+        db_index=True,
+    )
+    scheduled_at = models.DateTimeField(db_index=True)
+    location = models.CharField(max_length=255, blank=True)
+    agenda = models.TextField(blank=True, help_text="Ordre du jour")
+    participants = models.TextField(blank=True, help_text="Noms des participants, un par ligne")
+    secretary_present = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="meetings_created",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-scheduled_at"]
+        indexes = [
+            models.Index(fields=["branch", "scheduled_at"]),
+            models.Index(fields=["status", "scheduled_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.title} — {self.scheduled_at:%d/%m/%Y %H:%M}"
+
+    @property
+    def has_minutes(self):
+        return hasattr(self, "minutes") and self.minutes is not None
+
+
+class MeetingMinutes(models.Model):
+    meeting = models.OneToOneField(
+        Meeting,
+        on_delete=models.CASCADE,
+        related_name="minutes",
+    )
+    content = models.TextField(help_text="Corps du procès-verbal")
+    decisions = models.TextField(blank=True, help_text="Décisions prises")
+    next_steps = models.TextField(blank=True, help_text="Actions à suivre")
+    redacted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="minutes_redacted",
+    )
+    redacted_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Procès-verbal"
+        verbose_name_plural = "Procès-verbaux"
+
+    def __str__(self):
+        return f"PV — {self.meeting.title}"

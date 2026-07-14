@@ -90,7 +90,15 @@ def _managed_groups_queryset():
 # ============================================
 
 def superuser_required(user):
-    return bool(user.is_authenticated and user.is_superuser)
+    if not user.is_authenticated:
+        return False
+    from django.conf import settings
+
+    if settings.AUTH_POLICY_V2_ENABLED:
+        from accounts.access import get_user_position
+
+        return get_user_position(user) == "super_admin"
+    return bool(user.is_superuser)
 
 
 def _get_cockpit_pref(user):
@@ -2654,6 +2662,24 @@ def user_edit(request, pk):
 
             target_user.groups.set(groups.filter(id__in=selected_groups))
 
+            if new_password:
+                from accounts.models import AccountSecurityEvent, AccountSessionRecord
+                from accounts.session_policy import log_security_event
+                from accounts.session_security import revoke_user_sessions
+
+                log_security_event(
+                    user=target_user,
+                    actor=request.user,
+                    event_type=AccountSecurityEvent.PASSWORD_CHANGED,
+                    reason=AccountSessionRecord.END_PASSWORD_CHANGED,
+                    authentication_method="administrative_reset",
+                )
+                revoke_user_sessions(
+                    target_user,
+                    reason=AccountSessionRecord.END_PASSWORD_CHANGED,
+                    global_scope=True,
+                )
+
             messages.success(request, 'Utilisateur mis a jour avec succes.')
             return redirect('superadmin:user_list')
 
@@ -4147,6 +4173,23 @@ def bulk_action(request):
         if failed:
             messages.error(request, f'{failed} paiement(s) en echec. Verifiez les logs/SMTP.')
         return _redirect_back(request, default='superadmin:payment_list')
+
+    if model_type == 'event':
+        from news.models import Event
+        qs = Event.objects.filter(pk__in=selected_ids)
+        if action == 'publish':
+            updated = qs.update(is_published=True)
+            messages.success(request, f'{updated} événement(s) publié(s).')
+        elif action == 'unpublish':
+            updated = qs.update(is_published=False)
+            messages.success(request, f'{updated} événement(s) dépublié(s).')
+        elif action == 'delete':
+            deleted = qs.count()
+            qs.delete()
+            messages.success(request, f'{deleted} événement(s) supprimé(s).')
+        else:
+            messages.warning(request, 'Action non supportée pour les événements.')
+        return _redirect_back(request, default='superadmin:event_list')
 
     messages.warning(request, 'Action groupee non configuree pour ce module.')
     return _redirect_back(request)

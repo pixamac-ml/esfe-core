@@ -515,6 +515,16 @@ def _log_change(*, event, action_type, user, old_start_datetime=None, old_end_da
 def create_schedule_event(*, user, **data):
     event = AcademicScheduleEvent(created_by=user, updated_by=user, **data)
     event.full_clean()
+    if event.event_type == AcademicScheduleEvent.EVENT_TYPE_COURSE:
+        from academics.services.calendar_service import assert_course_not_blocked
+
+        assert_course_not_blocked(
+            branch=event.branch,
+            academic_year=event.academic_year,
+            academic_class=event.academic_class,
+            start_datetime=event.start_datetime,
+            end_datetime=event.end_datetime,
+        )
     _ensure_no_conflicts(event=event)
     event.save()
     _log_change(
@@ -839,12 +849,7 @@ def get_branch_week_schedule(branch, week_start):
     return _build_week_grid(events, normalized)
 
 
-def get_weekly_schedule_stats(branch, week_start):
-    queryset, _ = _week_queryset(
-        AcademicScheduleEvent.objects.filter(branch=branch),
-        week_start,
-    )
-    events = list(queryset)
+def _weekly_schedule_stats_from_events(events):
     hours_by_status = defaultdict(Decimal)
     teacher_load = defaultdict(lambda: {"count": 0, "hours": Decimal("0")})
     class_load = defaultdict(lambda: {"count": 0, "hours": Decimal("0")})
@@ -875,115 +880,105 @@ def get_weekly_schedule_stats(branch, week_start):
     }
 
 
+def get_weekly_schedule_stats(branch, week_start):
+    queryset, _ = _week_queryset(
+        AcademicScheduleEvent.objects.filter(branch=branch),
+        week_start,
+    )
+    return _weekly_schedule_stats_from_events(list(queryset))
+
+
+def _schedule_alerts_from_events(events, stats, branch, normalized):
+    alerts = []
+    teacher_hours = defaultdict(Decimal)
+
+    postponed_ids = [e.id for e in events if e.status == AcademicScheduleEvent.STATUS_POSTPONED]
+    postponed_logs = {}
+    if postponed_ids:
+        for log in (
+            AcademicScheduleChangeLog.objects
+            .filter(event_id__in=postponed_ids, action_type=AcademicScheduleChangeLog.ACTION_POSTPONED)
+            .order_by("event_id", "-created_at")
+        ):
+            if log.event_id not in postponed_logs:
+                postponed_logs[log.event_id] = log
+
+    for event in events:
+        if event.teacher_id:
+            teacher_key = event.teacher.get_full_name() or event.teacher.username
+            teacher_hours[teacher_key] += Decimal(event.duration_minutes) / Decimal(60)
+        else:
+            alerts.append({"level": "warning", "type": "missing_teacher",
+                           "message": f"L'evenement '{event.title}' n'a pas d'enseignant assigne.", "target": event.id})
+        if not event.location and not event.is_online:
+            alerts.append({"level": "warning", "type": "missing_location",
+                           "message": f"L'evenement '{event.title}' n'a pas de salle renseignee.", "target": event.id})
+        if event.status == AcademicScheduleEvent.STATUS_POSTPONED:
+            latest_log = postponed_logs.get(event.id)
+            if latest_log and latest_log.new_start_datetime and latest_log.new_start_datetime == latest_log.old_start_datetime:
+                alerts.append({"level": "warning", "type": "postponed_not_rescheduled",
+                               "message": f"L'evenement '{event.title}' est reporte sans vraie reprogrammation.", "target": event.id})
+
+    for teacher_key, hours in teacher_hours.items():
+        if hours > Decimal("12"):
+            alerts.append({"level": "warning", "type": "teacher_overload",
+                           "message": f"{teacher_key} depasse 12h de charge sur la semaine.", "target": teacher_key})
+
+    if stats["cancellation_rate"] >= 25:
+        alerts.append({"level": "warning", "type": "high_cancellation_rate",
+                       "message": "Le taux d'annulation depasse le seuil de 25% sur la semaine.", "target": branch.id})
+
+    class_ids_with_events = {event.academic_class_id for event in events}
+    for academic_class in AcademicClass.objects.filter(
+        branch=branch,
+        academic_year__start_date__lte=normalized + timedelta(days=6),
+        academic_year__end_date__gte=normalized,
+    ):
+        if academic_class.id not in class_ids_with_events:
+            alerts.append({"level": "info", "type": "class_without_events",
+                           "message": f"La classe {academic_class.display_name} n'a aucun cours programme cette semaine.",
+                           "target": academic_class.id})
+
+    by_class = defaultdict(list)
+    by_teacher = defaultdict(list)
+    by_location = defaultdict(list)
+    for event in events:
+        by_class[event.academic_class_id].append(event)
+        if event.teacher_id:
+            by_teacher[event.teacher_id].append(event)
+        if event.location:
+            by_location[event.location].append(event)
+
+    def _overlaps(a, b):
+        return a.start_datetime < b.end_datetime and b.start_datetime < a.end_datetime
+
+    conflict_event_ids = set()
+    for group in list(by_class.values()) + list(by_teacher.values()) + list(by_location.values()):
+        for i, a in enumerate(group):
+            for b in group[i + 1:]:
+                if a.id != b.id and _overlaps(a, b):
+                    conflict_event_ids.add(a.id)
+                    conflict_event_ids.add(b.id)
+
+    for event in events:
+        if event.id in conflict_event_ids:
+            alerts.append({"level": "warning", "type": "unresolved_conflict",
+                           "message": f"L'evenement '{event.title}' conserve un conflit non resolu.", "target": event.id})
+
+    return alerts
+
+
 def get_schedule_alerts(branch, week_start):
     queryset, normalized = _week_queryset(
         AcademicScheduleEvent.objects.filter(branch=branch),
         week_start,
     )
     events = list(queryset)
-    alerts = []
-    teacher_hours = defaultdict(Decimal)
-    teacher_counts = defaultdict(int)
-    for event in events:
-        if event.teacher_id:
-            teacher_key = event.teacher.get_full_name() or event.teacher.username
-            teacher_hours[teacher_key] += Decimal(event.duration_minutes) / Decimal(60)
-            teacher_counts[teacher_key] += 1
-        else:
-            alerts.append(
-                {
-                    "level": "warning",
-                    "type": "missing_teacher",
-                    "message": f"L'evenement '{event.title}' n'a pas d'enseignant assigne.",
-                    "target": event.id,
-                }
-            )
-        if not event.location and not event.is_online:
-            alerts.append(
-                {
-                    "level": "warning",
-                    "type": "missing_location",
-                    "message": f"L'evenement '{event.title}' n'a pas de salle renseignee.",
-                    "target": event.id,
-                }
-            )
-        if event.status == AcademicScheduleEvent.STATUS_POSTPONED:
-            latest_log = event.change_logs.filter(action_type=AcademicScheduleChangeLog.ACTION_POSTPONED).first()
-            if latest_log and latest_log.new_start_datetime and latest_log.new_start_datetime == latest_log.old_start_datetime:
-                alerts.append(
-                    {
-                        "level": "warning",
-                        "type": "postponed_not_rescheduled",
-                        "message": f"L'evenement '{event.title}' est reporte sans vraie reprogrammation.",
-                        "target": event.id,
-                    }
-                )
-    for teacher_key, hours in teacher_hours.items():
-        if hours > Decimal("12"):
-            alerts.append(
-                {
-                    "level": "warning",
-                    "type": "teacher_overload",
-                    "message": f"{teacher_key} depasse 12h de charge sur la semaine.",
-                    "target": teacher_key,
-                }
-            )
-
-    stats = get_weekly_schedule_stats(branch, normalized)
-    if stats["cancellation_rate"] >= 25:
-        alerts.append(
-            {
-                "level": "warning",
-                "type": "high_cancellation_rate",
-                "message": "Le taux d'annulation depasse le seuil de 25% sur la semaine.",
-                "target": branch.id,
-            }
-        )
-
-    class_ids_with_events = {event.academic_class_id for event in events}
-    for academic_class in AcademicClass.objects.filter(branch=branch, academic_year__start_date__lte=normalized + timedelta(days=6), academic_year__end_date__gte=normalized):
-        if academic_class.id not in class_ids_with_events:
-            alerts.append(
-                {
-                    "level": "info",
-                    "type": "class_without_events",
-                    "message": f"La classe {academic_class.display_name} n'a aucun cours programme cette semaine.",
-                    "target": academic_class.id,
-                }
-            )
-
-    for event in events:
-        conflicts = get_schedule_conflicts(
-            academic_class=event.academic_class,
-            teacher=event.teacher,
-            branch=event.branch,
-            academic_year=event.academic_year,
-            ec=event.ec,
-            location=event.location,
-            start_datetime=event.start_datetime,
-            end_datetime=event.end_datetime,
-            exclude_event=event,
-        )
-        if conflicts["has_conflict"]:
-            alerts.append(
-                {
-                    "level": "warning",
-                    "type": "unresolved_conflict",
-                    "message": f"L'evenement '{event.title}' conserve un conflit non resolu.",
-                    "target": event.id,
-                }
-            )
-    return alerts
+    stats = _weekly_schedule_stats_from_events(events)
+    return _schedule_alerts_from_events(events, stats, branch, normalized)
 
 
-def get_schedule_quality_score(branch, week_start):
-    queryset, normalized = _week_queryset(
-        AcademicScheduleEvent.objects.filter(branch=branch),
-        week_start,
-    )
-    events = list(queryset)
-    stats = get_weekly_schedule_stats(branch, normalized)
-    alerts = get_schedule_alerts(branch, normalized)
+def _schedule_quality_from_events(events, stats, alerts):
     warnings = [alert["message"] for alert in alerts]
     score = 100
     score -= stats["cancelled_count"] * 8
@@ -997,7 +992,7 @@ def get_schedule_quality_score(branch, week_start):
         local_start = timezone.localtime(event.start_datetime)
         events_by_day[local_start.date()].append(event)
     for day_events in events_by_day.values():
-        ordered = sorted(day_events, key=lambda event: event.start_datetime)
+        ordered = sorted(day_events, key=lambda e: e.start_datetime)
         for previous, current in zip(ordered, ordered[1:]):
             gap_minutes = int((current.start_datetime - previous.end_datetime).total_seconds() // 60)
             if gap_minutes >= 180:
@@ -1014,21 +1009,37 @@ def get_schedule_quality_score(branch, week_start):
         status = "medium"
     else:
         status = "critical"
-    return {
-        "score": score,
-        "status": status,
-        "warnings": list(dict.fromkeys(warnings)),
-    }
+    return {"score": score, "status": status, "warnings": list(dict.fromkeys(warnings))}
+
+
+def get_schedule_quality_score(branch, week_start):
+    queryset, normalized = _week_queryset(
+        AcademicScheduleEvent.objects.filter(branch=branch),
+        week_start,
+    )
+    events = list(queryset)
+    stats = _weekly_schedule_stats_from_events(events)
+    alerts = _schedule_alerts_from_events(events, stats, branch, normalized)
+    return _schedule_quality_from_events(events, stats, alerts)
 
 
 def get_director_schedule_overview(branch, week_start):
     normalized = _normalize_week_start(week_start)
+    queryset, _ = _week_queryset(
+        AcademicScheduleEvent.objects.filter(branch=branch),
+        week_start,
+    )
+    events = list(queryset)
+    stats = _weekly_schedule_stats_from_events(events)
+    alerts = _schedule_alerts_from_events(events, stats, branch, normalized)
+    quality = _schedule_quality_from_events(events, stats, alerts)
+    timetable = _build_week_grid(events, normalized)
     return {
         "week_start": normalized,
-        "stats": get_weekly_schedule_stats(branch, normalized),
-        "quality": get_schedule_quality_score(branch, normalized),
-        "alerts": get_schedule_alerts(branch, normalized),
-        "timetable": get_branch_week_schedule(branch, normalized),
+        "stats": stats,
+        "quality": quality,
+        "alerts": alerts,
+        "timetable": timetable,
     }
 
 

@@ -10,28 +10,11 @@
 {% block content %}
 <div id="topbar-loader"></div>
 <div class="shell" x-data="{ mobileNav: false }" @keydown.escape.window="mobileNav = false">
-  {% include "portal/staff/supervisor/partials/_sidebar_nav.html" %}
+  {% component "supervisor_sidebar" branch=branch user_initials=user_initials user_display_name=user_display_name section=section class_picker_items=class_picker_items selected_class_id=selected_class_id open_cases_count=open_cases_count %}{% endcomponent %}
   <div class="supervisor-nav-overlay" x-show="mobileNav" x-cloak @click="mobileNav = false" aria-hidden="true"></div>
   <div class="work">
-    <header class="work-head">
-      <button type="button" class="supervisor-menu-button" @click="mobileNav = true" aria-label="Ouvrir la navigation">
-        <i data-lucide="menu" aria-hidden="true"></i>
-      </button>
-      {% include "portal/staff/supervisor/partials/_work_head_inner.html" %}
-      <div class="date">{{ today|date:"l j F Y" }}</div>
-    </header>
-    <div class="work-body sg-scroll">
-      <div
-        id="supervisor-workspace"
-        {% if section == "cases" %}
-        hx-get="{% url 'accounts_portal:supervisor_cases_workspace' %}"
-        {% else %}
-        hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section={{ section|default:'home' }}"
-        hx-include="#sg-class-selector"
-        {% endif %}
-        hx-trigger="load"
-      ></div>
-    </div>
+    {% component "supervisor_topbar" today=today crumb=crumb panel_title=panel_title panel_lede=panel_lede %}{% endcomponent %}
+    {% component "supervisor_workspace" section=section %}{% endcomponent %}
   </div>
 </div>
 
@@ -45,6 +28,8 @@
     var bar = document.getElementById("topbar-loader");
     if (!bar) return;
     document.body.addEventListener("htmx:beforeRequest", function () {
+      var workspace = document.getElementById("supervisor-workspace");
+      if (workspace) workspace.setAttribute("aria-busy", "true");
       bar.style.transition = "none";
       bar.style.width = "0";
       bar.style.opacity = "1";
@@ -55,8 +40,13 @@
       setTimeout(function () { bar.style.width = "80%"; }, 150);
     });
     document.body.addEventListener("htmx:afterRequest", function () {
+      var workspace = document.getElementById("supervisor-workspace");
+      if (workspace) workspace.setAttribute("aria-busy", "false");
       bar.style.width = "100%";
       setTimeout(function () { bar.style.opacity = "0"; bar.style.width = "0"; }, 220);
+    });
+    document.body.addEventListener("htmx:afterSwap", function () {
+      if (window.lucide) window.lucide.createIcons();
     });
   });
 </script>

@@ -160,7 +160,7 @@ class SupervisorDrawerFormTests(TestCase):
         url = reverse("accounts_portal:supervisor_weekly_slot_form", args=[self.cls.id])
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Nouveau creneau")
+        self.assertContains(response, "Nouveau créneau")
         self.assertContains(response, 'name="weekday"')
         self.assertContains(response, 'name="start_time"')
         self.assertContains(response, 'name="end_time"')
@@ -183,7 +183,7 @@ class SupervisorDrawerFormTests(TestCase):
         url = reverse("accounts_portal:supervisor_weekly_slot_form", args=[self.cls.id])
         response = self.client.get(url, {"slot_id": slot.id})
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Modifier le creneau")
+        self.assertContains(response, "Modifier le créneau")
         self.assertContains(response, 'name="action" value="update"')
 
     def test_quick_course_form_renders_for_class(self):

@@ -13,11 +13,15 @@ from accounts.forms import BranchBankTransferForm, BranchExpenseForm, BranchMont
 from accounts.models import BranchBankTransfer, BranchCashMovement, BranchExpense, BranchMonthlyClosure, Donation
 from accounts.services.accounting_documents import (
     create_cash_movement,
-    ensure_cash_movement_receipt,
     ensure_expense_reference,
-    finalize_cash_movement_document,
 )
-from accounts.services.manager_intelligence import get_branch_cash_balance
+from accounts.services.manager_intelligence import (
+    branch_financial_orphan_report,
+    get_branch_cash_balance,
+    lock_branch_cash_balance,
+    sync_bank_transfer_cash_movement,
+    sync_donation_cash_movement,
+)
 
 from accounts.dashboards.htmx_utils import (
     manager_closure_redirect_response,
@@ -77,6 +81,7 @@ def expense_reject(request: HttpRequest, pk: int) -> HttpResponse:
 @require_POST
 def expense_pay(request: HttpRequest, pk: int) -> HttpResponse:
     with transaction.atomic():
+        _locked_branch, available_cash = lock_branch_cash_balance(request.branch)
         expense = get_object_or_404(
             BranchExpense.objects.select_for_update(),
             pk=pk,
@@ -84,6 +89,15 @@ def expense_pay(request: HttpRequest, pk: int) -> HttpResponse:
         )
         if not expense.can_be_paid:
             return HttpResponse("Cette depense doit etre approuvee avant paiement.", status=400)
+        if expense.amount > available_cash:
+            return HttpResponse(
+                (
+                    "<div class='rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700'>"
+                    f"Caisse insuffisante pour payer cette depense. Disponible: {available_cash} FCFA."
+                    "</div>"
+                ),
+                status=400,
+            )
         expense.status = BranchExpense.STATUS_PAID
         expense.paid_by = request.user
         expense.paid_at = timezone.now()
@@ -130,6 +144,24 @@ def monthly_closure_create(request: HttpRequest) -> HttpResponse:
 
     period_month = closure_form.cleaned_data["period_month"]
     transfer_amount = closure_form.cleaned_data["bank_transfer_amount"] or 0
+
+    orphan_report = branch_financial_orphan_report(request.branch, period_month)
+    if any(orphan_report.values()):
+        response = render(
+            request,
+            "accounts/dashboard/partials/monthly_closure_form.html",
+            {
+                "closure_form": closure_form,
+                "transfer_form": BranchBankTransferForm(request.POST, request.FILES),
+                "available_cash_balance": available_cash_balance,
+                "cash_reserve_target": request.branch.cash_reserve_target,
+                "suggested_transfer_amount": suggested_transfer_amount,
+                "closure_error": _format_financial_orphan_message(orphan_report),
+                "report_closure_blockers": [_format_financial_orphan_message(orphan_report)],
+            },
+        )
+        response.status_code = 400
+        return response
 
     existing_closure = BranchMonthlyClosure.objects.filter(
         branch=request.branch, period_month=period_month,
@@ -206,6 +238,28 @@ def monthly_closure_create(request: HttpRequest) -> HttpResponse:
         return response
 
     with transaction.atomic():
+        _locked_branch, locked_cash_balance = lock_branch_cash_balance(request.branch)
+        if transfer_amount > locked_cash_balance:
+            response = render(
+                request,
+                "accounts/dashboard/partials/monthly_closure_form.html",
+                {
+                    "closure_form": closure_form,
+                    "transfer_form": transfer_form,
+                    "available_cash_balance": locked_cash_balance,
+                    "cash_reserve_target": request.branch.cash_reserve_target,
+                    "suggested_transfer_amount": max(
+                        locked_cash_balance - request.branch.cash_reserve_target,
+                        0,
+                    ),
+                    "closure_error": (
+                        "Le versement bancaire depasse la caisse disponible "
+                        f"({locked_cash_balance} FCFA)."
+                    ),
+                },
+            )
+            response.status_code = 400
+            return response
         closure, _ = BranchMonthlyClosure.objects.update_or_create(
             branch=request.branch,
             period_month=period_month,
@@ -240,6 +294,7 @@ def monthly_closure_create(request: HttpRequest) -> HttpResponse:
             if transfer_form.cleaned_data.get("proof"):
                 transfer.proof = transfer_form.cleaned_data["proof"]
                 transfer.save(update_fields=["proof", "updated_at"])
+            sync_bank_transfer_cash_movement(transfer, user=request.user)
 
     return manager_closure_redirect_response(period_month)
 
@@ -250,6 +305,11 @@ def monthly_closure_validate(request: HttpRequest, pk: int) -> HttpResponse:
     closure = get_object_or_404(BranchMonthlyClosure, pk=pk, branch=request.branch)
     if closure.status != BranchMonthlyClosure.STATUS_DRAFT:
         return manager_section_notice_redirect_response("cloture", "cloture_non_brouillon")
+    orphan_report = branch_financial_orphan_report(request.branch, closure.period_month)
+    if any(orphan_report.values()):
+        return HttpResponse(_format_financial_orphan_message(orphan_report), status=400)
+    if get_branch_cash_balance(request.branch) < 0:
+        return HttpResponse("Cloture impossible: la caisse de l'annexe est negative.", status=400)
 
     closure.status = BranchMonthlyClosure.STATUS_VALIDATED
     closure.validated_by = request.user
@@ -265,6 +325,11 @@ def monthly_closure_close(request: HttpRequest, pk: int) -> HttpResponse:
     closure = get_object_or_404(BranchMonthlyClosure, pk=pk, branch=request.branch)
     if closure.status != BranchMonthlyClosure.STATUS_VALIDATED:
         return manager_section_notice_redirect_response("cloture", "cloture_non_validee")
+    orphan_report = branch_financial_orphan_report(request.branch, closure.period_month)
+    if any(orphan_report.values()):
+        return HttpResponse(_format_financial_orphan_message(orphan_report), status=400)
+    if get_branch_cash_balance(request.branch) < 0:
+        return HttpResponse("Cloture impossible: la caisse de l'annexe est negative.", status=400)
 
     closure.status = BranchMonthlyClosure.STATUS_CLOSED
     closure.closed_at = timezone.now()
@@ -284,23 +349,12 @@ def donation_create(request: HttpRequest) -> HttpResponse:
             {"donation_form": form},
         )
 
-    donation = form.save(commit=False)
-    donation.branch = request.branch
-    donation.created_by = request.user
-    donation.save()
-
-    BranchCashMovement.objects.create(
-        branch=request.branch,
-        movement_type=BranchCashMovement.TYPE_IN,
-        source=BranchCashMovement.SOURCE_DONATION,
-        amount=donation.amount,
-        label=f"Don de {donation.donor_name}",
-        movement_date=donation.date,
-        source_reference=f"donation_{donation.pk}",
-        reference=f"DON-{donation.pk:06d}",
-        notes=donation.description or "",
-        created_by=request.user,
-    )
+    with transaction.atomic():
+        donation = form.save(commit=False)
+        donation.branch = request.branch
+        donation.created_by = request.user
+        donation.save()
+        sync_donation_cash_movement(donation, user=request.user)
 
     response = render(
         request,
@@ -312,3 +366,21 @@ def donation_create(request: HttpRequest) -> HttpResponse:
         "showToast": {"message": f"Don de {donation.donor_name} enregistre ({donation.amount:,} FCFA).", "type": "success"},
     })
     return response
+
+
+def _format_financial_orphan_message(orphan_report: dict[str, list]) -> str:
+    labels = {
+        "payments": "paiement(s) etudiant valide(s) sans mouvement de caisse",
+        "shop_payments": "paiement(s) boutique valide(s) sans mouvement de caisse",
+        "donations": "don(s) sans mouvement de caisse",
+        "expenses": "depense(s) payee(s) sans mouvement de caisse",
+        "payroll_entries": "fiche(s) de paie payee(s) ou partielle(s) sans mouvement de caisse",
+        "honorarium_entries": "honoraire(s) enseignant(s) paye(s) ou partiel(s) sans mouvement de caisse",
+        "bank_transfers": "versement(s) bancaire(s) sans mouvement de sortie",
+    }
+    pieces = [
+        f"{len(items)} {labels[key]}"
+        for key, items in orphan_report.items()
+        if items
+    ]
+    return "Cloture bloquee : " + "; ".join(pieces) + "."

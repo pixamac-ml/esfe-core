@@ -5,13 +5,14 @@ from django_components import component
 class TeacherOverviewSection(component.Component):
     template_name = "dashboard/teacher_overview_section.html"
 
-    def get_context_data(self, kpi_cards=None, today_events=None, upcoming_events=None,
-                         recent_lesson_logs=None, recent_supports=None,
+    def get_context_data(self, kpi_cards=None, today_events=None, today_event_rows=None,
+                         upcoming_events=None, recent_lesson_logs=None, recent_supports=None,
                          teacher_insights=None, **kwargs):
         return {
             "active_section": "overview",
             "kpi_cards": kpi_cards or [],
             "today_events": today_events or [],
+            "today_event_rows": today_event_rows or [],
             "upcoming_events": upcoming_events or [],
             "recent_lesson_logs": recent_lesson_logs or [],
             "recent_supports": recent_supports or [],

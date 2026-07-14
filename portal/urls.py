@@ -13,6 +13,10 @@ from portal.views import (
     save_grade_confirm_otp,
 )
 from portal.views.it_dashboard_v2 import it_portal_v2
+from portal.views.system_profile import system_profile, system_profile_edit, system_security
+from portal.views.system_session import system_session_activity, system_session_status
+from accounts.auth_views import PortalPasswordChangeView
+from portal.views.annex_manager import access_regularization, annex_manager_portal
 from portal.views.admin_grades import excel_grade_view
 from portal.views.it_grades_import import it_grades_import_view
 from portal.views.it_surveillance import (
@@ -112,6 +116,9 @@ from portal.views.views import (
     dg_action,
     dg_assign_manager_modal,
     dg_closure_detail,
+    dg_coupon_create,
+    dg_coupon_programmes_options,
+    dg_coupon_toggle,
     dg_diploma_action,
     dg_drawer,
     dg_exec_action,
@@ -127,6 +134,7 @@ from portal.views.views import (
     director_teacher_contract_download,
     director_teacher_create,
     director_teacher_assign,
+    director_teacher_profile,
     director_teacher_documents_modal,
     director_teacher_document_upload,
     director_teacher_document_review,
@@ -145,6 +153,9 @@ from portal.views.views import (
     director_results_action,
     director_results_confirm_otp,
     director_bulletin_action,
+    director_exam_session_action,
+    director_evaluation_action,
+    director_calendar_action,
     director_workspace,
     finance_portal,
     it_accounts_panel,
@@ -169,6 +180,7 @@ from portal.views.views import (
     teacher_portal,
     teacher_class_detail,
     teacher_content_viewer,
+    teacher_declare_absence,
     teacher_lesson_log_panel,
     teacher_settings_workspace,
     teacher_support_workspace,
@@ -177,6 +189,14 @@ from portal.views.views import (
 app_name = "accounts_portal"
 
 urlpatterns = [
+    path("session/status/", system_session_status, name="system_session_status"),
+    path("session/activity/", system_session_activity, name="system_session_activity"),
+    path("account/", system_profile, name="system_profile"),
+    path("account/edit/", system_profile_edit, name="system_profile_edit"),
+    path("account/security/", system_security, name="system_security"),
+    path("account/password/", PortalPasswordChangeView.as_view(), name="system_change_password"),
+    path("access/regularization/", access_regularization, name="access_regularization"),
+    path("manager/", annex_manager_portal, name="portal_annex_manager"),
     path("", portal_home, name="portal_home"),
     path("dashboard/", portal_dashboard, name="portal_dashboard"),
     path("schedule/print/class/<int:class_id>/", schedule_class_print, name="schedule_class_print"),
@@ -188,6 +208,7 @@ urlpatterns = [
     path("teacher/supports/", teacher_support_workspace, name="teacher_support_workspace"),
     path("teacher/settings/", teacher_settings_workspace, name="teacher_settings_workspace"),
     path("teacher/events/<int:event_id>/lesson-log/", teacher_lesson_log_panel, name="teacher_lesson_log_panel"),
+    path("teacher/events/<int:event_id>/declare-absence/", teacher_declare_absence, name="teacher_declare_absence"),
     path("teacher/content/<int:content_id>/view/", teacher_content_viewer, name="teacher_content_viewer"),
     path("finance/", finance_portal, name="portal_finance"),
     path("secretary/", secretary_portal, name="portal_secretary"),
@@ -198,6 +219,7 @@ urlpatterns = [
     path("director/teachers/create/", director_teacher_create, name="director_teacher_create"),
     path("director/teachers/assign/", director_teacher_assign, name="director_teacher_assign"),
     path("director/teachers/<int:teacher_id>/contract/", director_teacher_contract_download, name="director_teacher_contract_download"),
+    path("director/teachers/<int:teacher_id>/profile/", director_teacher_profile, name="director_teacher_profile"),
     path("director/teachers/documents/modal/", director_teacher_documents_modal, name="director_teacher_documents_modal"),
     path("director/teachers/documents/upload/", director_teacher_document_upload, name="director_teacher_document_upload"),
     path("director/teachers/documents/review/", director_teacher_document_review, name="director_teacher_document_review"),
@@ -210,6 +232,9 @@ urlpatterns = [
     path("director/results/action/", director_results_action, name="director_results_action"),
     path("director/results/confirm-otp/", director_results_confirm_otp, name="director_results_confirm_otp"),
     path("director/bulletins/action/", director_bulletin_action, name="director_bulletin_action"),
+    path("director/exam-sessions/action/", director_exam_session_action, name="director_exam_session_action"),
+    path("director/evaluations/action/", director_evaluation_action, name="director_evaluation_action"),
+    path("director/calendar/action/", director_calendar_action, name="director_calendar_action"),
     path("director/export/report/xlsx/", director_export_report_xlsx, name="director_export_report_xlsx"),
     path("director/planner/hub/", director_planner_hub, name="director_planner_hub"),
     path("director/planner/view/", director_planner_view_workspace, name="director_planner_view_workspace"),
@@ -244,6 +269,9 @@ urlpatterns = [
     path("dg/drawer/", dg_drawer, name="dg_drawer"),
     path("dg/modal/", dg_modal, name="dg_modal"),
     path("dg/recruit-staff/", dg_recruit_staff, name="dg_recruit_staff"),
+    path("dg/coupons/create/", dg_coupon_create, name="dg_coupon_create"),
+    path("dg/coupons/toggle/", dg_coupon_toggle, name="dg_coupon_toggle"),
+    path("dg/coupons/programmes-options/", dg_coupon_programmes_options, name="dg_coupon_programmes_options"),
     path("dg/action/", dg_action, name="dg_action"),
     path("dg/exec-action/", dg_exec_action, name="dg_exec_action"),
     path("dg/assign-manager/", dg_assign_manager_modal, name="dg_assign_manager_modal"),

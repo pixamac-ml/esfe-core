@@ -1,0 +1,489 @@
+ANALYSE DU DASHBOARD DIRECTEUR DES ETUDES - ESFE CORE
+Date d'analyse : 11 juillet 2026
+Perimetre : lecture statique du code, templates et documents de cadrage presents dans le depot.
+
+======================================================================
+1. REPONSE COURTE
+======================================================================
+
+Le dashboard du Directeur des Etudes existe vraiment et il n'est pas juste une maquette.
+Il est branche sur les donnees academiques de l'annexe : classes, semestres, UE/EC,
+enseignants, emplois du temps, evaluations, resultats, bulletins, documents et calendrier.
+
+Mais il ne colle pas encore totalement a l'ambition complete de logiciel de gestion scolaire
+donnee au DG. Il couvre une bonne partie du pilotage pedagogique, surtout l'organisation
+des cours et la validation des resultats, mais il reste incomplet sur les workflows
+institutionnels lourds : import officiel des notes, PV de deliberation, releves de notes
+pilotes depuis le dashboard, cloture/archivage academique annuel, alertes pedagogiques
+traitables, et reporting pedagogique complet.
+
+Conclusion : le dashboard est credible pour une V1 consolidee, mais il ne faut pas le
+presenter comme un poste de controle pedagogique totalement fini.
+
+======================================================================
+2. CE QUE LE DIRECTEUR DES ETUDES A CONCRETEMENT DANS SON DASHBOARD
+======================================================================
+
+2.1 Accueil
+-----------
+
+Il voit une page d'accueil "Direction des Etudes" avec :
+- l'annexe rattachee au compte ;
+- le nom du directeur connecte ;
+- des KPI rapides : classes, enseignants, semestres, resultats a publier,
+  anomalies, documents publies ;
+- des acces rapides vers calendrier, sessions examens, enseignants, emploi du temps
+  et documents ;
+- une table des classes actives ;
+- les dernieres activites / cahiers de cours recents quand le contexte planning est charge ;
+- un centre de taches calcule depuis les semestres, enseignants sans affectation,
+  documents enseignants et demandes de transfert.
+
+Ce n'est pas seulement visuel : les donnees viennent des modeles AcademicClass,
+Semester, LessonLog, TeacherDocument, TransferRequest, etc.
+
+2.2 Calendrier academique
+-------------------------
+
+Le dashboard dispose maintenant d'un vrai module calendrier academique, avec les modeles
+AcademicCalendar et AcademicCalendarEntry.
+
+Le Directeur peut :
+- creer une annee academique ;
+- creer un calendrier par annexe et annee ;
+- ajouter des entrees : rentree, fin d'annee, debut/fin semestre, vacances,
+  inscriptions, reinscriptions, sessions d'examens, rattrapages, jury,
+  publication des resultats, reunions, ceremonie, autre ;
+- valider, publier, archiver ou supprimer selon le statut ;
+- rattacher certaines entrees a une annexe, une classe ou un semestre ;
+- bloquer les incoherences de dates via des regles metier.
+
+Point important : ce module corrige une ancienne faiblesse signalee dans l'audit
+du 7 juillet 2026. Le calendrier institutionnel n'est plus absent.
+
+2.3 Sessions d'examens
+----------------------
+
+Il existe une section "Sessions examens" / "Calendrier des evaluations".
+
+Le Directeur peut :
+- creer une session d'examen ou de rattrapage ;
+- choisir une classe ou laisser la session au niveau annexe ;
+- definir une periode de debut et de fin ;
+- publier ou annuler une session ;
+- affecter des surveillants sur une entree de calendrier.
+
+Limite : la session reste encore assez simple. Elle ne gere pas toute la logistique
+fine d'un examen : salles multiples, convocations detaillees, copies, surveillance
+par creneau, incidents d'examen, PV de surveillance.
+
+2.4 Evaluations et notes
+------------------------
+
+Le Directeur peut :
+- planifier une evaluation, un controle, un examen ou un TP via AcademicScheduleEvent ;
+- rattacher l'evaluation a une classe, une matiere EC, un enseignant, une salle,
+  une date et une heure ;
+- annuler une evaluation ;
+- voir les evaluations groupees par classe ;
+- voir l'etat des notes par classe et par semestre ;
+- detecter les notes manquantes ;
+- voir la moyenne, les credits, le rang et les anomalies ;
+- valider un semestre quand toutes les notes sont saisies ;
+- renvoyer un semestre en correction ;
+- demander la publication des resultats avec confirmation OTP ;
+- generer des bulletins semestriels ou annuels quand les conditions sont reunies.
+
+La publication est securisee : une demande OTP est creee via SensitiveActionRequest
+avant passage du semestre au statut publie.
+
+Limite importante : la saisie/import des notes n'est pas vraiment pilotee depuis ce
+dashboard. Il existe des briques d'import et de grille de notes ailleurs, notamment
+cote informaticien/admin, mais le Directeur ne dispose pas encore d'un workflow complet
+"importer - controler - demander correction - valider - publier" dans un seul parcours.
+
+2.5 Programmes UE / EC
+----------------------
+
+Le Directeur peut gerer la structure pedagogique par classe :
+- voir les classes et semestres ;
+- ouvrir une classe dans un drawer ;
+- creer ou modifier une UE ;
+- creer ou modifier un EC ;
+- supprimer un EC sous controle metier ;
+- voir la structure UE/EC par semestre.
+
+Les actions passent par des services metier et respectent l'annexe.
+
+Limites :
+- le versionnage de maquette pedagogique par annee/annexe reste limite ;
+- il manque une validation institutionnelle complete de la maquette ;
+- l'historique d'approbation n'est pas encore visible comme un vrai workflow.
+
+2.6 Emploi du temps
+-------------------
+
+Le Directeur a une section "Emploi du temps".
+
+Il peut :
+- voir la semaine courante, precedente ou suivante ;
+- voir les classes et ouvrir leur planning ;
+- modifier les creneaux hebdomadaires ;
+- materialiser une semaine ou un mois ;
+- creer des seances datees ;
+- consulter les alertes de planification ;
+- imprimer les emplois du temps par classe ou par enseignant ;
+- s'appuyer sur la detection de conflits et les statistiques de charge.
+
+C'est une partie assez solide du dashboard. Elle correspond bien au besoin
+operationnel de pilotage pedagogique.
+
+2.7 Enseignants
+---------------
+
+Le Directeur peut :
+- voir la liste des enseignants de son annexe ;
+- rechercher un enseignant ;
+- voir les enseignants affectes ou sans matiere ;
+- recruter un enseignant, ce qui cree un User + Profile ;
+- renseigner le tarif horaire enseignant ;
+- affecter un enseignant a une classe, une matiere EC, une salle et un volume horaire ;
+- generer un contrat enseignant PDF ;
+- consulter et uploader les documents enseignants ;
+- verifier/rejeter des pieces ;
+- suivre certaines demandes de transfert.
+
+Point fort : la creation enseignant envoie aussi un email via NotificationBus quand
+c'est possible, et les affectations sont enregistrees en base.
+
+Attention : il faut verifier que le tarif horaire declenche bien toute la chaine
+d'honoraires enseignants attendue. Le dashboard cree le profil et stocke le tarif,
+mais le paiement/honoraire n'est pas gere directement dans cette interface.
+
+2.8 Documents et correspondances
+--------------------------------
+
+Le Directeur peut :
+- creer un document administratif ;
+- l'enregistrer en brouillon ;
+- le publier ;
+- generer un PDF ;
+- voir les documents publies et brouillons de son annexe.
+
+Types possibles selon le modele : note, avis, lettre, convocation, fiche, etc.
+
+Limite : la diffusion reste assez basique. Il n'y a pas encore un vrai circuit
+de notification/accuse de reception par destinataire depuis ce module.
+
+2.9 Transferts
+--------------
+
+Des demandes de transfert existent dans l'espace enseignants/documents.
+
+Le Directeur peut :
+- creer une demande ;
+- examiner une demande soumise ;
+- valider ou rejeter selon le workflow existant.
+
+Limite : ce module est logiquement utile, mais son emplacement dans "Enseignants"
+est peu clair. Un transfert etudiant devrait etre visible dans un espace scolarite
+ou suivi etudiant, pas seulement dans la section personnel enseignant.
+
+2.10 Export pedagogique
+-----------------------
+
+Il existe un export Excel "rapport pedagogique".
+
+Il contient notamment :
+- classe ;
+- programme ;
+- semestre ;
+- statut ;
+- effectif ;
+- moyenne ;
+- taux de reussite ;
+- desinscriptions.
+
+Limite : ce rapport est utile mais trop synthetique pour etre le rapport complet
+du Directeur des Etudes. Il manque les PV, anomalies, absences enseignants,
+cahiers de texte, progression des cours, sessions d'examens et etat des publications.
+
+======================================================================
+3. EST-CE QUE CELA COLLE AVEC LES DESCRIPTIONS DONNEES AU DG ?
+======================================================================
+
+3.1 Ce qui colle bien
+---------------------
+
+Oui, le dashboard colle avec plusieurs promesses du systeme integre presente au DG :
+
+- La plateforme n'est pas seulement un site vitrine : le dashboard est branche
+  sur les classes, enseignants, programmes, notes, bulletins et planning.
+- Le parcours administratif peut rejoindre le pedagogique via AcademicEnrollment,
+  AcademicClass, Semester, UE, EC et ECGrade.
+- Le Directeur des Etudes dispose d'un espace dedie, distinct du DG, de la finance,
+  des admissions et de l'informaticien.
+- Le filtrage par annexe est bien centralise pour le Directeur des Etudes :
+  require_director_branch_scope() refuse un directeur sans annexe.
+- Les donnees historiques ne sont pas simplement ecrasees dans les modules de cycle
+  academique existants ; l'esprit "ne pas supprimer l'historique" est respecte
+  dans l'architecture globale.
+- L'emploi du temps, les evaluations, les bulletins et les documents montrent une
+  vraie logique metier, pas seulement des cartes decoratives.
+
+3.2 Ce qui colle partiellement
+------------------------------
+
+Le DG voulait un logiciel de gestion scolaire et administrative coherent. Sur ce point,
+le dashboard Directeur des Etudes est une brique pertinente, mais pas encore complete.
+
+Il donne une vision pedagogique utile, mais il ne ferme pas encore toute la chaine :
+
+- inscription administrative -> affectation academique -> cours -> evaluation ->
+  notes -> deliberation -> bulletin -> releve -> passage/reinscription -> archivage.
+
+Les premiers maillons existent. Les derniers sont disperses entre academics,
+academic_cycle, views d'import, rapports academiques et autres dashboards.
+
+3.3 Ce qui ne colle pas encore
+------------------------------
+
+Les ecarts principaux avec l'ambition DG sont :
+
+1. Import et controle officiel des notes
+   Le Directeur voit et valide les resultats, mais le workflow d'import/saisie des notes
+   n'est pas un parcours directeur complet. Il faut mieux integrer les imports,
+   corrections, validations et audits.
+
+2. PV de deliberation
+   Il n'y a pas encore un module clair pour produire, valider, signer et archiver
+   un PV de jury/deliberation.
+
+3. Releves de notes
+   Les releves existent dans academics, mais ils ne sont pas suffisamment pilotes
+   depuis le dashboard Directeur comme action officielle par classe/etudiant.
+
+4. Cloture academique et archivage annuel
+   academic_cycle contient les bases de cloture, deliberation, promotion,
+   reinscription et archivage, mais le dashboard Directeur ne les expose pas encore
+   comme un workflow central et lisible.
+
+5. Alertes pedagogiques traitables
+   Les alertes existent surtout sous forme de calculs et listes. Il manque un vrai
+   centre d'alertes avec gravite, responsable, echeance, commentaire, statut,
+   notification et resolution.
+
+6. Suivi pedagogique global
+   Le service de monitoring directeur existe en lecture seule, mais il n'est pas encore
+   clairement branche comme ecran principal de pilotage avec actions prioritaires.
+
+7. Separation des modules
+   Certains blocs sont regroupes de facon confuse. Par exemple les transferts sont
+   visibles dans la section enseignants ; les evaluations melangent planification
+   d'evaluations et validation de resultats ; le calendrier existe a la fois comme
+   module et comme panneau dans la planification.
+
+======================================================================
+4. POINTS DE QUALITE ET SECURITE
+======================================================================
+
+4.1 Points forts
+----------------
+
+- Annexe obligatoire pour le Directeur des Etudes.
+- Refus explicite si le directeur n'a pas d'annexe.
+- Plusieurs actions sensibles controlent la branche avant mutation.
+- Publication des resultats protegee par OTP.
+- Les modeles academiques sont reutilises au lieu de creer une logique parallele.
+- Les services dedies existent deja pour enseignants, affectations, calendrier,
+  planning, readiness, monitoring, documents et cycle academique.
+
+4.2 Points de vigilance
+-----------------------
+
+- Le fichier portal/views/views.py reste tres gros et concentre trop de logique :
+  rendu, contexte, mutations, OTP, PDF, planning, enseignants, calendrier.
+- Certains parcours sont fonctionnels mais encore trop "interface d'administration"
+  et pas assez "workflow metier".
+- Le Directeur des Etudes partage certaines permissions avec DG/superadmin, ce qui
+  est normal, mais il faut rester vigilant pour ne jamais donner une portee globale
+  au directeur simple.
+- La generation des bulletins est presente, mais il faut s'assurer que la dette
+  financiere et les restrictions documentaires sont bien appliquees partout.
+- Le dashboard peut etre presente comme avance, mais pas comme termine.
+
+======================================================================
+5. SUGGESTIONS PRIORITAIRES
+======================================================================
+
+Priorite 1 - Clarifier le parcours Directeur des Etudes
+-------------------------------------------------------
+
+Reorganiser le dashboard autour de modules metier plus lisibles :
+
+1. Accueil et alertes pedagogiques
+2. Calendrier academique
+3. Classes et programmes UE/EC
+4. Enseignants et affectations
+5. Emploi du temps
+6. Evaluations et sessions d'examens
+7. Notes et resultats
+8. Bulletins et releves
+9. Deliberation et PV
+10. Cloture / passage / reinscription
+11. Documents et correspondances
+
+Cela correspond mieux a ce qu'un DG attend d'un logiciel scolaire complet.
+
+Priorite 2 - Brancher un vrai workflow des notes
+------------------------------------------------
+
+Ajouter dans le dashboard Directeur :
+- import de notes par classe/EC/session ;
+- historique des imports ;
+- validation de fichier avant ecriture ;
+- liste des anomalies ;
+- renvoi en correction avec motif ;
+- audit des corrections ;
+- validation finale ;
+- publication OTP.
+
+Le Directeur ne doit pas forcement saisir toutes les notes lui-meme, mais il doit
+voir et controler toute la chaine.
+
+Priorite 3 - Ajouter PV de deliberation
+---------------------------------------
+
+Creer un module de deliberation avec :
+- liste des classes pretes ;
+- decisions automatiques proposees ;
+- exceptions manuelles justifiees ;
+- validation par Directeur/DG selon regle ;
+- generation PDF du PV ;
+- signature ou validation numerique ;
+- archivage consultable.
+
+Priorite 4 - Integrer bulletins et releves dans un espace officiel
+------------------------------------------------------------------
+
+Ajouter un espace "Documents academiques" :
+- bulletins semestriels ;
+- bulletins annuels ;
+- releves de notes ;
+- attestations ou fiches de frequentation ;
+- etat : genere, publie, bloque, delivre ;
+- blocage selon dette financiere si la regle DG le demande.
+
+Priorite 5 - Brancher academic_cycle dans le dashboard
+------------------------------------------------------
+
+Le Directeur doit voir :
+- readiness de l'annexe ;
+- readiness par classe ;
+- classes bloquees ;
+- semestres non publies ;
+- bulletins manquants ;
+- deliberation ;
+- promotion / redoublement / dette academique ;
+- reinscriptions ;
+- archives annuelles.
+
+Cela transformera le dashboard en vrai outil de fin d'annee.
+
+Priorite 6 - Creer un centre d'alertes pedagogiques durable
+-----------------------------------------------------------
+
+Les alertes ne doivent pas seulement etre calculees a l'affichage.
+Il faut un objet ou workflow avec :
+- source ;
+- gravite ;
+- annexe ;
+- classe / enseignant / etudiant concerne ;
+- responsable ;
+- statut ;
+- commentaire ;
+- echeance ;
+- resolution ;
+- notification.
+
+Priorite 7 - Nettoyer l'architecture
+------------------------------------
+
+Decouper progressivement portal/views/views.py :
+- director_dashboard_views.py ;
+- director_calendar_views.py ;
+- director_evaluation_views.py ;
+- director_results_views.py ;
+- director_teacher_views.py ;
+- director_documents_views.py ;
+- director_planning_views.py.
+
+La logique metier doit rester dans services/selectors, pas dans les views.
+
+======================================================================
+6. VERDICT FINAL
+======================================================================
+
+Le Directeur des Etudes a deja un dashboard concret et utile. Il peut travailler
+sur les classes, programmes, enseignants, emplois du temps, evaluations, resultats,
+bulletins, documents et calendrier. C'est une vraie base de pilotage pedagogique.
+
+Par contre, ce n'est pas encore le module pedagogique final attendu pour un logiciel
+de gestion scolaire complet. Les fonctions les plus institutionnelles restent a
+consolider : import et controle des notes, PV de deliberation, releves, cloture
+academique, archivage, alertes actionnables et cycle annuel.
+
+Ma recommandation : le presenter au DG comme une base avancee de Direction des Etudes
+en cours de consolidation, pas comme une version finale. Pour une V1 credible, il faut
+au minimum stabiliser calendrier, enseignants, emplois du temps, evaluations, validation
+des resultats et bulletins. Pour une V1.1/V2, il faut ajouter deliberation, releves,
+academic_cycle et alertes metier completes.
+
+
+MENU : Calendrier
+    │
+    ├── 1. CRÉER UN CALENDRIER
+    │       → Bouton "Nouveau calendrier"
+    │       → Choisir l'année académique (ex: 2026-2027)
+    │       → Calendrier créé en BROUILLON
+    │
+    ├── 2. AJOUTER LES ENTRÉES (dans l'ordre)
+    │
+    │   Étape 2a — Rentree academique
+    │       → Bouton "Ajouter une entrée"
+    │       → Type : "Rentrée académique"
+    │       → Date début / fin
+    │       → Portée : Toute l'annexe (auto)
+    │       → Enregistrer
+    │
+    │   Étape 2b — Clôture académique
+    │       → Type : "Clôture académique"
+    │       → Date de fin d'année
+    │       → Enregistrer
+    │
+    │   Étape 2c — Début de semestre (par classe)
+    │       → Type : "Début de semestre"
+    │       → Choisir la classe → choisir S1
+    │       → Enregistrer
+    │       → Refaire pour S2
+    │
+    │   Étape 2d — Session d'examens (par classe)
+    │       → Type : "Session d'examens"
+    │       → Choisir le semestre (S1 ou S2)
+    │       → Dates de la session
+    │       → Enregistrer
+    │
+    │   Étape 2e — Session de rattrapage (optionnel)
+    │       → Type : "Session de rattrapage"
+    │       → Choisir le semestre
+    │       → Enregistrer
+    │
+    ├── 3. VALIDER le calendrier
+    │       → Bouton "Valider" (visible quand ≥1 entrée)
+    │       → Statut passe : Brouillon → Validé
+    │
+    └── 4. PUBLIER le calendrier
+            → Bouton "Publier"
+            → Statut passe : Validé → Publié
+            → Le calendrier devient visible partout
+              (enseignants, étudiants, évaluations)

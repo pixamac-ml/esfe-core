@@ -16,6 +16,7 @@
       headers: {
         "Content-Type": "application/json",
         "X-CSRFToken": getCsrfToken(),
+        "X-ESFE-Automated-Request": "1",
       },
       body: JSON.stringify(payload),
     });

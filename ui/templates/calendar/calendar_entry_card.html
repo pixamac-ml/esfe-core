@@ -1,0 +1,24 @@
+{% load component_tags %}
+<div class="flex items-start gap-3 rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-3 transition hover:shadow-sm">
+  <span class="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[color:var(--school-primary)]" style="background: {{ entry.color|default:'var(--school-primary-soft)' }};">
+    <i data-lucide="{{ entry.icon|default:'calendar' }}" style="width:16px;height:16px;"></i>
+  </span>
+  <div class="min-w-0 flex-1">
+    <div class="flex items-center gap-2">
+      <strong class="text-sm font-black text-[color:var(--text)]">{{ entry.title }}</strong>
+      {% component "academic_badge" label=entry.status tone=entry.status|default:"neutral" %}{% endcomponent %}
+    </div>
+    <p class="mt-0.5 text-xs text-[color:var(--muted)]">{{ entry.start_datetime|default:'' }} — {{ entry.end_datetime|default:'' }}</p>
+    {% if entry.description %}<p class="mt-1 text-xs text-[color:var(--muted-2)] line-clamp-2">{{ entry.description }}</p>{% endif %}
+  </div>
+  {% if show_actions and calendar_id %}
+    <div class="flex shrink-0 gap-1">
+      <button type="button" @click="$dispatch('calendar-entry-edit', {{ entry.id }})" class="flex h-7 w-7 items-center justify-center rounded-lg text-[color:var(--muted)] hover:bg-[color:var(--card-soft)]" aria-label="Modifier">
+        <i data-lucide="pencil" style="width:14px;height:14px;"></i>
+      </button>
+      <button type="button" hx-delete="{% url 'academics:calendar_entry_detail' pk=calendar_id entry_pk=entry.id %}" hx-confirm="Supprimer cette entrée ?" hx-target="#calendar-detail" class="flex h-7 w-7 items-center justify-center rounded-lg text-[color:var(--danger)] hover:bg-[color:var(--danger-soft)]" aria-label="Supprimer">
+        <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
+      </button>
+    </div>
+  {% endif %}
+</div>

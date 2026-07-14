@@ -12,6 +12,7 @@ from accounts.access import (
     get_user_profile_role,
     get_user_role as get_canonical_user_role,
 )
+from accounts.position_registry import get_position_definition, normalize_position
 def get_user_role(user):
     if not getattr(user, "is_authenticated", False):
         return None
@@ -79,7 +80,27 @@ def get_post_login_portal_url(user):
     if not getattr(user, "is_authenticated", False):
         return reverse("accounts_portal:portal_home")
 
+    support_state = getattr(user, "support_state", None)
+    if support_state and support_state.must_change_password:
+        return reverse("accounts:password_change")
+
+    from django.conf import settings
+    if settings.AUTH_PORTAL_ROUTING_V2_ENABLED:
+        from accounts.access_context import build_access_context
+
+        context = build_access_context(user)
+        if context.context_type == "PUBLIC":
+            return reverse("community:topic_list")
+        if not context.is_valid:
+            return reverse("accounts_portal:access_regularization")
+        definition = get_position_definition(context.position)
+        if definition:
+            return reverse(definition.dashboard_url_name)
+        return reverse("accounts_portal:access_regularization")
+
     position = get_user_position(user)
+    if position in {"annex_manager", "branch_manager"} or {"gestionnaire", "manager"}.intersection(set(get_user_groups(user))):
+        return reverse("accounts_portal:portal_annex_manager")
     if getattr(user, "is_superuser", False) or position == "super_admin":
         return reverse("superadmin:dashboard")
     if position in {"executive_director", "deputy_executive_director"}:

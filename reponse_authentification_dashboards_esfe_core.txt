@@ -1,0 +1,424 @@
+MISSION D’EXÉCUTION — REFONTE ET CONSOLIDATION DU SYSTÈME D’IDENTITÉ,
+D’AUTHENTIFICATION, D’AUTORISATION ET DE DASHBOARDS ESFE CORE
+
+Tu as déjà réalisé l’audit général et intégré toutes les décisions précédentes
+dans reponse_authentification_dashboards_esfe_core.txt.
+
+Nous passons maintenant à l’exécution.
+
+Ne produis plus un nouvel audit général sans implémentation. Utilise les constats
+déjà établis, vérifie le code réel au fur et à mesure, puis effectue la refonte de
+manière progressive, testée et réversible.
+
+OBJECTIF FINAL
+
+Faire cohabiter proprement dans le même projet Django :
+
+1. les utilisateurs PUBLIC du site et de la communauté ;
+2. les utilisateurs SYSTEM du logiciel scolaire.
+
+Ils peuvent conserver User Django comme noyau technique commun, mais leurs
+profils, routes, interfaces, redirections et autorisations doivent être
+strictement séparés.
+
+Portal devient la couche centrale d’orchestration des utilisateurs SYSTEM :
+
+Connexion
+-> contrôle de l’état du compte
+-> contexte d’accès
+-> position officielle
+-> Portal
+-> dashboard principal unique
+-> modules HTMX/AJAX/Alpine.js
+-> services des applications métier.
+
+Portal ne doit pas absorber tous les modèles et services métier. Il orchestre les
+interfaces, la navigation et le routage. Les applications métier conservent leurs
+règles, services, modèles et endpoints spécialisés.
+
+========================================================================
+1. RÈGLES MÉTIER DÉFINITIVES
+========================================================================
+
+A. PUBLIC
+
+Un utilisateur PUBLIC :
+
+- utilise le site public et la communauté ;
+- possède un profil public ;
+- peut gérer ses informations communautaires ;
+- ne possède aucune position institutionnelle ;
+- n’accède à aucun dashboard SYSTEM ;
+- ne reçoit aucun accès logiciel par simple inscription.
+
+B. SYSTEM
+
+Un utilisateur SYSTEM :
+
+- possède un profil institutionnel ;
+- possède une position principale officielle ;
+- possède une catégorie dérivée de sa position ;
+- possède une portée organisationnelle ;
+- possède une annexe lorsque son scope est BRANCH ;
+- possède un dashboard principal unique ;
+- reçoit ses capacités grâce aux permissions Django.
+
+Son profil professionnel, ses paramètres et son changement de mot de passe
+restent dans son dashboard Portal. Il ne doit jamais être redirigé vers le profil
+communautaire pendant son travail.
+
+C. CATÉGORIES
+
+Les catégories sont dérivées du registre des positions :
+
+- STUDENT ;
+- TEACHING_STAFF ;
+- ADMIN_STAFF.
+
+Elles ne doivent pas être saisies indépendamment.
+
+D. ANNEX_MANAGER
+
+La gestionnaire possède une seule position officielle :
+
+- position : ANNEX_MANAGER ;
+- libellé : Gestionnaire d’annexe ;
+- catégorie : ADMIN_STAFF ;
+- scope : BRANCH ;
+- annexe obligatoire ;
+- dashboard principal unique dans Portal ;
+- groupe de capacités par défaut : annex_manager.
+
+Les anciens concepts gestionnaire, manager, branch_manager et certains usages de
+finance_manager doivent être normalisés lorsqu’ils représentent réellement cette
+même fonction.
+
+Le dashboard Portal de la gestionnaire doit réunir les fonctions existantes :
+
+- candidatures et dossiers ;
+- inscriptions ;
+- encaissements et paiements ;
+- caisse ;
+- dépenses ;
+- salaires ;
+- avances ;
+- honoraires des enseignants ;
+- boutique et stocks ;
+- dons ;
+- clôtures mensuelles ;
+- versements en banque ;
+- rapports et exports ;
+- situation financière de l’annexe.
+
+Ne réécris pas les règles métier déjà fonctionnelles. Réutilise les services et
+endpoints fiables de accounts, payments, shop et des autres applications.
+
+E. PAYMENT AGENT
+
+PaymentAgent représente par défaut une affectation ou une capacité opérationnelle,
+pas une identité donnant automatiquement accès à un dashboard complet.
+
+Il peut recevoir des permissions limitées pour :
+
+- encaisser ;
+- gérer une session de caisse ;
+- émettre un reçu ;
+- consulter les opérations autorisées.
+
+S’il existe des comptes exerçant exclusivement cette fonction, conserve
+temporairement leur position et fournis-leur une expérience restreinte. Ne les
+convertis pas automatiquement en ANNEX_MANAGER.
+
+F. AUTRES POSITIONS
+
+- STUDENT : STUDENT, scope BRANCH, dashboard étudiant Portal ;
+- TEACHER : TEACHING_STAFF, scope BRANCH, dashboard enseignant Portal ;
+- SECRETARY : ADMIN_STAFF, scope BRANCH, dashboard secrétaire ;
+- ADMISSIONS_OFFICER : ADMIN_STAFF, scope BRANCH par défaut ;
+- ACADEMIC_SUPERVISOR : ADMIN_STAFF, scope BRANCH ;
+- IT_SUPPORT : ADMIN_STAFF, scope BRANCH ;
+- DIRECTOR_OF_STUDIES : ADMIN_STAFF, scope BRANCH par défaut ;
+- MARKETING_MANAGER : ADMIN_STAFF, scope GLOBAL avec ciblage par annexe ;
+- EXECUTIVE_DIRECTOR : ADMIN_STAFF, scope GLOBAL ;
+- DEPUTY_EXECUTIVE_DIRECTOR : ADMIN_STAFF, scope GLOBAL ;
+- SUPER_ADMIN : ADMIN_STAFF, scope GLOBAL.
+
+Une supervision exceptionnelle de plusieurs annexes doit passer par une
+affectation explicite, jamais par un groupe ou un alias.
+
+G. DJANGO
+
+- User reste le noyau d’authentification ;
+- is_active contrôle l’utilisation administrative du compte ;
+- is_staff signifie uniquement accès à l’administration Django ;
+- is_superuser reste un privilège technique exceptionnel ;
+- SUPER_ADMIN est une fonction métier et n’implique pas automatiquement
+  is_superuser ;
+- les groupes sont des ensembles de permissions ;
+- les groupes ne déterminent jamais la position ni le dashboard.
+
+========================================================================
+2. IMPLÉMENTATION À EFFECTUER
+========================================================================
+
+ÉTAPE 1 — POINT DE SÉCURITÉ ET TESTS DE RÉFÉRENCE
+
+1. Créer un point de restauration propre.
+2. Préserver toutes les modifications utilisateur existantes.
+3. Exécuter les tests actuels et enregistrer l’état initial.
+4. Ajouter des tests reproduisant :
+   - le double accès gestionnaire/finance ;
+   - le mélange entre profil public et profil système ;
+   - les redirections concurrentes ;
+   - les accès inter-annexes importants.
+5. Ajouter les feature flags nécessaires, désactivés par défaut.
+
+ÉTAPE 2 — CARTOGRAPHIE PORTAL COURTE ET DIRECTEMENT EXPLOITABLE
+
+Cette cartographie fait partie de l’implémentation, elle ne doit pas arrêter le
+travail.
+
+1. Identifier les routes Portal officielles.
+2. Classer chaque route :
+   - PORTAL_ENTRY ;
+   - MODULE_ENDPOINT ;
+   - LEGACY_UI ;
+   - COMPATIBILITY_REDIRECT ;
+   - DUPLICATE ;
+   - SECURITY_FIX.
+3. Identifier les shells, workspaces, partials HTMX, appels AJAX et composants
+   Alpine.js.
+4. Identifier les services et endpoints métier réutilisables.
+5. Déterminer la route Portal officielle d’ANNEX_MANAGER à partir de
+   l’architecture moderne existante.
+6. Écrire cette cartographie dans la documentation du projet.
+7. Continuer immédiatement l’implémentation sauf ambiguïté destructive réelle.
+
+ÉTAPE 3 — CORRECTIFS DE SÉCURITÉ URGENTS
+
+1. Sécuriser le paramètre next.
+2. Introduire une AuthenticationGate commune à tous les modes de connexion.
+3. Appliquer les mêmes contrôles aux logins classique et carte.
+4. Remplacer carte_id brut par un challenge signé, court, lié à la session et à
+   usage unique.
+5. Forcer must_change_password après une réinitialisation IT.
+6. Révoquer les sessions après reset, suspension et changement de privilèges.
+7. Unifier le changement de mot de passe pour tous les dashboards.
+8. Corriger la protection insuffisante de /portal/it/v2/.
+9. Corriger les captures d’exceptions trop larges.
+10. Ajouter les tests correspondants.
+
+ÉTAPE 4 — SÉPARATION DES PROFILS
+
+1. Introduire une séparation claire entre profil public et profil institutionnel.
+2. Préserver User Django.
+3. Ne pas supprimer immédiatement le Profile historique.
+4. Répartir les champs existants :
+   - PUBLIC ;
+   - SYSTEM ;
+   - SHARED ;
+   - DOMAIN-SPECIFIC.
+5. Garder les données métier spécialisées dans leurs applications.
+6. Écrire des migrations de données réversibles.
+7. Préserver les activités communautaires des comptes système.
+8. Interdire toute transmission automatique de permissions entre PUBLIC et SYSTEM.
+9. Migrer progressivement les lectures puis les écritures.
+10. Ajouter les contraintes seulement après nettoyage des données.
+
+ÉTAPE 5 — REGISTRE CENTRAL ET POLICY V2
+
+Créer un registre central fermé :
+
+position ->
+- catégorie dérivée ;
+- scopes autorisés ;
+- annexe obligatoire ou interdite ;
+- dashboard Portal principal ;
+- groupe de capacités par défaut.
+
+Créer AccessContext :
+
+- user ;
+- contexte PUBLIC ou SYSTEM ;
+- position ;
+- catégorie ;
+- scope ;
+- annexe ;
+- état du compte ;
+- capacités.
+
+Créer Policy V2 :
+
+- deny by default ;
+- contrôle de l’action ;
+- contrôle de la ressource ;
+- contrôle du scope ;
+- contrôle de l’annexe ;
+- décision avec reason_code.
+
+Calculer AccessContext une seule fois par requête.
+
+Appliquer Policy V2 aux pages, HTMX, AJAX, JSON, PDF, Excel et WebSocket.
+
+Les querysets doivent également filtrer par annexe. Une policy seule ne suffit
+pas.
+
+ÉTAPE 6 — MODE SHADOW ET MIGRATION DES DONNÉES
+
+1. Comparer old_decision et new_decision sans modifier initialement la réponse.
+2. Journaliser les divergences sans données sensibles.
+3. Fournir audit_access_state avec dry-run et sortie JSON.
+4. Corriger automatiquement uniquement les mappings déterministes.
+5. Ne jamais inventer une annexe ou une position.
+6. Isoler les comptes ambigus pour régularisation manuelle.
+7. Conserver un rollback par feature flags.
+
+ÉTAPE 7 — CONSOLIDATION DE LA GESTIONNAIRE
+
+1. Créer/activer ANNEX_MANAGER.
+2. Créer ou finaliser son entrée officielle dans Portal.
+3. Réutiliser les modules modernes HTMX/AJAX/Alpine existants.
+4. Récupérer les fonctions utiles des anciennes interfaces manager et finance.
+5. Ne pas créer un fichier Python monolithique.
+6. Empêcher ANNEX_MANAGER d’accéder à deux dashboards principaux.
+7. Transformer les anciennes interfaces en redirections de compatibilité.
+8. Conserver les endpoints et services métier encore utiles.
+9. Migrer les groupes et alias historiques de manière prudente.
+10. Tester toutes les activités de la gestionnaire.
+
+ÉTAPE 8 — MIGRATION DE TOUS LES AUTRES DASHBOARDS
+
+Migrer successivement :
+
+- étudiant ;
+- enseignant ;
+- secrétaire ;
+- admissions ;
+- surveillant général ;
+- Directeur des études ;
+- informaticien ;
+- marketing ;
+- DG/DGA ;
+- super administrateur.
+
+Pour chaque position :
+
+1. confirmer le registre ;
+2. fixer un dashboard Portal principal ;
+3. intégrer le profil professionnel dans le dashboard ;
+4. appliquer les permissions ;
+5. appliquer l’isolation d’annexe ;
+6. convertir les anciennes routes en redirections compatibles ;
+7. tester l’accès autorisé ;
+8. tester le refus des autres positions ;
+9. tester les endpoints secondaires et exports.
+
+ÉTAPE 9 — BASCULE ET NETTOYAGE
+
+1. Activer Policy V2 progressivement par dashboard.
+2. Corriger les divergences restantes.
+3. Retirer role et user_type des décisions.
+4. Retirer les tests directs de groupes.
+5. Retirer les alias historiques.
+6. Retirer les anciennes interfaces après validation.
+7. Ne pas supprimer les services encore utilisés.
+8. Ajouter les contraintes définitives en base.
+9. Mettre à jour ACCESS_MAPPING.md et la documentation d’administration.
+
+========================================================================
+3. RÈGLES DE ROUTAGE
+========================================================================
+
+Après connexion :
+
+- utilisateur PUBLIC -> espace public/communautaire ;
+- utilisateur SYSTEM valide -> dashboard Portal correspondant à sa position ;
+- position absente/inconnue -> page contrôlée de régularisation ;
+- compte suspendu/inactif -> refus contrôlé ;
+- aucun fallback vers un dashboard approximatif ;
+- aucune boucle de redirection ;
+- aucune route historique ne contourne Policy V2.
+
+Portal est la porte d’entrée centrale du logiciel. Les applications métier
+continuent de fournir leurs services et endpoints.
+
+========================================================================
+4. TESTS D’ACCEPTATION
+========================================================================
+
+La mission n’est pas terminée tant que les tests suivants ne passent pas :
+
+- PUBLIC ne peut atteindre aucune ressource SYSTEM ;
+- SYSTEM ne tombe jamais sur le profil public depuis Portal ;
+- une inscription publique ne crée aucune position institutionnelle ;
+- chaque position possède un seul dashboard principal ;
+- ANNEX_MANAGER possède un seul dashboard Portal ;
+- ANNEX_MANAGER conserve toutes ses fonctionnalités métier ;
+- PaymentAgent n’obtient pas automatiquement ANNEX_MANAGER ;
+- is_staff seul n’accorde aucun dashboard ;
+- SUPER_ADMIN n’implique pas is_superuser ;
+- groupe ou permission supplémentaire ne change pas la position ;
+- category ne peut pas contredire position ;
+- scope ne peut pas contredire position ;
+- BRANCH impose une annexe ;
+- GLOBAL n’accorde pas tous les droits ;
+- aucune visibilité inter-annexes non autorisée ;
+- tests GET, POST, HTMX, AJAX, JSON, PDF, Excel et WebSocket ;
+- login classique et carte appliquent les mêmes états de compte ;
+- challenge carte falsifié, expiré ou rejoué refusé ;
+- reset IT impose le changement de mot de passe et révoque les sessions ;
+- changement de position ou d’annexe révoque les accès précédents ;
+- données publiques, académiques, RH et financières préservées ;
+- routes historiques sécurisées ou redirigées ;
+- aucune boucle de redirection ;
+- deny by default effectif.
+
+========================================================================
+5. AUTONOMIE ET CHECKPOINTS
+========================================================================
+
+Tu es autorisé à modifier le code, créer les migrations, ajouter les tests,
+exécuter les commandes nécessaires et corriger les régressions directement liées
+à cette mission.
+
+Ne t’arrête pas après une simple cartographie ou un nouveau plan.
+
+Travaille jusqu’à obtenir des lots fonctionnels et testés.
+
+Crée un checkpoint après chaque grande étape en indiquant :
+
+- résultat obtenu ;
+- fichiers modifiés ;
+- migrations ;
+- tests exécutés ;
+- problèmes rencontrés ;
+- décisions prises ;
+- rollback disponible ;
+- prochaine étape.
+
+Tu peux poursuivre automatiquement entre les étapes lorsque :
+
+- la règle métier est déjà définie ;
+- les migrations sont déterministes et réversibles ;
+- les tests passent ;
+- aucune donnée ambiguë n’est corrigée automatiquement.
+
+Arrête-toi uniquement si :
+
+- une décision métier réellement nouvelle est nécessaire ;
+- une migration destructive est inévitable ;
+- des comptes ambigus doivent être reclassés manuellement ;
+- le comportement réel contredit une décision validée ;
+- un risque sérieux de perte de données est détecté.
+
+À la fin, fournir :
+
+1. rapport final ;
+2. matrice définitive des positions ;
+3. cartographie définitive de Portal ;
+4. liste des anciennes routes et leur statut ;
+5. migrations effectuées ;
+6. tests et résultats ;
+7. documentation de création et gestion des comptes ;
+8. procédure de rollback ;
+9. risques résiduels éventuels.

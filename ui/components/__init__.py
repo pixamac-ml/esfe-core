@@ -72,6 +72,29 @@ from .dashboard.teacher_sections import (
 )
 from .dashboard.secretary_sidebar import SecretarySidebar
 from .dashboard.secretary_topbar import SecretaryTopbar
+from .dashboard.secretary_sections import (
+    SecretaryWorkspace,
+    SecretaryOverviewSection,
+    SecretaryRegistrySection,
+    SecretaryVisitsSection,
+    SecretaryAppointmentsSection,
+    SecretaryDepositsSection,
+    SecretaryMeetingsSection,
+    SecretaryTasksSection,
+    SecretaryReportsSection,
+    SecretarySalarySection,
+    SecretaryNotificationsSection,
+    SecretarySettingsSection,
+)
+from .dashboard.supervisor_sidebar import SupervisorSidebar
+from .dashboard.supervisor_topbar import SupervisorTopbar
+from .dashboard.supervisor_workspace import SupervisorWorkspace
+
+# Portal shared components — réutilisables dans tous les dashboards
+from .dashboard.portal_notification_bell import PortalNotificationBell
+from .dashboard.portal_salary_section import PortalSalarySection
+from .dashboard.portal_notifications_section import PortalNotificationsSection
+from .dashboard.portal_settings_section import PortalSettingsSection
 
 # Card components
 from .cards.base_card.base_card import BaseCard
@@ -141,3 +164,36 @@ from .formation_overview.formation_overview import FormationOverview
 from .alerts_panel import AlertsPanel
 from .attendance_workflow import AttendanceWorkflow
 from .timetable_view import TimetableView
+
+# Calendar components — frontend Calendrier Académique
+from .calendar import (
+    CalendarEntryCard,
+    CalendarMiniList,
+    CalendarMonthGrid,
+    CalendarYearGrid,
+)
+
+# Academic wrappers — composants scolaires réutilisables pour tous les dashboards
+from .academic import (
+    AcademicAlert,
+    AcademicBadge,
+    AcademicButton,
+    AcademicCalendar,
+    AcademicCard,
+    AcademicDrawer,
+    AcademicEmptyState,
+    AcademicFilterBar,
+    AcademicModal,
+    AcademicPageHeader,
+    AcademicPageLayout,
+    AcademicProgress,
+    AcademicQuickAction,
+    AcademicSectionHeader,
+    AcademicSidebar,
+    AcademicStatCard,
+    AcademicStepper,
+    AcademicTable,
+    AcademicTabs,
+    AcademicTimeline,
+    AcademicToolbar,
+)

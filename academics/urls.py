@@ -23,9 +23,19 @@ from .views import (
     teacher_lesson_logs_view,
 )
 from .views_import import download_template, upload_grades
+from .views_frontend import academic_calendar_frontend
+from . import calendar_views
 
 app_name = "academics"
 urlpatterns = [
+    path("calendar/", calendar_views.calendar_list_create, name="calendar_list_create"),
+    path("calendar/<int:pk>/", calendar_views.calendar_detail_update, name="calendar_detail_update"),
+    path("calendar/<int:pk>/validate/", calendar_views.calendar_validate, name="calendar_validate"),
+    path("calendar/<int:pk>/publish/", calendar_views.calendar_publish, name="calendar_publish"),
+    path("calendar/<int:pk>/archive/", calendar_views.calendar_archive, name="calendar_archive"),
+    path("calendar/<int:pk>/entries/", calendar_views.calendar_entry_create, name="calendar_entry_create"),
+    path("calendar/<int:pk>/entries/<int:entry_pk>/", calendar_views.calendar_entry_detail, name="calendar_entry_detail"),
+    path("calendar-ui/", academic_calendar_frontend, name="calendar_frontend"),
     path(
         "imports/grades/template/<int:class_id>/<int:semester_id>/",
         download_template,

@@ -65,7 +65,7 @@ if settings.DEBUG and "django_browser_reload" in settings.INSTALLED_APPS:
     urlpatterns.append(path("__reload__/", include("django_browser_reload.urls")))
 
 if settings.DEBUG:
-    # La galerie de composants contient uniquement des données de démonstration.
+    # Galerie de composants réservée au mode DEBUG.
     urlpatterns.append(path("ui/", include("ui.urls")))
 
 

@@ -1,0 +1,138 @@
+{% load component_tags %}
+{# ================================================================
+   portal_settings_section
+   Section paramètres universelle — profil + préférences + sécurité.
+   ================================================================ #}
+<div id="{{ panel_id }}" class="space-y-5">
+
+  {% component "page_header" title="Paramètres" subtitle="Profil, préférences et informations du compte" %}
+    {% fill "actions" %}
+      <span class="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--card-soft)] px-3 py-1 text-xs font-bold text-[color:var(--muted)]">
+        <i data-lucide="at-sign" style="width:11px;height:11px;" aria-hidden="true"></i>
+        {{ request.user.username }}
+      </span>
+    {% endfill %}
+  {% endcomponent %}
+
+  <div class="grid gap-5 lg:grid-cols-2">
+
+    {# ── Carte profil ── #}
+    {% component "dashboard_card" elevated=True %}
+      {% fill "default" %}
+        <div class="mb-4 flex items-center gap-2">
+          <i data-lucide="user-round" style="width:15px;height:15px;" class="text-[color:var(--school-primary)]" aria-hidden="true"></i>
+          <span class="text-xs font-bold uppercase tracking-wide text-[color:var(--muted)]">Profil</span>
+        </div>
+
+        {# Avatar + infos rapides #}
+        <div class="mb-5 flex items-center gap-4 rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] p-4">
+          <div class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[color:var(--school-primary-soft)] text-xl font-black text-[color:var(--school-primary)]">
+            {% if avatar_url %}
+              <img src="{{ avatar_url }}" alt="" class="h-full w-full object-cover">
+            {% else %}
+              {{ request.user.first_name|default:request.user.username|slice:":1"|upper }}
+            {% endif %}
+          </div>
+          <div class="min-w-0">
+            <div class="text-sm font-black text-[color:var(--text)]">{{ request.user.get_full_name|default:request.user.username }}</div>
+            {% if role_label %}
+            <div class="mt-0.5 text-xs font-semibold text-[color:var(--school-primary)]">{{ role_label }}</div>
+            {% endif %}
+            <div class="mt-0.5 text-xs text-[color:var(--muted-2)]">{{ phone|default:"Téléphone non renseigné" }}</div>
+            <div class="text-xs text-[color:var(--muted-2)]">{{ location|default:"Localisation non renseignée" }}</div>
+          </div>
+        </div>
+
+        {% if profile_form and profile_update_url %}
+          <form method="post" action="{{ profile_update_url }}" enctype="multipart/form-data" class="space-y-4">
+            {% csrf_token %}
+            {% include "secretary/htmx/form_fields.html" with form=profile_form %}
+            {% component "button" label="Enregistrer le profil" icon_left="check" variant="primary" type="submit" %}{% endcomponent %}
+          </form>
+        {% else %}
+          {# Affichage lecture seule si pas de formulaire #}
+          <div class="space-y-2 text-sm">
+            {% if position_display %}
+            <div><span class="font-bold text-[color:var(--text)]">Fonction&nbsp;:</span> <span class="text-[color:var(--muted-2)]">{{ position_display }}</span></div>
+            {% endif %}
+            {% if branch_name %}
+            <div><span class="font-bold text-[color:var(--text)]">Annexe&nbsp;:</span> <span class="text-[color:var(--muted-2)]">{{ branch_name }}</span></div>
+            {% endif %}
+            {% if request.user.email %}
+            <div><span class="font-bold text-[color:var(--text)]">Email&nbsp;:</span> <span class="text-[color:var(--muted-2)]">{{ request.user.email }}</span></div>
+            {% endif %}
+          </div>
+          <div class="mt-3 pt-2 border-t border-[color:var(--line)]">
+            <a href="{% url 'accounts:edit_profile' %}"
+               class="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--line)] px-3 py-2 text-xs font-bold text-[color:var(--text)] transition hover:border-[color:var(--school-primary-soft)]">
+              <i data-lucide="pen-square" style="width:14px;height:14px;" aria-hidden="true"></i>
+              Modifier mon profil
+            </a>
+          </div>
+        {% endif %}
+      {% endfill %}
+    {% endcomponent %}
+
+    {# ── Préférences + sécurité ── #}
+    {% component "dashboard_card" elevated=True %}
+      {% fill "default" %}
+        <div class="mb-4 flex items-center gap-2">
+          <i data-lucide="settings-2" style="width:15px;height:15px;" class="text-[color:var(--muted)]" aria-hidden="true"></i>
+          <span class="text-xs font-bold uppercase tracking-wide text-[color:var(--muted)]">Préférences</span>
+        </div>
+
+        {% if preference_form and preferences_update_url %}
+          <form method="post" action="{{ preferences_update_url }}" class="space-y-4 mb-5">
+            {% csrf_token %}
+            {% include "secretary/htmx/form_fields.html" with form=preference_form %}
+            {% component "button" label="Enregistrer les préférences" icon_left="check" variant="primary" type="submit" %}{% endcomponent %}
+          </form>
+        {% endif %}
+
+        <div class="{% if preference_form %}border-t border-[color:var(--line)] pt-5 {% endif %}space-y-2">
+
+          {# Infos compte standard #}
+          <div class="flex items-center justify-between rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2.5">
+            <div>
+              <div class="text-xs font-black text-[color:var(--text)]">Email</div>
+              <div class="text-[10px] text-[color:var(--muted-2)]">{{ request.user.email|default:"Non renseigné" }}</div>
+            </div>
+            {% component "badge" label="Compte" tone="neutral" size="sm" %}{% endcomponent %}
+          </div>
+
+          {% if position_display %}
+          <div class="flex items-center justify-between rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2.5">
+            <div>
+              <div class="text-xs font-black text-[color:var(--text)]">Fonction</div>
+              <div class="text-[10px] text-[color:var(--muted-2)]">{{ position_display }}{% if branch_name %} — {{ branch_name }}{% endif %}</div>
+            </div>
+            {% component "badge" label="RH" tone="info" size="sm" %}{% endcomponent %}
+          </div>
+          {% endif %}
+
+          {# Champs supplémentaires (injectés par chaque rôle) #}
+          {% for field in extra_fields %}
+          <div class="flex items-center justify-between rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2.5">
+            <div>
+              <div class="text-xs font-black text-[color:var(--text)]">{{ field.label }}</div>
+              <div class="text-[10px] text-[color:var(--muted-2)]">{{ field.value }}</div>
+            </div>
+            {% if field.tone %}{% component "badge" label=field.badge_label|default:field.label tone=field.tone size="sm" %}{% endcomponent %}{% endif %}
+          </div>
+          {% endfor %}
+
+          {# Sécurité #}
+          <div class="flex items-center justify-between rounded-xl border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 py-2.5">
+            <div>
+              <div class="text-xs font-black text-[color:var(--text)]">Mot de passe</div>
+              <div class="text-[10px] text-[color:var(--muted-2)]">Changement géré par l'informaticien</div>
+            </div>
+            {% component "badge" label="Support" tone="warning" size="sm" %}{% endcomponent %}
+          </div>
+
+        </div>
+      {% endfill %}
+    {% endcomponent %}
+
+  </div>
+</div>

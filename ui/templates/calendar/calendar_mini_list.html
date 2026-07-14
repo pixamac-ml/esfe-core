@@ -1,0 +1,20 @@
+{% load component_tags %}
+<div class="space-y-2">
+  {% for cal in calendars %}
+    <button
+      type="button"
+      hx-get="{% url 'academics:calendar_detail_update' pk=cal.id %}"
+      hx-target="#calendar-detail"
+      hx-swap="innerHTML"
+      class="w-full rounded-lg border px-3 py-2 text-left transition {% if cal.id == selected_id %}border-[color:var(--school-primary)] bg-[color:var(--school-primary-soft)]{% else %}border-[color:var(--line)] bg-[color:var(--card)] hover:bg-[color:var(--surface)]{% endif %}"
+    >
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-black text-[color:var(--text)]">Calendrier v{{ cal.version }}</span>
+        {% component "academic_badge" label=cal.status tone=cal.status %}{% endcomponent %}
+      </div>
+      <span class="block text-[10px] text-[color:var(--muted)]">{{ cal.academic_year }}</span>
+    </button>
+  {% empty %}
+    <p class="text-xs text-[color:var(--muted)]">Aucun calendrier.</p>
+  {% endfor %}
+</div>

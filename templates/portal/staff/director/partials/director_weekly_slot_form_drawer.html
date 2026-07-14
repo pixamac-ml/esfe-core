@@ -1,0 +1,105 @@
+{% if academic_class %}
+<div class="space-y-5">
+
+  <div>
+    <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">
+      {% if editing_slot %}Modifier le créneau{% else %}Nouveau créneau{% endif %}
+    </p>
+    <h3 class="mt-1 text-lg font-black text-slate-900">{{ academic_class.display_name }}</h3>
+    <p class="mt-1 text-xs font-semibold text-slate-500">Modèle hebdomadaire · récurrence par jour de semaine.</p>
+  </div>
+
+  <form
+    hx-post="{% url 'accounts_portal:director_weekly_slot_save' academic_class.id %}"
+    hx-target="#director-workspace"
+    hx-swap="innerHTML"
+    hx-on::after-request="if(event.detail.successful){ window.deCloseDrawer && window.deCloseDrawer(); }"
+    class="space-y-4"
+  >
+    {% csrf_token %}
+    <input type="hidden" name="week_start" value="{{ schedule.week_start|date:'Y-m-d' }}" />
+    <input type="hidden" name="action" value="{% if editing_slot %}update{% else %}create{% endif %}" />
+    {% if editing_slot %}<input type="hidden" name="slot_id" value="{{ editing_slot.id }}" />{% endif %}
+
+    <!-- Jour -->
+    <div>
+      <label class="mb-1.5 block text-sm font-bold text-slate-700">Jour <span class="text-[color:var(--danger)]">*</span></label>
+      <select name="weekday" required
+              class="w-full rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2.5 text-sm font-semibold text-[color:var(--text)] focus:border-[color:var(--school-primary)] focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/20">
+        {% for val, label in weekday_choices %}
+        <option value="{{ val }}" {% if editing_slot and editing_slot.weekday == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Horaires -->
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="mb-1.5 block text-sm font-bold text-slate-700">Début <span class="text-[color:var(--danger)]">*</span></label>
+        <input name="start_time" type="time" required
+               {% if editing_slot %}value="{{ editing_slot.start_time }}"{% endif %}
+               class="w-full rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2.5 text-sm font-semibold text-[color:var(--text)] focus:border-[color:var(--school-primary)] focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/20" />
+      </div>
+      <div>
+        <label class="mb-1.5 block text-sm font-bold text-slate-700">Fin <span class="text-[color:var(--danger)]">*</span></label>
+        <input name="end_time" type="time" required
+               {% if editing_slot %}value="{{ editing_slot.end_time }}"{% endif %}
+               class="w-full rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2.5 text-sm font-semibold text-[color:var(--text)] focus:border-[color:var(--school-primary)] focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/20" />
+      </div>
+    </div>
+
+    <!-- Matière -->
+    <div>
+      <label class="mb-1.5 block text-sm font-bold text-slate-700">Matière (EC) <span class="text-[color:var(--danger)]">*</span></label>
+      <select name="ec_id" required
+              class="w-full rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2.5 text-sm font-semibold text-[color:var(--text)] focus:border-[color:var(--school-primary)] focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/20">
+        <option value="">Choisir une matière…</option>
+        {% for ec in ecs %}
+        <option value="{{ ec.id }}" {% if editing_slot and editing_slot.ec_id == ec.id %}selected{% endif %}>
+          {{ ec.ue.code }} — {{ ec.title }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Enseignant -->
+    <div>
+      <label class="mb-1.5 block text-sm font-bold text-slate-700">Enseignant <span class="text-[color:var(--danger)]">*</span></label>
+      <select name="teacher_id" required
+              class="w-full rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2.5 text-sm font-semibold text-[color:var(--text)] focus:border-[color:var(--school-primary)] focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/20">
+        <option value="">Choisir un enseignant…</option>
+        {% for t in teachers %}
+        <option value="{{ t.id }}" {% if editing_slot and editing_slot.teacher_id == t.id %}selected{% endif %}>
+          {{ t.get_full_name|default:t.username }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Salle -->
+    <div>
+      <label class="mb-1.5 block text-sm font-bold text-slate-700">Salle</label>
+      <input name="room" type="text"
+             value="{% if editing_slot %}{{ editing_slot.room }}{% endif %}"
+             placeholder="Ex : A102"
+             class="w-full rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2.5 text-sm font-semibold text-[color:var(--text)] placeholder:text-slate-400 focus:border-[color:var(--school-primary)] focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/20" />
+    </div>
+
+    <!-- Actions -->
+    <div class="flex flex-wrap items-center justify-end gap-3 border-t border-[color:var(--line)] pt-4">
+      <button type="button"
+              onclick="window.deCloseDrawer && window.deCloseDrawer()"
+              class="inline-flex items-center justify-center rounded-lg border border-[color:var(--line)] px-4 py-2 text-sm font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface)]">
+        Annuler
+      </button>
+      <button type="submit"
+              class="inline-flex items-center justify-center rounded-lg border border-[color:var(--school-primary)] bg-[color:var(--school-primary)] px-5 py-2 text-sm font-bold text-white transition hover:opacity-90">
+        <i data-lucide="{% if editing_slot %}save{% else %}plus{% endif %}" class="w-4 h-4 mr-2"></i>
+        {% if editing_slot %}Enregistrer{% else %}Créer le créneau{% endif %}
+      </button>
+    </div>
+  </form>
+</div>
+{% else %}
+<p class="text-sm font-semibold text-[color:var(--muted)]">Aucune classe sélectionnée.</p>
+{% endif %}

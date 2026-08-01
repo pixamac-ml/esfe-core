@@ -1,7 +1,7 @@
 {% extends "superadmin/base.html" %}
 
 {% block page_title %}{{ page_title }}{% endblock %}
-{% block page_subtitle %}Métadonnées du mémoire et dépôt du PDF source{% endblock %}
+{% block page_subtitle %}Métadonnées du mémoire, image de couverture et dépôt du PDF source{% endblock %}
 
 {% block content_main %}
 <div class="max-w-4xl mx-auto space-y-6">
@@ -88,6 +88,18 @@
                     <p class="text-xs text-slate-500 mt-1">
                         Fichier actuel conservé si aucun nouveau PDF n'est sélectionné ({{ memoire.nb_pages }} page{{ memoire.nb_pages|pluralize }} générée{{ memoire.nb_pages|pluralize }}).
                     </p>
+                    {% endif %}
+                </div>
+
+                <div class="md:col-span-2">
+                    <label class="text-sm font-medium text-slate-700">Image de couverture</label>
+                    {{ form.image }}
+                    {% if form.image.errors %}<p class="text-xs text-red-600 mt-1">{{ form.image.errors|join:', ' }}</p>{% endif %}
+                    <p class="text-xs text-slate-500 mt-1">Image affichée dans la liste et la fiche du mémoire. Optionnel.</p>
+                    {% if memoire and memoire.image %}
+                    <div class="mt-2">
+                        <img src="{{ memoire.image.url }}" alt="Couverture actuelle" class="h-24 rounded-lg object-cover border border-slate-200">
+                    </div>
                     {% endif %}
                 </div>
 

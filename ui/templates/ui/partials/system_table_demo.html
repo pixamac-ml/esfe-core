@@ -1,0 +1,55 @@
+{% load component_tags %}
+<div id="ui-table-demo" class="space-y-3" data-ui-demo="table">
+  <form
+    hx-get="{{ base_url }}"
+    hx-target="#ui-table-demo"
+    hx-swap="outerHTML"
+    hx-trigger="submit"
+    hx-sync="#ui-table-demo:replace"
+    class="grid gap-3 rounded-ui-card border border-ui-border bg-ui-surface p-4 md:grid-cols-2 xl:grid-cols-4"
+  >
+    <label class="text-sm font-semibold text-ui-text">
+      <span class="mb-1.5 block">Recherche instantanée</span>
+      <span class="relative block">
+        <input name="q" type="search" value="{{ query }}" placeholder="Nom ou contexte" hx-get="{{ base_url }}" hx-target="#ui-table-demo" hx-swap="outerHTML" hx-trigger="input changed delay:350ms, search" hx-include="closest form" class="ui-control w-full pr-9 focus:border-ui-focus focus:ring-ui-focus">
+        <button type="button" data-ui-clear-input class="absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-ui-button text-ui-text-muted hover:bg-ui-surface-hover" aria-label="Effacer la recherche"><i data-lucide="x" class="h-4 w-4"></i></button>
+      </span>
+    </label>
+    <label class="text-sm font-semibold text-ui-text">
+      <span class="mb-1.5 block">Statut</span>
+      <select name="status" hx-get="{{ base_url }}" hx-target="#ui-table-demo" hx-swap="outerHTML" hx-trigger="change" hx-include="closest form" class="ui-control w-full focus:border-ui-focus focus:ring-ui-focus">
+        <option value="">Tous</option>
+        <option value="Actif" {% if status == "Actif" %}selected{% endif %}>Actif</option>
+        <option value="En attente" {% if status == "En attente" %}selected{% endif %}>En attente</option>
+        <option value="Suspendu" {% if status == "Suspendu" %}selected{% endif %}>Suspendu</option>
+      </select>
+    </label>
+    <label class="text-sm font-semibold text-ui-text">
+      <span class="mb-1.5 block">Densité</span>
+      <select name="density" hx-get="{{ base_url }}" hx-target="#ui-table-demo" hx-swap="outerHTML" hx-trigger="change" hx-include="closest form" class="ui-control w-full focus:border-ui-focus focus:ring-ui-focus">
+        <option value="comfortable" {% if density == "comfortable" %}selected{% endif %}>Comfortable</option>
+        <option value="compact" {% if density == "compact" %}selected{% endif %}>Compacte</option>
+      </select>
+    </label>
+    <div class="flex items-end gap-2">
+      <button type="submit" class="inline-flex h-ui-control items-center rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary">Appliquer</button>
+      <span class="htmx-indicator grid h-ui-control w-ui-control place-items-center" role="status" aria-label="Chargement"><i data-lucide="loader-circle" class="h-5 w-5 animate-spin text-ui-primary"></i></span>
+    </div>
+  </form>
+
+  <div class="flex flex-wrap gap-2" aria-label="États du tableau">
+    <button type="button" hx-get="{{ base_url }}?state=empty" hx-target="#ui-table-demo" hx-swap="outerHTML" class="rounded-ui-button border border-ui-border px-3 py-2 text-xs font-semibold hover:bg-ui-surface-hover">État vide</button>
+    <button type="button" hx-get="{{ base_url }}?state=error" hx-target="#ui-table-demo" hx-swap="outerHTML" class="rounded-ui-button border border-ui-border px-3 py-2 text-xs font-semibold hover:bg-ui-surface-hover">Erreur</button>
+    <button type="button" hx-get="{{ base_url }}?state=permission" hx-target="#ui-table-demo" hx-swap="outerHTML" class="rounded-ui-button border border-ui-border px-3 py-2 text-xs font-semibold hover:bg-ui-surface-hover">Permission refusée</button>
+    <button type="button" hx-get="{{ base_url }}" hx-target="#ui-table-demo" hx-swap="outerHTML" class="rounded-ui-button border border-ui-border px-3 py-2 text-xs font-semibold hover:bg-ui-surface-hover">Réinitialiser</button>
+  </div>
+
+  {% component "ui_core.data_table" id="interactive-table" caption="Données fictives" headers=headers rows=rows density=density selectable=True result_count=result_count page=page page_count=page_count error=error permission_denied=permission_denied empty_title="Aucun résultat" empty_message="Modifiez la recherche ou les filtres." %}
+    {% fill "footer" %}
+      <nav class="flex items-center gap-2" aria-label="Pagination du tableau">
+        <button type="button" hx-get="{{ base_url }}?page={{ page|add:'-1' }}&q={{ query|urlencode }}&status={{ status|urlencode }}&density={{ density }}" hx-target="#ui-table-demo" hx-swap="outerHTML" {% if page <= 1 %}disabled{% endif %} class="grid h-9 w-9 place-items-center rounded-ui-button border border-ui-border disabled:opacity-40" aria-label="Page précédente"><i data-lucide="chevron-left" class="h-4 w-4"></i></button>
+        <button type="button" hx-get="{{ base_url }}?page={{ page|add:'1' }}&q={{ query|urlencode }}&status={{ status|urlencode }}&density={{ density }}" hx-target="#ui-table-demo" hx-swap="outerHTML" {% if page >= page_count %}disabled{% endif %} class="grid h-9 w-9 place-items-center rounded-ui-button border border-ui-border disabled:opacity-40" aria-label="Page suivante"><i data-lucide="chevron-right" class="h-4 w-4"></i></button>
+      </nav>
+    {% endfill %}
+  {% endcomponent %}
+</div>

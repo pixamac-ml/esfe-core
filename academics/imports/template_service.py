@@ -60,11 +60,20 @@ def _get_ec_note_label(ec: EC) -> str:
     return f"NOTE /20 - {_get_ec_human_label(ec)}"
 
 
-def generate_import_template(academic_class: AcademicClass, semester: Semester) -> io.BytesIO:
+def generate_import_template(
+    academic_class: AcademicClass,
+    semester: Semester,
+    *,
+    session_type: str = "normal",
+) -> io.BytesIO:
     """Genere un template Excel lisible pour l'import des notes."""
 
     if semester.academic_class_id != academic_class.id:
         raise ValueError("Le semestre ne correspond pas a la classe academique.")
+
+    session_type = (session_type or "normal").strip().lower()
+    if session_type not in {"normal", "retake"}:
+        raise ValueError("Type de session invalide.")
 
     from openpyxl import Workbook
     from openpyxl.comments import Comment
@@ -73,7 +82,8 @@ def generate_import_template(academic_class: AcademicClass, semester: Semester) 
 
     wb = Workbook()
     ws = wb.active
-    ws.title = f"Import S{semester.number}"
+    session_label = "Rattrapage" if session_type == "retake" else "Normale"
+    ws.title = f"{session_label} S{semester.number}"
 
     enrollments = list(_get_class_enrollments(academic_class))
     ecs = list(_get_semester_ecs(semester))
@@ -81,7 +91,10 @@ def generate_import_template(academic_class: AcademicClass, semester: Semester) 
     ws.append(["Ecole", "ESFE"])
     ws.append(["Classe", academic_class.display_name])
     ws.append(["Annee academique", str(academic_class.academic_year)])
-    ws.append(["Semestre", f"Semestre {semester.number} - saisir les notes dans les colonnes jaunes NOTE /20"])
+    ws.append([
+        "Semestre",
+        f"Semestre {semester.number} - session {session_label.lower()} - saisir les notes dans les colonnes jaunes NOTE /20",
+    ])
 
     headers = ["ENROLLMENT_ID", "MATRICULE", "NOM", "PRENOM", *[_get_ec_note_label(ec) for ec in ecs]]
     ws.append(headers)

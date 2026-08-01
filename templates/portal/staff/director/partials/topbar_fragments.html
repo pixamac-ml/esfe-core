@@ -1,0 +1,35 @@
+{% load component_tags %}
+{% url 'accounts_portal:director_account_panel' as director_account_panel_url %}
+{% url 'accounts:logout' as director_logout_url %}
+{% url 'accounts_portal:director_topbar_fragments' as director_topbar_fragments_url %}
+<div id="director-topbar-fragments" class="flex items-center gap-2">
+  {% component "account.profile_dropdown"
+    user=request.user
+    avatar_url=avatar_url
+    display_name=display_name
+    role=role
+    profile_url=director_account_panel_url|add:"?view=profile"
+    edit_url=director_account_panel_url|add:"?view=edit"
+    security_url=director_account_panel_url|add:"?view=security"
+    preferences_url=director_account_panel_url|add:"?view=preferences"
+    logout_url=director_logout_url
+    drawer_id="director-drawer"
+  %}{% endcomponent %}
+
+  {% component "notifications.bell"
+    unread_count=notification_count
+    preview_url=preview_url
+    preview_target="#notification-dropdown-content"
+    center_url=center_url
+    center_target="#director-workspace"
+  %}{% endcomponent %}
+
+  <button
+    id="director-topbar-refresh"
+    type="button"
+    class="hidden"
+    hx-get="{{ director_topbar_fragments_url }}"
+    hx-target="#director-topbar-fragments"
+    hx-swap="outerHTML"
+  ></button>
+</div>

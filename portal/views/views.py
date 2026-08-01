@@ -1,3 +1,4 @@
+import json
 from collections import defaultdict
 import csv
 from datetime import datetime, timedelta
@@ -7,15 +8,19 @@ from urllib.parse import quote
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import PasswordChangeForm
+from django.contrib.auth import update_session_auth_hash
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.core.validators import validate_email
 from django.db.models import Count, Q, Sum
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden, HttpResponseNotAllowed, JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.urls.exceptions import NoReverseMatch
 from django.utils import timezone
 from django.utils.safestring import mark_safe
+from django.views.decorators.http import require_GET, require_POST
 
 from academics.models import (
     AcademicBulletin,
@@ -37,6 +42,7 @@ from academics.permissions import (
     DIRECTOR_DASHBOARD_POSITIONS,
     can_manage_bulletins,
     can_manage_diplomas,
+    is_global_academic_user,
     require_director_branch_scope,
 )
 from academic_cycle.services.academic_excel_reports import build_academic_report_xlsx, xlsx_response
@@ -47,7 +53,8 @@ from academics.services.documents import (
 )
 from admissions.models import Candidature
 from academic_cycle.services.audit_service import log_action
-from accounts.models import BranchExpense, Profile, SensitiveActionRequest
+from accounts.forms import SystemProfileForm, UserPreferenceForm
+from accounts.models import BranchExpense, Profile, SensitiveActionRequest, UserPreference
 from accounts.services.sensitive_actions import SensitiveActionError, confirm_sensitive_action, request_sensitive_action
 from academics.services.lesson_log_service import create_lesson_log, update_lesson_log
 from academics.services.schedule_service import (
@@ -75,7 +82,14 @@ from accounts.dashboards.helpers import get_user_branch, paginate_queryset
 from branches.models import Branch
 from inscriptions.models import Inscription
 from payments.models import Payment
-from notification_center.selectors import get_user_unread_count
+from notification_center.presentation import get_safe_action_url
+from notification_center.selectors import (
+    get_notification_center_queryset,
+    get_notification_center_stats,
+    get_notification_filter_options,
+    get_user_in_app_messages,
+    get_user_unread_count,
+)
 from portal.permissions import get_post_login_portal_url
 from portal.services import (
     build_it_dashboard_context,
@@ -102,6 +116,8 @@ from portal.services.teacher_dashboard_service import (
     update_teacher_dashboard_preference,
 )
 from students.models import TeacherAttendance
+from notifier.models import NotificationMessage
+from notifier.services import NotificationBus
 from portal.services.director import (
     build_director_calendar_context,
     build_director_classroom_ops_context,
@@ -117,6 +133,9 @@ from portal.services.director import (
     review_teacher_document,
     review_transfer_request,
     upload_teacher_document,
+)
+from portal.services.director_dashboard_presentation import (
+    build_director_dashboard_presentation,
 )
 from portal.services.supervisor_service import build_class_detail_context
 from portal.services.academic_structure_service import (
@@ -151,7 +170,7 @@ from portal.dg.services import (
 )
 from portal.dg.forms import DgCouponForm, DgRecruitmentForm
 from portal.dg.rh_service import create_staff_from_recruitment
-from portal.dg.coupons_service import list_coupons, create_coupon, toggle_coupon
+from portal.dg.coupons_service import create_coupon, get_coupon_detail, list_coupons, toggle_coupon
 from portal.dg.actions_service import (
     create_finance_followup,
     escalate_student_case,
@@ -394,15 +413,12 @@ def _render_director_dashboard(request):
         ),
         "dashboard_kind": "Direction des etudes",
         **workspace_context,
-        "director_active_section": workspace_context.get("section", "home"),
         "quality_score": (workspace_context.get("quality") or {}).get("score", 0),
         "home_alerts_count": len(workspace_context.get("alerts") or []),
         "lesson_logs_count": len(workspace_context.get("recent_lesson_logs") or []),
-        "sidebar_items": _build_director_sidebar_items(),
-        "class_table_rows": _build_director_class_rows(
-            workspace_context.get("class_cards", []), branch
-        ),
     }
+    context.update(build_director_dashboard_presentation(request, workspace_context))
+    context.update(_director_account_profile_context(request))
     return render(request, "portal/staff/director_dashboard.html", context)
 
 
@@ -424,7 +440,7 @@ def _parse_director_section(request, default="home"):
         "publications": "evaluations",
         "settings": "enseignants",
         "stats": "evaluations",
-        "notifications": "evaluations",
+        "notifications": "notifications",
         "logs": "evaluations",
         "students": "programme",
         "anomalies": "evaluations",
@@ -439,6 +455,7 @@ def _parse_director_section(request, default="home"):
         "evaluations",
         "evaluations_calendar",
         "calendrier",
+        "notifications",
     }
     return section if section in allowed else default
 
@@ -450,11 +467,11 @@ def _normalize_director_section(section: str, default: str = "home") -> str:
         "schedule": "planification", "planning": "planification", "academic": "programme",
         "classes": "programme", "teachers": "enseignants", "documents": "enseignants",
         "transfers": "enseignants", "results": "evaluations", "publications": "evaluations",
-        "settings": "enseignants", "stats": "evaluations", "notifications": "evaluations",
+        "settings": "enseignants", "stats": "evaluations", "notifications": "notifications",
         "logs": "evaluations", "students": "programme", "anomalies": "evaluations",
     }
     normalized = aliases.get(section, section)
-    allowed = {"home", "planification", "programme", "correspondances", "enseignants", "evaluations", "evaluations_calendar", "calendrier"}
+    allowed = {"home", "planification", "programme", "correspondances", "enseignants", "evaluations", "evaluations_calendar", "calendrier", "notifications"}
     return normalized if normalized in allowed else default
 
 
@@ -1059,6 +1076,7 @@ def _build_director_workspace_context(request, *, toast=None):
 
     context = {
         "branch": branch,
+        "director_global_scope": is_global_academic_user(request.user),
         "section": section,
         "week_start": week_start,
         "week_end": week_end,
@@ -1190,10 +1208,306 @@ def _build_director_workspace_context(request, *, toast=None):
     return context
 
 
+def _director_account_profile_context(request):
+    profile, _ = Profile.objects.get_or_create(user=request.user)
+    position = get_user_position(request.user)
+    position_label = dict(Profile.POSITION_CHOICES).get(profile.position, profile.position or "")
+    role_label = dict(Profile.ROLE_CHOICES).get(profile.role, profile.role or "")
+    status_label = dict(Profile.EMPLOYMENT_STATUS_CHOICES).get(profile.employment_status, profile.employment_status or "")
+    extra_fields = []
+    if profile.employee_code:
+        extra_fields.append({"label": "Code employe", "value": profile.employee_code})
+    if profile.location:
+        extra_fields.append({"label": "Localisation", "value": profile.location})
+    if profile.main_domain:
+        extra_fields.append({"label": "Domaine", "value": profile.main_domain})
+    if profile.website:
+        extra_fields.append({"label": "Site web", "value": profile.website})
+    if position_label:
+        extra_fields.append({"label": "Fonction", "value": position_label})
+    if role_label:
+        extra_fields.append({"label": "Groupe", "value": role_label})
+    account_actions = [
+        {
+            "label": "Modifier",
+            "icon": "pencil",
+            "hx_get": f"{reverse('accounts_portal:director_account_panel')}?view=edit",
+            "hx_target": "#director-drawer-content",
+            "hx_swap": "innerHTML",
+        },
+        {
+            "label": "Securite",
+            "icon": "shield",
+            "hx_get": f"{reverse('accounts_portal:director_account_panel')}?view=security",
+            "hx_target": "#director-drawer-content",
+            "hx_swap": "innerHTML",
+        },
+        {
+            "label": "Preferences",
+            "icon": "settings",
+            "hx_get": f"{reverse('accounts_portal:director_account_panel')}?view=preferences",
+            "hx_target": "#director-drawer-content",
+            "hx_swap": "innerHTML",
+        },
+    ]
+    return {
+        "profile": profile,
+        "display_name": request.user.get_full_name() or request.user.username,
+        "avatar_url": profile.avatar_url,
+        "email": request.user.email,
+        "role": position_label or role_label or "Compte institutionnel",
+        "branch": profile.branch.name if profile.branch else "Annexe non definie",
+        "status": profile.employment_status,
+        "status_label": status_label or "Actif",
+        "phone": profile.phone,
+        "address": profile.address,
+        "created_at": timezone.localtime(profile.created_at).strftime("%d/%m/%Y") if profile.created_at else "",
+        "last_seen": timezone.localtime(profile.last_seen).strftime("%d/%m/%Y %H:%M") if profile.last_seen else "",
+        "bio": profile.bio,
+        "extra_fields": extra_fields,
+        "account_actions": account_actions,
+        "is_system_account": bool(position),
+    }
+
+
+def _director_notifications_items(request, notifications):
+    items = []
+    for notification in notifications:
+        created_at = timezone.localtime(notification.created_at).strftime("%d/%m/%Y %H:%M") if notification.created_at else ""
+        items.append({
+            "id": notification.id,
+            "title": notification.title,
+            "summary": notification.body[:140] if notification.body else "",
+            "icon": "bell",
+            "source": notification.event_type or notification.legacy_source or "notification",
+            "time_ago": created_at,
+            "is_read": notification.read_at is not None,
+            "priority": notification.priority,
+            "action_url": get_safe_action_url(notification, request),
+            "detail_url": reverse("accounts_portal:director_notification_detail", args=[notification.id]),
+            "hx_mark_read": "",
+        })
+    return items
+
+
+def _director_notifications_context(request):
+    filters = {
+        "channel": request.GET.get("channel") or "in_app",
+        "status": request.GET.get("status") or "",
+        "priority": request.GET.get("priority") or "",
+        "source": request.GET.get("source") or "",
+        "q": (request.GET.get("q") or "").strip(),
+    }
+    queryset = get_notification_center_queryset(request.user, filters)
+    paginator = Paginator(queryset, 10)
+    page = request.GET.get("page") or 1
+    try:
+        page_obj = paginator.page(page)
+    except PageNotAnInteger:
+        page_obj = paginator.page(1)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages or 1)
+
+    selected_notification = None
+    selected_id = (request.GET.get("notification_id") or "").strip()
+    if selected_id.isdigit():
+        selected_notification = NotificationMessage.objects.select_related("actor", "event").filter(recipient=request.user, pk=int(selected_id)).first()
+    if selected_notification is None and page_obj.object_list:
+        selected_notification = page_obj.object_list[0]
+
+    return {
+        "page_title": "Centre de notifications",
+        "filters": filters,
+        "filters_options": get_notification_filter_options(request.user),
+        "stats": get_notification_center_stats(request.user),
+        "unread_count": get_user_unread_count(request.user),
+        "page_obj": page_obj,
+        "notifications": _director_notifications_items(request, page_obj.object_list),
+        "selected_notification": selected_notification,
+    }
+
+
+def _director_notifications_preview_context(request):
+    notifications = list(get_user_in_app_messages(request.user, limit=6))
+    return {
+        "unread_count": get_user_unread_count(request.user),
+        "notifications": _director_notifications_items(request, notifications),
+    }
+
+
+def _director_account_hx_trigger(message, *, tone="success", extra=None):
+    payload = {"ui:toast": {"message": message, "tone": tone}}
+    if extra:
+        payload.update(extra)
+    return json.dumps(payload, ensure_ascii=True)
+
+
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
+def director_topbar_fragments(request):
+    workspace = _build_director_workspace_context(request)
+    workspace.update(build_director_dashboard_presentation(request, workspace))
+    account = _director_account_profile_context(request)
+    return render(request, "portal/staff/director/partials/topbar_fragments.html", {
+        **workspace,
+        **account,
+        "preview_url": reverse("accounts_portal:director_notifications_preview"),
+        "center_url": f"{reverse('accounts_portal:director_workspace')}?section=notifications",
+    })
+
+
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
+def director_account_panel(request):
+    view_name = (request.GET.get("view") or request.POST.get("view") or "profile").strip().lower()
+    if view_name not in {"profile", "edit", "security", "preferences"}:
+        return HttpResponseBadRequest("Vue de compte inconnue.")
+
+    profile = _director_account_profile_context(request)
+    system_profile, _ = Profile.objects.get_or_create(user=request.user)
+    preference, _ = UserPreference.objects.get_or_create(user=request.user)
+
+    if request.method == "POST":
+        if view_name == "edit":
+            form = SystemProfileForm(request.POST, request.FILES, instance=system_profile, user=request.user)
+            if form.is_valid():
+                form.save()
+                response = render(request, "portal/staff/director/partials/account/profile.html", _director_account_profile_context(request))
+                response["HX-Trigger"] = _director_account_hx_trigger("Profil mis a jour.", extra={"account:profile-updated": True})
+                return response
+            response = render(request, "portal/staff/director/partials/account/edit.html", {
+                "form": form,
+                "drawer_id": "director-drawer",
+                "profile": system_profile,
+            }, status=400)
+            return response
+        if view_name == "security":
+            form = PasswordChangeForm(request.user, request.POST)
+            if form.is_valid():
+                user = form.save()
+                update_session_auth_hash(request, user)
+                response = render(request, "portal/staff/director/partials/account/security.html", {
+                    "password_form": PasswordChangeForm(request.user),
+                    "email": request.user.email,
+                })
+                response["HX-Trigger"] = _director_account_hx_trigger("Mot de passe mis a jour.", extra={"account:profile-updated": True})
+                return response
+            return render(request, "portal/staff/director/partials/account/security.html", {
+                "password_form": form,
+                "email": request.user.email,
+            }, status=400)
+        if view_name == "preferences":
+            form = UserPreferenceForm(request.POST, instance=preference)
+            if form.is_valid():
+                form.save()
+                response = render(request, "portal/staff/director/partials/account/preferences.html", {
+                    "form": UserPreferenceForm(instance=preference),
+                })
+                response["HX-Trigger"] = _director_account_hx_trigger("Preferences mises a jour.", extra={"account:profile-updated": True})
+                return response
+            return render(request, "portal/staff/director/partials/account/preferences.html", {
+                "form": form,
+            }, status=400)
+
+    if view_name == "profile":
+        return render(request, "portal/staff/director/partials/account/profile.html", profile)
+    if view_name == "edit":
+        form = SystemProfileForm(instance=system_profile, user=request.user)
+        return render(request, "portal/staff/director/partials/account/edit.html", {
+            "form": form,
+            "drawer_id": "director-drawer",
+            "profile": system_profile,
+        })
+    if view_name == "security":
+        return render(request, "portal/staff/director/partials/account/security.html", {
+            "password_form": PasswordChangeForm(request.user),
+            "email": request.user.email,
+        })
+    return render(request, "portal/staff/director/partials/account/preferences.html", {
+        "form": UserPreferenceForm(instance=preference),
+    })
+
+
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
+def director_notifications_preview(request):
+    return render(request, "portal/staff/director/partials/notifications/preview.html", _director_notifications_preview_context(request))
+
+
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
+def director_notifications_workspace(request):
+    context = _director_notifications_context(request)
+    return render(request, "portal/staff/director/partials/notifications/workspace.html", context)
+
+
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
+def director_notification_detail(request, pk):
+    notification = get_object_or_404(
+        NotificationMessage.objects.select_related("actor", "event"),
+        pk=pk,
+        recipient=request.user,
+    )
+    if (
+        notification.channel == NotificationMessage.CHANNEL_IN_APP
+        and notification.read_at is None
+    ):
+        NotificationBus.mark_as_read(notification)
+    response = render(
+        request,
+        "portal/staff/director/partials/notifications/detail.html",
+        {"notification": notification},
+    )
+    response["HX-Trigger"] = "notification.read"
+    return response
+
+
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
+@require_POST
+def director_mark_all_notifications_read(request):
+    now = timezone.now()
+    NotificationMessage.objects.filter(
+        recipient=request.user,
+        read_at__isnull=True,
+        archived_at__isnull=True,
+        channel=NotificationMessage.CHANNEL_IN_APP,
+    ).update(read_at=now, status=NotificationMessage.STATUS_READ, updated_at=now)
+    response = render(request, "portal/staff/director/partials/notifications/workspace.html", _director_notifications_context(request))
+    response["HX-Trigger"] = _director_account_hx_trigger("Toutes les notifications ont ete marquees comme lues.", extra={"notificationsChanged": True})
+    return response
+
+
 @_position_required(DIRECTOR_DASHBOARD_POSITIONS)
 def director_workspace(request):
     context = _build_director_workspace_context(request)
+    context.update(build_director_dashboard_presentation(request, context))
+    if context.get("section") == "home":
+        return render(request, "portal/staff/director/partials/home.html", context)
+    if context.get("section") == "notifications":
+        context.update(_director_notifications_context(request))
+        return render(request, "portal/staff/director/partials/notifications/workspace.html", context)
     return render(request, "portal/staff/director/partials/workspace.html", context)
+
+
+_EVAL_SUBVIEW_TEMPLATES = {
+    "overview": "portal/staff/director/partials/evaluations/overview.html",
+    "create": "portal/staff/director/partials/evaluations/create.html",
+    "scheduled": "portal/staff/director/partials/evaluations/scheduled.html",
+    "validation": "portal/staff/director/partials/evaluations/validation.html",
+}
+
+
+@_position_required(DIRECTOR_DASHBOARD_POSITIONS)
+def director_evaluations_subcontent(request):
+    """Charge le fragment de sous-fenetre pour la section evaluations."""
+    raw_view = (request.GET.get("view") or "").strip().lower()
+    subview = raw_view if raw_view in _EVAL_SUBVIEW_TEMPLATES else "overview"
+    original_get = request.GET
+    params = request.GET.copy()
+    params["section"] = "evaluations"
+    request.GET = params
+    try:
+        context = _build_director_workspace_context(request)
+        context["eval_subview"] = subview
+    finally:
+        request.GET = original_get
+    return render(request, _EVAL_SUBVIEW_TEMPLATES[subview], context)
 
 
 @_position_required(DIRECTOR_DASHBOARD_POSITIONS)
@@ -2916,6 +3230,8 @@ def admissions_portal(request):
 
 @_position_required({"director_of_studies", "executive_director", "deputy_executive_director", "super_admin"})
 def director_portal(request):
+    if is_global_academic_user(request.user):
+        return _render_director_dashboard(request)
     return redirect("accounts_portal:portal_dashboard")
 
 
@@ -3880,6 +4196,14 @@ def dg_modal(request):
         return render(request, "portal/dg/modals/recruitment.html", {"form": DgRecruitmentForm()})
     if modal == "coupon":
         return render(request, "portal/dg/modals/coupon_form.html", {"form": DgCouponForm()})
+    if modal == "coupon_detail":
+        coupon_id = (request.GET.get("coupon_id") or "").strip()
+        if not coupon_id.isdigit():
+            return HttpResponseBadRequest("Coupon invalide.")
+        coupon = get_coupon_detail(int(coupon_id))
+        if coupon is None:
+            return HttpResponse("Coupon introuvable.", status=404)
+        return render(request, "portal/dg/modals/coupon_detail.html", {"coupon": coupon})
     if modal in {"branch", "alert", "case", "workflow", "finance", "analytics", "realtime", "rh"}:
         context = build_dg_drawer_context(request)
         context.update(
@@ -3917,13 +4241,21 @@ def dg_recruit_staff(request):
 
 
 def _build_coupons_section_extra_context():
+    coupons = list(list_coupons())
     return {
-        "coupons": list_coupons(),
+        "coupons": coupons,
         "coupon_form": DgCouponForm(),
+        "coupon_stats": {
+            "total": len(coupons),
+            "available": sum(coupon.is_currently_valid() for coupon in coupons),
+            "uses": sum(coupon.usage_count for coupon in coupons),
+            "discount_total": sum((coupon.discount_total or 0) for coupon in coupons),
+        },
     }
 
 
 @login_required
+@require_GET
 def dg_coupon_programmes_options(request):
     position = get_user_position(request.user)
     if position not in {"executive_director", "deputy_executive_director"}:
@@ -3938,12 +4270,11 @@ def dg_coupon_programmes_options(request):
 
 
 @login_required
+@require_POST
 def dg_coupon_create(request):
     position = get_user_position(request.user)
     if position not in {"executive_director", "deputy_executive_director"}:
         return HttpResponseForbidden("Accès réservé au Directeur Général.")
-    if request.method != "POST":
-        return HttpResponseBadRequest("Methode invalide.")
     form = DgCouponForm(request.POST)
     if not form.is_valid():
         return render(request, "portal/dg/modals/coupon_form.html", {"form": form}, status=400)
@@ -3958,16 +4289,17 @@ def dg_coupon_create(request):
 
 
 @login_required
+@require_POST
 def dg_coupon_toggle(request):
     position = get_user_position(request.user)
     if position not in {"executive_director", "deputy_executive_director"}:
         return HttpResponseForbidden("Accès réservé au Directeur Général.")
-    if request.method != "POST":
-        return HttpResponseBadRequest("Methode invalide.")
     coupon_id = (request.POST.get("coupon_id") or "").strip()
     if not coupon_id.isdigit():
         return HttpResponseBadRequest("Coupon invalide.")
-    toggle_coupon(actor=request.user, coupon_id=int(coupon_id))
+    coupon = toggle_coupon(actor=request.user, coupon_id=int(coupon_id))
+    if coupon is None:
+        return HttpResponse("Coupon introuvable.", status=404)
     context = build_dg_section_context(request, "coupons", _build_portal_context)
     context.update(_build_coupons_section_extra_context())
     return render(request, "portal/dg/partials/coupons/list.html", context)

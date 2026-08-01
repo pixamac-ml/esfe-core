@@ -4,6 +4,7 @@ from html import unescape
 from datetime import date, timedelta
 from decimal import Decimal
 from io import BytesIO
+import json
 import re
 from typing import Any, cast
 from unittest.mock import patch
@@ -1233,6 +1234,10 @@ class ManagerCouponWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         inscription.refresh_from_db()
         self.assertEqual(inscription.amount_due, 75000)
+        trigger = json.loads(response.headers["HX-Trigger"])
+        self.assertEqual(trigger["couponApplied"]["inscription_id"], inscription.id)
+        self.assertEqual(trigger["couponApplied"]["amount_after"], 75000)
+        self.assertContains(response, f'id="inscription-balance-{inscription.id}"')
 
     def test_apply_coupon_rejected_after_full_payment(self):
         candidature = _create_candidature(self.programme, self.branch, status="accepted")
@@ -1299,6 +1304,46 @@ class ManagerCouponWorkflowTests(TestCase):
             reverse("accounts:htmx_inscription_apply_coupon", args=[inscription.id])
         )
         self.assertEqual(response.status_code, 405)
+
+    def test_coupon_preview_rejects_cross_branch_inscription(self):
+        other_branch = _create_branch("CPN2", "Autre annexe coupon")
+        candidature = _create_candidature(self.programme, other_branch, status="accepted")
+        inscription = Inscription.objects.create(candidature=candidature, amount_due=100000)
+        coupon = self._create_coupon()
+
+        response = self.client.get(
+            reverse("accounts:htmx_coupon_preview"),
+            {"inscription_id": inscription.id, "code": coupon.code},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_coupon_preview_rejects_invalid_inscription_identifier(self):
+        response = self.client.get(
+            reverse("accounts:htmx_coupon_preview"),
+            {"inscription_id": "invalid", "code": "ANY"},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertContains(response, "Inscription invalide", status_code=400)
+
+    def test_active_coupon_widget_is_scoped_to_manager_branch(self):
+        visible = self._create_coupon(code="VISIBLE-MANAGER", max_redemptions=5)
+        visible.branches.add(self.branch)
+        other_branch = _create_branch("CPN3", "Annexe coupon cache")
+        hidden = self._create_coupon(code="HIDDEN-MANAGER", max_redemptions=5)
+        hidden.branches.add(other_branch)
+
+        response = self.client.get(reverse("accounts:widget_active_coupons"), HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, visible.code)
+        self.assertNotContains(response, hidden.code)
+
+        dashboard_response = self.client.get(
+            reverse("accounts:manager_dashboard"), {"section": "overview"}
+        )
+        self.assertEqual(dashboard_response.status_code, 200)
+        self.assertContains(dashboard_response, visible.code)
 
 
 @override_settings(

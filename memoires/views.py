@@ -1,14 +1,16 @@
+from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Count, Q
-from django.http import Http404, HttpResponse
-from django.shortcuts import get_object_or_404
+from django.http import Http404, HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 from django.views.generic import DetailView, ListView
 from datetime import timedelta
 
 from formations.models import Filiere
 
-from .models import ConsultationLog, Memoire, PageMemoire
+from .models import ConsultationLog, Memoire, MemoireFavori, PageMemoire
 from .services.watermark import get_watermarked_page, watermark_identity
 
 PAGE_SIZE = 12
@@ -113,12 +115,68 @@ class MemoireDetailView(DetailView):
         context["mots_cles_liste"] = [
             mot.strip() for mot in self.object.mots_cles.split(",") if mot.strip()
         ]
-        context["memoires_similaires"] = (
-            Memoire.objects.filter(statut=Memoire.Statut.PUBLIE, filiere=self.object.filiere)
-            .exclude(pk=self.object.pk)
-            .select_related("filiere")[:3]
-        )
+        context["memoires_similaires"] = self._trouver_similaires()
+
+        # Vérifier si le mémoire est en favori pour l'utilisateur connecté
+        context["est_favori"] = False
+        if self.request.user.is_authenticated:
+            context["est_favori"] = MemoireFavori.objects.filter(
+                user=self.request.user, memoire=self.object
+            ).exists()
+
         return context
+
+    def _trouver_similaires(self):
+        """Trouve les mémoires similaires par scoring multi-critères."""
+        memoire = self.object
+        candidats = Memoire.objects.filter(
+            statut=Memoire.Statut.PUBLIE
+        ).exclude(pk=memoire.pk).select_related("filiere")
+
+        # Mots-clés du mémoire actuel
+        cles_actuelles = {
+            mot.strip().lower()
+            for mot in memoire.mots_cles.split(",")
+            if mot.strip()
+        }
+
+        score_map = {}
+        for m in candidats:
+            score = 0
+
+            # 1. Même filière (+10 points)
+            if m.filiere_id == memoire.filiere_id:
+                score += 10
+
+            # 2. Mots-clés en commun (+3 par mot commun)
+            if cles_actuelles:
+                cles_candidat = {
+                    mot.strip().lower()
+                    for mot in m.mots_cles.split(",")
+                    if mot.strip()
+                }
+                communs = cles_actuelles & cles_candidat
+                score += len(communs) * 3
+
+            # 3. Même année (+2 points)
+            if m.annee == memoire.annee:
+                score += 2
+
+            # 4. Même encadreur (+2 points)
+            if memoire.encadreur and m.encadreur:
+                if memoire.encadreur.lower().strip() == m.encadreur.lower().strip():
+                    score += 2
+
+            # 5. Même niveau (+1 point)
+            if m.niveau == memoire.niveau:
+                score += 1
+
+            if score > 0:
+                score_map[m] = score
+
+        # Tri par score décroissant, puis par vues
+        classés = sorted(score_map.items(), key=lambda x: (-x[1], -x[0].nombre_vues))
+        return [m for m, _ in classés[:4]]
 
 
 def servir_page(request, slug, numero):
@@ -135,3 +193,38 @@ def servir_page(request, slug, numero):
     response["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
     response["Pragma"] = "no-cache"
     return response
+
+
+# ================= FAVORIS =================
+
+
+@login_required
+def toggle_favori(request, slug):
+    """Ajoute ou retire un mémoire des favoris (POST uniquement)."""
+    if request.method != "POST":
+        return JsonResponse({"error": "Méthode non autorisée"}, status=405)
+
+    memoire = get_object_or_404(Memoire, slug=slug, statut=Memoire.Statut.PUBLIE)
+    favori, created = MemoireFavori.objects.get_or_create(
+        user=request.user, memoire=memoire
+    )
+
+    if not created:
+        favori.delete()
+        return JsonResponse({"status": "removed", "favoris_count": MemoireFavori.objects.filter(memoire=memoire).count()})
+
+    return JsonResponse({"status": "added", "favoris_count": MemoireFavori.objects.filter(memoire=memoire).count()})
+
+
+@login_required
+def favoris_liste(request):
+    """Page listant les favoris de l'utilisateur."""
+    favoris = MemoireFavori.objects.filter(
+        user=request.user
+    ).select_related("memoire", "memoire__filiere")
+
+    page = request.GET.get("page")
+    paginator = Paginator(favoris, 12)
+    page_obj = paginator.get_page(page)
+
+    return render(request, "memoires/favoris.html", {"page_obj": page_obj})

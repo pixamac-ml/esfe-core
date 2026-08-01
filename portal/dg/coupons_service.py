@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from django.db import transaction
+from django.db.models import Count, Prefetch, Sum
 from django.utils import timezone
 
 from branches.models import Branch
-from coupons.models import Coupon
+from coupons.models import Coupon, CouponRedemption
 from notifier.models import NotificationMessage
 from notifier.services.audience import resolve_platform_users
 from notifier.services.bus import NotificationBus
@@ -15,14 +16,34 @@ COUPON_RECIPIENT_ROLE_TOKENS = [
     "payment_agent",
     "admissions",
     "branch_manager",
+    "annex_manager",
 ]
 
 
 def list_coupons():
     return (
         Coupon.objects.all()
-        .prefetch_related("branches", "programmes", "redemptions")
+        .annotate(
+            usage_count=Count("redemptions", distinct=True),
+            discount_total=Sum("redemptions__discount_amount"),
+        )
+        .prefetch_related("branches", "programmes")
         .order_by("-created_at")
+    )
+
+
+def get_coupon_detail(coupon_id):
+    redemptions = CouponRedemption.objects.select_related(
+        "applied_by",
+        "inscription__candidature__branch",
+        "inscription__candidature__programme",
+    ).order_by("-applied_at")
+    return (
+        Coupon.objects
+        .select_related("created_by")
+        .prefetch_related("branches", "programmes", Prefetch("redemptions", queryset=redemptions))
+        .filter(pk=coupon_id)
+        .first()
     )
 
 
@@ -48,8 +69,11 @@ def create_coupon(*, actor, form):
     return coupon
 
 
+@transaction.atomic
 def toggle_coupon(*, actor, coupon_id):
-    coupon = Coupon.objects.get(pk=coupon_id)
+    coupon = Coupon.objects.select_for_update().filter(pk=coupon_id).first()
+    if coupon is None:
+        return None
     coupon.is_active = not coupon.is_active
     coupon.save(update_fields=["is_active", "updated_at"])
     return coupon
@@ -68,10 +92,12 @@ def _notify_coupon_created(*, actor, coupon):
 
     programme_names = ", ".join(p.title for p in coupon.programmes.all()) or "toutes les formations"
     title = f"Nouveau coupon disponible : {coupon.code}"
-    body = (
-        f"{coupon.label} — {coupon.get_discount_type_display()} de {coupon.value} "
-        f"sur {programme_names}."
+    reduction = (
+        f"{coupon.value} %"
+        if coupon.discount_type == Coupon.DISCOUNT_PERCENTAGE
+        else f"{coupon.value} FCFA"
     )
+    body = f"{coupon.label} — réduction de {reduction} sur {programme_names}."
 
     for recipient in recipients:
         NotificationBus.notify(

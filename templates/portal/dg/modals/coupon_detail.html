@@ -1,0 +1,58 @@
+{% load humanize %}
+<div class="p-6">
+  <div class="mb-5 flex items-start justify-between gap-4">
+    <div>
+      <p class="text-xs font-black uppercase tracking-[.18em] text-blue-600">Finance / Coupon</p>
+      <h3 class="mt-1 text-2xl font-black text-slate-950">{{ coupon.code }}</h3>
+      <p class="mt-1 text-sm font-semibold text-slate-500">{{ coupon.label }}</p>
+    </div>
+    <button type="button" class="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50" onclick="dgCloseModal()">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+  </div>
+
+  <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div class="rounded-xl border border-slate-200 p-4"><p class="text-xs font-black text-slate-500">Reduction</p><p class="mt-1 text-lg font-black text-slate-950">{% if coupon.discount_type == 'percentage' %}{{ coupon.value }}%{% else %}{{ coupon.value|intcomma }} FCFA{% endif %}</p></div>
+    <div class="rounded-xl border border-slate-200 p-4"><p class="text-xs font-black text-slate-500">Statut</p><p class="mt-1 text-lg font-black text-slate-950">{{ coupon.availability_status_label }}</p></div>
+    <div class="rounded-xl border border-slate-200 p-4"><p class="text-xs font-black text-slate-500">Utilisations</p><p class="mt-1 text-lg font-black text-slate-950">{{ coupon.redemptions_count }} / {{ coupon.max_redemptions|default:"∞" }}</p></div>
+    <div class="rounded-xl border border-slate-200 p-4"><p class="text-xs font-black text-slate-500">Cree par</p><p class="mt-1 text-sm font-black text-slate-950">{% if coupon.created_by %}{{ coupon.created_by.get_full_name|default:coupon.created_by.username }}{% else %}Compte supprime{% endif %}</p></div>
+  </div>
+
+  <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+    <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <p class="text-xs font-black uppercase text-slate-500">Perimetre</p>
+      <p class="mt-2 text-sm font-bold text-slate-800">Annexes : {% for branch in coupon.branches.all %}{{ branch.name }}{% if not forloop.last %}, {% endif %}{% empty %}Toutes les annexes{% endfor %}</p>
+      <p class="mt-1 text-sm font-bold text-slate-800">Formations : {% for programme in coupon.programmes.all %}{{ programme.title }}{% if not forloop.last %}, {% endif %}{% empty %}Toutes les formations{% endfor %}</p>
+    </div>
+    <div class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+      <p class="text-xs font-black uppercase text-slate-500">Validite</p>
+      <p class="mt-2 text-sm font-bold text-slate-800">Du {{ coupon.valid_from|date:"d/m/Y H:i" }}</p>
+      <p class="mt-1 text-sm font-bold text-slate-800">Au {{ coupon.valid_until|date:"d/m/Y H:i"|default:"sans limite" }}</p>
+    </div>
+  </div>
+
+  <div class="mt-5">
+    <div class="mb-3 flex items-center justify-between"><h4 class="text-sm font-black uppercase tracking-[.16em] text-slate-600">Historique des utilisations</h4><span class="text-sm font-black text-violet-700">Total : {{ coupon.redemptions_count }} utilisation{{ coupon.redemptions_count|pluralize }}</span></div>
+    <div class="max-h-80 overflow-auto rounded-xl border border-slate-200">
+      <table class="dg-table">
+        <thead><tr><th>Date</th><th>Etudiant</th><th>Annexe</th><th>Formation</th><th>Avant</th><th>Remise</th><th>Apres</th><th>Applique par</th></tr></thead>
+        <tbody>
+          {% for redemption in coupon.redemptions.all %}
+          <tr>
+            <td class="text-xs">{{ redemption.applied_at|date:"d/m/Y H:i" }}</td>
+            <td>{{ redemption.inscription.candidature.full_name }}</td>
+            <td>{{ redemption.inscription.candidature.branch.name }}</td>
+            <td>{{ redemption.inscription.candidature.programme.title }}</td>
+            <td>{{ redemption.amount_before|intcomma }}</td>
+            <td class="font-black text-violet-700">-{{ redemption.discount_amount|intcomma }}</td>
+            <td>{{ redemption.amount_after|intcomma }}</td>
+            <td>{% if redemption.applied_by %}{{ redemption.applied_by.get_full_name|default:redemption.applied_by.username }}{% else %}Compte supprime{% endif %}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="8" class="dg-empty">Ce coupon n'a pas encore ete utilise.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

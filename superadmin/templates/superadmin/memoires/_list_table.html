@@ -3,6 +3,7 @@
     <table class="data-table min-w-full">
         <thead>
             <tr>
+                <th>Image</th>
                 <th>Titre</th>
                 <th>Auteurs</th>
                 <th>Filière</th>
@@ -17,6 +18,15 @@
         <tbody>
             {% for memoire in memoires %}
             <tr>
+                <td>
+                    {% if memoire.image %}
+                    <img src="{{ memoire.image.url }}" alt="" class="h-10 w-10 rounded object-cover border border-slate-200">
+                    {% else %}
+                    <span class="inline-flex items-center justify-center h-10 w-10 rounded bg-slate-100 text-slate-400">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/></svg>
+                    </span>
+                    {% endif %}
+                </td>
                 <td>
                     <p class="font-semibold text-slate-900 mb-0">{{ memoire.titre }}</p>
                     <p class="text-xs text-slate-500 mb-0">{{ memoire.nb_pages }} page{{ memoire.nb_pages|pluralize }}</p>
@@ -68,7 +78,7 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="9" class="text-center text-slate-500 py-8">Aucun mémoire trouvé.</td>
+                <td colspan="10" class="text-center text-slate-500 py-8">Aucun mémoire trouvé.</td>
             </tr>
             {% endfor %}
         </tbody>

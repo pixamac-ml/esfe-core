@@ -71,6 +71,31 @@
   </div>
 </section>
 
+{% if published_bulletins %}
+  <section class="mt-5 rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
+    <div class="mb-3 flex items-center gap-2">
+      <i data-lucide="file-check-2" class="text-[color:var(--school-primary)]" style="width:17px;height:17px;"></i>
+      <h4 class="text-xs font-black uppercase tracking-wide text-[color:var(--muted)]">Mes bulletins publiés</h4>
+    </div>
+    <div class="grid gap-3 sm:grid-cols-2">
+      {% for bulletin in published_bulletins %}
+        <article class="rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3">
+          <p class="text-sm font-black text-[color:var(--text)]">
+            {% if bulletin.bulletin_type == "semester" %}Semestre {{ bulletin.semester.number }}{% else %}Bulletin annuel{% endif %}
+          </p>
+          <p class="mt-1 text-xs font-semibold text-[color:var(--muted)]">{{ bulletin.reference }}</p>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <a href="{% url 'academics:bulletin_detail' bulletin.id %}" target="_blank"
+               class="rounded-lg border border-[color:var(--line)] px-3 py-2 text-xs font-extrabold text-[color:var(--text)]">Consulter</a>
+            <a href="{% url 'academics:bulletin_pdf' bulletin.id %}" target="_blank"
+               class="rounded-lg bg-[color:var(--school-primary)] px-3 py-2 text-xs font-extrabold text-white">PDF</a>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}
+
 {% if semester_rows %}
   <div class="mt-5 grid gap-3 lg:grid-cols-2">
     {% for row in semester_rows %}

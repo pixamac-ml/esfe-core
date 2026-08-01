@@ -6,10 +6,8 @@ from django.core.exceptions import ValidationError
 from django.db.models import Count
 
 from academics.models import AcademicEnrollment, ECGrade, Semester
-from academics.services.documents import generate_annual_bulletins_for_class, generate_semester_bulletins_for_class
 from academics.services.grading import compute_ec_status, resolve_ec_threshold
 from academics.services.semester import compute_semester_result
-from academics.services.year import create_academic_debts
 from accounts.dashboards.helpers import get_user_branch
 from portal.models import SupportAuditLog
 from portal.services.it_support_service import log_support_action
@@ -232,19 +230,12 @@ def get_available_actions(*, state: NotesWorkflowState | None):
             [{"code": ACTION_PREVIEW_RETAKE, "label": "Ouvrir rattrapage", "style": "secondary", "kind": "modal"}]
             if state.retake_ready
             else []
-        ) + [
-            {"code": ACTION_PUBLISH_FINAL, "label": "Publier resultats finaux", "style": "primary"},
-        ],
+        ),
         STATE_RETAKE_IN_PROGRESS: [
-            {"code": ACTION_PUBLISH_FINAL, "label": "Publier resultats finaux", "style": "primary"},
+            {"code": ACTION_VERIFY, "label": "Verifier les notes", "style": "secondary"},
         ],
-        STATE_READY_TO_PUBLISH_FINAL: [
-            {"code": ACTION_PUBLISH_FINAL, "label": "Publier resultats finaux", "style": "primary"},
-        ],
-        STATE_FINAL_PUBLISHED: [
-            {"code": ACTION_GENERATE_DECISIONS, "label": "Generer decisions annuelles", "style": "secondary"},
-            {"code": ACTION_GENERATE_BULLETINS, "label": "Generer bulletins", "style": "primary"},
-        ],
+        STATE_READY_TO_PUBLISH_FINAL: [],
+        STATE_FINAL_PUBLISHED: [],
     }
     return actions_by_state.get(state.code, [])
 
@@ -253,6 +244,15 @@ def apply_notes_workflow_action(*, actor, academic_class, semester, action):
     state = get_notes_state(academic_class=academic_class, semester=semester)
     if state is None:
         raise ValidationError("Selection classe/semestre invalide.")
+
+    if action in {
+        ACTION_PUBLISH_FINAL,
+        ACTION_GENERATE_DECISIONS,
+        ACTION_GENERATE_BULLETINS,
+    }:
+        raise ValidationError(
+            "Action reservee a la Direction des etudes via le workflow de validation et publication OTP."
+        )
 
     if action == ACTION_START:
         if semester.status == Semester.STATUS_DRAFT:
@@ -308,53 +308,6 @@ def apply_notes_workflow_action(*, actor, academic_class, semester, action):
             action_type=SupportAuditLog.ACTION_RESULTS_SENT,
             target_label=f"Activation rattrapage {academic_class.display_name} S{semester.number}",
             details="Rattrapage active depuis le dashboard informaticien.",
-        )
-        return
-
-    if action == ACTION_PUBLISH_FINAL:
-        if semester.status not in {Semester.STATUS_NORMAL_LOCKED, Semester.STATUS_RETAKE_ENTRY, Semester.STATUS_FINALIZED}:
-            raise ValidationError("La publication finale n'est pas autorisee a ce stade.")
-        enrollments = AcademicEnrollment.objects.filter(
-            academic_class=academic_class,
-            academic_year=academic_class.academic_year,
-            is_active=True,
-        )
-        for enrollment in enrollments:
-            compute_semester_result(semester, enrollment)
-        semester.status = Semester.STATUS_PUBLISHED
-        semester.save(update_fields=["status"])
-        log_support_action(
-            actor=actor,
-            branch=get_user_branch(actor),
-            action_type=SupportAuditLog.ACTION_RESULTS_SENT,
-            target_label=f"Publication finale {academic_class.display_name} S{semester.number}",
-            details=f"Resultats finaux publies pour {enrollments.count()} etudiant(s).",
-        )
-        return
-
-    if action == ACTION_GENERATE_DECISIONS:
-        if semester.status != Semester.STATUS_PUBLISHED:
-            raise ValidationError("Les decisions annuelles ne peuvent etre generees qu'apres publication finale.")
-        bulletins = generate_annual_bulletins_for_class(academic_class=academic_class, actor=actor, publish=True)
-        log_support_action(
-            actor=actor,
-            branch=get_user_branch(actor),
-            action_type=SupportAuditLog.ACTION_RESULTS_SENT,
-            target_label=f"Decisions annuelles {academic_class.display_name}",
-            details=f"{len(bulletins)} bulletin(s) annuel(s) generes avec decisions.",
-        )
-        return
-
-    if action == ACTION_GENERATE_BULLETINS:
-        if semester.status != Semester.STATUS_PUBLISHED:
-            raise ValidationError("Les bulletins ne peuvent etre generes qu'apres publication finale.")
-        bulletins = generate_semester_bulletins_for_class(academic_class=academic_class, semester=semester, actor=actor, publish=True)
-        log_support_action(
-            actor=actor,
-            branch=get_user_branch(actor),
-            action_type=SupportAuditLog.ACTION_RESULTS_SENT,
-            target_label=f"Bulletins {academic_class.display_name} S{semester.number}",
-            details=f"{len(bulletins)} bulletin(s) semestriel(s) generes.",
         )
         return
 

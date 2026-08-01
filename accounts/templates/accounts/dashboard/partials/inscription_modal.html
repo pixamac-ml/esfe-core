@@ -1,4 +1,4 @@
-{% load component_tags %}
+{% load component_tags humanize %}
 <div class="space-y-0">
 <div class="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between">
             <div>
@@ -175,3 +175,8 @@
             {% endif %}
     </div>
 </div>
+
+<span id="inscription-status-{{ inscription.id }}"
+      hx-swap-oob="outerHTML"
+      class="dashboard-badge-sm {% if inscription.status == 'active' %}dashboard-badge-green{% elif inscription.status == 'partial_paid' %}dashboard-badge-amber{% elif inscription.status == 'awaiting_payment' %}dashboard-badge-blue{% else %}dashboard-badge-gray{% endif %}">{{ inscription.get_status_display }}</span>
+<span id="inscription-balance-{{ inscription.id }}" hx-swap-oob="outerHTML">{{ inscription.balance|intcomma }} FCFA</span>

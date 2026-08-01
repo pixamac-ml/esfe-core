@@ -4,7 +4,7 @@
      class="dashboard-panel"
      style="margin-bottom:16px;"
      hx-get="{% url 'accounts:widget_active_coupons' %}"
-     hx-trigger="every 60s"
+     hx-trigger="couponApplied from:body, every 60s"
      hx-swap="outerHTML">
   <div class="dashboard-panel-title">Coupons actifs <span class="dashboard-badge-sm dashboard-badge-green">{{ coupons|length }}</span></div>
   {% for coupon in coupons %}
@@ -13,6 +13,7 @@
       <div class="dashboard-action-label">{{ coupon.code }}</div>
       <div class="dashboard-action-sub">
         {% if coupon.discount_type == "percentage" %}{{ coupon.value }}%{% else %}{{ coupon.value|intcomma }} FCFA{% endif %}
+        {% with programme_count=coupon.programmes.count %}{% if programme_count %} &middot; {{ programme_count }} formation{{ programme_count|pluralize }}{% endif %}{% endwith %}
         {% if coupon.valid_until %} &middot; expire le {{ coupon.valid_until|date:"d/m/Y" }}{% endif %}
       </div>
     </div>

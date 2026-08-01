@@ -1,0 +1,43 @@
+<div
+  class="relative inline-flex"
+  data-ui-core="dropdown-menu"
+  x-data="{ open: false }"
+  @keydown.escape.window="open = false"
+  @click.outside="open = false"
+>
+  <button
+    type="button"
+    id="{{ id }}-trigger"
+    @click="open = !open"
+    :aria-expanded="open"
+    aria-haspopup="menu"
+    aria-controls="{{ id }}-menu"
+    {% if disabled %}disabled{% endif %}
+    class="inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus disabled:cursor-not-allowed disabled:opacity-40"
+  >
+    {{ label }} <i data-lucide="chevron-down" class="h-4 w-4" aria-hidden="true"></i>
+  </button>
+  <div
+    x-show="open"
+    x-cloak
+    id="{{ id }}-menu"
+    role="menu"
+    class="absolute top-full z-40 mt-2 min-w-48 rounded-ui-card border border-ui-border bg-ui-surface p-1 shadow-ui-dropdown {% if align == 'left' %}left-0{% else %}right-0{% endif %}"
+  >
+    {% for item in items %}
+      {% if item.separator %}<div class="my-1 border-t border-ui-border" role="separator"></div>{% endif %}
+      <button
+        type="button"
+        role="menuitem"
+        @click="open = false"
+        {% if item.disabled %}disabled{% endif %}
+        class="flex w-full items-center gap-2 rounded-ui-button px-3 py-2 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus disabled:cursor-not-allowed disabled:opacity-40 {% if item.danger %}text-ui-danger hover:bg-ui-danger-soft{% else %}text-ui-text hover:bg-ui-surface-hover{% endif %}"
+      >
+        {% if item.icon %}<i data-lucide="{{ item.icon }}" class="h-4 w-4" aria-hidden="true"></i>{% endif %}
+        {{ item.label }}
+      </button>
+    {% empty %}
+      <p class="px-3 py-2 text-sm text-ui-text-muted">Aucune action</p>
+    {% endfor %}
+  </div>
+</div>

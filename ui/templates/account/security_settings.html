@@ -1,0 +1,59 @@
+{% load component_tags %}
+<div data-ui-core="security-settings" class="space-y-6">
+  <div>
+    <h3 class="text-lg font-bold text-ui-text">Changer le mot de passe</h3>
+    <p class="mt-1 text-sm text-ui-text-muted">Assurez-vous d'utiliser un mot de passe fort et unique.</p>
+
+    <form {% if hx_post %}hx-post="{{ hx_post }}" hx-target="{{ hx_target|default:'#security-container' }}" hx-swap="innerHTML" hx-indicator="#password-loading"{% endif %} method="POST" class="mt-4 space-y-4">
+      {% csrf_token %}
+      {% if password_form %}
+        {% for field in password_form %}
+          <div class="space-y-1.5">
+            <label for="{{ field.id_for_label }}" class="block text-sm font-semibold text-ui-text">
+              {{ field.label }}{% if field.field.required %}<span class="text-ui-danger" aria-hidden="true"> *</span>{% endif %}
+            </label>
+            {{ field }}
+            {% if field.errors %}
+              <p class="text-xs text-ui-danger" role="alert">{{ field.errors.0 }}</p>
+            {% endif %}
+          </div>
+        {% endfor %}
+      {% endif %}
+
+      <div id="password-loading" class="htmx-indicator">
+        <div class="flex items-center gap-2 text-sm text-ui-text-muted">
+          <div class="h-4 w-4 animate-spin rounded-full border-2 border-ui-border border-t-ui-info"></div>
+          Mise à jour...
+        </div>
+      </div>
+
+      <button type="submit" class="rounded-ui-button bg-ui-info px-4 py-2 text-sm font-semibold text-white hover:bg-ui-info/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2">
+        Mettre à jour le mot de passe
+      </button>
+    </form>
+  </div>
+
+  {% if sessions %}
+    <div class="border-t border-ui-border pt-6">
+      <h3 class="text-lg font-bold text-ui-text">Sessions actives</h3>
+      <div class="mt-3 space-y-2">
+        {% for session in sessions %}
+          <div class="flex items-center justify-between rounded-ui-card border border-ui-border p-3">
+            <div class="flex items-center gap-3">
+              <i data-lucide="monitor" class="h-5 w-5 text-ui-text-muted"></i>
+              <div>
+                <p class="text-sm font-medium text-ui-text">{{ session.device|default:"Appareil inconnu" }}</p>
+                <p class="text-xs text-ui-text-muted">{{ session.ip|default:"" }} · {{ session.last_active|default:"" }}</p>
+              </div>
+            </div>
+            {% if session.is_current %}
+              <span class="rounded-full bg-ui-success/10 px-2 py-0.5 text-xs font-medium text-ui-success">Actuelle</span>
+            {% else %}
+              <button type="button" class="text-xs text-ui-danger hover:underline">Révoquer</button>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+</div>

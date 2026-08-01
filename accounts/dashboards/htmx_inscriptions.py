@@ -74,8 +74,9 @@ def inscription_apply_coupon(request: HttpRequest, pk: int) -> HttpResponse:
     inscription = _get_manager_inscription(request, pk)
     code = (request.POST.get("coupon_code") or "").strip()
     coupon_error = ""
+    redemption = None
     try:
-        apply_coupon(
+        redemption = apply_coupon(
             code=code,
             inscription_id=inscription.id,
             actor=request.user,
@@ -85,11 +86,31 @@ def inscription_apply_coupon(request: HttpRequest, pk: int) -> HttpResponse:
     except ValidationError as exc:
         coupon_error = exc.messages[0] if hasattr(exc, "messages") else str(exc)
 
-    return render(
+    response = render(
         request,
         "accounts/dashboard/partials/inscription_modal.html",
         _build_inscription_detail_context(request, inscription, coupon_error=coupon_error),
     )
+    if redemption is not None:
+        response["HX-Trigger"] = json.dumps({
+            "couponApplied": {
+                "inscription_id": inscription.id,
+                "discount_amount": redemption.discount_amount,
+                "amount_after": redemption.amount_after,
+            },
+            "showToast": {
+                "message": (
+                    f"Coupon {redemption.coupon.code} appliqué : "
+                    f"réduction de {redemption.discount_amount} FCFA."
+                ),
+                "type": "success",
+            },
+        })
+    elif coupon_error:
+        response["HX-Trigger"] = json.dumps({
+            "showToast": {"message": coupon_error, "type": "error"},
+        })
+    return response
 
 
 @manager_required
@@ -97,6 +118,13 @@ def inscription_apply_coupon(request: HttpRequest, pk: int) -> HttpResponse:
 def coupon_preview(request: HttpRequest) -> HttpResponse:
     inscription_id = (request.GET.get("inscription_id") or "").strip()
     code = (request.GET.get("code") or "").strip()
+    if not inscription_id.isdigit():
+        return render(
+            request,
+            "accounts/dashboard/partials/coupon_preview.html",
+            {"valid": False, "message": "Inscription invalide."},
+            status=400,
+        )
     inscription = get_object_or_404(
         Inscription.objects.select_related("candidature", "candidature__programme", "candidature__branch"),
         pk=inscription_id,

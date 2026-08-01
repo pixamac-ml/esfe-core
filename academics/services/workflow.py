@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from academics.models import AcademicEnrollment, ECGrade, Semester
 
 
@@ -6,7 +8,7 @@ def get_semester_permissions(semester):
 
     return {
         "can_enter_normal": status == Semester.STATUS_NORMAL_ENTRY,
-        "can_enter_retake": status in {Semester.STATUS_NORMAL_LOCKED, Semester.STATUS_RETAKE_ENTRY},
+        "can_enter_retake": status == Semester.STATUS_RETAKE_ENTRY,
         "can_publish": status == Semester.STATUS_FINALIZED,
         "can_generate_reports": status == Semester.STATUS_PUBLISHED,
         "is_locked": status in {Semester.STATUS_FINALIZED, Semester.STATUS_PUBLISHED},
@@ -14,6 +16,17 @@ def get_semester_permissions(semester):
 
 
 def can_publish_semester(semester, enrollment_list):
+    configured_credits = sum(
+        (
+            Decimal(str(value or 0))
+            for value in semester.ues.values_list("ecs__credit_required", flat=True)
+            if value is not None
+        ),
+        Decimal("0.00"),
+    )
+    if configured_credits != Decimal(str(semester.total_required_credits or 0)):
+        return False
+
     ec_ids = list(semester.ues.values_list("ecs__id", flat=True).distinct())
     ec_ids = [ec_id for ec_id in ec_ids if ec_id is not None]
     if not ec_ids:

@@ -1,38 +1,528 @@
-SPRINT 2 — BACKEND WORKFLOW CALENDRIER ACADEMIQUE Projet : ESFE Core
-Destinataire : Codex
+MISSION DE RAFFINEMENT — SOUS-FENÊTRES DU DASHBOARD DIRECTEUR DES ÉTUDES
 
-OBJECTIF Construire le backend fonctionnel du Calendrier Académique en
-s’appuyant sur les modèles du Sprint 1.
+Tu travailles dans le projet ESFE Core existant.
 
-PREREQUIS Le Sprint 1 doit être terminé et les migrations doivent être
-vertes.
+Une première implémentation de sous-fenêtres internes a déjà été réalisée dans
+le dashboard Directeur des Études.
 
-TACHE 1 Créer les vues backend CRUD du Calendrier Académique. - Liste -
-Détail - Création - Modification - Publication - Archivage
+Le concept général est correct :
 
-TACHE 2 Créer les URLs dédiées.
+- la sidebar principale reste inchangée ;
+- la topbar reste inchangée ;
+- les sous-fenêtres sont placées dans la zone de contenu ;
+- une seule sous-page interne est visible à la fois.
 
-TACHE 3 Intégrer les permissions : - Directeur des Études : son annexe
-uniquement. - DG : toutes les annexes. - Super Admin : accès total.
+Cependant, l’implémentation actuelle manque encore de cohérence métier, de
+fluidité, d’intégration visuelle et de raccordement réel au backend.
 
-TACHE 4 Implémenter le workflow :
+Ta mission est de RAFFINER cette implémentation existante.
 
-Brouillon → Validation → Publication → Archivage
+Ne recommence pas toute l’architecture.
+Ne crée pas une nouvelle démonstration.
+Travaille directement sur la section réelle déjà modifiée.
 
-Une seule version publiée par année et annexe.
+======================================================================
+1. CORRIGER D’ABORD LA COHÉRENCE MÉTIER
+======================================================================
 
-TACHE 5 Créer les règles métier : - empêcher la publication si des
-périodes se chevauchent. - empêcher les dates hors année académique. -
-empêcher les incohérences de portée (classe, programme, semestre).
+Avant toute modification, inspecter les responsabilités réelles des sections :
 
-TACHE 6 Préparer l’intégration avec AcademicScheduleEvent : - vérifier
-les périodes bloquantes avant création d’un cours. - ne pas modifier le
-moteur d’emploi du temps.
+- Sessions d’évaluations ;
+- Résultats et notes.
 
-TACHE 7 Tests : - CRUD - permissions - publication - archivage -
-conflits - filtres par annexe et année
+Ne pas supposer que « Résultats et notes » crée les évaluations.
 
-LIVRABLE 1. Résumé 2. Fichiers créés/modifiés 3. Tests 4. API/vues
-disponibles 5. Points pour Sprint 3
+Dans le fonctionnement attendu :
 
-IMPORTANT Aucun frontend. Aucun template. Aucun composant HTMX.
+- les sessions et la planification des évaluations doivent être rattachées à
+  « Sessions d’évaluations » si c’est bien ainsi que le backend réel fonctionne ;
+- « Résultats et notes » doit rester centré sur les résultats, les notes,
+  les validations, les publications et les bulletins, selon ce qui existe
+  réellement dans le projet.
+
+Vérifier les vues, routes, services, formulaires et modèles existants avant de
+conserver ou déplacer une sous-fenêtre.
+
+Ne pas inventer de responsabilité métier.
+
+Produire un tableau rapide dans le rapport final :
+
+| Fonction | Section correcte | Vue existante | Action |
+|---|---|---|---|
+
+======================================================================
+2. NE PAS INVENTER DE DONNÉES OU DE CONTEXTE TECHNIQUE
+======================================================================
+
+Le projet concerne une école de santé.
+
+Ne pas utiliser d’exemples comme :
+
+- Algorithmique ;
+- Informatique ;
+- Contrôle de programmation ;
+- Réseaux ;
+- Machine learning.
+
+Utiliser uniquement :
+
+- les vraies matières présentes dans la base ;
+- les vraies classes ;
+- les vraies filières de santé ;
+- les vraies données du projet.
+
+Exemples possibles uniquement si présents réellement :
+
+- Anatomie ;
+- Physiologie ;
+- Pharmacologie ;
+- Biologie médicale ;
+- Santé communautaire ;
+- Soins infirmiers ;
+- Pédiatrie ;
+- Gynécologie ;
+- Pathologie ;
+- Biochimie.
+
+Ne pas créer de données fictives supplémentaires.
+
+======================================================================
+3. OBJECTIF VISUEL
+======================================================================
+
+Le concept actuel est bon, mais le rendu doit être beaucoup plus propre,
+cohérent et professionnel.
+
+La sous-navigation interne doit apparaître comme une partie native du dashboard,
+pas comme quatre liens ajoutés rapidement sous le titre.
+
+Revoir :
+
+- l’alignement ;
+- les espacements ;
+- les marges ;
+- les bordures ;
+- l’état actif ;
+- les icônes ;
+- la hiérarchie visuelle ;
+- la largeur des blocs ;
+- la cohérence entre le titre, les statistiques, les raccourcis et le contenu.
+
+Le rendu doit s’inspirer directement des sections du dashboard déjà les plus
+réussies.
+
+Inspecter notamment :
+
+- les sections les plus fluides ;
+- les formulaires déjà bien structurés ;
+- les tableaux déjà bien intégrés ;
+- les cartes d’action existantes ;
+- les drawers et contenus HTMX déjà stabilisés ;
+- la gestion du profil et des notifications dans le workspace.
+
+Réutiliser les mêmes patterns UI Core.
+
+Ne pas créer un style parallèle.
+
+======================================================================
+4. SOUS-NAVIGATION À RAFFINER
+======================================================================
+
+La sous-navigation doit :
+
+- rester sous l’en-tête de la section ;
+- être clairement distincte du contenu ;
+- montrer nettement l’onglet actif ;
+- avoir un état hover ;
+- avoir un état focus clavier ;
+- être compacte ;
+- être responsive ;
+- rester lisible sur mobile ;
+- ne pas créer de scroll horizontal global.
+
+Elle peut suivre cette logique :
+
+```text
+Titre de la section
+Résumé court
+Actions principales éventuelles
+
+[ Vue d’ensemble ] [ Créer ] [ Programmées ] [ Validation ]
+
+Contenu actif
+
+Mais les intitulés doivent correspondre aux vraies fonctions du projet.
+
+Si certaines sous-fenêtres sont mal placées dans la section actuelle, les
+corriger selon la logique métier réelle.
+
+======================================================================
+5. FLUIDITÉ HTMX OBLIGATOIRE
+
+L’expérience actuelle paraît trop sèche.
+
+Toutes les interactions internes doivent utiliser les patterns HTMX déjà
+stabilisés dans le projet.
+
+Les clics sur les sous-fenêtres doivent :
+
+charger uniquement le contenu interne ;
+ne pas recharger toute la page ;
+conserver la sidebar ;
+conserver la topbar ;
+conserver l’en-tête de section ;
+mettre à jour l’état actif ;
+mettre à jour l’URL si cela correspond aux conventions existantes ;
+gérer correctement l’historique navigateur si le projet le fait déjà.
+
+Utiliser une cible stable, par exemple :
+
+#director-section-subcontent
+
+ou la cible déjà créée si elle est correcte.
+
+Ajouter :
+
+indicateur de chargement discret ;
+gestion des erreurs HTMX ;
+état vide ;
+état de succès ;
+état d’échec ;
+gestion du bouton précédent/suivant du navigateur si compatible avec
+l’architecture existante.
+
+Ne pas faire de JavaScript lourd si HTMX suffit.
+
+======================================================================
+6. PAGINATION HTMX
+
+La pagination actuelle doit être fonctionnelle et fluide.
+
+Le bouton :
+
+Suivant
+
+doit réellement charger la page suivante.
+
+Il ne doit pas :
+
+recharger tout le dashboard ;
+casser la sous-fenêtre active ;
+perdre les filtres ;
+perdre la section ;
+remonter l’utilisateur ailleurs.
+
+La pagination doit cibler uniquement la liste ou la grille concernée.
+
+Exemple :
+
+clic sur Suivant
+→ hx-get vers la page suivante
+→ remplacement uniquement de la liste
+→ conservation des filtres
+→ conservation de la sous-fenêtre active
+
+Vérifier aussi :
+
+Précédent ;
+première page ;
+dernière page ;
+page vide ;
+filtres actifs ;
+résultats triés.
+======================================================================
+7. BOUTONS ET CARTES D’ACTION
+
+Les cartes et boutons actuellement affichés ne doivent pas être décoratifs.
+
+Chaque bouton doit déclencher une vraie action existante.
+
+Exemples :
+
+Planifier
+→ ouvre le vrai formulaire de planification
+
+Programmées
+→ ouvre la vraie liste des éléments programmés
+
+Validation
+→ ouvre la vraie vue de validation
+
+Les actions doivent utiliser :
+
+les vraies routes ;
+les vraies vues ;
+les vrais services ;
+les vraies permissions ;
+les vrais formulaires ;
+les vraies données.
+
+Aucune action factice.
+
+Aucun bouton sans effet.
+
+Aucun lien mort.
+
+======================================================================
+8. FORMULAIRES
+
+Les formulaires doivent suivre les patterns déjà réussis dans le projet.
+
+Vérifier :
+
+labels ;
+champs requis ;
+erreurs par champ ;
+erreurs globales ;
+messages de succès ;
+désactivation temporaire du bouton pendant la requête ;
+protection contre les doubles soumissions ;
+conservation des valeurs en cas d’erreur ;
+retour correct après création ;
+mise à jour des statistiques après succès ;
+mise à jour de la liste liée si nécessaire.
+
+Privilégier :
+
+POST HTMX
+→ validation backend
+→ rendu des erreurs dans le formulaire
+→ message de succès
+→ mise à jour du contenu utile
+
+Ne pas contourner les vues ou services existants.
+
+======================================================================
+9. VUE D’ENSEMBLE
+
+La vue d’ensemble doit rester courte.
+
+Elle peut contenir :
+
+total ;
+à venir ;
+à valider ;
+à publier ;
+alertes importantes ;
+raccourcis utiles.
+
+Elle ne doit pas répéter toutes les listes.
+
+Les cartes de raccourci doivent ouvrir les vraies sous-fenêtres.
+
+La vue d’ensemble doit servir à orienter l’utilisateur, pas à recréer une longue
+page.
+
+======================================================================
+10. LISTES ET GRILLES
+
+Les listes doivent être mieux agencées.
+
+Vérifier :
+
+alignement des colonnes ;
+densité ;
+lisibilité ;
+nombre d’éléments visibles ;
+pagination ;
+filtres ;
+actions ;
+états ;
+badges ;
+responsive ;
+débordements.
+
+Pour les classes ou validations nombreuses :
+
+ne pas tout afficher sans contrôle ;
+utiliser pagination ;
+utiliser filtres ;
+utiliser recherche si elle existe déjà ;
+conserver une hiérarchie visuelle claire.
+
+Les éléments importants doivent être visibles immédiatement :
+
+classe ;
+filière ;
+matière ;
+session ;
+statut ;
+nombre de notes ;
+actions disponibles.
+======================================================================
+11. CORRIGER LES DÉPASSEMENTS
+
+Vérifier précisément :
+
+min-w-0 dans les conteneurs flex/grid ;
+max-w-full ;
+overflow-x-auto uniquement autour des tableaux ;
+grilles adaptatives ;
+textes longs ;
+badges trop larges ;
+boutons qui sortent du conteneur ;
+pagination hors cadre ;
+formulaires trop larges ;
+colonnes qui écrasent les contenus.
+
+Aucun élément ne doit dépasser la zone centrale.
+
+Le scroll horizontal doit rester local à un tableau si nécessaire.
+
+Le document entier ne doit jamais défiler horizontalement.
+
+======================================================================
+12. S’INSPIRER DES MEILLEURES SECTIONS EXISTANTES
+
+Avant de raffiner, inspecter les sections du dashboard déjà considérées comme
+fluides et professionnelles.
+
+Comparer :
+
+structure du header ;
+boutons ;
+cartes ;
+tableaux ;
+formulaires ;
+HTMX ;
+modales ;
+drawers ;
+pagination ;
+états vides ;
+retours utilisateur.
+
+Réutiliser les composants UI Core existants lorsqu’ils répondent au besoin.
+
+Ne pas dupliquer un composant déjà présent.
+
+Ne pas introduire un nouveau design system.
+
+======================================================================
+13. TESTS FONCTIONNELS OBLIGATOIRES
+
+Tester dans le vrai navigateur :
+
+connexion Directeur des Études ;
+ouverture de la section ;
+affichage correct de la sous-navigation ;
+changement de sous-fenêtre sans reload complet ;
+retour navigateur ;
+ouverture du formulaire réel ;
+erreurs de formulaire ;
+succès de création ;
+mise à jour des statistiques ;
+ouverture de la liste programmée ;
+pagination Suivant ;
+pagination Précédent ;
+conservation des filtres ;
+ouverture de la validation ;
+actions réelles de validation selon les permissions ;
+responsive desktop ;
+responsive tablette ;
+responsive mobile ;
+absence d’erreur console ;
+absence de débordement global.
+======================================================================
+14. CAPTURES OBLIGATOIRES
+
+Créer :
+
+_audit/director_subwindows_refinement/
+
+Captures minimales :
+
+01-overview-refined.png
+02-create-refined.png
+03-scheduled-refined.png
+04-validation-refined.png
+05-pagination-page-1.png
+06-pagination-page-2.png
+07-form-errors.png
+08-form-success.png
+09-mobile.png
+10-tablet.png
+======================================================================
+15. TESTS TECHNIQUES
+
+Exécuter au minimum :
+
+python manage.py check
+python manage.py makemigrations --check --dry-run
+python manage.py test portal.test_director_dashboard_phase2 --settings=config.settings_test_local --keepdb
+python manage.py test ui --settings=config.settings_test_local --keepdb
+npm run build:css
+
+Ajouter ou corriger les tests ciblés pour :
+
+sous-navigation ;
+HTMX ;
+pagination ;
+formulaires ;
+permissions ;
+actions backend ;
+états actifs ;
+données réelles ;
+absence de migration ;
+responsive structurel ;
+absence de liens morts.
+======================================================================
+16. LIMITES STRICTES
+
+Ne pas :
+
+modifier la sidebar ;
+modifier la topbar ;
+refaire le dashboard complet ;
+généraliser encore à toutes les sections ;
+inventer de nouvelles fonctions ;
+inventer de nouvelles matières ;
+utiliser des exemples d’école informatique ;
+modifier les modèles sans nécessité absolue ;
+créer une migration ;
+contourner les services métier ;
+remplacer des actions backend par du JavaScript ;
+laisser des boutons décoratifs ;
+laisser une pagination non fonctionnelle ;
+faire un commit ;
+faire un push.
+======================================================================
+17. RAPPORT FINAL
+
+Créer :
+
+docs/ui/DIRECTOR_SUBWINDOWS_REFINEMENT_REPORT.md
+
+Le rapport doit contenir :
+
+cohérence métier vérifiée ;
+fonctions déplacées ou corrigées ;
+section finale retenue ;
+sous-fenêtres finales ;
+composants UI Core réutilisés ;
+interactions HTMX ;
+pagination ;
+formulaires ;
+actions backend ;
+données de santé utilisées ;
+fichiers modifiés ;
+captures ;
+tests ;
+limites ;
+état Git ;
+verdict.
+
+Le verdict doit être exactement l’un des deux suivants :
+
+SOUS-FENÊTRES RAFFINÉES ET PRÊTES POUR VALIDATION VISUELLE
+
+ou :
+
+SOUS-FENÊTRES ENCORE NON SATISFAISANTES
+
+Commence par comparer l’implémentation actuelle avec les sections les plus
+fluides du dashboard. Corrige d’abord la cohérence métier entre
+« Sessions d’évaluations » et « Résultats et notes », puis raffine
+l’interface, les actions backend, la pagination et l’expérience HTMX.
+
+
+Le but de cette étape est simple : **ne pas encore appliquer partout**. Il doit d’abord transformer cette version

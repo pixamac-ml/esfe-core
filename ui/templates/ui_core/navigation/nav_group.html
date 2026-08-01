@@ -1,0 +1,9 @@
+{% load component_tags %}
+<section aria-label="{{ label|default:'Navigation' }}" x-data="{ groupOpen: {{ open|yesno:'true,false' }} }">
+  {% if label %}<button type="button" @click="groupOpen = !groupOpen" :aria-expanded="groupOpen" class="mb-2 flex w-full items-center justify-between rounded-ui-button px-3 py-1 text-ui-caption font-bold uppercase text-ui-on-primary/50 hover:bg-ui-on-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" x-show="!collapsed"><span>{{ label }}{% if count != None %} ({{ count }}){% endif %}</span><i data-lucide="chevron-down" class="h-3.5 w-3.5"></i></button>{% endif %}
+  <ul class="space-y-1" x-show="groupOpen || collapsed">
+    {% for item in items %}
+      <li>{% component "ui_core.nav_item" label=item.label url=item.url icon=item.icon active=item.active badge=item.badge disabled=item.disabled hx_get=item.hx_get hx_target=item.hx_target hx_swap=item.hx_swap hx_push_url=item.hx_push_url nav_key=item.nav_key %}{% endcomponent %}</li>
+    {% endfor %}
+  </ul>
+</section>

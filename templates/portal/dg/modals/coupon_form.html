@@ -13,6 +13,7 @@
   {% if form and form.errors %}
   <div class="mb-4 rounded-xl border border-rose-100 bg-rose-50 p-3 text-sm font-semibold text-rose-700">
     Merci de corriger les champs signales.
+    {% if form.non_field_errors %}<div class="mt-1">{{ form.non_field_errors.0 }}</div>{% endif %}
   </div>
   {% endif %}
 
@@ -43,6 +44,7 @@
       <label class="block">
         <span class="text-xs font-black text-slate-500">Type de reduction</span>
         {{ form.discount_type }}
+        {% if form.discount_type.errors %}<p class="mt-1 text-xs font-semibold text-rose-600">{{ form.discount_type.errors.0 }}</p>{% endif %}
       </label>
       <label class="block">
         <span class="text-xs font-black text-slate-500">Valeur (% ou FCFA)</span>
@@ -52,10 +54,14 @@
       <label class="block">
         <span class="text-xs font-black text-slate-500">Annexes concernees</span>
         {{ form.branches }}
+        <p class="mt-1 text-xs text-slate-500">Laissez vide pour toutes les annexes.</p>
+        {% if form.branches.errors %}<p class="mt-1 text-xs font-semibold text-rose-600">{{ form.branches.errors.0 }}</p>{% endif %}
       </label>
       <label class="block" id="dg-coupon-programmes-wrap">
         <span class="text-xs font-black text-slate-500">Formations concernees</span>
         {{ form.programmes }}
+        <p class="mt-1 text-xs text-slate-500">Laissez vide pour toutes les formations.</p>
+        {% if form.programmes.errors %}<p class="mt-1 text-xs font-semibold text-rose-600">{{ form.programmes.errors.0 }}</p>{% endif %}
       </label>
       <label class="block">
         <span class="text-xs font-black text-slate-500">Valide a partir de</span>
@@ -69,6 +75,7 @@
       <label class="block">
         <span class="text-xs font-black text-slate-500">Nombre max d'utilisations</span>
         {{ form.max_redemptions }}
+        {% if form.max_redemptions.errors %}<p class="mt-1 text-xs font-semibold text-rose-600">{{ form.max_redemptions.errors.0 }}</p>{% endif %}
       </label>
     </div>
 
@@ -83,6 +90,22 @@
 (() => {
   const branchesSelect = document.getElementById('dg-coupon-branches');
   const programmesWrap = document.getElementById('dg-coupon-programmes-wrap');
+  const discountType = document.getElementById('id_discount_type');
+  const valueInput = document.getElementById('id_value');
+
+  const syncValueBounds = () => {
+    if (!discountType || !valueInput) return;
+    if (discountType.value === 'percentage') {
+      valueInput.max = '100';
+      valueInput.placeholder = 'Ex: 10 pour 10 %';
+    } else {
+      valueInput.removeAttribute('max');
+      valueInput.placeholder = 'Ex: 25000 FCFA';
+    }
+  };
+  if (discountType) discountType.addEventListener('change', syncValueBounds);
+  syncValueBounds();
+
   if (!branchesSelect || !programmesWrap) return;
 
   branchesSelect.addEventListener('change', () => {

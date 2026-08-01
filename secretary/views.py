@@ -438,6 +438,7 @@ def secretary_dashboard(request):
     context["notifications_rows"] = context["notifications_page"].object_list
     context["selected_notification"] = selected_notification
     context["messages_count"] = get_user_unread_count(request.user)
+    context["notifications_count"] = context["messages_count"]
 
     context["quick_registry_form"] = RegistryEntryForm(**_form_kwargs(request))
     context["quick_appointment_form"] = AppointmentForm(**_form_kwargs(request))

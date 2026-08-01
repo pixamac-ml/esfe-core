@@ -1,0 +1,251 @@
+RAPPORT DE VERIFICATION — REDUCTIONS ET COUPONS DE FORMATION
+================================================================
+
+Date de verification : 16 juillet 2026
+Projet : ESFE Core
+
+
+1. CONCLUSION
+-------------
+
+Oui, la fonctionnalite de reduction par coupon est implementee dans le systeme.
+Elle est reliee aux inscriptions, au dashboard du Directeur General, au dashboard
+de la gestionnaire, aux rapports financiers et au journal d'audit.
+
+Attention a la nuance : un coupon ne modifie pas durablement le prix public d'une
+formation. Il diminue le montant a payer (amount_due) d'une inscription precise.
+
+
+2. FONCTIONNALITES DISPONIBLES
+------------------------------
+
+- Creation d'un coupon par le Directeur General ou son adjoint.
+- Reduction en pourcentage ou en montant fixe FCFA.
+- Restriction a une ou plusieurs annexes.
+- Restriction a une ou plusieurs formations.
+- Date de debut et date d'expiration.
+- Nombre maximal d'utilisations.
+- Activation et desactivation d'un coupon.
+- Application lors de la creation d'une inscription.
+- Application sur une inscription existante non entierement payee.
+- Previsualisation du montant de la reduction et du nouveau montant a payer.
+- Un seul coupon autorise par inscription.
+- Refus d'un coupon inconnu, desactive, expire ou dont le quota est epuise.
+- Refus d'un coupon utilise dans une mauvaise annexe ou une mauvaise formation.
+- Le montant apres reduction ne peut pas devenir inferieur au montant deja paye.
+- Enregistrement de l'utilisation dans CouponRedemption.
+- Enregistrement de la reduction dans FinancialLog.
+- Comptabilisation des coupons et des remises dans les rapports Excel.
+- Notification des agents des annexes concernees lors de la creation d'un coupon.
+
+La saisie du coupon est actuellement administrative : elle est faite par la
+gestionnaire. Il n'existe pas encore de formulaire public permettant au candidat
+ou a l'etudiant d'appliquer lui-meme son coupon.
+
+
+3. RESULTATS DES VERIFICATIONS TECHNIQUES
+-----------------------------------------
+
+- Application Django "coupons" presente dans INSTALLED_APPS.
+- Migration initiale coupons presente et coherente avec les modeles.
+- Commande makemigrations --check : aucune migration manquante.
+- Commande manage.py check : aucune anomalie detectee.
+- 24 tests cibles executes : 24 reussis.
+
+Les tests couvrent notamment les pourcentages, les montants fixes, les dates,
+les quotas, les annexes, les formations, les paiements deja effectues, l'application
+depuis le dashboard de la gestionnaire et la creation d'inscription avec coupon.
+
+
+4. CE QU'IL FAUT FAIRE POUR LE RENDRE OPERATIONNEL EN PRODUCTION
+---------------------------------------------------------------
+
+Le code est deja fonctionnel. Pour l'activer sur le serveur reel, effectuer les
+operations suivantes dans cet ordre :
+
+1) Sauvegarder la base de donnees de production avant le deploiement.
+
+2) Deployer la version actuelle du projet en incluant :
+   - le dossier coupons/ ;
+   - les routes accounts et portal ;
+   - les templates du dashboard DG et de la gestionnaire ;
+   - les migrations Django.
+
+3) Installer ou mettre a jour les dependances du projet :
+
+   pip install -r requirements.txt
+
+4) Appliquer les migrations sur la base de donnees configuree pour le serveur :
+
+   python manage.py migrate
+
+   Cette commande doit notamment appliquer coupons/migrations/0001_initial.py si
+   elle n'a pas encore ete appliquee.
+
+5) Construire les fichiers CSS et collecter les fichiers statiques selon le mode
+   de deploiement du serveur :
+
+   npm install
+   npm run build:css
+   python manage.py collectstatic --noinput
+
+6) Executer les controles apres migration :
+
+   python manage.py check
+   python manage.py test --settings=config.settings_test_local coupons.tests accounts.test_manager_workflows.ManagerCouponWorkflowTests
+
+7) Redemarrer les processus de l'application : serveur ASGI/Daphne ou serveur
+   WSGI/Gunicorn, ainsi que les services associes si necessaire.
+
+
+5. CONFIGURATION DES UTILISATEURS
+---------------------------------
+
+Pour creer et utiliser les coupons, les comptes doivent etre correctement classes :
+
+- Le compte qui cree les coupons doit avoir la position executive_director ou
+  deputy_executive_director.
+- Le compte qui applique les coupons doit etre une gestionnaire/manager associee
+  a son annexe.
+- La candidature et l'inscription doivent appartenir a la meme annexe que la
+  gestionnaire. Le controle inter-annexes est volontairement bloque.
+- Les annexes, les formations, les classes academiques et leurs frais doivent etre
+  correctement configures avant de creer les inscriptions.
+
+
+6. PROCEDURE D'UTILISATION
+-------------------------
+
+A. Creation par le Directeur General
+
+1) Se connecter au portail du Directeur General.
+2) Ouvrir la section "Coupons".
+3) Cliquer sur "Nouveau coupon".
+4) Renseigner un code unique, un libelle, le type et la valeur de la reduction.
+5) Selectionner les annexes et formations autorisees.
+   - Aucune annexe selectionnee signifie : toutes les annexes.
+   - Aucune formation selectionnee signifie : toutes les formations.
+6) Renseigner la periode de validite et le quota d'utilisations.
+7) Enregistrer puis verifier que le coupon apparait comme actif.
+
+B. Application par la gestionnaire
+
+Deux parcours sont disponibles :
+
+- Lors de la creation de l'inscription : saisir le code dans le champ facultatif
+  "Code coupon" avant de valider l'inscription.
+- Sur une inscription existante : ouvrir le detail de l'inscription, saisir le
+  code dans "Appliquer un coupon", attendre la previsualisation puis cliquer sur
+  "Appliquer".
+
+Une inscription entierement payee ne peut plus recevoir de coupon. Une inscription
+partiellement payee peut en recevoir un, mais son nouveau total ne descendra jamais
+sous la somme deja payee.
+
+
+7. RECETTE FONCTIONNELLE RECOMMANDEE AVANT OUVERTURE
+----------------------------------------------------
+
+Effectuer au minimum les essais suivants avec des donnees de test :
+
+1) Creer un coupon de 10 % limite a une annexe et une formation.
+2) L'appliquer a une inscription eligible et verifier le nouveau montant.
+3) Verifier la presence de CouponRedemption et de la trace FinancialLog.
+4) Essayer le meme coupon dans une autre annexe : il doit etre refuse.
+5) Essayer le coupon sur une autre formation : il doit etre refuse.
+6) Epuiser son quota puis essayer une utilisation supplementaire : refus attendu.
+7) Essayer un coupon expire et un coupon desactive : refus attendu.
+8) Essayer une deuxieme reduction sur la meme inscription : refus attendu.
+9) Verifier le nombre de coupons et le total des remises dans l'export Excel.
+10) Confirmer que chaque gestionnaire ne voit que les inscriptions de son annexe.
+
+
+8. AMELIORATION OPTIONNELLE
+---------------------------
+
+Si l'objectif est que le candidat saisisse lui-meme son coupon pendant une demande
+d'admission ou un paiement en ligne, ce parcours reste a developper. Il faudra alors
+ajouter un champ public, une previsualisation securisee et appliquer le coupon cote
+serveur sans affaiblir les controles d'annexe, de formation, de quota et de paiement.
+
+
+9. QU'EST-CE QU'UN SYSTEME DE COUPONS ?
+---------------------------------------
+
+Un systeme de coupons permet d'accorder une reduction exceptionnelle sans modifier
+le prix normal d'un produit ou d'un service pour tout le monde.
+
+Dans le cas de l'ESFE, le produit ou service est une formation et la facture concernee
+est le montant a payer pour une inscription. Le coupon est donc un code, par exemple
+ESFE-LICENCE-10, que l'on applique a une inscription pour reduire son montant.
+
+Un systeme de coupons complet doit normalement accomplir les fonctions suivantes :
+
+1) Creer un code identifiable et unique.
+2) Definir la reduction accordee : pourcentage ou montant fixe.
+3) Definir les formations sur lesquelles le code est autorise.
+4) Definir les annexes dans lesquelles il est utilisable.
+5) Definir une periode de validite.
+6) Limiter le nombre d'utilisations si necessaire.
+7) Verifier le code avant de l'accepter.
+8) Calculer la reduction et le nouveau montant a payer.
+9) Empecher les utilisations interdites ou multiples.
+10) Conserver la preuve de l'utilisation pour le suivi financier et l'audit.
+
+Exemple simple :
+
+- Prix normal de l'inscription : 500 000 FCFA.
+- Coupon : RENTREE10.
+- Reduction : 10 %.
+- Montant de la reduction : 50 000 FCFA.
+- Nouveau montant a payer : 450 000 FCFA.
+
+Le prix officiel de la formation reste 500 000 FCFA. Seule l'inscription qui a recu
+le coupon passe a 450 000 FCFA. C'est la difference entre un coupon individuel et
+une modification generale du tarif d'une formation.
+
+
+10. EST-CE BIEN CE QUI A ETE IMPLEMENTE DANS ESFE CORE ?
+--------------------------------------------------------
+
+Oui. Le fonctionnement implemente dans ESFE Core correspond bien a un veritable
+systeme de coupons.
+
+Votre implementation permet effectivement de :
+
+- creer un code unique ;
+- choisir une reduction en pourcentage ou en FCFA ;
+- limiter le coupon par annexe et par formation ;
+- definir ses dates de validite et son quota ;
+- verifier automatiquement son eligibilite ;
+- calculer et afficher le nouveau montant ;
+- reduire le montant total a payer pour l'inscription ;
+- interdire un deuxieme coupon sur la meme inscription ;
+- proteger une somme deja payee ;
+- enregistrer qui a applique le coupon, quand, sur quelle inscription et pour quel
+  montant ;
+- integrer les remises dans les traces et rapports financiers.
+
+La reponse claire est donc : OUI, vous avez implemente un systeme de coupons coherent
+avec le fonctionnement attendu pour une ecole.
+
+Ce systeme est actuellement un outil administratif : le Directeur General cree le
+coupon et la gestionnaire l'applique a l'inscription. Ce choix est adapte lorsque
+l'ecole veut garder le controle sur les reductions accordees.
+
+Ce qui n'est pas encore implemente n'empeche pas de parler d'un systeme de coupons :
+
+- le candidat ou l'etudiant ne peut pas encore saisir lui-meme son code depuis un
+  formulaire public ;
+- il n'existe pas de promotion automatique sans code, par exemple une reduction de
+  10 % appliquee automatiquement a toutes les inscriptions pendant une periode ;
+- il n'existe pas de regles commerciales plus avancees comme un montant minimum,
+  un coupon reserve a un etudiant precis ou plusieurs coupons cumulables.
+
+Ces elements sont des extensions possibles. Ils ne sont pas obligatoires pour que
+la fonctionnalite actuelle soit consideree comme un vrai systeme de coupons.
+
+En conclusion, l'essentiel est deja present et correctement organise. Pour l'usage
+actuel de l'ESFE, il faut principalement deployer les migrations, configurer les
+roles, creer les premiers coupons et effectuer la recette fonctionnelle decrite dans
+ce rapport.

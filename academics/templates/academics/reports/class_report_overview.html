@@ -91,8 +91,12 @@
           <td>{{ row.student_name }}</td>
           <td>
             <div class="actions">
-              <a class="action-link" href="{% url 'academics:student_semester_report' row.student_id semester.id %}">Voir relevé</a>
-              <a class="action-link primary" href="{% url 'academics:student_semester_pdf' row.student_id semester.id %}" target="_blank">PDF</a>
+              {% if row.bulletin %}
+                <a class="action-link" href="{% url 'academics:bulletin_detail' row.bulletin.id %}" target="_blank">Bulletin officiel</a>
+                <a class="action-link primary" href="{% url 'academics:bulletin_pdf' row.bulletin.id %}" target="_blank">PDF officiel</a>
+              {% else %}
+                <span>Aucun bulletin publié</span>
+              {% endif %}
             </div>
           </td>
         </tr>

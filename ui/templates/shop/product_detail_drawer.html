@@ -1,0 +1,92 @@
+{% load component_tags %}
+<div
+  x-data="uiOverlay(false)"
+  @keydown.escape.window="if (open) close()"
+  @ui-overlay-open.window="if ($event.detail.id === '{{ drawer_id }}') show()"
+  @ui-overlay-close.window="if ($event.detail.id === '{{ drawer_id }}') close()"
+  data-ui-core="product-detail-drawer"
+>
+  <div x-show="open" x-cloak class="fixed inset-0 z-50 bg-ui-overlay/45" role="dialog" aria-modal="true" aria-labelledby="{{ drawer_id }}-title">
+    <aside x-ref="dialog" tabindex="-1" @keydown.tab="trap($event)" class="absolute inset-y-0 right-0 w-full max-w-lg overflow-auto bg-ui-surface shadow-ui-drawer focus:outline-none">
+      <header class="sticky top-0 z-10 flex items-center justify-between border-b border-ui-border bg-ui-surface px-5 py-4">
+        <h2 id="{{ drawer_id }}-title" class="text-base font-bold text-ui-text">Détail du produit</h2>
+        <button type="button" @click="close()" class="grid h-9 w-9 place-items-center rounded-ui-button hover:bg-ui-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" aria-label="Fermer">
+          <i data-lucide="x" class="h-4 w-4"></i>
+        </button>
+      </header>
+
+      <div id="{{ drawer_id }}-content" class="p-5">
+        {% if hx_load %}
+          <div hx-get="{{ hx_load }}" hx-trigger="revealed" hx-swap="innerHTML" hx-target="#{{ drawer_id }}-content" class="flex items-center justify-center p-8">
+            <div class="h-6 w-6 animate-spin rounded-full border-2 border-ui-border border-t-ui-info"></div>
+          </div>
+        {% elif product %}
+          {% if product.image_url %}
+            <img src="{{ product.image_url }}" alt="{{ product.name }}" class="w-full rounded-ui-card object-cover" loading="lazy">
+          {% endif %}
+
+          <div class="mt-4 space-y-3">
+            <div>
+              <h3 class="text-lg font-bold text-ui-text">{{ product.name }}</h3>
+              {% if product.category %}
+                <span class="mt-1 inline-block rounded-full bg-ui-surface-muted px-2 py-0.5 text-xs text-ui-text-muted">{{ product.category }}</span>
+              {% endif %}
+            </div>
+
+            {% if product.description %}
+              <p class="text-sm text-ui-text-muted">{{ product.description }}</p>
+            {% endif %}
+
+            <div class="flex items-baseline gap-3">
+              <span class="text-2xl font-bold text-ui-text">{{ product.price }}</span>
+              {% if product.original_price %}
+                <span class="text-sm text-ui-text-muted line-through">{{ product.original_price }}</span>
+              {% endif %}
+            </div>
+
+            <div class="flex items-center gap-2 text-sm">
+              {% if product.stock > 0 %}
+                <span class="text-ui-success">En stock ({{ product.stock }})</span>
+              {% else %}
+                <span class="text-ui-danger">Indisponible</span>
+              {% endif %}
+            </div>
+
+            {% if product.variants %}
+              <div class="border-t border-ui-border pt-3">
+                <p class="text-xs font-semibold text-ui-text-muted uppercase">Variantes</p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  {% for variant in product.variants %}
+                    <button type="button" class="rounded-full border border-ui-border px-3 py-1 text-xs text-ui-text hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus">
+                      {{ variant.name }}{% if variant.extra_price %} (+{{ variant.extra_price }}){% endif %}
+                    </button>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+
+      {% if product and product.is_available and product.stock > 0 %}
+        <footer class="sticky bottom-0 border-t border-ui-border bg-ui-surface px-5 py-4">
+          {% if hx_add_to_cart %}
+            <button
+              type="button"
+              hx-post="{{ hx_add_to_cart }}"
+              hx-swap="innerHTML"
+              hx-target="#cart-feedback"
+              class="w-full rounded-ui-button bg-ui-info py-2.5 text-sm font-semibold text-white hover:bg-ui-info/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2"
+            >
+              Ajouter au panier
+            </button>
+          {% else %}
+            <button type="button" class="w-full rounded-ui-button bg-ui-info py-2.5 text-sm font-semibold text-white hover:bg-ui-info/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2">
+              Commander
+            </button>
+          {% endif %}
+        </footer>
+      {% endif %}
+    </aside>
+  </div>
+</div>

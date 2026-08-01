@@ -1,0 +1,27 @@
+{% load component_tags %}
+{% if href %}<a href="{{ href }}" {% if hx_get %}hx-get="{{ hx_get }}"{% endif %} {% if hx_target %}hx-target="{{ hx_target }}" hx-swap="innerHTML"{% endif %} {% if hx_push_url %}hx-push-url="{{ hx_push_url }}"{% endif %} class="block rounded-ui-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus">{% else %}<article>{% endif %}
+  <div class="relative rounded-ui-card border border-ui-border bg-ui-surface shadow-ui-card transition hover:border-ui-primary/30 {% if compact %}min-h-24 p-3{% else %}min-h-32 p-4{% endif %}" data-ui-core="stat-card">
+    {% if loading %}
+      <div class="animate-pulse space-y-3" role="status" aria-label="Chargement"><div class="h-3 w-24 rounded-ui-button bg-ui-skeleton"></div><div class="h-8 w-20 rounded-ui-button bg-ui-skeleton"></div></div>
+    {% elif empty %}
+      <p class="text-xs font-bold uppercase text-ui-text-muted">{{ label|default:"Indicateur" }}</p>
+      <p class="mt-4 text-sm text-ui-text-muted">Aucune donnée disponible</p>
+    {% else %}
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <p class="break-words text-xs font-bold uppercase text-ui-text-muted">{{ label|default:"Indicateur" }}</p>
+          <p class="mt-2 break-words font-bold text-ui-text {% if compact %}text-xl{% else %}text-2xl{% endif %}">{% if value == "" or value == None %}—{% else %}{{ value }}{% endif %}{% if unit %}<span class="ml-1 text-sm font-semibold text-ui-text-muted">{{ unit }}</span>{% endif %}</p>
+          {% if description %}<p class="mt-1 text-xs text-ui-text-muted">{{ description }}</p>{% endif %}
+        </div>
+        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button {% if tone == 'success' %}bg-ui-success-soft text-ui-success{% elif tone == 'warning' %}bg-ui-warning-soft text-ui-warning{% elif tone == 'danger' %}bg-ui-danger-soft text-ui-danger{% elif tone == 'accent' %}bg-ui-accent-soft text-ui-accent-strong{% elif tone == 'info' %}bg-ui-info-soft text-ui-info{% elif tone == 'neutral' %}bg-ui-surface-muted text-ui-text-muted{% else %}bg-ui-primary-soft text-ui-primary{% endif %}">
+          <i data-lucide="{{ icon }}" class="h-5 w-5" aria-hidden="true"></i>
+        </span>
+      </div>
+      {% if trend != None or period %}<p class="mt-3 text-xs text-ui-text-muted">{% if trend != None %}<strong class="{% if trend > 0 %}text-ui-success{% elif trend < 0 %}text-ui-danger{% endif %}">{{ trend }} %</strong>{% endif %}{% if trend_label %} {{ trend_label }}{% endif %}{% if period %}<span class="ml-1">{{ period }}</span>{% endif %}</p>{% endif %}
+      {% if progress != None %}
+        <div class="mt-3">{% component "ui_core.progress_bar" value=progress label="Objectif" compact=True %}{% endcomponent %}</div>
+      {% endif %}
+      {% if target != None %}<p class="mt-2 text-xs text-ui-text-muted">Objectif : {{ target }}</p>{% endif %}
+    {% endif %}
+  </div>
+{% if href %}</a>{% else %}</article>{% endif %}

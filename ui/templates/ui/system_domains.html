@@ -1,0 +1,118 @@
+{% extends "ui/system_base.html" %}
+{% load component_tags %}
+
+{% block title %}Catalogue des composants métier | ESFE{% endblock %}
+
+{% block content %}
+{% component "ui_core.app_shell" title="Composants métier" %}
+  {% fill "sidebar" %}
+    {% component "ui_core.app_sidebar" groups=navigation_groups brand="ESFE" subtitle="Catalogue interne" user_name=user_display_name user_meta="17 composants" %}{% endcomponent %}
+  {% endfill %}
+  {% fill "topbar" %}
+    {% component "ui_core.app_topbar" title="Catalogue des composants métier" user_name=user_display_name context_label="Compte, notifications, étudiants, boutique" notification_count=domain_component_count %}
+      {% fill "actions" %}
+        <a href="{{ ui_system_url }}" class="inline-flex h-10 items-center gap-2 rounded-ui-button border border-ui-border px-3 text-sm font-semibold hover:bg-ui-surface-hover"><i data-lucide="layout-dashboard" class="h-4 w-4"></i>UI Core</a>
+      {% endfill %}
+    {% endcomponent %}
+  {% endfill %}
+
+  {% fill "default" %}
+  <div x-data="{ query: '', family: 'all', matches(value) { return !this.query || value.toLowerCase().includes(this.query.toLowerCase()) } }" class="space-y-6">
+    {% component "ui_core.page_header" eyebrow="Showcase métier" title="Catalogue des composants métier" subtitle="Chaque carte ouvre un drawer de détail et charge une démonstration réelle ou connectée au backend." %}
+      {% fill "actions" %}
+        <div class="flex items-center gap-3">
+          <span class="rounded-full bg-ui-primary/10 px-3 py-1 text-xs font-semibold text-ui-primary">{{ domain_component_count }} composants</span>
+          <span class="rounded-full bg-ui-success/10 px-3 py-1 text-xs font-semibold text-ui-success">{{ domain_backend_count }} branchés</span>
+          <span class="rounded-full bg-ui-info/10 px-3 py-1 text-xs font-semibold text-ui-info">{{ domain_dashboard_count }} utilisés</span>
+        </div>
+      {% endfill %}
+    {% endcomponent %}
+
+    <section class="space-y-4" aria-labelledby="catalog-filter-title">
+      <h2 id="catalog-filter-title" class="sr-only">Filtres du catalogue</h2>
+      <div class="grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_auto] lg:items-end">
+        <label class="block">
+          <span class="mb-2 block text-xs font-semibold uppercase tracking-wide text-ui-text-muted">Recherche</span>
+          <div class="flex items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-3">
+            <i data-lucide="search" class="h-4 w-4 text-ui-text-muted"></i>
+            <input type="search" x-model="query" class="w-full border-0 bg-transparent py-3 text-sm outline-none placeholder:text-ui-text-muted" placeholder="Rechercher un composant, une état ou un fichier">
+          </div>
+        </label>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" @click="family = 'all'" :class="family === 'all' ? 'bg-ui-primary text-ui-on-primary' : 'border border-ui-border bg-ui-surface text-ui-text'" class="rounded-full px-3 py-2 text-xs font-semibold">Toutes</button>
+          {% for family in domain_families %}
+            <button type="button" @click="family = '{{ family.id }}'" :class="family === '{{ family.id }}' ? 'bg-ui-primary text-ui-on-primary' : 'border border-ui-border bg-ui-surface text-ui-text'" class="rounded-full px-3 py-2 text-xs font-semibold">{{ family.label }}</button>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+
+    {% for family in domain_families %}
+      <section id="family-{{ family.id }}" class="space-y-4" aria-labelledby="family-{{ family.id }}-title">
+        <div class="flex items-end justify-between gap-4 border-b border-ui-border pb-3">
+          <div>
+            <h3 id="family-{{ family.id }}-title" class="text-lg font-bold text-ui-text">{{ family.label }}</h3>
+            <p class="text-sm text-ui-text-muted">{{ family.description }}</p>
+          </div>
+          <span class="rounded-full bg-ui-surface-muted px-3 py-1 text-xs font-semibold text-ui-text-muted">{{ family.components|length }} composants</span>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {% for component in family.components %}
+            <article
+              x-show="(family === 'all' || family === '{{ family.id }}') && matches($el.dataset.search)"
+              x-cloak
+              data-search="{{ component.name }} {{ component.label }} {{ component.description }} {{ component.states|join:' ' }}"
+              class="rounded-ui-card border border-ui-border bg-ui-surface p-4 shadow-sm transition hover:shadow-ui-dropdown"
+            >
+              <div class="flex items-start justify-between gap-4">
+                <div class="space-y-2">
+                  <div class="flex items-center gap-2">
+                    <span class="inline-flex h-9 w-9 items-center justify-center rounded-ui-card bg-ui-primary/10 text-ui-primary">
+                      <i data-lucide="{% if family.id == 'account' %}user{% elif family.id == 'notifications' %}bell{% elif family.id == 'student' %}graduation-cap{% else %}shopping-bag{% endif %}" class="h-4 w-4"></i>
+                    </span>
+                    <div>
+                      <h4 class="text-sm font-bold text-ui-text">{{ component.label }}</h4>
+                      <code class="text-[10px] text-ui-text-muted">{{ component.name }}</code>
+                    </div>
+                  </div>
+                  <p class="text-sm text-ui-text-muted">{{ component.description }}</p>
+                </div>
+                <span class="rounded-full {% if component.backend_real %}bg-ui-success/10 text-ui-success{% else %}bg-ui-warning/10 text-ui-warning{% endif %} px-2.5 py-1 text-[10px] font-semibold">{{ component.backend_status }}</span>
+              </div>
+
+              <div class="mt-4 flex flex-wrap gap-1.5">
+                {% for state in component.states %}
+                  <span class="rounded-full bg-ui-surface-muted px-2 py-1 text-[10px] font-medium text-ui-text-muted">{{ state }}</span>
+                {% endfor %}
+              </div>
+
+              <div class="mt-4 flex items-center justify-between gap-3">
+                <span class="text-xs text-ui-text-muted">{% if component.used_in_dashboard %}Utilisé dans un dashboard réel{% else %}Catalogue / démonstration{% endif %}</span>
+                <button
+                  type="button"
+                  hx-get="{{ component.detail_url }}"
+                  hx-target="#domain-component-drawer-content"
+                  hx-swap="innerHTML"
+                  @click="$dispatch('ui-overlay-open', { id: 'domain-component-drawer' })"
+                  class="inline-flex items-center gap-2 rounded-ui-button bg-ui-primary px-3 py-2 text-xs font-semibold text-ui-on-primary"
+                >
+                  <i data-lucide="arrow-right" class="h-4 w-4"></i>
+                  Voir la démonstration
+                </button>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
+    {% endfor %}
+
+    {% component "ui_core.drawer" drawer_id="domain-component-drawer" title="Détail du composant" size="wide" %}
+      <div class="space-y-4 rounded-ui-card border border-dashed border-ui-border bg-ui-surface-soft p-4 text-sm text-ui-text-muted">
+        Sélectionnez un composant pour afficher sa fiche, ses fichiers et sa démonstration.
+      </div>
+    {% endcomponent %}
+  </div>
+  {% endfill %}
+{% endcomponent %}
+{% endblock %}

@@ -66,21 +66,18 @@ def build_student_semester_report(student_id: int, semester_id: int) -> dict:
             "programme",
             "branch",
         )
-        .filter(student=student.user, is_active=True)
+        .filter(
+            student=student.user,
+            academic_class=semester.academic_class,
+            academic_year=semester.academic_class.academic_year,
+            is_active=True,
+        )
         .order_by("-id")
     )
 
-    matched_enrollment = enrollment.filter(
-        academic_class=semester.academic_class
-    ).first()
+    matched_enrollment = enrollment.first()
     if matched_enrollment is None:
-        matched_enrollment = enrollment.filter(
-            academic_year=semester.academic_class.academic_year
-        ).first()
-    if matched_enrollment is None:
-        matched_enrollment = enrollment.first()
-    if matched_enrollment is None:
-        raise Http404("Aucune inscription active trouvée pour cet étudiant.")
+        raise Http404("Aucune inscription active ne correspond a cet etudiant, cette classe et ce semestre.")
 
     semester_result = compute_semester_result(
         semester=semester,
@@ -107,6 +104,15 @@ def build_student_semester_report(student_id: int, semester_id: int) -> dict:
             row["credit_obtained_display"] = format_decimal(row.get("credit_obtained"))
             row["ec_coefficient_display"] = format_decimal(getattr(row.get("ec"), "coefficient", None))
 
+    candidature = getattr(getattr(student, "inscription", None), "candidature", None)
+    birth_date = getattr(candidature, "birth_date", None)
+    birth_place = (getattr(candidature, "birth_place", "") or "").strip()
+    birth_parts = []
+    if birth_date:
+        birth_parts.append(birth_date.strftime("%d/%m/%Y"))
+    if birth_place:
+        birth_parts.append(birth_place)
+
     return {
         "student": student,
         "enrollment": matched_enrollment,
@@ -119,9 +125,9 @@ def build_student_semester_report(student_id: int, semester_id: int) -> dict:
         "domain_name": programme.cycle.name if programme and programme.cycle else "",
         "student_full_name": get_student_full_name(student),
         "student_matricule": getattr(student, "matricule", "N/A"),
-        "student_last_name": getattr(student.user, "last_name", ""),
-        "student_first_name": getattr(student.user, "first_name", ""),
-        "student_birth_info": getattr(student, "birth_info", "Non renseigne"),
+        "student_last_name": (getattr(candidature, "last_name", "") or getattr(student.user, "last_name", "")),
+        "student_first_name": (getattr(candidature, "first_name", "") or getattr(student.user, "first_name", "")),
+        "student_birth_info": " a ".join(birth_parts) if birth_parts else "Non renseigne",
     }
 
 

@@ -4,11 +4,12 @@ from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from unidecode import unidecode
 
 from academics.models import AcademicClass, AcademicEnrollment, EC, ECGrade, Semester
-from academics.services.grading import apply_ec_grade
+from academics.services.grading import apply_ec_grade, compute_ec_status, resolve_ec_threshold
 
 
 @dataclass
@@ -88,7 +89,13 @@ def _to_decimal_score(value: Any) -> Decimal | None:
 
 
 @transaction.atomic
-def import_grades(file, academic_class: AcademicClass, semester: Semester) -> ImportGradesResult:
+def import_grades(
+    file,
+    academic_class: AcademicClass,
+    semester: Semester,
+    *,
+    session_type: str = "normal",
+) -> ImportGradesResult:
     """Importe les notes depuis un Excel simple et lisible.
 
     Format supporté:
@@ -102,6 +109,21 @@ def import_grades(file, academic_class: AcademicClass, semester: Semester) -> Im
 
     if semester.academic_class_id != academic_class.id:
         raise ValueError("Le semestre ne correspond pas à la classe académique.")
+
+    session_type = (session_type or "normal").strip().lower()
+    if session_type not in {"normal", "retake"}:
+        raise ValidationError("Type de session de notes invalide.")
+    expected_status = (
+        Semester.STATUS_RETAKE_ENTRY
+        if session_type == "retake"
+        else Semester.STATUS_NORMAL_ENTRY
+    )
+    if semester.status != expected_status:
+        label = "rattrapage" if session_type == "retake" else "normale"
+        raise ValidationError(
+            f"L'import de la session {label} est verrouille pour ce semestre "
+            f"(statut actuel: {semester.get_status_display()})."
+        )
 
     import pandas as pd
 
@@ -268,17 +290,42 @@ def import_grades(file, academic_class: AcademicClass, semester: Semester) -> Im
                 })
                 continue
 
+            if session_type == "retake":
+                existing_grade = ECGrade.objects.filter(enrollment=enrollment, ec=ec).first()
+                threshold = resolve_ec_threshold(ec.coefficient)
+                is_eligible = bool(
+                    existing_grade
+                    and existing_grade.normal_score is not None
+                    and (
+                        existing_grade.retake_score is not None
+                        or compute_ec_status(existing_grade.normal_score, threshold) == "failed"
+                    )
+                )
+                if not is_eligible:
+                    result.skipped_invalid_scores += 1
+                    result.student_issues.append({
+                        "row_number": excel_row_number,
+                        "nom": display_nom,
+                        "prenom": display_prenom,
+                        "reason": "retake_not_allowed",
+                        "message": f"Rattrapage non autorise pour {ec.title}.",
+                    })
+                    continue
+
             pending_updates.append((enrollment, ec, score))
 
     if result.skipped_invalid_scores or result.skipped_unknown_students:
         return result
 
     for enrollment, ec, score in pending_updates:
-        grade, _created = ECGrade.objects.update_or_create(
+        grade, _created = ECGrade.objects.get_or_create(
             enrollment=enrollment,
             ec=ec,
-            defaults={"normal_score": score},
         )
+        if session_type == "retake":
+            grade.retake_score = score
+        else:
+            grade.normal_score = score
         apply_ec_grade(grade)
         grade.save()
         result.updated += 1

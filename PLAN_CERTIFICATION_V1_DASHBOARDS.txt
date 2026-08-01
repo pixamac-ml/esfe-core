@@ -1,0 +1,286 @@
+ESFE CORE — PLAN DE CERTIFICATION V1 DES DASHBOARDS
+===================================================
+
+OBJECTIF
+--------
+
+Passer officiellement en phase de certification V1 de tous les dashboards.
+Aucune nouvelle fonctionnalite ni finition esthetique ne doit etre ajoutee
+tant que les parcours metier critiques ne sont pas verifies.
+
+
+1. TESTER UN SCENARIO REEL QUI TRAVERSE TOUT LE SYSTEME
+-------------------------------------------------------
+
+Il ne faut pas tester les dashboards uniquement de maniere isolee.
+
+Creer une annexe pilote, une annee academique, des classes et quelques
+utilisateurs, puis executer le parcours suivant :
+
+1. Superadmin
+   - Creer ou verifier l'annexe pilote.
+   - Creer les comptes institutionnels.
+   - Verifier les roles, positions et droits d'acces.
+
+2. Admissions
+   - Recevoir une candidature.
+   - Controler les informations et documents.
+   - Approuver la candidature.
+   - Creer l'inscription.
+
+3. Finance
+   - Enregistrer un paiement.
+   - Valider le paiement.
+   - Verifier le montant restant et l'historique financier.
+   - Verifier que les donnees d'une autre annexe sont invisibles.
+
+4. Gestionnaire d'annexe
+   - Controler l'inscription.
+   - Verifier la caisse et les mouvements.
+   - Controler les depenses, dons et documents.
+
+5. Directeur des etudes
+   - Creer ou verifier le programme et la structure pedagogique.
+   - Creer la classe et les semestres.
+   - Configurer le calendrier et l'emploi du temps.
+   - Affecter les enseignants aux classes et aux matieres.
+
+6. Enseignant
+   - Consulter ses classes et son emploi du temps.
+   - Consulter les matieres qui lui sont affectees.
+   - Ajouter ou consulter les supports de cours.
+   - Remplir le cahier de cours.
+
+7. Surveillant general
+   - Controler les presences des etudiants et enseignants.
+   - Enregistrer les incidents et convocations.
+   - Verifier et valider les heures de cours effectuees.
+
+8. Informaticien
+   - Importer ou saisir les notes.
+   - Verifier les notes manquantes et les calculs.
+   - Publier la session normale.
+   - Ouvrir et traiter le rattrapage si necessaire.
+   - Publier les resultats finaux.
+
+9. Etudiant
+   - Consulter son tableau de bord.
+   - Consulter sa classe, son emploi du temps et ses matieres.
+   - Consulter ses notes et resultats publies.
+   - Consulter et telecharger son bulletin PDF.
+   - Verifier qu'il ne peut consulter les donnees d'aucun autre etudiant.
+
+10. Secretaire
+    - Gerer le courrier et le registre.
+    - Gerer les rendez-vous, reunions et visiteurs.
+    - Gerer les documents et les taches.
+
+11. Gestionnaire — cycle financier final
+    - Verifier et payer les salaires du personnel.
+    - Verifier et payer les honoraires enseignants.
+    - Produire les rapports journaliers, hebdomadaires et mensuels.
+    - Enregistrer les versements bancaires.
+    - Effectuer la cloture mensuelle sans supprimer l'historique.
+
+12. DG / DGA
+    - Consulter les donnees consolidees de toutes les annexes.
+    - Consulter les resultats academiques.
+    - Consulter les paiements, depenses, salaires et honoraires.
+    - Consulter les versements bancaires et clotures par annexe.
+    - Produire ou telecharger les rapports necessaires.
+
+13. Marketing
+    - Definir les fonctions strictement retenues pour la V1.
+    - Verifier uniquement ce perimetre avant le lancement.
+
+
+2. CRITERES DE CERTIFICATION DE CHAQUE DASHBOARD
+------------------------------------------------
+
+Chaque dashboard doit recevoir un statut :
+
+- VERT   : pret pour la V1 et prouve par une recette.
+- ORANGE : fonctionnel en apparence, mais preuve incomplete ou anomalie mineure.
+- ROUGE  : erreur bloquante ou fonction metier critique indisponible.
+
+Pour passer au statut VERT, chaque dashboard doit satisfaire ces controles :
+
+1. Connexion et redirection vers le bon dashboard.
+2. Refus d'acces aux utilisateurs non autorises.
+3. Filtrage strict des donnees par annexe.
+4. Affichage de donnees reelles et coherentes.
+5. Fonctionnement des actions metier principales.
+6. Fonctionnement des exports, PDF et notifications necessaires.
+7. Absence d'erreur serveur et affichage mobile acceptable.
+
+
+3. STATUT PROVISOIRE AU MOMENT DE L'AUDIT
+-----------------------------------------
+
+Gestionnaire
+Statut : VERT sur les tests automatises.
+Preuve : 72 tests sur 72 reussis.
+Reste a faire : recette manuelle complete du parcours metier.
+
+Informaticien / Notes
+Statut : VERT sur les tests automatises du workflow de notes.
+Preuve : 23 tests sur 23 reussis.
+Reste a faire : produire et consulter un vrai bulletin PDF de bout en bout.
+
+Secretaire
+Statut : ROUGE.
+Anomalie : la page des reunions appelle le template inexistant
+"secretary/meeting_list.html".
+
+Directeur des etudes
+Statut : ORANGE.
+Reste a faire : recette des programmes, calendriers, enseignants,
+emplois du temps et resultats.
+
+Etudiant
+Statut : ORANGE.
+Reste a faire : verifier le parcours complet de l'inscription jusqu'au bulletin.
+
+Enseignant
+Statut : ORANGE.
+Reste a faire : verifier les affectations, cours, supports, emploi du temps et
+cahier de cours.
+
+Surveillant general
+Statut : ORANGE.
+Reste a faire : verifier les presences, incidents, convocations et heures.
+
+Admissions
+Statut : ORANGE.
+Reste a faire : recette complete de la candidature jusqu'a l'inscription.
+
+Finance
+Statut : ORANGE.
+Reste a faire : recette des paiements, de la caisse et de l'isolation par annexe.
+
+DG / DGA
+Statut : ORANGE.
+Reste a faire : verifier les consolidations multi-annexes et les rapports.
+
+Superadmin
+Statut : ORANGE.
+Reste a faire : verifier l'administration, les comptes, les roles et la securite.
+
+Marketing
+Statut : NON CERTIFIE.
+Reste a faire : definir precisement le perimetre fonctionnel de la V1.
+
+
+4. RESULTATS TECHNIQUES DE L'AUDIT
+----------------------------------
+
+- Verification Django standard : aucun probleme detecte.
+- Migrations : aucun changement de migration non genere detecte.
+- Suite globale la plus recente :
+  - 691 tests executes ;
+  - 665 tests reussis ;
+  - 5 echecs ;
+  - 14 erreurs ;
+  - 7 tests ignores.
+
+Une grande partie des anomalies vient de tests devenus incompatibles avec les
+nouvelles regles metier. Cependant, plusieurs anomalies produit sont confirmees.
+
+
+5. ANOMALIES PRODUIT CONFIRMEES
+-------------------------------
+
+1. Modification d'un profil public
+   Fichier : accounts/views.py
+   Probleme : la variable "form_kwargs" est utilisee sans etre definie.
+
+2. Dashboard secretaire — page des reunions
+   Fichier : secretary/views.py
+   Probleme : le template "secretary/meeting_list.html" n'existe pas.
+
+3. Alertes d'emploi du temps
+   Fichier : academics/services/schedule_service.py
+   Probleme : le tri utilise le champ inexistant "created_at" au lieu du champ
+   reel du journal de modification.
+
+4. Chevauchement des periodes academiques
+   Decision metier necessaire : le test attend le rejet de deux periodes qui se
+   chevauchent, mais le service ne controle que les entrees marquees bloquantes.
+
+
+6. CONFIGURATION DE PRODUCTION
+------------------------------
+
+La configuration actuellement chargee est une configuration de developpement :
+
+- DEBUG = True ;
+- redirection HTTPS desactivee ;
+- cookies de session non securises ;
+- cookie CSRF non securise ;
+- HSTS desactive ;
+- AUTH_POLICY_V2_ENABLED = False.
+
+Avant le lancement, il faut obligatoirement :
+
+- utiliser DEBUG=False ;
+- definir correctement ALLOWED_HOSTS et CSRF_TRUSTED_ORIGINS ;
+- activer HTTPS et les cookies securises ;
+- verifier PostgreSQL et les migrations sur la preproduction ;
+- verifier Redis et les WebSockets ;
+- verifier l'envoi des emails ;
+- construire le CSS de production ;
+- preparer une sauvegarde et tester la restauration ;
+- definir une procedure de retour arriere ;
+- choisir et figer le systeme d'acces V1 ou V2 avant la recette finale.
+
+
+7. ORDRE DE TRAVAIL RECOMMANDE
+------------------------------
+
+Etape 1 — Gel fonctionnel
+Arreter les nouvelles fonctions et les retouches visuelles non bloquantes.
+
+Etape 2 — Correction des rouges
+Corriger les bugs produit confirmes et la page des reunions.
+
+Etape 3 — Nettoyage des tests
+Mettre a jour les tests obsoletes et obtenir une suite globale propre, ou
+documenter explicitement chaque exception acceptee.
+
+Etape 4 — Preproduction
+Deployer une configuration proche de la production avec des donnees de recette.
+
+Etape 5 — Recette par profil
+Tester chaque dashboard selon les sept criteres de certification.
+
+Etape 6 — Recette transversale
+Executer le scenario complet : candidature, paiement, inscription, classe,
+cours, presences, notes, publication, bulletin, rapports et cloture.
+
+Etape 7 — Decision GO / NO-GO
+Le lancement est autorise uniquement lorsque tous les parcours critiques sont
+VERTS et qu'aucun probleme de securite ou d'isolation par annexe ne subsiste.
+
+Etape 8 — Lancement pilote
+Lancer d'abord la V1 sur une seule annexe avec un nombre limite d'utilisateurs.
+Observer les incidents, corriger, puis generaliser aux autres annexes.
+
+
+8. MESSAGE RECOMMANDE AU DG
+---------------------------
+
+"Le coeur fonctionnel de la V1 est operationnel, notamment les workflows du
+gestionnaire et le traitement des notes. Nous ne declarons toutefois pas encore
+la plateforme entierement certifiee. Une recette finale est en cours sur chaque
+profil, avec quelques corrections identifiees et une verification complete du
+parcours allant de la candidature jusqu'au bulletin et aux rapports de direction.
+Nous recommandons un lancement pilote sur une annexe avant la generalisation."
+
+
+CONCLUSION
+----------
+
+La plateforme n'est pas a recommencer. Elle dispose deja d'un socle metier
+important et largement teste. La priorite n'est plus de developper davantage,
+mais de prouver, corriger, certifier et deployer progressivement.
+

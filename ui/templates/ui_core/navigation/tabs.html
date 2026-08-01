@@ -1,0 +1,21 @@
+<div class="overflow-x-auto" data-ui-core="tabs" x-data="{ active: '{{ active|escapejs }}' }">
+  <div class="flex min-w-max border-b border-ui-border" role="tablist" aria-label="Navigation secondaire">
+    {% for item in items %}
+      <button
+        type="button"
+        id="{{ id }}-{{ item.id }}-tab"
+        role="tab"
+        :aria-selected="active === '{{ item.id|escapejs }}'"
+        aria-controls="{{ id }}-{{ item.id }}-panel"
+        {% if item.disabled %}disabled aria-disabled="true"{% endif %}
+        @click="active = '{{ item.id|escapejs }}'"
+        class="inline-flex items-center gap-2 border-b-2 px-4 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ui-focus disabled:cursor-not-allowed disabled:opacity-40 {% if density == 'compact' %}py-2 text-xs{% else %}py-3 text-sm{% endif %}"
+        :class="active === '{{ item.id|escapejs }}' ? 'border-ui-primary text-ui-primary' : 'border-transparent text-ui-text-muted hover:border-ui-border hover:text-ui-text'"
+      >
+        {% if item.icon %}<i data-lucide="{{ item.icon }}" class="h-4 w-4" aria-hidden="true"></i>{% endif %}
+        {{ item.label }}
+        {% if item.count != None %}<span class="rounded-ui-badge bg-ui-surface-muted px-2 py-0.5 text-ui-micro">{{ item.count }}</span>{% endif %}
+      </button>
+    {% endfor %}
+  </div>
+</div>

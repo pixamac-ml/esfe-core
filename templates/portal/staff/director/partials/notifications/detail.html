@@ -1,0 +1,30 @@
+{% load notification_center_tags humanize %}
+{% notification_action_url notification as action_url %}
+<div class="space-y-5">
+  <div>
+    {% if notification.priority == 'critical' %}
+      <span class="inline-flex items-center rounded-full bg-ui-danger/10 px-2.5 py-0.5 text-[10px] font-bold text-ui-danger">Urgent</span>
+    {% elif notification.priority == 'high' %}
+      <span class="inline-flex items-center rounded-full bg-ui-warning/10 px-2.5 py-0.5 text-[10px] font-bold text-ui-warning">Important</span>
+    {% endif %}
+    <h3 class="mt-2 text-lg font-bold text-ui-text">{{ notification.title }}</h3>
+    <p class="mt-1 text-xs text-ui-text-muted">Reçu le {{ notification.created_at|date:"d/m/Y à H:i" }}</p>
+  </div>
+
+  <div class="rounded-ui-card border border-ui-border bg-ui-surface-muted/40 p-4 text-sm leading-6 text-ui-text">
+    {% if notification.body %}
+      {{ notification.body|linebreaksbr }}
+    {% else %}
+      <span class="text-ui-text-muted">Aucun contenu pour cette notification.</span>
+    {% endif %}
+  </div>
+
+  <div class="flex flex-wrap gap-2">
+    {% if action_url %}
+      <a href="{{ action_url }}" class="inline-flex items-center gap-2 rounded-ui-button border border-ui-border px-3 py-2 text-sm font-medium text-ui-text hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus">
+        <i data-lucide="external-link" class="h-4 w-4"></i>
+        Ouvrir la ressource
+      </a>
+    {% endif %}
+  </div>
+</div>

@@ -25,6 +25,7 @@ class MemoireForm(forms.ModelForm):
             "annee": forms.NumberInput(attrs={"class": _INPUT_CLASS}),
             "mots_cles": forms.TextInput(attrs={"class": _INPUT_CLASS, "placeholder": "Séparés par des virgules"}),
             "fichier_source": forms.ClearableFileInput(attrs={"class": _INPUT_CLASS, "accept": "application/pdf"}),
+            "image": forms.ClearableFileInput(attrs={"class": _INPUT_CLASS, "accept": "image/*"}),
             "statut": forms.Select(attrs={"class": _INPUT_CLASS}),
             "est_mis_en_avant": forms.CheckboxInput(attrs={"class": "h-4 w-4 text-primary-600"}),
         }

@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from branches.models import Branch
-from .models import Appointment, DocumentReceipt, RegistryEntry, SecretaryTask, VisitorLog
+from .models import Appointment, DocumentReceipt, Meeting, RegistryEntry, SecretaryTask, VisitorLog
 from .services import (
     archive_document,
     archive_registry_entry,
@@ -961,3 +961,152 @@ class CommandPaletteViewTests(SecretaryTestMixin, TestCase):
         self.client.force_login(self.regular_user)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 403)
+
+
+# =================== DASHBOARD SMOKE TESTS ===================
+
+class SecretaryDashboardSmokeTests(SecretaryTestMixin, TestCase):
+    """Vérifier que toutes les sections et tous les endpoints HTMX du dashboard chargent sans erreur."""
+
+    def setUp(self):
+        super().setUp()
+        from secretary.views import SECRETARY_DASHBOARD_SECTIONS
+
+        self.sections = SECRETARY_DASHBOARD_SECTIONS
+        # Créer quelques objets pour les pages de détail/mise à jour
+        self.entry = create_registry_entry(
+            entry_type=RegistryEntry.TYPE_PARENT_VISIT,
+            created_by=self.secretary,
+            branch=self.branch,
+        )
+        self.appointment = create_appointment(
+            title="Test RDV",
+            person_name="Jean",
+            scheduled_at=timezone.now() + timedelta(minutes=5),
+            created_by=self.secretary,
+        )
+        self.visitor = register_visitor(
+            full_name="Visiteur",
+            reason="Info",
+            arrived_at=timezone.now(),
+            created_by=self.secretary,
+        )
+        self.document = register_document(
+            title="Document",
+            submitted_by_name="Jean",
+            received_by=self.secretary,
+        )
+        self.task = create_task(
+            title="Tache",
+            created_by=self.secretary,
+        )
+        self.meeting = Meeting.objects.create(
+            title="Test reunion",
+            scheduled_at=timezone.now(),
+            created_by=self.secretary,
+            branch=self.branch,
+        )
+
+    def test_dashboard_full_page_renders(self):
+        self.client.force_login(self.secretary)
+        response = self.client.get(reverse("secretary:secretary_dashboard"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "secretary-workspace")
+
+    def test_dashboard_every_section_renders(self):
+        self.client.force_login(self.secretary)
+        for section in self.sections:
+            with self.subTest(section=section):
+                response = self.client.get(
+                    reverse("secretary:secretary_dashboard"),
+                    {"section": section},
+                    HTTP_HX_REQUEST="true",
+                )
+                self.assertEqual(response.status_code, 200)
+
+    def test_all_htmx_dashboard_endpoints_respond_200(self):
+        self.client.force_login(self.secretary)
+        endpoints = [
+            "htmx_dashboard_scope",
+            "htmx_dashboard_kpis",
+            "htmx_sidebar_counters",
+            "htmx_overview_registry",
+            "htmx_overview_appointments",
+            "htmx_overview_visits",
+            "htmx_overview_tasks",
+            "htmx_visits_open",
+            "htmx_appointments_today",
+            "htmx_documents_pending",
+            "htmx_command_palette",
+            "htmx_student_results",
+            "htmx_class_results",
+            "htmx_registry_results",
+            "htmx_appointment_results",
+            "htmx_document_results",
+            "htmx_task_results",
+            "htmx_messages_panel",
+            "htmx_meetings_list",
+            "htmx_reports_preview",
+        ]
+        for name in endpoints:
+            with self.subTest(name=name):
+                response = self.client.get(
+                    reverse(f"secretary:{name}"),
+                    HTTP_HX_REQUEST="true",
+                )
+                self.assertEqual(response.status_code, 200, f"{name} failed")
+
+    def test_all_list_pages_respond_200(self):
+        self.client.force_login(self.secretary)
+        list_urls = [
+            "registry_list",
+            "registry_kanban",
+            "appointment_list",
+            "visitor_list",
+            "document_receipt_list",
+            "task_list",
+            "meeting_list",
+            "daily_registry_report",
+        ]
+        for name in list_urls:
+            with self.subTest(name=name):
+                response = self.client.get(reverse(f"secretary:{name}"))
+                self.assertEqual(response.status_code, 200, f"{name} failed")
+
+    def test_create_forms_render_as_htmx_partials(self):
+        self.client.force_login(self.secretary)
+        create_urls = [
+            "registry_create",
+            "appointment_create",
+            "visitor_create",
+            "document_receipt_create",
+            "task_create",
+            "meeting_create",
+        ]
+        for name in create_urls:
+            with self.subTest(name=name):
+                response = self.client.get(
+                    reverse(f"secretary:{name}"),
+                    HTTP_HX_REQUEST="true",
+                )
+                self.assertEqual(response.status_code, 200, f"{name} failed")
+
+    def test_detail_and_update_pages_respond_200(self):
+        self.client.force_login(self.secretary)
+        pages = [
+            ("registry_detail", {"pk": self.entry.pk}),
+            ("registry_update", {"pk": self.entry.pk}),
+            ("appointment_update", {"pk": self.appointment.pk}),
+            ("visitor_update", {"pk": self.visitor.pk}),
+            ("document_receipt_update", {"pk": self.document.pk}),
+            ("task_update", {"pk": self.task.pk}),
+            ("meeting_update", {"pk": self.meeting.pk}),
+            ("meeting_minutes", {"pk": self.meeting.pk}),
+        ]
+        for name, kwargs in pages:
+            with self.subTest(name=name):
+                response = self.client.get(
+                    reverse(f"secretary:{name}", kwargs=kwargs),
+                    HTTP_HX_REQUEST="true",
+                )
+                self.assertEqual(response.status_code, 200, f"{name} failed")

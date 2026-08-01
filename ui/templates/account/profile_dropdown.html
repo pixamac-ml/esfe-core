@@ -1,0 +1,60 @@
+{% load component_tags %}
+<div x-data="{ open: false }" @click.outside="open = false" @keydown.escape.window="if (open) open = false" data-ui-core="profile-dropdown" class="relative">
+  <button type="button" @click="open = !open" class="flex items-center gap-2 rounded-ui-button p-1.5 hover:bg-ui-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" aria-haspopup="true" :aria-expanded="open.toString()">
+    {% if avatar_url %}
+      <img src="{{ avatar_url }}" alt="{{ display_name }}" class="h-8 w-8 rounded-full object-cover" loading="lazy">
+    {% else %}
+      <div class="flex h-8 w-8 items-center justify-center rounded-full bg-ui-info/15 text-xs font-bold text-ui-info">
+        {{ display_name|truncatechars:2 }}
+      </div>
+    {% endif %}
+    <span class="hidden text-sm font-medium text-ui-text sm:block">{{ display_name|truncatechars:20 }}</span>
+    <i data-lucide="chevron-down" class="hidden h-4 w-4 text-ui-text-muted sm:block"></i>
+  </button>
+
+  <div x-show="open" x-cloak x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-75" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95" class="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-ui-card border border-ui-border bg-ui-surface shadow-ui-dropdown" role="menu">
+    <div class="border-b border-ui-border px-4 py-3">
+      <p class="truncate text-sm font-semibold text-ui-text">{{ display_name|default:"Utilisateur" }}</p>
+      {% if role %}
+        <p class="truncate text-xs text-ui-text-muted">{{ role }}</p>
+      {% endif %}
+    </div>
+    <div class="py-1">
+      {% if profile_url and profile_url != "#" %}
+        <button type="button" hx-get="{{ profile_url }}" hx-target="#{{ drawer_id }}-content" hx-swap="innerHTML" @click="open = false; if (window.deOpenDrawer) window.deOpenDrawer()" class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-ui-text hover:bg-ui-surface-hover focus:bg-ui-surface-hover focus:outline-none" role="menuitem">
+          <i data-lucide="user" class="h-4 w-4 text-ui-text-muted"></i>
+          Mon profil
+        </button>
+      {% endif %}
+      {% if edit_url and edit_url != "#" %}
+        <button type="button" hx-get="{{ edit_url }}" hx-target="#{{ drawer_id }}-content" hx-swap="innerHTML" @click="open = false; if (window.deOpenDrawer) window.deOpenDrawer()" class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-ui-text hover:bg-ui-surface-hover focus:bg-ui-surface-hover focus:outline-none" role="menuitem">
+          <i data-lucide="pencil" class="h-4 w-4 text-ui-text-muted"></i>
+          Modifier le profil
+        </button>
+      {% endif %}
+      {% if security_url and security_url != "#" %}
+        <button type="button" hx-get="{{ security_url }}" hx-target="#{{ drawer_id }}-content" hx-swap="innerHTML" @click="open = false; if (window.deOpenDrawer) window.deOpenDrawer()" class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-ui-text hover:bg-ui-surface-hover focus:bg-ui-surface-hover focus:outline-none" role="menuitem">
+          <i data-lucide="shield" class="h-4 w-4 text-ui-text-muted"></i>
+          SÃ©curitÃ©
+        </button>
+      {% endif %}
+      {% if preferences_url and preferences_url != "#" %}
+        <button type="button" hx-get="{{ preferences_url }}" hx-target="#{{ drawer_id }}-content" hx-swap="innerHTML" @click="open = false; if (window.deOpenDrawer) window.deOpenDrawer()" class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-ui-text hover:bg-ui-surface-hover focus:bg-ui-surface-hover focus:outline-none" role="menuitem">
+          <i data-lucide="settings" class="h-4 w-4 text-ui-text-muted"></i>
+          PrÃ©fÃ©rences
+        </button>
+      {% endif %}
+    </div>
+    {% if logout_url and logout_url != "#" %}
+      <div class="border-t border-ui-border py-1">
+        <form method="post" action="{{ logout_url }}">
+          {% csrf_token %}
+          <button type="submit" class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-ui-danger hover:bg-ui-danger/5 focus:bg-ui-danger/5 focus:outline-none" role="menuitem">
+            <i data-lucide="log-out" class="h-4 w-4"></i>
+            DÃ©connexion
+          </button>
+        </form>
+      </div>
+    {% endif %}
+  </div>
+</div>

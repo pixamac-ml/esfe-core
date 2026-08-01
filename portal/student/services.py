@@ -155,6 +155,7 @@ def is_semester_unlocked_for_enrollment(enrollment, semester_number):
         ECGrade.objects.filter(
             enrollment=enrollment,
             ec_id__in=previous_ec_ids,
+            ec__ue__semester__status="PUBLISHED",
             is_validated=True,
         )
         .values("ec_id")
@@ -205,7 +206,10 @@ def get_student_courses(student):
     if enrollment is not None:
         grade_by_ec_id = {
             grade.ec_id: grade
-            for grade in ECGrade.objects.filter(enrollment=enrollment).select_related("ec")
+            for grade in ECGrade.objects.filter(
+                enrollment=enrollment,
+                ec__ue__semester__status="PUBLISHED",
+            ).select_related("ec")
         }
 
     for ec in ecs:
@@ -234,7 +238,7 @@ def get_student_results_summary(student):
 
     grades = list(
         ECGrade.objects.select_related("ec", "ec__ue", "ec__ue__semester")
-        .filter(enrollment=enrollment)
+        .filter(enrollment=enrollment, ec__ue__semester__status="PUBLISHED")
         .order_by("ec__ue__semester__number", "ec__ue__code", "ec__title")
     )
     grade_by_ec_id = {grade.ec_id: grade for grade in grades}

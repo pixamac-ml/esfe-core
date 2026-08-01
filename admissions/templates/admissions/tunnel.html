@@ -2,6 +2,7 @@
 {% load static %}
 
 {% block title %}Admission | ESFE{% endblock %}
+{% block public_floating_widget %}{% endblock %}
 
 {% block extra_head %}
 {{ block.super }}
@@ -373,45 +374,19 @@
     }
     .tunnel-media-pane [x-show="step === 3"] {
       display: flex;
-      flex-direction: row;
-      gap: 0.65rem;
-      background: transparent;
-      padding: 0.25rem 0 0.45rem;
-      overflow-x: auto;
-      overflow-y: hidden;
-      -webkit-overflow-scrolling: touch;
-      scroll-snap-type: x proximity;
+      flex-direction: column;
+      height: 100%;
+      min-height: 0;
+      gap: 0;
+      background: #0f2f43;
+      padding: 0;
+      overflow: hidden;
     }
-    .tunnel-media-pane .school-item {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      flex: 0 0 clamp(180px, 62vw, 240px);
-      min-height: 68px;
-      border: 1px solid rgba(148, 163, 184, 0.35);
-      border-radius: 0.9rem;
-      background: #fff;
-      padding: 0.55rem 0.7rem;
-      scroll-snap-align: start;
+    .tunnel-media-pane .campus-thumb {
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .tunnel-media-pane .school-item > img {
-      width: 48px;
-      height: 48px;
-      border-radius: 0.6rem;
-      flex: 0 0 48px;
-      object-fit: cover;
-    }
-    .tunnel-media-pane .school-item > .absolute.inset-0 {
-      display: none;
-    }
-    .tunnel-media-pane .school-item > .absolute.left-3.bottom-3 {
-      position: static;
-      color: #1e4f6f;
-      margin: 0;
-    }
-    .tunnel-media-pane .school-item > .absolute.left-3.bottom-3 p:last-child {
-      color: #64748b;
-      margin-top: 0.2rem;
+    .tunnel-media-pane .campus-thumb:active {
+      transform: scale(0.97);
     }
     .tunnel-scroll > .space-y-3,
     .tunnel-scroll > .space-y-5,
@@ -449,7 +424,7 @@
     }
   }
   @media (max-width: 768px) {
-    .school-item:nth-child(n+5) {
+    .campus-thumb:nth-child(n+5) {
       display: none;
     }
   }
@@ -493,7 +468,7 @@
   {% include "admissions/partials/hero_admission.html" %}
 </div>
 
-<section class="admission-shell w-full isolate" aria-label="Tunnel admission">
+<section class="admission-shell w-full isolate" aria-label="Tunnel de découverte et de candidature">
   <form method="post"
         action="{% url 'admissions:admission_tunnel' %}"
         enctype="multipart/form-data"
@@ -560,32 +535,91 @@
 
         <div x-show="step === 3"
              x-cloak
+             x-data="{ activeCampus: 0 }"
              x-transition:enter="transition duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
              x-transition:enter-start="opacity-0 translate-y-4"
              x-transition:enter-end="opacity-100 translate-y-0"
              x-transition:leave="transition duration-500 ease-in-out"
              x-transition:leave-start="opacity-100 translate-y-0"
              x-transition:leave-end="opacity-0 -translate-y-4"
-             class="tunnel-pane-layer grid grid-cols-1 sm:grid-cols-2 auto-rows-fr gap-px bg-[#0f2f43]">
-          {% for branch in branches|slice:":4" %}
-          <button type="button"
-                  class="school-item group relative overflow-hidden"
-                  @click="formData.branch_id='{{ branch.id }}'; formData.branch_name='{{ branch.name|escapejs }}'; formData.branch_city='{{ branch.city|default:''|escapejs }}'; formData.campus_image='{% if branch.image %}{{ branch.image.url }}{% endif %}'"
-                  :class="String(formData.branch_id) === '{{ branch.id }}' ? 'ring-2 ring-[#1db5b0] z-10' : ''">
-            {% if branch.image %}
-            <img src="{{ branch.image.url }}" alt="{{ branch.name }}" class="h-full w-full object-cover transition duration-700 group-hover:scale-105">
-            {% else %}
-            <div class="h-full w-full bg-gradient-to-br from-[#1e4f6f] to-[#1db5b0]"></div>
-            {% endif %}
-            <div class="absolute inset-0 bg-black/45 transition group-hover:bg-black/25"></div>
-            <div class="absolute left-3 bottom-3 text-left text-white">
-              <p class="text-sm font-semibold leading-tight">{{ branch.name }}</p>
-              <p class="text-[11px] inline-flex items-center gap-1 text-white/85">
-                <i class="fa-solid fa-location-dot text-[#1db5b0]"></i>{{ branch.city|default:'Campus ESFE' }}
-              </p>
+             class="tunnel-pane-layer relative overflow-hidden bg-[#0f2f43] p-3 sm:p-4 flex flex-col gap-3">
+
+          <!-- Hero image principale -->
+          <div class="relative flex-1 min-h-0 rounded-2xl overflow-hidden group/hero">
+            {% for branch in branches|slice:":4" %}
+            <div x-show="activeCampus === {{ forloop.counter0 }}"
+                 x-transition:enter="transition duration-500 ease-out"
+                 x-transition:enter-start="opacity-0 scale-105"
+                 x-transition:enter-end="opacity-100 scale-100"
+                 class="absolute inset-0">
+              {% if branch.image %}
+              <img src="{{ branch.image.url }}" alt="{{ branch.name }}" class="h-full w-full object-cover">
+              {% else %}
+              <div class="h-full w-full bg-gradient-to-br from-primary-600 via-primary-500 to-secondary flex items-center justify-center">
+                <i class="fa-solid fa-building-columns text-white/20 text-6xl sm:text-7xl"></i>
+              </div>
+              {% endif %}
+              <div class="absolute inset-0 bg-gradient-to-t from-[#0f2f43]/90 via-[#0f2f43]/20 to-transparent"></div>
+              <div class="absolute inset-0 bg-gradient-to-r from-[#0f2f43]/30 to-transparent"></div>
+              <!-- Info overlay bas -->
+              <div class="absolute bottom-0 left-0 right-0 p-4 sm:p-5">
+                <div class="flex items-end justify-between">
+                  <div>
+                    <p class="text-[10px] uppercase tracking-[0.2em] text-[#1db5b0] font-semibold mb-1">Campus</p>
+                    <h3 class="text-lg sm:text-xl font-bold text-white leading-tight">{{ branch.name }}</h3>
+                    <p class="text-xs sm:text-sm text-white/75 mt-0.5 inline-flex items-center gap-1.5">
+                      <i class="fa-solid fa-location-dot text-[#1db5b0] text-[10px]"></i>
+                      {{ branch.city|default:'Campus ESFE' }}
+                    </p>
+                  </div>
+                  <div x-show="String(formData.branch_id) === '{{ branch.id }}'"
+                       x-transition:enter="transition duration-300 ease-out"
+                       x-transition:enter-start="opacity-0 scale-75"
+                       x-transition:enter-end="opacity-100 scale-100"
+                       class="w-9 h-9 rounded-full bg-[#1db5b0] flex items-center justify-center shadow-lg shadow-[#1db5b0]/30 flex-shrink-0">
+                    <i class="fa-solid fa-check text-white text-sm"></i>
+                  </div>
+                </div>
+              </div>
             </div>
-          </button>
-          {% endfor %}
+            {% endfor %}
+
+            <!-- Fallback si aucune branche -->
+            {% if not branches %}
+            <div class="absolute inset-0 bg-gradient-to-br from-primary-600 via-primary-500 to-secondary flex items-center justify-center">
+              <div class="text-center text-white/50">
+                <i class="fa-solid fa-building-columns text-5xl mb-3"></i>
+                <p class="text-sm">Aucun campus disponible</p>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+
+          <!-- Miniatures -->
+          <div class="flex gap-2 sm:gap-2.5 flex-shrink-0">
+            {% for branch in branches|slice:":4" %}
+            <button type="button"
+                    @click="activeCampus = {{ forloop.counter0 }}; formData.branch_id='{{ branch.id }}'; formData.branch_name='{{ branch.name|escapejs }}'; formData.branch_city='{{ branch.city|default:''|escapejs }}'; formData.campus_image='{% if branch.image %}{{ branch.image.url }}{% endif %}'; delete errors.branch_id;"
+                    class="campus-thumb relative flex-1 h-16 sm:h-18 rounded-xl overflow-hidden border-2 transition-all duration-300"
+                    :class="activeCampus === {{ forloop.counter0 }} ? 'border-[#1db5b0] shadow-lg shadow-[#1db5b0]/20 scale-[1.02]' : 'border-white/10 hover:border-white/30 opacity-60 hover:opacity-90'">
+              {% if branch.image %}
+              <img src="{{ branch.image.url }}" alt="{{ branch.name }}" class="w-full h-full object-cover">
+              {% else %}
+              <div class="w-full h-full bg-gradient-to-br from-primary-600 to-secondary flex items-center justify-center">
+                <i class="fa-solid fa-building text-white/40 text-lg"></i>
+              </div>
+              {% endif %}
+              <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+              <div class="absolute bottom-1 left-1.5 right-1.5">
+                <p class="text-[9px] sm:text-[10px] font-semibold text-white truncate leading-tight">{{ branch.name }}</p>
+              </div>
+              <!-- Indicateur actif -->
+              <div x-show="activeCampus === {{ forloop.counter0 }}"
+                   x-transition:enter="transition duration-200"
+                   class="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#1db5b0] shadow-sm"></div>
+            </button>
+            {% endfor %}
+          </div>
         </div>
 
         <div x-show="step === 2"
@@ -697,6 +731,8 @@
 
   window.admissionTunnelData = function () {
     return {
+      draftKey: 'esfe-admission-tunnel-draft-v1',
+      restoreDraft: {{ restore_draft|yesno:"true,false" }},
       step: {{ initial_step|default:1 }},
       step3Phase: '{{ initial_step3_phase|default:"school"|escapejs }}',
       errors: {},
@@ -733,6 +769,7 @@
           email: 2,
           phone: 2,
           birth_date: 2,
+          gender: 2,
           current_level: 2,
           branch_id: 3,
           formation_slug: 3,
@@ -748,6 +785,7 @@
           email: '[data-field="email"]',
           phone: '[data-field="phone"]',
           birth_date: '[data-field="birth_date"]',
+          gender: '[data-field="gender"]',
           current_level: '[data-field="current_level"]',
           branch_id: '[data-field="branch_id"]',
           formation_slug: '[data-field="formation_slug"]',
@@ -763,6 +801,7 @@
           'email',
           'phone',
           'birth_date',
+          'gender',
           'current_level',
           'branch_id',
           'formation_slug',
@@ -808,7 +847,7 @@
       clearErrorsForStep(stepNo) {
         const fieldsByStep = {
           1: ['last_name', 'first_name', 'city'],
-          2: ['email', 'phone', 'birth_date', 'current_level'],
+          2: ['email', 'phone', 'birth_date', 'gender', 'current_level'],
           3: ['branch_id', 'formation_slug', 'documents'],
         };
         (fieldsByStep[stepNo] || []).forEach((fieldName) => {
@@ -816,6 +855,10 @@
         });
       },
       init() {
+        if (this.restoreDraft) {
+          this.restoreSavedDraft();
+        }
+
         if (this.backendErrors && Object.keys(this.backendErrors).length) {
           this.errors = Object.assign({}, this.backendErrors);
           this.revealStepOneIdentify = ['last_name', 'first_name', 'city'].includes(this.backendErrorField);
@@ -843,10 +886,61 @@
             this.documentsDeferred = false;
           }
         });
+
+        this.$watch('formData', () => this.persistDraft());
+        this.$watch('step', () => this.persistDraft());
+        this.$watch('step3Phase', () => this.persistDraft());
+
+        this.$nextTick(() => {
+          this.refreshStepThree();
+        });
+      },
+      restoreSavedDraft() {
+        try {
+          const saved = JSON.parse(window.sessionStorage.getItem(this.draftKey) || 'null');
+          if (!saved || typeof saved !== 'object' || !saved.formData) return;
+          this.formData = Object.assign({}, this.formData, saved.formData);
+          if ([1, 2, 3, 4].includes(Number(saved.step))) this.step = Number(saved.step);
+          if (['school', 'program', 'documents'].includes(saved.step3Phase)) this.step3Phase = saved.step3Phase;
+          if (['all', 'licence', 'master'].includes(saved.activeCycle)) this.activeCycle = saved.activeCycle;
+          this.revealStepOneIdentify = Boolean(saved.revealStepOneIdentify);
+        } catch (error) {
+          window.sessionStorage.removeItem(this.draftKey);
+        }
+      },
+      persistDraft() {
+        try {
+          window.sessionStorage.setItem(this.draftKey, JSON.stringify({
+            step: this.step,
+            step3Phase: this.step3Phase,
+            activeCycle: this.activeCycle,
+            revealStepOneIdentify: this.revealStepOneIdentify,
+            formData: this.formData,
+          }));
+        } catch (error) {
+          // Le tunnel reste utilisable lorsque le stockage navigateur est indisponible.
+        }
+      },
+      refreshStepThree() {
+        if (this.step !== 3) return;
+        if (this.step3Phase === 'program' && this.formData.branch_id) {
+          document.body.dispatchEvent(new CustomEvent('admission-step-3'));
+        }
+      },
+      startDiscovery() {
+        this.step = 3;
+        this.step3Phase = this.formData.branch_id ? 'program' : 'school';
+        this.activeCycle = this.formData.current_level || 'all';
+        this.$nextTick(() => {
+          this.refreshStepThree();
+          if (typeof window.syncAdmissionTunnelLayout === 'function') {
+            window.syncAdmissionTunnelLayout();
+          }
+        });
       },
       isStepComplete(stepNo) {
         if (stepNo === 1) return this.formData.last_name && this.formData.first_name && this.formData.city;
-        if (stepNo === 2) return this.formData.email && this.formData.phone && this.formData.birth_date && this.formData.current_level;
+        if (stepNo === 2) return this.formData.email && this.formData.phone && this.formData.birth_date && this.formData.gender && this.formData.current_level;
         if (stepNo === 3) return this.formData.branch_id && this.formData.formation_slug;
         return true;
       },
@@ -854,7 +948,7 @@
         this.clearErrorsForStep(stepNo);
         const fieldsByStep = {
           1: ['last_name', 'first_name', 'city'],
-          2: ['email', 'phone', 'birth_date', 'current_level'],
+          2: ['email', 'phone', 'birth_date', 'gender', 'current_level'],
           3: ['branch_id', 'formation_slug', 'documents'],
         };
         if (stepNo === 1) {
@@ -866,6 +960,7 @@
           if (!this.formData.email) this.errors.email = 'Le champ email est obligatoire.';
           if (!this.formData.phone) this.errors.phone = 'Veuillez renseigner votre numero de telephone.';
           if (!this.formData.birth_date) this.errors.birth_date = 'Veuillez renseigner votre date de naissance.';
+          if (!this.formData.gender) this.errors.gender = 'Veuillez selectionner votre genre.';
           if (!this.formData.current_level) this.errors.current_level = 'Veuillez selectionner votre niveau d\'etudes.';
         }
         if (stepNo === 3 && !this.formData.branch_id) {
@@ -889,6 +984,7 @@
           this.documentsDeferred = true;
         }
 
+        this.persistDraft();
         event.target.submit();
       },
       goTo(target) {

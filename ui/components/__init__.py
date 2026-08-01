@@ -197,3 +197,56 @@ from .academic import (
     AcademicTimeline,
     AcademicToolbar,
 )
+
+# UI Core foundation. Existing components remain registered for compatibility.
+from .ui_core import (
+    Alert as UiCoreAlert,
+    AppShell,
+    AppSidebar,
+    AppTopbar,
+    Breadcrumb as UiCoreBreadcrumb,
+    ChartPanel as UiCoreChartPanel,
+    ConfirmDialog as UiCoreConfirmDialog,
+    ContentGrid,
+    DataTable as UiCoreDataTable,
+    Drawer as UiCoreDrawer,
+    DropdownMenu as UiCoreDropdownMenu,
+    EmptyState as UiCoreEmptyState,
+    FilterBar as UiCoreFilterBar,
+    FormField as UiCoreFormField,
+    LoadingOverlay as UiCoreLoadingOverlay,
+    Modal as UiCoreModal,
+    NavGroup,
+    NavItem,
+    PageHeader as UiCorePageHeader,
+    PageSection,
+    Panel as UiCorePanel,
+    ProgressBar as UiCoreProgressBar,
+    StatCard as UiCoreStatCard,
+    StatusBadge as UiCoreStatusBadge,
+    Tabs as UiCoreTabs,
+    Timeline as UiCoreTimeline,
+    Toast as UiCoreToast,
+)
+
+# Shared domain components — composants métier partagés réutilisables dans tous les dashboards
+from .account.profile_card import ProfileCard
+from .account.profile_dropdown import ProfileDropdown
+from .account.profile_view import ProfileView
+from .account.profile_editor import ProfileEditor
+from .account.security_settings import SecuritySettings
+from .account.preference_settings import PreferenceSettings
+
+from .notifications.bell import NotificationBell
+from .notifications.badge import NotificationBadge
+from .notifications.item import NotificationItem
+from .notifications.list import NotificationList
+from .notifications.drawer import NotificationDrawer
+
+from .student.identity_card import StudentIdentityCard
+from .student.status_card import StudentStatusCard
+from .student.progress_card import StudentProgressCard
+
+from .shop.product_card import ProductCard
+from .shop.product_grid import ProductGrid
+from .shop.product_detail_drawer import ProductDetailDrawer

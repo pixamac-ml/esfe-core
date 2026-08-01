@@ -40,6 +40,14 @@ class Memoire(models.Model):
     )
     nb_pages = models.PositiveIntegerField(default=0)
 
+    image = models.ImageField(
+        upload_to="memoires/couvertures/",
+        blank=True,
+        null=True,
+        verbose_name="Image de couverture",
+        help_text="Image affichée dans la liste et la fiche du mémoire.",
+    )
+
     est_mis_en_avant = models.BooleanField(default=False, db_index=True, verbose_name="Mis en avant")
     statut = models.CharField(
         max_length=20, choices=Statut.choices, default=Statut.BROUILLON, db_index=True
@@ -100,3 +108,31 @@ class ConsultationLog(models.Model):
         verbose_name = "Consultation"
         verbose_name_plural = "Consultations"
         indexes = [models.Index(fields=["memoire", "date"])]
+
+
+class MemoireFavori(models.Model):
+    """Favori d'un utilisateur pour un mémoire."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="memoires_favoris",
+    )
+    memoire = models.ForeignKey(
+        Memoire, on_delete=models.CASCADE, related_name="favoris"
+    )
+    date_ajout = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Favori"
+        verbose_name_plural = "Favoris"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "memoire"],
+                name="unique_favori_user_memoire",
+            )
+        ]
+        ordering = ["-date_ajout"]
+
+    def __str__(self):
+        return f"{self.user} → {self.memoire.titre}"

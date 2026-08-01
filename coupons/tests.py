@@ -6,6 +6,7 @@ from typing import Any, cast
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
+from django.urls import reverse
 from django.utils import timezone
 
 from academics.models import AcademicClass, AcademicYear
@@ -18,6 +19,7 @@ from payments.models import FinancialLog, Payment
 
 from coupons.models import Coupon, CouponRedemption
 from coupons.services.application import apply_coupon
+from coupons.services.querysets import active_coupons_for_branch
 from coupons.services.validation import get_valid_coupon
 from notifier.models import NotificationMessage
 from portal.dg.coupons_service import create_coupon
@@ -235,6 +237,7 @@ class CouponNotificationTests(TestCase):
         self.other_branch = _create_branch(code="OTH3", name="Autre annexe 3")
         self.dg = USER_MANAGER.create_user(username="dg", email="dg@test.com", password="pass1234")
         self.secretary = _create_staff_user("secretary1", self.branch, "secretary")
+        self.manager = _create_staff_user("manager1", self.branch, "annex_manager")
         self.other_secretary = _create_staff_user("secretary2", self.other_branch, "secretary")
 
     def test_coupon_creation_notifies_only_targeted_branch(self):
@@ -252,6 +255,9 @@ class CouponNotificationTests(TestCase):
 
         self.assertTrue(
             NotificationMessage.objects.filter(recipient=self.secretary, event_type="coupon_created").exists()
+        )
+        self.assertTrue(
+            NotificationMessage.objects.filter(recipient=self.manager, event_type="coupon_created").exists()
         )
         self.assertFalse(
             NotificationMessage.objects.filter(recipient=self.other_secretary, event_type="coupon_created").exists()
@@ -275,3 +281,125 @@ class CouponModelTests(TestCase):
         coupon.programmes.add(programme)
         self.assertTrue(coupon.applies_to(branch=branch, programme=programme))
         self.assertFalse(coupon.applies_to(branch=other_branch, programme=programme))
+
+    def test_runtime_status_distinguishes_expired_and_exhausted_coupons(self):
+        expired = _create_coupon(
+            code="EXPIRED",
+            valid_from=timezone.now() - timedelta(days=10),
+            valid_until=timezone.now() - timedelta(days=1),
+        )
+        self.assertEqual(expired.availability_status, Coupon.AVAILABILITY_EXPIRED)
+
+        branch = _create_branch(code="RUN", name="Annexe runtime")
+        programme = _create_programme(title="Formation runtime")
+        candidature = _create_candidature(programme, branch, email="runtime@test.com")
+        inscription = _create_inscription(candidature, branch)
+        actor = USER_MANAGER.create_user(username="runtime_actor", password="pass1234")
+        exhausted = _create_coupon(code="EXHAUSTED", max_redemptions=1)
+        apply_coupon(code=exhausted.code, inscription_id=inscription.id, actor=actor)
+        self.assertEqual(exhausted.availability_status, Coupon.AVAILABILITY_EXHAUSTED)
+
+    def test_branch_selector_excludes_coupon_for_unavailable_programme(self):
+        branch = _create_branch(code="SEL", name="Annexe selection")
+        offered_programme = _create_programme(title="Formation offerte")
+        other_programme = _create_programme(title="Formation absente")
+        _create_academic_class(offered_programme, branch)
+
+        visible = _create_coupon(code="VISIBLE", max_redemptions=5)
+        visible.branches.add(branch)
+        visible.programmes.add(offered_programme)
+        hidden = _create_coupon(code="HIDDEN", max_redemptions=5)
+        hidden.branches.add(branch)
+        hidden.programmes.add(other_programme)
+
+        codes = {coupon.code for coupon in active_coupons_for_branch(branch, limit=None)}
+        self.assertIn(visible.code, codes)
+        self.assertNotIn(hidden.code, codes)
+
+
+@override_settings(PASSWORD_HASHERS=["django.contrib.auth.hashers.MD5PasswordHasher"])
+class CouponDashboardTests(TestCase):
+    def setUp(self):
+        self.branch = _create_branch(code="DGD", name="Annexe DG")
+        self.dg = _create_staff_user("coupon_dg", self.branch, "executive_director")
+        self.dga = _create_staff_user("coupon_dga", self.branch, "deputy_executive_director")
+        self.manager = _create_staff_user("coupon_manager", self.branch, "annex_manager")
+
+    def _payload(self, *, code="DGPROD", value="10"):
+        return {
+            "code": code,
+            "label": "Reduction production",
+            "discount_type": Coupon.DISCOUNT_PERCENTAGE,
+            "value": value,
+            "branches": [str(self.branch.id)],
+            "valid_from": (timezone.now() - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M"),
+            "valid_until": (timezone.now() + timedelta(days=10)).strftime("%Y-%m-%dT%H:%M"),
+            "max_redemptions": "5",
+        }
+
+    def test_dg_and_dga_can_create_coupons(self):
+        for user, code in ((self.dg, "DGPROD"), (self.dga, "DGAPROD")):
+            self.client.force_login(user)
+            response = self.client.post(reverse("accounts_portal:dg_coupon_create"), self._payload(code=code))
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(Coupon.objects.filter(code=code, created_by=user).exists())
+
+    def test_manager_cannot_create_or_toggle_coupon(self):
+        coupon = _create_coupon(code="LOCKED", max_redemptions=5)
+        self.client.force_login(self.manager)
+        create_response = self.client.post(
+            reverse("accounts_portal:dg_coupon_create"), self._payload(code="FORBIDDEN")
+        )
+        toggle_response = self.client.post(
+            reverse("accounts_portal:dg_coupon_toggle"), {"coupon_id": coupon.id}
+        )
+        self.assertEqual(create_response.status_code, 403)
+        self.assertEqual(toggle_response.status_code, 403)
+        coupon.refresh_from_db()
+        self.assertTrue(coupon.is_active)
+
+    def test_percentage_above_100_is_rejected_in_form(self):
+        form = DgCouponForm(data=self._payload(value="101"))
+        self.assertFalse(form.is_valid())
+        self.assertIn("value", form.errors)
+
+    def test_coupon_detail_displays_redemption_audit(self):
+        programme = _create_programme(title="Formation audit DG")
+        candidature = _create_candidature(programme, self.branch, email="audit-dg@test.com")
+        inscription = _create_inscription(candidature, self.branch)
+        coupon = _create_coupon(code="AUDITDG", max_redemptions=5, created_by=self.dg)
+        coupon.branches.add(self.branch)
+        coupon.programmes.add(programme)
+        apply_coupon(code=coupon.code, inscription_id=inscription.id, actor=self.manager)
+
+        self.client.force_login(self.dga)
+        response = self.client.get(
+            reverse("accounts_portal:dg_modal"),
+            {"modal": "coupon_detail", "coupon_id": coupon.id},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, coupon.code)
+        self.assertContains(response, candidature.full_name)
+        self.assertContains(response, self.manager.username)
+
+    def test_coupon_creation_and_toggle_are_post_only(self):
+        self.client.force_login(self.dg)
+        self.assertEqual(self.client.get(reverse("accounts_portal:dg_coupon_create")).status_code, 405)
+        self.assertEqual(self.client.get(reverse("accounts_portal:dg_coupon_toggle")).status_code, 405)
+
+    def test_dg_coupon_section_renders_operational_status_and_totals(self):
+        active = _create_coupon(code="SECTION-ACTIVE", max_redemptions=5, created_by=self.dg)
+        active.branches.add(self.branch)
+        _create_coupon(
+            code="SECTION-EXPIRED",
+            valid_from=timezone.now() - timedelta(days=5),
+            valid_until=timezone.now() - timedelta(days=1),
+            max_redemptions=5,
+            created_by=self.dg,
+        )
+        self.client.force_login(self.dg)
+        response = self.client.get(reverse("accounts_portal:dg_section", args=["coupons"]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, active.code)
+        self.assertContains(response, "Expiré")
+        self.assertContains(response, "Remises accordees")

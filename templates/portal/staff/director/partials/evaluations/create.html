@@ -1,0 +1,116 @@
+{# Formulaire de creation — Resultats & Notes #}
+<div class="space-y-6">
+  <div x-data="deEvalForm()"
+       class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+      <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-[color:var(--school-primary)] text-white">
+        <i data-lucide="plus" class="w-4 h-4"></i>
+      </span>
+      <div>
+        <h3 class="text-sm font-black text-slate-900">Planifier une nouvelle evaluation</h3>
+        <p class="text-[11px] text-slate-400">Devoir, controle, examen, seminaire — visible immediatement dans l'agenda etudiants</p>
+      </div>
+    </div>
+
+    <div class="px-6 py-6">
+      <form hx-post="{% url 'accounts_portal:director_evaluation_action' %}"
+            hx-target="#director-workspace" hx-swap="innerHTML"
+            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+            hx-disabled-elt="button[type=submit]"
+            hx-indicator="#eval-create-loading"
+            class="space-y-5">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create">
+
+        {# Ligne 1 : Titre + Type #}
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="md:col-span-2">
+            <label class="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-600">Intitule *</label>
+            <input type="text" name="title" required placeholder="Ex: Devoir 1 — Anatomie"
+              class="w-full rounded-xl border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+          </div>
+          <div>
+            <label class="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-600">Type</label>
+            <select name="event_type"
+              class="w-full rounded-xl border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+              <option value="exam">Examen</option>
+              <option value="practical">Devoir / TP</option>
+              <option value="seminar">Seminaire</option>
+            </select>
+          </div>
+        </div>
+
+        {# Ligne 2 : Classe + Matiere #}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-600">Classe *</label>
+            <select name="class_id" required x-model="selectedClass"
+              class="w-full rounded-xl border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+              <option value="">— Choisir une classe —</option>
+              {% for cls in eval_form_classes %}
+              <option value="{{ cls.id }}">{{ cls.display_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label class="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-600">Matiere (EC) *</label>
+            <select name="ec_id" required
+              :disabled="!selectedClass"
+              :class="selectedClass ? 'border-[color:var(--school-primary)]' : 'opacity-60'"
+              class="w-full rounded-xl border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30 transition">
+              <option value="" x-text="selectedClass ? '— Choisir une matiere —' : '— Choisir d\'abord une classe —'"></option>
+              <template x-if="selectedClass && ecsByClass[selectedClass]">
+                <template x-for="ec in ecsByClass[selectedClass]" :key="ec.id">
+                  <option :value="ec.id" x-text="ec.title"></option>
+                </template>
+              </template>
+            </select>
+          </div>
+        </div>
+
+        {# Ligne 3 : Date/heure debut + fin #}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-600">Debut *</label>
+            <input type="datetime-local" name="start_datetime" required
+              class="w-full rounded-xl border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+          </div>
+          <div>
+            <label class="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-600">Fin *</label>
+            <input type="datetime-local" name="end_datetime" required
+              class="w-full rounded-xl border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+          </div>
+        </div>
+
+        {# Ligne 4 : Salle + Description/Programme #}
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label class="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-600">Salle</label>
+            <input type="text" name="location" placeholder="Ex: Amphi 1"
+              class="w-full rounded-xl border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30">
+          </div>
+          <div class="md:col-span-2">
+            <label class="mb-1.5 block text-xs font-black uppercase tracking-wide text-slate-600">Programme / Contenu evalue</label>
+            <textarea name="description" rows="2"
+              placeholder="Ex: Chapitres 1 a 4 — Anatomie generale, systemes organiques..."
+              class="w-full rounded-xl border border-[color:var(--line)] bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[color:var(--school-primary)]/30 resize-none"></textarea>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-2">
+          <div id="eval-create-loading" class="htmx-indicator flex items-center gap-2 text-xs font-bold text-slate-400">
+            <svg class="h-3.5 w-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+            Envoi en cours...
+          </div>
+          <button type="submit"
+            class="inline-flex items-center justify-center gap-2 rounded-lg border border-[color:var(--school-primary)] bg-[color:var(--school-primary)] px-5 py-2.5 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-50">
+            <i data-lucide="calendar-plus" class="w-4 h-4"></i>Planifier l'evaluation
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {# Donnees EC par classe serialisees depuis le backend #}
+  <script id="de-ecs-by-class-data" type="application/json">{{ eval_form_ecs_json|safe }}</script>
+</div>

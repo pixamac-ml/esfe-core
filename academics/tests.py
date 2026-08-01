@@ -1,16 +1,19 @@
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+from io import BytesIO
 from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from academics.models import (
     AcademicClass,
+    AcademicBulletin,
+    AcademicDebt,
     AcademicEnrollment,
     AcademicScheduleChangeLog,
     AcademicScheduleEvent,
@@ -23,6 +26,12 @@ from academics.models import (
     WeeklyScheduleSlot,
 )
 from academics.services.grading import calculate_ec_grade
+from academics.imports.import_service import import_grades
+from academics.services.documents import (
+    build_bulletin_context,
+    generate_annual_bulletin,
+    generate_semester_bulletin,
+)
 from academics.services.semester import compute_semester_result
 from academics.services.year import compute_annual_decision, compute_annual_result
 from academics.services.lesson_log_service import (
@@ -53,6 +62,7 @@ from branches.models import Branch
 from formations.models import Cycle, Diploma, Filiere, Programme
 from inscriptions.models import Inscription
 from notifier.models import NotificationMessage
+from portal.student.widgets.academics import get_academics_widget
 from students.models import Student, TeacherAttendance
 
 
@@ -202,6 +212,148 @@ class AcademicResultCalculationTests(TestCase):
         self.assertEqual(decision["rule_code"], "admissible_gap")
         self.assertTrue(decision["requires_academic_debt"])
         self.assertEqual(len(decision["debt_subjects"]), 2)
+        self.assertFalse(AcademicDebt.objects.filter(enrollment=self.enrollment).exists())
+
+    def test_import_is_rejected_outside_the_active_grade_session(self):
+        self.semester.status = Semester.STATUS_PUBLISHED
+        self.semester.save(update_fields=["status"])
+
+        with self.assertRaises(ValidationError):
+            import_grades(
+                BytesIO(b"not-read-because-session-is-locked"),
+                academic_class=self.academic_class,
+                semester=self.semester,
+            )
+
+    def test_published_grade_is_locked(self):
+        grade = ECGrade.objects.create(
+            enrollment=self.enrollment,
+            ec=self.ec_one,
+            normal_score=Decimal("14.00"),
+        )
+        self.semester.status = Semester.STATUS_PUBLISHED
+        self.semester.save(update_fields=["status"])
+
+        grade.normal_score = Decimal("5.00")
+        with self.assertRaises(ValidationError):
+            grade.save()
+
+    def test_annual_bulletin_requires_both_semesters(self):
+        ECGrade.objects.create(enrollment=self.enrollment, ec=self.ec_one, normal_score=Decimal("14.00"))
+        ECGrade.objects.create(enrollment=self.enrollment, ec=self.ec_two, normal_score=Decimal("12.00"))
+        self.semester.status = Semester.STATUS_PUBLISHED
+        self.semester.save(update_fields=["status"])
+
+        with self.assertRaisesMessage(ValidationError, "exactement les semestres S1 et S2"):
+            generate_annual_bulletin(enrollment=self.enrollment, publish=True)
+
+    @override_settings(
+        STORAGES={
+            "default": {"BACKEND": "django.core.files.storage.memory.InMemoryStorage"},
+            "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+        }
+    )
+    def test_published_bulletin_keeps_snapshot_and_pdf_immutable(self):
+        ECGrade.objects.create(enrollment=self.enrollment, ec=self.ec_one, normal_score=Decimal("14.00"))
+        ECGrade.objects.create(enrollment=self.enrollment, ec=self.ec_two, normal_score=Decimal("10.00"))
+        self.semester.status = Semester.STATUS_PUBLISHED
+        self.semester.save(update_fields=["status"])
+
+        bulletin = generate_semester_bulletin(
+            enrollment=self.enrollment,
+            semester=self.semester,
+            publish=True,
+        )
+
+        self.assertEqual(bulletin.status, AcademicBulletin.STATUS_PUBLISHED)
+        self.assertEqual(bulletin.snapshot["version"], 2)
+        self.assertTrue(bulletin.pdf_file.name)
+        with bulletin.pdf_file.open("rb") as pdf_file:
+            self.assertTrue(pdf_file.read(4).startswith(b"%PDF"))
+
+        ECGrade.objects.filter(enrollment=self.enrollment, ec=self.ec_one).update(
+            normal_score=Decimal("1.00"),
+            final_score=Decimal("1.00"),
+            note=Decimal("1.00"),
+        )
+        context = build_bulletin_context(bulletin)
+        self.assertEqual(context["semester_result"]["average"], Decimal("12.00"))
+
+        bulletin.decision = "ALTERE"
+        with self.assertRaisesMessage(ValidationError, "definitif"):
+            bulletin.save()
+
+    def test_student_widget_hides_grades_until_publication(self):
+        ECGrade.objects.create(enrollment=self.enrollment, ec=self.ec_one, normal_score=Decimal("14.00"))
+
+        hidden_widget = get_academics_widget(self.user)
+        self.assertEqual(hidden_widget["average"], "Non disponible")
+
+        self.semester.status = Semester.STATUS_PUBLISHED
+        self.semester.save(update_fields=["status"])
+        published_widget = get_academics_widget(self.user)
+        self.assertEqual(published_widget["average"], "14.00/20")
+
+    def test_generated_bulletin_is_not_exposed_as_official(self):
+        ECGrade.objects.create(enrollment=self.enrollment, ec=self.ec_one, normal_score=Decimal("14.00"))
+        ECGrade.objects.create(enrollment=self.enrollment, ec=self.ec_two, normal_score=Decimal("10.00"))
+        self.semester.status = Semester.STATUS_PUBLISHED
+        self.semester.save(update_fields=["status"])
+        bulletin = generate_semester_bulletin(
+            enrollment=self.enrollment,
+            semester=self.semester,
+            publish=False,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("academics:bulletin_detail", args=[bulletin.pk]))
+
+        self.assertEqual(response.status_code, 404)
+
+    @override_settings(
+        STORAGES={
+            "default": {"BACKEND": "django.core.files.storage.memory.InMemoryStorage"},
+            "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+        }
+    )
+    def test_annual_publication_creates_debts_and_persists_pdf(self):
+        second_semester = Semester.objects.create(
+            academic_class=self.academic_class,
+            number=2,
+            total_required_credits=Decimal("6.00"),
+            status=Semester.STATUS_PUBLISHED,
+        )
+        second_ue = UE.objects.create(semester=second_semester, code="RES203", title="Dette")
+        ec_three = EC.objects.create(
+            ue=second_ue,
+            title="Matiere C",
+            credit_required=Decimal("3.00"),
+            coefficient=Decimal("3.00"),
+        )
+        ec_four = EC.objects.create(
+            ue=second_ue,
+            title="Matiere D",
+            credit_required=Decimal("3.00"),
+            coefficient=Decimal("3.00"),
+        )
+        ECGrade.objects.create(enrollment=self.enrollment, ec=self.ec_one, normal_score=Decimal("10.00"))
+        ECGrade.objects.create(enrollment=self.enrollment, ec=self.ec_two, normal_score=Decimal("10.00"))
+        ECGrade.objects.create(enrollment=self.enrollment, ec=ec_three, normal_score=Decimal("9.50"))
+        ECGrade.objects.create(enrollment=self.enrollment, ec=ec_four, normal_score=Decimal("9.50"))
+        self.semester.status = Semester.STATUS_PUBLISHED
+        self.semester.save(update_fields=["status"])
+
+        bulletin = generate_annual_bulletin(enrollment=self.enrollment, publish=True)
+
+        self.assertEqual(bulletin.decision, "ADMISSIBLE")
+        self.assertTrue(bulletin.pdf_file.name)
+        self.assertEqual(
+            AcademicDebt.objects.filter(
+                enrollment=self.enrollment,
+                status=AcademicDebt.STATUS_PENDING,
+            ).count(),
+            2,
+        )
 
     def test_annual_decision_repeats_when_semester_gap_is_too_large(self):
         second_semester = Semester.objects.create(

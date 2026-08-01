@@ -1,0 +1,22 @@
+{% if disabled %}
+  <span class="group relative flex cursor-not-allowed items-center gap-3 rounded-ui-button px-3 py-2.5 text-sm text-ui-on-primary/35" aria-disabled="true">
+{% else %}
+  <a
+    href="{{ url }}"
+    class="ui-nav-item group relative flex items-center gap-3 rounded-ui-button px-3 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus"
+    data-ui-nav-item
+    data-active="{{ active|yesno:'true,false' }}"
+    {% if nav_key %}data-nav-key="{{ nav_key }}"{% endif %}
+    {% if active %}aria-current="page"{% endif %}
+    {% if hx_get %}hx-get="{{ hx_get }}"{% endif %}
+    {% if hx_target %}hx-target="{{ hx_target }}"{% endif %}
+    {% if hx_swap %}hx-swap="{{ hx_swap }}"{% endif %}
+    {% if hx_push_url %}hx-push-url="{{ hx_push_url }}"{% endif %}
+    @click="mobileNavOpen = false"
+  >
+{% endif %}
+    <i data-lucide="{{ icon }}" class="h-4 w-4 shrink-0" aria-hidden="true"></i>
+    <span class="min-w-0 flex-1 truncate" x-show="!collapsed">{{ label }}</span>
+    {% if badge != None %}<span x-show="!collapsed" class="rounded-ui-badge bg-ui-accent px-1.5 py-0.5 text-ui-micro font-bold text-ui-sidebar">{{ badge }}</span>{% endif %}
+    <span x-show="collapsed" x-cloak class="pointer-events-none absolute left-full z-40 ml-2 hidden whitespace-nowrap rounded-ui-button bg-ui-overlay px-2 py-1 text-xs text-ui-on-primary shadow-ui-dropdown group-hover:block">{{ label }}</span>
+{% if disabled %}</span>{% else %}</a>{% endif %}

@@ -1,400 +1,74 @@
-{% extends "base.html" %}
+{% extends "portal/app_base.html" %}
 {% load static component_tags %}
-
-{% block public_navbar %}{% endblock %}
-{% block public_footer %}{% endblock %}
-{% block public_floating_widget %}{% endblock %}
 
 {% block title %}Dashboard Direction des Études{% endblock %}
 
 {% block extra_head %}
-<script defer src="{% static 'vendor/chartjs/chart.umd.min.js' %}"></script>
-<style>
-  [x-cloak] { display: none !important; }
-
-  /* ── Transitions HTMX ── */
-  #director-workspace {
-    transition: opacity 0.15s ease, transform 0.15s ease;
-  }
-  #director-workspace.htmx-swapping {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  #director-workspace.htmx-settling {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  #director-drawer-content {
-    transition: opacity 0.12s ease;
-  }
-  #director-drawer-content.htmx-swapping {
-    opacity: 0;
-  }
-
-  /* ── Bouton en cours de requête ── */
-  [data-de-loading] {
-    opacity: 0.65;
-    pointer-events: none;
-    cursor: wait;
-  }
-
-  /* ── Animation d'entrée sections ── */
-  @keyframes de-fade-in {
-    from { opacity: 0; transform: translateY(10px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  .de-section-enter {
-    animation: de-fade-in 0.2s ease forwards;
-  }
-</style>
+  <script defer src="{% static 'src/js/portal/director_dashboard.js' %}"></script>
 {% endblock %}
 
 {% block content %}
-<div
-  x-data="deDashboard()"
-  x-init="init()"
-  @keydown.window.escape="$dispatch('academic-drawer-close'); $dispatch('academic-modal-close')"
-  x-cloak
-  class="min-h-screen bg-[color:var(--surface)] text-[color:var(--text)]"
->
-  <div class="flex min-h-screen overflow-hidden">
-
-    {% component "academic_sidebar"
-      brand_title="ESFE Mali"
-      brand_subtitle="Direction des Études"
-      user_name=request.user.get_full_name|default:"Directeur"
-      user_role="Direction des Études"
-      user_initial=request.user.first_name|first|default:"D"
-      active_key=director_active_section|default:"home"
-      items=sidebar_items
+{% component "ui_core.app_shell" %}
+  {% fill "sidebar" %}
+    {% component "ui_core.app_sidebar"
+      groups=director_navigation
+      brand="ESFE Mali"
+      subtitle="Direction des Études"
+      user_name=request.user.get_full_name|default:request.user.username
+      user_meta=director_context_label
     %}{% endcomponent %}
+  {% endfill %}
 
-    <main class="flex-1 min-w-0 flex flex-col overflow-hidden bg-[color:var(--surface)]">
+  {% fill "topbar" %}
+    {% component "ui_core.app_topbar"
+      title="Direction des Études"
+      context_label=director_context_label
+      user_name=""
+      notification_count=notification_count
+      notifications_url=""
+      show_notifications_button=False
+    %}
+      {% fill "actions" %}
+        {% include "portal/staff/director/partials/topbar_fragments.html" %}
+      {% endfill %}
+    {% endcomponent %}
+  {% endfill %}
 
-      <header class="flex h-16 shrink-0 items-center justify-between border-b border-[color:var(--line)] bg-[color:var(--card)] px-4 lg:px-6">
-        <div class="flex items-center gap-3">
-          <button @click="sidebarOpen = !sidebarOpen" class="flex h-9 w-9 items-center justify-center rounded-lg border border-[color:var(--line)] text-[color:var(--muted)] transition hover:bg-[color:var(--surface)] hover:text-[color:var(--text)]">
-            <i data-lucide="menu" class="h-5 w-5"></i>
-          </button>
-          <div class="hidden md:block">
-            <template x-if="activeModule === 'home'">
-              <div>
-                <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">Dashboard</p>
-                <h1 class="text-lg font-black leading-tight text-[color:var(--text)]">Direction des Études</h1>
-              </div>
-            </template>
-            <template x-if="activeModule !== 'home'">
-              <div>
-                <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]" x-text="activeTitle()"></p>
-                <h1 class="text-lg font-black leading-tight text-[color:var(--text)]" x-text="activeSubtitle()"></h1>
-              </div>
-            </template>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <div data-portal-notification-slot></div>
-          {% component "academic_button" label="Accueil" icon="layout-dashboard" variant="outline" size="sm" extra_class="hidden md:inline-flex" attrs='@click="openModule(\'home\')"' %}{% endcomponent %}
-          <a href="{% url 'accounts:edit_profile' %}" class="flex h-9 w-9 items-center justify-center rounded-lg border border-[color:var(--line)] text-[color:var(--muted)] transition hover:bg-[color:var(--surface)] hover:text-[color:var(--text)]" title="Mon profil">
-            <i data-lucide="user-cog" class="h-4 w-4"></i>
-          </a>
-          <form method="post" action="{% url 'accounts:logout' %}" class="inline-flex">
-            {% csrf_token %}
-            {% component "academic_button" label="Déconnexion" icon="log-out" variant="danger" size="sm" type="submit" extra_class="hidden lg:inline-flex" %}{% endcomponent %}
-          </form>
-        </div>
-      </header>
-
-      <section class="flex-1 overflow-y-auto p-4 lg:p-6">
-
-        <section x-show="activeModule === 'home'" x-transition class="space-y-5">
-
-          {% component "academic_card" title="" icon="" padding="none" extra_class="overflow-hidden" %}
-            <div class="relative flex flex-col gap-4 bg-gradient-to-r from-[color:var(--school-primary)] to-[color:var(--esfe-light)] p-5 text-white sm:flex-row sm:items-center sm:justify-between lg:p-6">
-              <div>
-                <p class="text-[10px] font-black uppercase tracking-widest text-white/70">Direction des études · {{ branch.name|default:"Annexe" }}</p>
-                <h2 class="mt-1 text-2xl font-black lg:text-3xl">Bonjour, {{ request.user.first_name|default:"Directeur" }}</h2>
-                <p class="mt-1 text-sm font-semibold text-white/90">{{ today|date:"l d F Y" }} · Vue générale de vos activités.</p>
-              </div>
-              <div class="flex flex-wrap gap-2">
-                {% component "academic_button" label="Mon profil" variant="secondary" size="sm" hx_get="{% url 'accounts:edit_profile' %}" hx_target="#director-workspace" extra_class="bg-white/10 text-white border-white/20 hover:bg-white/20" %}{% endcomponent %}
-                {% component "academic_button" label="Préférences" variant="secondary" size="sm" hx_get="{% url 'accounts:edit_preferences' %}" hx_target="#director-workspace" extra_class="bg-white/10 text-white border-white/20 hover:bg-white/20" %}{% endcomponent %}
-                {% component "academic_button" label="Actualiser" icon="refresh-cw" variant="primary" size="sm" attrs='@click="openModule(activeModule)"' %}{% endcomponent %}
-              </div>
-            </div>
-          {% endcomponent %}
-
-          {% if tasks_center %}
-            {% component "academic_alert" level="warning" title="Tâches en attente" message=tasks_center_message|default:"" %}{% endcomponent %}
-          {% endif %}
-
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            {% component "academic_stat_card" label="Classes" value=total_classes|default:0 icon="school" hint="Actives" extra_class="border-l-4 border-[color:var(--school-primary)]" %}{% endcomponent %}
-            {% component "academic_stat_card" label="Enseignants" value=teachers_total|default:0 icon="users" hint="Affectés" extra_class="border-l-4 border-[color:var(--esfe-light)]" %}{% endcomponent %}
-            {% component "academic_stat_card" label="Semestres" value=total_semesters|default:0 icon="calendar-range" hint="Suivis" extra_class="border-l-4 border-[color:var(--school-accent)]" %}{% endcomponent %}
-            {% component "academic_stat_card" label="À publier" value=ready_to_publish|length|default:0 icon="send" hint="Résultats prêts" extra_class="border-l-4 border-[color:var(--success)]" %}{% endcomponent %}
-            {% component "academic_stat_card" label="Anomalies" value=teacher_unassigned_count|default:0 icon="triangle-alert" hint="Sans affectation" extra_class="border-l-4 border-[color:var(--danger)]" %}{% endcomponent %}
-            {% component "academic_stat_card" label="Documents" value=admin_doc_published_count|default:0 icon="file-check" hint="Publiés" extra_class="border-l-4 border-[color:var(--info)]" %}{% endcomponent %}
-          </div>
-
-          {% component "academic_card" title="Accès rapide" icon="zap" %}
-            <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-              <template x-for="action in quickActions" :key="action.label">
-                <button type="button" @click="openModule(action.key)" class="group flex flex-col items-center justify-center gap-3 rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 text-center transition hover:-translate-y-1 hover:border-[color:var(--school-primary)] hover:shadow-lg">
-                  <div class="grid h-12 w-12 place-items-center rounded-2xl bg-[color:var(--surface)] transition group-hover:bg-[color:var(--school-primary-soft)]">
-                    <i :data-lucide="action.icon" class="h-6 w-6" :class="action.color"></i>
-                  </div>
-                  <p class="text-sm font-bold text-[color:var(--text)]" x-text="action.label"></p>
-                </button>
-              </template>
-            </div>
-          {% endcomponent %}
-
-          <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
-            {% component "academic_card" title="Classes actives" icon="school" extra_class="lg:col-span-2" %}
-              {% component "academic_table"
-                id="director-classes-table"
-                headers="Classe,Étudiants,Progression,Statut"
-                rows=class_table_rows
-                empty_message="Aucune classe active."
-              %}{% endcomponent %}
-            {% endcomponent %}
-
-            {% component "academic_card" title="Dernières activités" icon="activity" %}
-              <div class="divide-y divide-[color:var(--line)]">
-                {% for log in recent_lesson_logs|slice:":6" %}
-                  <div class="flex items-center gap-3 px-2 py-3 transition hover:bg-[color:var(--surface)]">
-                    <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[color:var(--success-soft)] text-[color:var(--success)]">
-                      <i data-lucide="file-check-2" class="h-5 w-5"></i>
-                    </div>
-                    <div class="min-w-0">
-                      <p class="text-sm font-semibold text-[color:var(--text)] truncate">{{ log.academic_class.display_name }} · {{ log.ec.title }}</p>
-                      <p class="mt-0.5 text-xs text-[color:var(--muted)]">{{ log.date|date:"d/m/Y" }} · {{ log.start_time|time:"H:i" }}</p>
-                    </div>
-                  </div>
-                {% empty %}
-                  {% component "academic_empty_state" title="Aucune activité" message="Aucune activité récente." icon="inbox" %}{% endcomponent %}
-                {% endfor %}
-              </div>
-            {% endcomponent %}
-          </div>
-
-        </section>
-
-        <section x-show="activeModule !== 'home'" x-transition class="min-h-[50vh]">
-          <div id="director-workspace">
-            {% if director_active_section != "home" %}
-              {% include "portal/staff/director/partials/workspace.html" %}
-            {% endif %}
-          </div>
-        </section>
-
-      </section>
-    </main>
-  </div>
-
-  {% component "academic_drawer" id="director-drawer" content_id="director-drawer-content" kicker="Détail" title="Élément sélectionné" icon="panel-right-open" open_event="academic-drawer-open" close_event="academic-drawer-close" %}{% endcomponent %}
-
-  {% component "academic_modal" id="director-modal" title="Formulaire" show_footer=False %}
-    {% fill "trigger" %}{% endfill %}
-    {% fill "content" %}
-      <div id="director-modal-content" class="text-sm text-[color:var(--muted)]">
-        <p>Sélectionnez une action pour ouvrir le formulaire.</p>
+  {% fill "default" %}
+    <div class="relative">
+      <div
+        id="director-loading"
+        class="hidden fixed left-1/2 top-20 z-40 -translate-x-1/2 rounded-ui-button border border-ui-border bg-ui-surface px-4 py-2 text-sm font-semibold text-ui-text shadow-ui-dropdown"
+        role="status"
+        aria-live="polite"
+      >
+        <span class="inline-flex items-center gap-2">
+          <i data-lucide="loader-circle" class="h-4 w-4 animate-spin text-ui-primary" aria-hidden="true"></i>
+          Mise à jour
+        </span>
       </div>
-    {% endfill %}
-  {% endcomponent %}
-</div>
+      <div id="director-workspace" tabindex="-1" aria-live="polite" aria-busy="false">
+        {% if director_active_section == "home" %}
+          {% include "portal/staff/director/partials/home.html" %}
+        {% else %}
+          {% include "portal/staff/director/partials/workspace.html" %}
+        {% endif %}
+      </div>
+    </div>
 
-<script>
-function deDashboard() {
-  return {
-    sidebarOpen: true,
-    activeModule: '{{ director_active_section|default:"home"|escapejs }}',
+    {% component "ui_core.drawer" id="director-drawer" title="Détail" size="wide" %}
+      {% fill "default" %}
+        <p class="text-sm text-ui-text-muted">Sélectionnez un élément pour afficher ses détails.</p>
+      {% endfill %}
+    {% endcomponent %}
 
-    modules: [
-      { key: 'home',                 label: 'Accueil',           sub: 'Vue generale',           icon: 'layout-dashboard',  title: 'Tableau de bord',            subtitle: 'Vue generale des activites de la direction' },
-      { key: 'calendrier',           label: 'Calendrier',        sub: 'Annee & Evenements',     icon: 'calendar-days',     title: 'Calendrier academique',      subtitle: 'Initialiser et gerer le calendrier de l annexe' },
-      { key: 'evaluations_calendar', label: 'Sessions examens',  sub: 'Planifier & Publier',    icon: 'clipboard-check',   title: 'Sessions d evaluations',     subtitle: 'Creer et publier les sessions d examens et de rattrapage' },
-      { key: 'evaluations',          label: 'Resultats & Notes', sub: 'Notes & PV',             icon: 'bar-chart-2',       title: 'Resultats & Notes',          subtitle: 'Validation et publication des notes par semestre' },
-      { key: 'enseignants',          label: 'Enseignants',       sub: 'Recrutement & Suivi',    icon: 'user-check',        title: 'Personnel enseignant',       subtitle: 'Recrutement, affectations, contrats et suivi pedagogique' },
-      { key: 'programme',            label: 'Programmes',        sub: 'UE, EC & Classes',       icon: 'book-open',         title: 'Programmes academiques',     subtitle: 'Gestion des UE, EC et suivi des classes' },
-      { key: 'planification',        label: 'Emploi du temps',   sub: 'Grille & Creneaux',      icon: 'calendar-range',    title: 'Emploi du temps',            subtitle: 'Creer et publier les grilles horaires par classe' },
-      { key: 'correspondances',      label: 'Documents',         sub: 'Avis & Correspondances', icon: 'mail',              title: 'Documents & Correspondances', subtitle: 'Redaction, publication et dispatch des documents administratifs' },
-    ],
+    {% component "ui_core.modal" id="director-modal" title="Formulaire" size="wide" %}
+      {% fill "default" %}
+        <p class="text-sm text-ui-text-muted">Sélectionnez une action pour ouvrir le formulaire.</p>
+      {% endfill %}
+    {% endcomponent %}
 
-    quickActions: [
-      { key: 'calendrier',           label: 'Calendrier',        icon: 'calendar-days',      color: 'text-[color:var(--school-primary)]' },
-      { key: 'evaluations_calendar', label: 'Sessions examens',  icon: 'clipboard-check',    color: 'text-[color:var(--esfe-light)]' },
-      { key: 'enseignants',          label: 'Enseignants',       icon: 'user-check',         color: 'text-[color:var(--success)]' },
-      { key: 'planification',        label: 'Emploi du temps',   icon: 'calendar-range',     color: 'text-[color:var(--school-accent)]' },
-      { key: 'correspondances',      label: 'Nouveau document',  icon: 'file-plus-2',        color: 'text-[color:var(--warning)]' },
-    ],
-
-    init() {
-      this.$nextTick(() => { this.renderIcons(); });
-      window.deOpenDrawer  = () => window.dispatchEvent(new CustomEvent('academic-drawer-open'));
-      window.deCloseDrawer = () => window.dispatchEvent(new CustomEvent('academic-drawer-close'));
-      window.deOpenModal   = () => window.dispatchEvent(new CustomEvent('academic-modal-open'));
-      window.deCloseModal  = () => window.dispatchEvent(new CustomEvent('academic-modal-close'));
-      if (window.htmx) {
-        window.htmx.config.defaultSwapStyle = 'innerHTML';
-        window.htmx.config.globalViewTransitions = false;
-        window.htmx.config.refreshOnHistoryMiss = false;
-        window.htmx.config.indicatorClass = 'htmx-request-hidden';
-        window.htmx.config.swapDelay = 0;
-        window.htmx.config.settleDelay = 80;
-      }
-
-      /* ── Skeletons ── */
-      const _skeletonRow = (w) => `<div class="h-3 ${w} rounded-lg bg-[color:var(--line)]"></div>`;
-      const _skeletonCard = () =>
-        `<div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 animate-pulse space-y-3">` +
-        _skeletonRow('w-1/3') + _skeletonRow('w-2/3') + _skeletonRow('w-1/2') + `</div>`;
-      const _skeletonKpi = () =>
-        `<div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 animate-pulse">` +
-        `<div class="h-2 w-1/2 rounded bg-[color:var(--line)] mb-3"></div>` +
-        `<div class="h-8 w-1/3 rounded-lg bg-[color:var(--surface)]"></div></div>`;
-      window._buildWorkspaceSkeleton = () => {
-        let s = `<div class="space-y-6 de-section-enter">`;
-        s += `<div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] px-6 py-5 animate-pulse">` +
-             `<div class="h-2 w-1/4 rounded bg-[color:var(--line)] mb-3"></div>` +
-             `<div class="h-6 w-1/2 rounded-lg bg-[color:var(--line)] mb-2"></div>` +
-             `<div class="h-3 w-2/3 rounded bg-[color:var(--surface)]"></div></div>`;
-        s += `<div class="grid grid-cols-2 sm:grid-cols-4 gap-4">`;
-        for (let i = 0; i < 4; i++) s += _skeletonKpi();
-        s += `</div>`;
-        s += _skeletonCard() + _skeletonCard();
-        s += `</div>`;
-        return s;
-      };
-      const _drawerSkeleton =
-        `<div class="space-y-5 animate-pulse">` +
-        `<div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5">` +
-        `<div class="h-2 w-1/3 rounded bg-[color:var(--line)] mb-3"></div>` +
-        `<div class="h-5 w-2/3 rounded-lg bg-[color:var(--line)] mb-2"></div>` +
-        `<div class="h-3 w-1/2 rounded bg-[color:var(--surface)]"></div></div>` +
-        `<div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5">` +
-        `<div class="h-3 w-full rounded bg-[color:var(--surface)] mb-2"></div>` +
-        `<div class="h-3 w-4/5 rounded bg-[color:var(--surface)] mb-2"></div>` +
-        `<div class="h-3 w-3/5 rounded bg-[color:var(--surface)]"></div></div>` +
-        `<div class="h-24 rounded-2xl bg-[color:var(--surface)]"></div>` +
-        `</div>`;
-      const _modalSkeleton =
-        `<div class="space-y-4 animate-pulse p-1">` +
-        `<div class="h-4 w-1/2 rounded-lg bg-[color:var(--line)]"></div>` +
-        `<div class="h-3 w-3/4 rounded bg-[color:var(--surface)]"></div>` +
-        `<div class="h-10 rounded-xl bg-[color:var(--surface)]"></div>` +
-        `<div class="h-10 rounded-xl bg-[color:var(--surface)]"></div>` +
-        `<div class="h-10 rounded-xl bg-[color:var(--surface)]"></div>` +
-        `</div>`;
-
-      /* ── Gestion loading boutons ── */
-      const _setLoading = (elt, on) => {
-        if (!elt) return;
-        if (on) elt.setAttribute('data-de-loading', '1');
-        else elt.removeAttribute('data-de-loading');
-      };
-
-      /* ── Événements HTMX ── */
-      document.body.addEventListener('htmx:beforeRequest', (evt) => {
-        const elt = evt.detail && evt.detail.elt;
-        const targetId = elt && elt.getAttribute && elt.getAttribute('hx-target');
-        _setLoading(elt, true);
-        if (targetId === '#director-drawer-content') {
-          const dc = document.getElementById('director-drawer-content');
-          if (dc) dc.innerHTML = _drawerSkeleton;
-          window.deOpenDrawer();
-        }
-        if (targetId === '#director-modal-content') {
-          const mc = document.getElementById('director-modal-content');
-          if (mc) mc.innerHTML = _modalSkeleton;
-          window.deOpenModal();
-        }
-        if (targetId === '#director-workspace') {
-          const ws = document.getElementById('director-workspace');
-          if (ws && window._buildWorkspaceSkeleton) ws.innerHTML = window._buildWorkspaceSkeleton();
-        }
-      });
-      document.body.addEventListener('htmx:afterRequest', (evt) => {
-        _setLoading(evt.detail && evt.detail.elt, false);
-      });
-      document.body.addEventListener('htmx:afterSwap', (evt) => {
-        this.syncSectionFromWorkspace();
-        this.renderIcons();
-        const target = evt.detail && evt.detail.target;
-        if (!target) return;
-        if (target.id === 'director-workspace') {
-          target.querySelectorAll('section, [data-director-section] > *').forEach(el => {
-            el.classList.add('de-section-enter');
-          });
-        }
-        if (target.id === 'director-drawer-content' && target.innerHTML.trim()) {
-          window.deOpenDrawer();
-        }
-        if (target.id === 'director-modal-content' && target.innerHTML.trim()) {
-          window.deOpenModal();
-        }
-      });
-    },
-
-    activeTitle() {
-      const mod = this.modules.find(m => m.key === this.activeModule) || this.modules[0];
-      return mod.title;
-    },
-    activeSubtitle() {
-      const mod = this.modules.find(m => m.key === this.activeModule) || this.modules[0];
-      return mod.subtitle;
-    },
-
-    openModule(key) {
-      this.activeModule = key || 'home';
-      if (this.activeModule === 'home') { this.closeDrawer(); this.closeModal(); return; }
-      const url = '{% url "accounts_portal:director_workspace" %}?section=' + encodeURIComponent(this.activeModule);
-      this.openWorkspaceUrl(url);
-    },
-
-    openWorkspaceUrl(url) {
-      const resolved = new URL(url, window.location.origin);
-      const section = resolved.searchParams.get('section');
-      if (section) this.activeModule = section;
-      this.closeDrawer();
-      this.closeModal();
-      /* Skeleton instantané avant la requête */
-      const ws = document.getElementById('director-workspace');
-      if (ws && window._buildWorkspaceSkeleton) {
-        ws.innerHTML = window._buildWorkspaceSkeleton();
-      }
-      if (window.htmx) { window.htmx.ajax('GET', url, '#director-workspace'); }
-      this.$nextTick(() => this.renderIcons());
-    },
-
-    syncSectionFromWorkspace() {
-      const el = document.querySelector('#director-workspace [data-director-section]');
-      if (el && el.dataset.directorSection) { this.activeModule = el.dataset.directorSection; }
-    },
-
-    openDrawer() {
-      window.dispatchEvent(new CustomEvent('academic-drawer-open'));
-      this.$nextTick(() => this.renderIcons());
-    },
-    closeDrawer() {
-      window.dispatchEvent(new CustomEvent('academic-drawer-close'));
-      const el = document.getElementById('director-drawer-content');
-      if (el) el.innerHTML = '<p class="text-sm font-semibold text-[color:var(--muted-2)]">Selectionnez un element pour afficher les details.</p>';
-    },
-    openModal() {
-      window.dispatchEvent(new CustomEvent('academic-modal-open'));
-    },
-    closeModal() {
-      window.dispatchEvent(new CustomEvent('academic-modal-close'));
-      const el = document.getElementById('director-modal-content');
-      if (el) el.innerHTML = '<p class="text-sm font-semibold text-[color:var(--muted-2)]">Selectionnez une action pour ouvrir le formulaire.</p>';
-    },
-
-    renderIcons() {
-      if (window.lucide && typeof window.lucide.createIcons === 'function') { window.lucide.createIcons(); }
-    },
-  };
-}
-</script>
+    {% component "ui_core.confirm_dialog" id="director-confirm" title="Confirmer l'action" message="Cette action nécessite votre confirmation." confirm_label="Confirmer" cancel_label="Annuler" %}{% endcomponent %}
+  {% endfill %}
+{% endcomponent %}
 {% endblock %}

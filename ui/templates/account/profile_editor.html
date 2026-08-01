@@ -1,0 +1,70 @@
+{% load component_tags %}
+<div data-ui-core="profile-editor" x-data="{}">
+  <h3 class="mb-4 text-lg font-bold text-ui-text">{{ title }}</h3>
+  <form {% if form_action %}action="{{ form_action }}"{% endif %} method="{{ form_method }}" {% if enctype %}enctype="{{ enctype }}"{% endif %} {% if hx_post %}hx-post="{{ hx_post }}" hx-target="{{ hx_target|default:'#director-drawer-content' }}" hx-swap="{{ hx_swap }}" hx-indicator="#profile-loading"{% endif %} class="space-y-4">
+    {% csrf_token %}
+
+    {% if form %}
+      {% if form.avatar %}
+        <div class="rounded-ui-card border border-ui-border bg-ui-surface-muted/40 p-4">
+          <div class="flex items-center gap-4">
+            <div class="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-ui-info/10 text-lg font-bold text-ui-info">
+              {% if form.instance.avatar_url %}
+                <img src="{{ form.instance.avatar_url }}" alt="Avatar actuel" class="h-full w-full object-cover">
+              {% else %}
+                {{ form.instance.user.get_full_name|default:form.instance.user.username|truncatechars:2 }}
+              {% endif %}
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-semibold text-ui-text">Avatar</p>
+              <p class="text-xs text-ui-text-muted">JPEG, PNG ou WebP. La taille maximale reste contrÃ´lÃ©e par le backend.</p>
+              <div class="mt-2 flex flex-wrap items-center gap-2">
+                <button type="button" @click="$refs.avatarInput.click()" class="inline-flex items-center gap-2 rounded-ui-button border border-ui-border px-3 py-2 text-sm font-medium text-ui-text hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus">
+                  <i data-lucide="image-plus" class="h-4 w-4"></i>
+                  Choisir un avatar
+                </button>
+                {{ form.avatar }}
+              </div>
+              {% if form.avatar.errors %}
+                <p class="mt-2 text-xs text-ui-danger" role="alert">{{ form.avatar.errors.0 }}</p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      {% for field in form %}
+        {% if field.name != "avatar" %}
+          <div class="space-y-1.5">
+            <label for="{{ field.id_for_label }}" class="block text-sm font-semibold text-ui-text">
+              {{ field.label }}{% if field.field.required %}<span class="text-ui-danger" aria-hidden="true"> *</span>{% endif %}
+            </label>
+            {{ field }}
+            {% if field.help_text %}
+              <p class="text-xs text-ui-text-muted">{{ field.help_text }}</p>
+            {% endif %}
+            {% if field.errors %}
+              <p class="text-xs text-ui-danger" role="alert">{{ field.errors.0 }}</p>
+            {% endif %}
+          </div>
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+
+    <div id="profile-loading" class="htmx-indicator">
+      <div class="flex items-center gap-2 text-sm text-ui-text-muted">
+        <div class="h-4 w-4 animate-spin rounded-full border-2 border-ui-border border-t-ui-info"></div>
+        Enregistrement...
+      </div>
+    </div>
+
+    <div class="flex items-center justify-end gap-3 border-t border-ui-border pt-4">
+      <button type="button" @click="$dispatch('ui-overlay-close', { id: '{{ drawer_id }}' })" class="rounded-ui-button border border-ui-border px-4 py-2 text-sm font-medium text-ui-text hover:bg-ui-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus">
+        Annuler
+      </button>
+      <button type="submit" class="rounded-ui-button bg-ui-info px-4 py-2 text-sm font-semibold text-white hover:bg-ui-info/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2">
+        Enregistrer
+      </button>
+    </div>
+  </form>
+</div>

@@ -1,0 +1,56 @@
+{% load component_tags %}
+<div x-data="{ open: false }" @click.outside="open = false" @keydown.escape.window="if (open) open = false" data-ui-core="notification-bell" class="relative">
+  <button
+    type="button"
+    @click="open = !open"
+    {% if preview_url and preview_url != "#" %}hx-get="{{ preview_url }}" hx-target="{{ preview_target|default:'#notification-dropdown-content' }}" hx-swap="innerHTML" hx-trigger="once"{% endif %}
+    class="relative rounded-ui-button p-2 text-ui-text-muted hover:bg-ui-surface-muted hover:text-ui-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus"
+    aria-label="Notifications"
+    :aria-expanded="open.toString()"
+    aria-haspopup="true"
+  >
+    <i data-lucide="bell" class="h-5 w-5"></i>
+    {% if unread_count > 0 %}
+      <span class="js-notification-unread-count absolute -top-0.5 -right-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-ui-danger px-1 text-[10px] font-bold text-white" aria-label="{{ unread_count }} non lues">
+        {% if unread_count > 99 %}99+{% else %}{{ unread_count }}{% endif %}
+      </span>
+    {% endif %}
+  </button>
+
+  <div
+    x-show="open"
+    x-cloak
+    x-transition:enter="transition ease-out duration-100"
+    x-transition:enter-start="opacity-0 scale-95"
+    x-transition:enter-end="opacity-100 scale-100"
+    x-transition:leave="transition ease-in duration-75"
+    x-transition:leave-start="opacity-100 scale-100"
+    x-transition:leave-end="opacity-0 scale-95"
+    class="absolute right-0 z-50 mt-2 w-80 origin-top-right rounded-ui-card border border-ui-border bg-ui-surface shadow-ui-dropdown"
+    role="menu"
+  >
+    <div id="notification-dropdown-content" class="max-h-96 overflow-auto">
+      {% if preview_url and preview_url != "#" %}
+        <div class="flex items-center justify-center p-4">
+          <div class="h-5 w-5 animate-spin rounded-full border-2 border-ui-border border-t-ui-info"></div>
+        </div>
+      {% else %}
+        <div class="p-4 text-center text-sm text-ui-text-muted">Aucune notification</div>
+      {% endif %}
+    </div>
+    <div class="border-t border-ui-border px-4 py-2">
+      {% if center_url and center_url != "#" %}
+        <button
+          type="button"
+          hx-get="{{ center_url }}"
+          hx-target="{{ center_target|default:'#director-workspace' }}"
+          hx-swap="innerHTML"
+          @click="open = false"
+          class="block w-full text-center text-xs font-medium text-ui-info hover:underline"
+        >
+          Voir toutes les notifications
+        </button>
+      {% endif %}
+    </div>
+  </div>
+</div>

@@ -179,6 +179,7 @@ class SystemProfileForm(forms.ModelForm):
             "class": "hidden",
             "accept": "image/jpeg,image/png,image/webp",
             "id": "avatar-input",
+            "x-ref": "avatarInput",
         })
         self.fields["phone"].widget.attrs.update({
             "class": INPUT_CLASS,

@@ -7,6 +7,8 @@ Responsabilites :
 - Validation metier des entrees avant persistence (validate_entry_business_rules)
 - Construction du contexte complet pour le template (build_director_calendar_context)
 """
+import json
+
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
@@ -578,7 +580,10 @@ def build_director_calendar_context(branch, selected_calendar_id=None):
         "director_calendar_missing_key_events": missing_key_events,
         "director_calendar_event_type_choices": AcademicCalendarEntry.EVENT_TYPE_CHOICES,
         "director_calendar_event_groups": EVENT_GROUPS,
-        "director_calendar_event_meta_json": event_meta_json,
+        "director_calendar_event_meta_json": json.dumps(
+            event_meta_json,
+            ensure_ascii=False,
+        ),
         "director_calendar_available_classes": available_classes,
         "director_calendar_available_semesters": available_semesters,
         "director_calendar_no_semesters": selected is not None and not available_semesters,

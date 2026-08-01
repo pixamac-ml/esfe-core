@@ -1,0 +1,27 @@
+{% load component_tags %}
+<div class="grid grid-cols-1 gap-5 xl:grid-cols-3">
+  <div class="xl:col-span-2">
+    {% component "ui_core.data_table" id="director-classes-table" caption="Classes actives" headers=director_class_headers rows=director_class_table_rows result_count=total_classes density="compact" empty_title="Aucune classe active" empty_message="Aucune classe n'est disponible dans ce périmètre." %}{% endcomponent %}
+  </div>
+  {% component "ui_core.panel" title="Activité récente" subtitle="Derniers journaux de cours reçus." density="compact" scrollable=True %}
+    {% fill "default" %}
+      {% if recent_lesson_logs %}
+        <ol class="divide-y divide-ui-border">
+          {% for log in recent_lesson_logs|slice:":6" %}
+            <li class="flex gap-3 py-3 first:pt-0">
+              <span class="grid h-9 w-9 shrink-0 place-items-center rounded-ui-button bg-ui-success-soft text-ui-success">
+                <i data-lucide="file-check-2" class="h-4 w-4" aria-hidden="true"></i>
+              </span>
+              <div class="min-w-0">
+                <p class="truncate text-sm font-semibold text-ui-text">{{ log.academic_class.display_name }} · {{ log.ec.title }}</p>
+                <p class="mt-1 text-xs text-ui-text-muted">{{ log.date|date:"d/m/Y" }} · {{ log.start_time|time:"H:i" }}</p>
+              </div>
+            </li>
+          {% endfor %}
+        </ol>
+      {% else %}
+        {% component "ui_core.empty_state" title="Aucune activité récente" message="Les derniers journaux de cours apparaîtront ici." icon="inbox" %}{% endcomponent %}
+      {% endif %}
+    {% endfill %}
+  {% endcomponent %}
+</div>

@@ -4,7 +4,7 @@ import zipfile
 from datetime import date, time
 
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.http import HttpResponse, JsonResponse
+from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.template.loader import render_to_string
 from django.contrib.auth import get_user_model
@@ -39,6 +39,7 @@ from academics.services.documents import (
     generate_annual_bulletin,
     generate_semester_bulletin,
     prepare_diploma_award,
+    render_bulletin_pdf_bytes,
 )
 from academics.services.reporting import (
     build_annual_class_report,
@@ -238,6 +239,15 @@ def class_reports_overview_view(request, semester_id):
         id=semester_id,
     )
     _ensure_can_view_class_reports(request, semester.academic_class)
+    published_bulletins = {
+        bulletin.student_id: bulletin
+        for bulletin in AcademicBulletin.objects.filter(
+            academic_class=semester.academic_class,
+            semester=semester,
+            bulletin_type=AcademicBulletin.TYPE_SEMESTER,
+            status=AcademicBulletin.STATUS_PUBLISHED,
+        )
+    }
     rows = []
     for student_id in _get_class_student_ids(semester):
         context = _build_semester_report_context(request, student_id, semester.id)
@@ -245,6 +255,7 @@ def class_reports_overview_view(request, semester_id):
             "student_id": student_id,
             "student_name": context["student_full_name"],
             "student_matricule": context["student_matricule"],
+            "bulletin": published_bulletins.get(student_id),
         })
 
     return render(
@@ -309,7 +320,12 @@ def generate_semester_bulletin_view(request, enrollment_id, semester_id):
     if not can_manage_bulletins(request.user, enrollment.academic_class):
         raise PermissionDenied("Vous n'etes pas autorise a generer ce bulletin.")
     semester = get_object_or_404(Semester, pk=semester_id, academic_class=enrollment.academic_class)
-    bulletin = generate_semester_bulletin(enrollment=enrollment, semester=semester, actor=request.user)
+    bulletin = generate_semester_bulletin(
+        enrollment=enrollment,
+        semester=semester,
+        actor=request.user,
+        publish=True,
+    )
     return JsonResponse({"ok": True, "bulletin_id": bulletin.pk, "reference": bulletin.reference})
 
 
@@ -328,7 +344,7 @@ def generate_annual_bulletin_view(request, enrollment_id):
     )
     if not can_manage_bulletins(request.user, enrollment.academic_class):
         raise PermissionDenied("Vous n'etes pas autorise a generer ce bulletin.")
-    bulletin = generate_annual_bulletin(enrollment=enrollment, actor=request.user)
+    bulletin = generate_annual_bulletin(enrollment=enrollment, actor=request.user, publish=True)
     return JsonResponse({"ok": True, "bulletin_id": bulletin.pk, "reference": bulletin.reference})
 
 
@@ -344,6 +360,7 @@ def bulletin_detail_view(request, bulletin_id):
             "semester",
         ),
         pk=bulletin_id,
+        status=AcademicBulletin.STATUS_PUBLISHED,
     )
     if not can_view_student_academic_report(request.user, bulletin.student, academic_class=bulletin.academic_class):
         raise PermissionDenied("Acces refuse a ce bulletin.")
@@ -362,13 +379,22 @@ def bulletin_pdf_view(request, bulletin_id):
             "semester",
         ),
         pk=bulletin_id,
+        status=AcademicBulletin.STATUS_PUBLISHED,
     )
     if not can_view_student_academic_report(request.user, bulletin.student, academic_class=bulletin.academic_class):
         raise PermissionDenied("Acces refuse a ce bulletin.")
-    context = build_bulletin_context(bulletin)
-    pdf_bytes, backend_error = _render_pdf_from_template(request, "academics/reports/bulletin_esfe.html", context)
-    if backend_error is not None:
-        return backend_error
+    if bulletin.pdf_file:
+        response = FileResponse(
+            bulletin.pdf_file.open("rb"),
+            content_type="application/pdf",
+        )
+        response["Content-Disposition"] = f'inline; filename="bulletin-{bulletin.reference}.pdf"'
+        return response
+
+    try:
+        pdf_bytes = render_bulletin_pdf_bytes(bulletin)
+    except ValidationError as exc:
+        return HttpResponse(" ".join(exc.messages), status=500, content_type="text/plain; charset=utf-8")
     response = HttpResponse(pdf_bytes, content_type="application/pdf")
     response["Content-Disposition"] = f'inline; filename="bulletin-{bulletin.reference}.pdf"'
     return response

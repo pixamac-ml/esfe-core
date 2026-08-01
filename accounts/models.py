@@ -1,7 +1,6 @@
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.templatetags.static import static
 from django.utils import timezone
 import uuid
 
@@ -205,7 +204,7 @@ class Profile(models.Model):
     def avatar_url(self):
         if self.avatar and hasattr(self.avatar, "url"):
             return self.avatar.url
-        return static("images/default-avatar.png")
+        return ""
 
     @property
     def score(self):

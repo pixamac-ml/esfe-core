@@ -674,7 +674,11 @@ class PortalPhaseOneTests(TestCase):
 			study_level="LICENCE",
 			is_active=True,
 		)
-		semester = Semester.objects.create(academic_class=academic_class, number=1)
+		semester = Semester.objects.create(
+			academic_class=academic_class,
+			number=1,
+			total_required_credits=Decimal("3.00"),
+		)
 		ue = UE.objects.create(semester=semester, code=f"UE-{level}", title=f"UE {level}")
 		ec = EC.objects.create(ue=ue, title=f"EC {level}", credit_required=3, coefficient=2)
 		return academic_year, academic_class, ec
@@ -1326,8 +1330,9 @@ class PortalPhaseOneTests(TestCase):
 		self.client.force_login(director)
 		response = self.client.get(reverse("accounts_portal:portal_dashboard"))
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, "Dashboard Direction des Etudes")
-		self.assertContains(response, "Vue generale de vos activites")
+		self.assertContains(response, "Direction des Études")
+		self.assertContains(response, 'data-ui-core="app-shell"')
+		self.assertNotContains(response, 'data-ui-component="academic-sidebar"')
 		self.assertContains(response, reverse("accounts:logout"))
 
 	def test_director_dashboard_is_limited_to_its_branch(self):
@@ -1338,7 +1343,7 @@ class PortalPhaseOneTests(TestCase):
 			name="2030-2031",
 			start_date="2030-10-01",
 			end_date="2031-07-31",
-			is_active=True,
+			is_active=False,
 		)
 		other_class = AcademicClass.objects.create(
 			programme=self.programme,
@@ -1948,9 +1953,11 @@ class PortalPhaseOneTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, student.full_name)
 		self.assertContains(response, "ADMISSIBLE")
+		# Une consultation reste sans effet de bord. Les dettes sont creees
+		# seulement lors de la publication du bulletin annuel officiel.
 		self.assertEqual(
 			AcademicDebt.objects.filter(enrollment=enrollment, status="pending").count(),
-			2,
+			0,
 		)
 
 	def test_it_notes_workflow_publishes_normal_session_then_unlocks_retake_modal(self):
@@ -2130,6 +2137,8 @@ class PortalPhaseOneTests(TestCase):
 		student = self._create_student_record(student_user, inscription_status=Inscription.STATUS_ACTIVE)
 		academic_year, academic_class, ec = self._create_academic_class_bundle("L4U")
 		semester = academic_class.semesters.get(number=1)
+		semester.status = Semester.STATUS_NORMAL_ENTRY
+		semester.save(update_fields=["status"])
 		enrollment = AcademicEnrollment.objects.create(
 			inscription=student.inscription,
 			student=student_user,

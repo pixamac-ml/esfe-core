@@ -1,0 +1,59 @@
+{% load component_tags %}
+<section class="relative overflow-hidden rounded-ui-card border border-ui-border bg-ui-surface" data-ui-core="data-table" data-density="{{ density }}">
+  <header class="flex flex-wrap items-center justify-between gap-3 border-b border-ui-border px-4 py-3">
+    <div>
+      <strong class="text-sm text-ui-text">{{ caption|default:"Résultats" }}</strong>
+      <span class="ml-2 text-xs text-ui-text-muted">{{ result_count }} résultat{{ result_count|pluralize }}</span>
+    </div>
+    <div class="flex items-center gap-2">
+      {% if selected_count %}<span class="text-xs font-semibold text-ui-primary">{{ selected_count }} sélectionné{{ selected_count|pluralize }}</span>{% endif %}
+      {% slot "actions" %}{% endslot %}
+    </div>
+  </header>
+  {% if error %}
+    {% component "ui_core.alert" title="Chargement impossible" message=error tone="danger" %}{% endcomponent %}
+  {% elif permission_denied %}
+    {% component "ui_core.empty_state" title="Accès non autorisé" message="Vous ne disposez pas des droits nécessaires pour consulter ces données." icon="shield-alert" %}{% endcomponent %}
+  {% elif rows %}
+    <div class="max-w-full overflow-x-auto">
+      <table id="{{ table_id }}" class="w-full min-w-ui-table text-left text-sm">
+        {% if caption %}<caption class="sr-only">{{ caption }}</caption>{% endif %}
+        <thead class="sticky top-0 z-10 bg-ui-surface-muted text-xs uppercase text-ui-text-muted">
+          <tr>
+            {% if selectable %}<th scope="col" class="w-12 px-4 py-3"><input type="checkbox" aria-label="Sélectionner toutes les lignes" class="rounded-ui-input border-ui-border text-ui-primary focus:ring-ui-focus"></th>{% endif %}
+            {% for header in headers %}
+              <th scope="col" class="px-4 {% if density == 'compact' %}py-2{% else %}py-3{% endif %} font-bold">
+                {% if header.sort_url %}
+                  <button type="button" hx-get="{{ header.sort_url }}" hx-target="#ui-table-demo" hx-swap="outerHTML" class="inline-flex items-center gap-1 hover:text-ui-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus">
+                    {{ header.label }} <i data-lucide="arrow-up-down" class="h-3.5 w-3.5" aria-hidden="true"></i>
+                  </button>
+                {% else %}{{ header.label|default:header }}{% endif %}
+              </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-ui-border">
+          {% for row in rows %}
+            <tr class="hover:bg-ui-surface-hover {% if row.selected %}bg-ui-selected{% endif %}">
+              {% if selectable %}<td class="px-4 {% if density == 'compact' %}py-2{% else %}py-3{% endif %}"><input type="checkbox" aria-label="Sélectionner {{ row.label|default:'la ligne' }}" class="rounded-ui-input border-ui-border text-ui-primary focus:ring-ui-focus"></td>{% endif %}
+              {% for cell in row.cells %}
+                <td class="max-w-sm px-4 {% if density == 'compact' %}py-2{% else %}py-3{% endif %} text-ui-text">
+                  {% if cell.tone %}{% component "ui_core.status_badge" label=cell.value tone=cell.tone %}{% endcomponent %}
+                  {% elif cell.amount %}<span class="font-semibold tabular-nums">{{ cell.value }}</span>
+                  {% else %}<span class="break-words">{{ cell.value|default:"—" }}</span>{% endif %}
+                </td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <footer class="flex flex-wrap items-center justify-between gap-3 border-t border-ui-border px-4 py-3 text-sm">
+      <span class="text-ui-text-muted">Page {{ page }} sur {{ page_count }}</span>
+      {% slot "footer" %}{% endslot %}
+    </footer>
+  {% else %}
+    {% component "ui_core.empty_state" title=empty_title message=empty_message compact=True %}{% endcomponent %}
+  {% endif %}
+  {% if loading %}{% component "ui_core.loading_overlay" loading=True %}{% endcomponent %}{% endif %}
+</section>

@@ -8,6 +8,17 @@
 	--esfe-surface-soft: 248 250 252;
 	--esfe-border: 226 232 240;
 	--esfe-shadow: 15 23 42;
+	--ui-sidebar-width: 17rem;
+	--ui-sidebar-collapsed-width: 4.5rem;
+	--ui-topbar-height: 4rem;
+	--ui-content-max-width: 90rem;
+	--ui-focus-color: #1db5b0;
+	--ui-radius-input: 0.375rem;
+	--ui-radius-button: 0.375rem;
+	--ui-radius-card: 0.5rem;
+	--ui-radius-modal: 0.5rem;
+	--ui-chart-primary: #1e4f6f;
+	--ui-chart-primary-soft: rgba(30, 79, 111, 0.12);
   }
 
   html {
@@ -19,6 +30,16 @@
 	background:
 	  radial-gradient(circle at top, rgba(29, 181, 176, 0.08), transparent 28%),
 	  linear-gradient(180deg, #f8fbfc 0%, #f8fafc 28%, #f1f5f9 100%);
+  }
+
+  body.ui-system-body {
+	@apply m-0 bg-ui-surface-soft font-sans text-ui-text;
+	background-image: none;
+  }
+
+  body.ui-app-body {
+	@apply m-0 bg-ui-surface-soft font-sans text-ui-text;
+	background-image: none;
   }
 
   h1,
@@ -40,6 +61,40 @@
 }
 
 @layer components {
+  .ui-nav-item[data-active="true"] {
+	@apply bg-ui-surface text-ui-sidebar;
+  }
+
+  .ui-nav-item[data-active="false"] {
+	@apply text-ui-on-primary/80 hover:bg-ui-on-primary/10 hover:text-ui-on-primary;
+  }
+
+  .ui-focus-ring {
+	@apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus focus-visible:ring-offset-2;
+  }
+
+  .ui-control {
+	@apply h-ui-control rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text;
+  }
+
+  .ui-demo-anchor {
+	scroll-margin-top: calc(var(--ui-topbar-height) + 1rem);
+  }
+
+  .htmx-indicator {
+	opacity: 0;
+	transition: opacity 120ms ease;
+  }
+
+  .htmx-request .htmx-indicator,
+  .htmx-request.htmx-indicator,
+  form:has(.htmx-request) .htmx-indicator {
+	opacity: 1;
+  }
+
+  [x-cloak] {
+	display: none !important;
+  }
   .container-shell {
 	@apply max-w-7xl mx-auto px-4 md:px-6 lg:px-8;
   }

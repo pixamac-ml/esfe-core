@@ -1,0 +1,108 @@
+{% load component_tags %}
+<div data-ui-core="profile-view" class="space-y-6">
+  <div class="flex items-start gap-5">
+    <div class="relative flex-shrink-0">
+      {% if avatar_url %}
+        <img src="{{ avatar_url }}" alt="{{ display_name }}" class="h-20 w-20 rounded-full object-cover ring-4 ring-ui-border" loading="lazy">
+      {% else %}
+        <div class="flex h-20 w-20 items-center justify-center rounded-full bg-ui-info/15 text-2xl font-bold text-ui-info">
+          {{ display_name|truncatechars:2 }}
+        </div>
+      {% endif %}
+      {% if status == "active" %}
+        <span class="absolute -bottom-1 -right-1 h-5 w-5 rounded-full border-2 border-ui-surface bg-ui-success" aria-label="Actif"></span>
+      {% elif status == "suspended" %}
+        <span class="absolute -bottom-1 -right-1 h-5 w-5 rounded-full border-2 border-ui-surface bg-ui-danger" aria-label="Suspendu"></span>
+      {% endif %}
+    </div>
+    <div class="min-w-0 flex-1">
+      <h3 class="text-xl font-bold text-ui-text">{{ display_name|default:"Utilisateur" }}</h3>
+      {% if role %}
+        <p class="text-sm text-ui-text-muted">{{ role }}</p>
+      {% endif %}
+      {% if branch %}
+        <p class="mt-1 text-xs text-ui-text-muted">Annexe : {{ branch }}</p>
+      {% endif %}
+      <div class="mt-2">
+        <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium {% if status == 'active' %}bg-ui-success/10 text-ui-success{% elif status == 'suspended' %}bg-ui-danger/10 text-ui-danger{% else %}bg-ui-warning/10 text-ui-warning{% endif %}">
+          {{ status_label }}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="space-y-4 border-t border-ui-border pt-4">
+    {% if email %}
+      <div class="flex items-center gap-3">
+        <i data-lucide="mail" class="h-4 w-4 flex-shrink-0 text-ui-text-muted"></i>
+        <span class="text-sm text-ui-text">{{ email }}</span>
+      </div>
+    {% endif %}
+    {% if phone %}
+      <div class="flex items-center gap-3">
+        <i data-lucide="phone" class="h-4 w-4 flex-shrink-0 text-ui-text-muted"></i>
+        <span class="text-sm text-ui-text">{{ phone }}</span>
+      </div>
+    {% endif %}
+    {% if address %}
+      <div class="flex items-center gap-3">
+        <i data-lucide="map-pin" class="h-4 w-4 flex-shrink-0 text-ui-text-muted"></i>
+        <span class="text-sm text-ui-text">{{ address }}</span>
+      </div>
+    {% endif %}
+    {% if created_at %}
+      <div class="flex items-center gap-3">
+        <i data-lucide="calendar" class="h-4 w-4 flex-shrink-0 text-ui-text-muted"></i>
+        <span class="text-sm text-ui-text">Membre depuis {{ created_at }}</span>
+      </div>
+    {% endif %}
+    {% if last_seen %}
+      <div class="flex items-center gap-3">
+        <i data-lucide="clock" class="h-4 w-4 flex-shrink-0 text-ui-text-muted"></i>
+        <span class="text-sm text-ui-text">DerniÃ¨re connexion : {{ last_seen }}</span>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if bio %}
+    <div class="border-t border-ui-border pt-4">
+      <p class="text-sm text-ui-text">{{ bio }}</p>
+    </div>
+  {% endif %}
+
+  {% if extra_fields %}
+    <div class="space-y-3 border-t border-ui-border pt-4">
+      {% for field in extra_fields %}
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-ui-text-muted">{{ field.label }}</span>
+          <span class="text-sm font-medium text-ui-text">{{ field.value }}</span>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if actions %}
+    <div class="flex flex-wrap gap-2 border-t border-ui-border pt-4">
+      {% for action in actions %}
+        {% if action.hx_get %}
+          <button
+            type="button"
+            hx-get="{{ action.hx_get }}"
+            hx-target="{{ action.hx_target|default:'#director-drawer-content' }}"
+            hx-swap="{{ action.hx_swap|default:'innerHTML' }}"
+            @click="if (window.deOpenDrawer) window.deOpenDrawer()"
+            class="inline-flex items-center gap-1.5 rounded-ui-button border border-ui-border px-3 py-1.5 text-sm font-medium text-ui-text hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus"
+          >
+            {% if action.icon %}<i data-lucide="{{ action.icon }}" class="h-4 w-4"></i>{% endif %}
+            {{ action.label }}
+          </button>
+        {% else %}
+          <a href="{{ action.url }}" class="inline-flex items-center gap-1.5 rounded-ui-button border border-ui-border px-3 py-1.5 text-sm font-medium text-ui-text hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus">
+            {% if action.icon %}<i data-lucide="{{ action.icon }}" class="h-4 w-4"></i>{% endif %}
+            {{ action.label }}
+          </a>
+        {% endif %}
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

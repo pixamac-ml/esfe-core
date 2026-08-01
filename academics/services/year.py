@@ -189,6 +189,7 @@ def compute_annual_result(enrollment):
     - decision : VALIDE / ADMISSIBLE / NON ADMIS
     """
     semesters = list(enrollment.academic_class.semesters.all().order_by("number"))
+    semester_numbers = {semester.number for semester in semesters}
     total_credits = Decimal("0.00")
     credits_obtained = Decimal("0.00")
     missing_grades = 0
@@ -206,7 +207,18 @@ def compute_annual_result(enrollment):
         for reason in result.get("blocking_reasons", []):
             blocking_reasons.append(f"S{semester.number}: {reason}")
 
-    is_complete = missing_grades == 0 and bool(semesters)
+    has_required_semesters = semester_numbers == {1, 2} and len(semesters) == 2
+    all_semesters_complete = bool(semester_results) and all(
+        result.get("is_complete") for result in semester_results
+    )
+    is_complete = missing_grades == 0 and has_required_semesters and all_semesters_complete
+    if not has_required_semesters:
+        blocking_reasons.append("Les semestres S1 et S2 sont obligatoires pour la decision annuelle.")
+    for result in semester_results:
+        if not result.get("is_complete") and not result.get("missing_grades"):
+            blocking_reasons.append(
+                f"{_semester_label(result)}: semestre incomplet ou sans EC configure."
+            )
     if missing_grades and not blocking_reasons:
         blocking_reasons.append(f"{missing_grades} note(s) manquante(s).")
 
@@ -278,7 +290,6 @@ def compute_annual_decision(enrollment):
                 rule_code = RULE_ADMISSIBLE_GAP
                 requires_academic_debt = True
                 debt_subjects = _debt_subjects_from_semester(failed_semester)
-                create_academic_debts(enrollment, failed_semester)
                 reasons = [
                     f"{_semester_label(failed_semester)} non valide (moyenne={failed_avg:.2f}) "
                     f"mais dans la marge d'admissibilite de {gap:.2f} point(s) sous le seuil de {threshold:.2f}.",

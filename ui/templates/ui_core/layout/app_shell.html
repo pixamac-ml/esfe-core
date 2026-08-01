@@ -1,0 +1,27 @@
+{% load component_tags %}
+<div
+  class="ui-app-shell min-h-screen bg-ui-surface-soft text-ui-text"
+  x-data="{ sidebarOpen: {{ sidebar_open|yesno:'true,false' }}, mobileNavOpen: false }"
+  data-ui-core="app-shell"
+>
+  <a href="#ui-core-main" class="sr-only z-ui-skip rounded-ui-button bg-ui-surface p-3 focus:not-sr-only focus:fixed focus:left-3 focus:top-3">
+    Aller au contenu
+  </a>
+  <div class="flex min-h-screen">
+    {% slot "sidebar" %}{% endslot %}
+    <button
+      type="button"
+      x-show="mobileNavOpen"
+      x-cloak
+      @click="mobileNavOpen = false"
+      class="fixed inset-0 z-40 bg-ui-overlay/45 lg:hidden"
+      aria-label="Fermer la navigation"
+    ></button>
+    <div class="min-w-0 flex-1">
+      {% slot "topbar" %}{% endslot %}
+      <main id="ui-core-main" tabindex="-1" class="mx-auto w-full max-w-ui-content px-ui-mobile py-6 md:px-ui-tablet lg:px-ui-desktop">
+        {% slot "default" %}{% endslot %}
+      </main>
+    </div>
+  </div>
+</div>

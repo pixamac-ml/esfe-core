@@ -10,6 +10,7 @@ from django.conf.urls.static import static
 from django.http import HttpResponse
 from core import views as core_views
 from core.sitemaps import build_sitemaps
+from ui.views import ui_system
 from portal.views.it_surveillance import surveillance_general_api_view
 
 
@@ -58,6 +59,7 @@ urlpatterns = [
     path("community/", include("community.urls")),
     path("notifications/", include(("notification_center.urls", "notification_center"), namespace="notification_center")),
     path("marketing/", include(("marketing.urls", "marketing"), namespace="marketing")),
+    path("ui/system/", ui_system, name="ui_system"),
     path("ckeditor5/", include("django_ckeditor_5.urls")),
 ]
 

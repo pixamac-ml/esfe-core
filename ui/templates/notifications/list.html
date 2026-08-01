@@ -1,0 +1,48 @@
+{% load component_tags %}
+<div data-ui-core="notification-list" class="divide-y divide-ui-border">
+  {% if mark_all_read_url %}
+    <div class="flex items-center justify-between px-4 py-2">
+      <span class="text-xs font-medium text-ui-text-muted">Notifications</span>
+      <button
+        type="button"
+        hx-post="{{ mark_all_read_url }}"
+        hx-swap="innerHTML"
+        hx-target="closest [data-ui-core='notification-list']"
+        class="text-xs font-medium text-ui-info hover:underline focus-visible:outline-none"
+      >
+        Tout marquer comme lu
+      </button>
+    </div>
+  {% endif %}
+
+  {% if loading %}
+    <div class="flex items-center justify-center p-8">
+      <div class="h-6 w-6 animate-spin rounded-full border-2 border-ui-border border-t-ui-info"></div>
+    </div>
+  {% elif notifications %}
+    {% for notif in notifications %}
+      {% component "notifications.item" notification_id=notif.id title=notif.title summary=notif.summary icon=notif.icon|default:"bell" source=notif.source time_ago=notif.time_ago is_read=notif.is_read priority=notif.priority|default:"normal" action_url=notif.action_url hx_mark_read=notif.hx_mark_read detail_url=notif.detail_url detail_target=detail_target detail_opens_drawer=detail_opens_drawer %}{% endcomponent %}
+    {% endfor %}
+
+    {% if hx_load_more %}
+      <div class="p-4 text-center">
+        <button
+          type="button"
+          hx-get="{{ hx_load_more }}"
+          hx-swap="beforeend"
+          hx-target="closest [data-ui-core='notification-list']"
+          hx-indicator="#load-more-indicator"
+          class="text-xs font-medium text-ui-info hover:underline"
+        >
+          Charger plus
+          <span id="load-more-indicator" class="htmx-indicator ml-1 inline-block h-3 w-3 animate-spin rounded-full border border-ui-border border-t-ui-info"></span>
+        </button>
+      </div>
+    {% endif %}
+  {% else %}
+    <div class="flex flex-col items-center justify-center p-8 text-center">
+      <i data-lucide="{{ empty_icon }}" class="mb-2 h-10 w-10 text-ui-text-muted/40"></i>
+      <p class="text-sm text-ui-text-muted">{{ empty_message }}</p>
+    </div>
+  {% endif %}
+</div>

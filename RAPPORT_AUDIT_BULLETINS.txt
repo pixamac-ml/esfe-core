@@ -1,0 +1,240 @@
+AUDIT DE LA PRODUCTION DES BULLETINS SCOLAIRES
+================================================
+
+VERDICT : NON
+
+Le système sait calculer les résultats et générer un PDF, mais il ne garantit
+pas encore un bulletin fiable, immuable et correctement publié de bout en bout
+en production.
+
+
+1. CE QUI FONCTIONNE DÉJÀ
+--------------------------
+
+- Saisie manuelle des notes normales et de rattrapage.
+- Import Excel avec identification par inscription, matricule ou nom/prénom.
+- Validation des notes entre 0 et 20.
+- Calcul pondéré des EC, UE et semestres.
+- Blocage de la moyenne lorsqu’une note manque.
+- Calcul des crédits acquis.
+- Rattrapage utilisant la meilleure note entre session normale et rattrapage.
+- Décision annuelle et gestion des dettes académiques.
+- Workflow directeur avec validation et publication par OTP.
+- Création des bulletins semestriels et annuels.
+- Routes HTML et PDF existantes.
+- WeasyPrint fonctionne dans l’environnement audité.
+- Filtrage par annexe présent dans plusieurs parcours IT/directeur.
+- Toutes les migrations academics sont appliquées.
+- makemigrations --check ne détecte aucun changement manquant.
+
+État réel de la base au moment de l’audit :
+
+- 17 inscriptions académiques, dont 15 actives ;
+- 115 notes ;
+- aucune note hors de l’intervalle 0–20 ;
+- aucune note rattachée à une mauvaise classe ;
+- aucune incohérence annexe/année/programme sur les inscriptions ;
+- 4 bulletins publiés ;
+- les 4 PDF ont été rendus correctement ;
+- leurs moyennes enregistrées, instantanées et recalculées étaient identiques
+  au moment du contrôle.
+
+
+2. CE QUI NE FONCTIONNE PAS DE MANIÈRE FIABLE
+----------------------------------------------
+
+2.1. Notes modifiables après publication
+
+L’import Excel ne contrôle jamais le statut du semestre. Il écrit toujours
+dans normal_score, y compris si le semestre est FINALIZED ou PUBLISHED.
+
+Le défaut a été reproduit : un import sur un semestre publié a modifié deux
+notes.
+
+Fichiers concernés :
+
+- academics/imports/import_service.py, lignes 91 et 277 ;
+- academics/views_import.py, ligne 46.
+
+
+2.2. Bulletin publié non immuable
+
+Le bulletin enregistre un snapshot, mais son affichage et son PDF semestriel
+recalculent les résultats depuis les notes actuelles.
+
+Le défaut a été reproduit :
+
+- la moyenne enregistrée du bulletin est restée inchangée ;
+- une note a été modifiée après publication ;
+- la moyenne affichée dans le bulletin a changé ;
+- l’instantané du bulletin a été ignoré lors du rendu.
+
+Un même bulletin publié peut donc produire un PDF différent ultérieurement.
+
+Fichiers concernés :
+
+- academics/services/documents.py, lignes 89 et 274 ;
+- academics/views.py, ligne 354.
+
+
+2.3. Notes provisoires visibles par les étudiants
+
+Le portail étudiant lit directement toutes les lignes ECGrade sans vérifier
+que le semestre est publié.
+
+Le défaut a été reproduit sur un semestre en saisie normale : les notes étaient
+déjà visibles dans le widget étudiant.
+
+Fichiers concernés :
+
+- portal/student/widgets/academics.py, ligne 103 ;
+- portal/student/services.py, ligne 217.
+
+
+2.4. Bulletin non publié consultable
+
+Les vues HTML et PDF contrôlent l’identité et le rôle, mais ne vérifient pas que
+bulletin.status vaut published.
+
+Le défaut a été reproduit : un étudiant a pu ouvrir un bulletin au statut
+generated.
+
+Fichiers concernés :
+
+- academics/views.py, lignes 336 et 354.
+
+
+2.5. Bulletin annuel validé avec un seul semestre
+
+La décision annuelle considère tous les semestres existants sans imposer
+explicitement la présence de S1 et S2.
+
+Le défaut a été reproduit : avec seulement un S1 publié et validé, le système a
+créé un bulletin annuel publié avec la décision VALIDE.
+
+Fichiers concernés :
+
+- academics/services/year.py, lignes 209, 231 et 265 ;
+- academics/services/documents.py, ligne 146.
+
+
+2.6. Permissions contradictoires
+
+Les permissions officielles autorisent l’informaticien à importer les notes,
+mais pas à gérer les bulletins. Pourtant, son workflow lui permet directement :
+
+- de publier les résultats finaux ;
+- de passer le semestre à PUBLISHED ;
+- de générer des bulletins avec publish=True.
+
+Cela contourne le workflow directeur protégé par OTP.
+
+Les positions globales contournent également le filtrage par annexe, ce qui est
+contraire à la règle stricte d’absence de visibilité inter-annexe.
+
+Fichiers concernés :
+
+- academics/permissions/__init__.py, lignes 6 à 10 et 81 à 96 ;
+- portal/services/notes_workflow.py, lignes 252, 314 et 348 ;
+- portal/views/views.py, ligne 1449.
+
+
+2.7. Mauvaise inscription possible dans un relevé
+
+Si aucune inscription ne correspond exactement à la classe du semestre demandé,
+le service essaie une inscription de la même année, puis n’importe quelle
+inscription active. Il peut donc construire un relevé avec une inscription qui
+ne correspond pas au semestre.
+
+Fichier concerné :
+
+- academics/services/reporting.py, lignes 53 à 87.
+
+
+3. BUGS ET INCOHÉRENCES SUPPLÉMENTAIRES
+---------------------------------------
+
+- Le modèle possède un champ pdf_file, mais aucun service n’y enregistre le PDF.
+- Il n’existe donc pas d’archive PDF immuable du bulletin publié.
+- Le tableau du bulletin affiche une moyenne sur 20 avec un symbole « % ».
+- La couleur succès/échec utilise toujours le seuil 10 alors que les seuils EC
+  sont 8, 10 ou 12 selon le coefficient.
+- Semester.total_required_credits n’est pas la source directe du calcul : le
+  service additionne les crédits des EC sans validation modèle garantissant
+  l’égalité des deux valeurs.
+- L’interface directeur déclenche la génération des bulletins, mais ne fournit
+  pas ensuite une liste avec les liens des bulletins et PDF générés.
+- Le portail étudiant ne contient aucun lien vers bulletin_detail ou
+  bulletin_pdf.
+- Les parcours « relevé recalculé en direct » et « bulletin avec snapshot »
+  coexistent sans source canonique unique.
+
+Template concerné :
+
+- academics/templates/academics/reports/bulletin_esfe.html,
+  lignes 177, 195 et 202.
+
+
+4. ÉLÉMENTS MANQUANTS
+----------------------
+
+- Verrouillage centralisé de toute modification après publication.
+- Import séparé et contrôlé pour les rattrapages.
+- Bulletin et PDF construits exclusivement depuis un snapshot figé.
+- Archivage réel du PDF publié avec date, auteur et éventuellement empreinte.
+- Contrôle obligatoire de S1 et S2 avant décision annuelle.
+- Filtrage de la visibilité étudiante selon la publication.
+- Liste étudiante des bulletins publiés avec téléchargement.
+- Liste directeur des bulletins générés avec accès PDF.
+- Tests de bout en bout couvrant import, rattrapage, publication, bulletin et PDF.
+- Tests d’immuabilité, de permissions, d’annexe et de publication.
+
+
+5. RÉSULTATS DES CONTRÔLES
+--------------------------
+
+- python manage.py check : réussi.
+- Migrations academics : toutes appliquées.
+- makemigrations --check --dry-run : aucun changement détecté.
+- Rendu WeasyPrint : réussi.
+- 9 tests ciblés notes/rattrapages : réussis.
+- Suite academics complète : 95 tests, 1 échec et 10 erreurs.
+- Les erreurs de la suite complète concernent principalement le calendrier,
+  l’emploi du temps et le journal de cours.
+- Aucun test existant ne couvre réellement le bulletin complet de bout en bout.
+- check --deploy produit 5 avertissements : DEBUG=True, redirection HTTPS, HSTS
+  et cookies sécurisés non activés dans l’environnement actuellement chargé.
+
+
+6. CORRECTIONS NÉCESSAIRES
+--------------------------
+
+1. Refuser tout import normal hors de NORMAL_ENTRY.
+2. Ajouter un import rattrapage distinct, limité à RETAKE_ENTRY et aux EC
+   concernés.
+3. Faire passer toutes les corrections post-clôture par le workflow OTP.
+4. Construire le bulletin semestriel exclusivement depuis
+   AcademicBulletin.snapshot.
+5. Générer et enregistrer définitivement le PDF lors de la publication.
+6. Interdire les vues bulletin HTML/PDF si le bulletin n’est pas publié.
+7. Masquer toutes les notes étudiantes tant que le semestre n’est pas publié.
+8. Exiger exactement S1 et S2, complets et publiés, avant un bulletin annuel.
+9. Retirer à l’informaticien la publication finale et la publication des
+   bulletins, ou aligner formellement les permissions et l’OTP.
+10. Supprimer les fallbacks d’inscription dans build_student_semester_report ;
+    l’absence de correspondance exacte doit produire une erreur.
+11. Ajouter les écrans de consultation et téléchargement des bulletins publiés.
+12. Corriger les colonnes et seuils visuels du template.
+13. Ajouter une suite de tests de bout en bout et rendre tous les contrôles
+    académiques verts.
+14. Corriger la configuration avant déploiement et valider check --deploy.
+
+
+CONCLUSION
+----------
+
+NON : dans son état actuel, le système ne peut pas garantir la production
+fiable d’un bulletin scolaire complet, correct, immuable et fonctionnel en
+production.
+
+Aucun fichier applicatif n’a été modifié pendant l’audit.

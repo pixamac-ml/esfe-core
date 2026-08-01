@@ -1,0 +1,41 @@
+{% load component_tags %}
+<div
+  x-data="uiOverlay(false)"
+  @keydown.escape.window="if (open) close()"
+  @ui-overlay-open.window="if ($event.detail.id === '{{ drawer_id }}') show()"
+  @ui-overlay-close.window="if ($event.detail.id === '{{ drawer_id }}') close()"
+  data-ui-core="notification-drawer"
+>
+  <div x-show="open" x-cloak class="fixed inset-0 z-50 bg-ui-overlay/45" role="dialog" aria-modal="true" aria-labelledby="{{ drawer_id }}-title">
+    <aside x-ref="dialog" tabindex="-1" @keydown.tab="trap($event)" class="absolute inset-y-0 right-0 w-full max-w-md overflow-auto bg-ui-surface shadow-ui-drawer focus:outline-none">
+      <header class="sticky top-0 z-10 flex items-center justify-between border-b border-ui-border bg-ui-surface px-5 py-4">
+        <h2 id="{{ drawer_id }}-title" class="text-base font-bold text-ui-text">{{ title }}</h2>
+        <button type="button" @click="close()" class="grid h-9 w-9 place-items-center rounded-ui-button hover:bg-ui-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" aria-label="Fermer">
+          <i data-lucide="x" class="h-4 w-4"></i>
+        </button>
+      </header>
+
+      <div id="{{ drawer_id }}-content" class="min-h-20">
+        {% if hx_load %}
+          <div
+            hx-get="{{ hx_load }}"
+            hx-trigger="revealed"
+            hx-swap="innerHTML"
+            hx-target="#{{ drawer_id }}-content"
+            class="flex items-center justify-center p-8"
+          >
+            <div class="h-6 w-6 animate-spin rounded-full border-2 border-ui-border border-t-ui-info"></div>
+          </div>
+        {% else %}
+          {% component "notifications.list" notifications=notifications mark_all_read_url=mark_all_read_url %}{% endcomponent %}
+        {% endif %}
+      </div>
+
+      <footer class="sticky bottom-0 border-t border-ui-border bg-ui-surface px-5 py-3">
+        {% if center_url and center_url != "#" %}
+          <a href="{{ center_url }}" class="block text-center text-sm font-medium text-ui-info hover:underline">Ouvrir le centre de notifications</a>
+        {% endif %}
+      </footer>
+    </aside>
+  </div>
+</div>

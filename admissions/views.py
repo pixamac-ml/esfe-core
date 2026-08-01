@@ -1,11 +1,16 @@
 # admissions/views.py
 
 import json
+import logging
+from pathlib import Path
 
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.db import IntegrityError, transaction
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.templatetags.static import static
 
 from branches.models import Branch
@@ -15,10 +20,26 @@ from .forms import CandidatureForm
 from .models import CandidatureDocument, Candidature
 
 
+logger = logging.getLogger(__name__)
+
+TUNNEL_CYCLES = {"licence", "master"}
+TUNNEL_DOCUMENT_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png", ".doc", ".docx"}
+TUNNEL_MAX_DOCUMENT_SIZE = 10 * 1024 * 1024
+
+
+def _programme_cycle_key(programme):
+    cycle_slug = (programme.cycle.slug or "").lower()
+    cycle_name = (programme.cycle.name or "").lower()
+    for cycle_key in TUNNEL_CYCLES:
+        if cycle_key in cycle_slug or cycle_key in cycle_name:
+            return cycle_key
+    return ""
+
+
 def _build_formation_cards(cycle_slug="all", branch_id=None):
     formations_qs = (
         Programme.objects.filter(is_active=True)
-        .select_related("cycle")
+        .select_related("cycle", "diploma_awarded")
         .prefetch_related("years__fees")
         .order_by("title")
     )
@@ -46,8 +67,12 @@ def _build_formation_cards(cycle_slug="all", branch_id=None):
             {
                 "title": formation.title,
                 "slug": formation.slug,
+                "cycle": formation.cycle.name,
+                "diploma": formation.diploma_awarded.name,
                 "duration_years": formation.duration_years,
                 "first_year_cost": first_year_cost,
+                "short_description": formation.short_description,
+                "image_url": formation.illustration.url if formation.illustration else "",
                 "details_url": formation.get_absolute_url(),
             }
         )
@@ -75,16 +100,132 @@ def _default_form_data():
     }
 
 
-def admission_tunnel(request):
-    cycle_filter = request.GET.get("cycle", "all").lower()
-    branches = Branch.objects.filter(is_active=True, accepts_online_registration=True).order_by("name")
+def _resolve_branch_token(token):
+    token = (token or "").strip()
+    if not token:
+        return None
+    queryset = Branch.objects.filter(is_active=True, accepts_online_registration=True)
+    if token.isdigit():
+        return queryset.filter(id=int(token)).first()
+    return queryset.filter(slug=token).first()
+
+
+def _initial_tunnel_state(request):
     form_data = _default_form_data()
+    cycle_filter = request.GET.get("cycle", "all").strip().lower()
+    if cycle_filter not in TUNNEL_CYCLES | {"all"}:
+        cycle_filter = "all"
+
+    branch_token = (
+        request.GET.get("branch")
+        or request.GET.get("annexe")
+        or request.GET.get("branch_id")
+        or request.GET.get("annexe_id")
+    )
+    branch = _resolve_branch_token(branch_token)
+    if branch:
+        form_data.update(
+            {
+                "branch_id": str(branch.id),
+                "branch_name": branch.name,
+                "branch_city": branch.city,
+                "campus_image": branch.image.url if branch.image else "",
+            }
+        )
+
+    formation_slug = (
+        request.GET.get("formation") or request.GET.get("formation_slug") or ""
+    ).strip()
+    programme = (
+        Programme.objects.filter(is_active=True, slug=formation_slug)
+        .select_related("cycle")
+        .first()
+        if formation_slug
+        else None
+    )
+    if programme:
+        programme_cycle = _programme_cycle_key(programme)
+        form_data.update(
+            {
+                "formation": programme.title,
+                "formation_slug": programme.slug,
+                "current_level": programme_cycle,
+            }
+        )
+        if programme_cycle:
+            cycle_filter = programme_cycle
+
+    requested_step = request.GET.get("step", "").strip()
+    initial_step = int(requested_step) if requested_step in {"1", "2", "3"} else 1
+    if initial_step == 1 and (branch or programme):
+        initial_step = 3
+
+    if branch and programme:
+        step3_phase = "documents"
+    elif branch:
+        step3_phase = "program"
+    else:
+        step3_phase = "school"
+
+    has_direct_state = bool(request.GET.keys())
+    return form_data, cycle_filter, initial_step, step3_phase, not has_direct_state
+
+
+def _tunnel_context(
+    *,
+    form_data,
+    cycle_filter,
+    branches,
+    initial_step,
+    initial_step3_phase,
+    backend_error="",
+    backend_errors=None,
+    backend_error_step=1,
+    backend_error_field="",
+    restore_draft=False,
+):
+    return {
+        "formation_cards": [],
+        "selected_cycle": cycle_filter,
+        "branches": branches,
+        "initial_form_json": json.dumps(form_data),
+        "initial_step": initial_step,
+        "initial_step3_phase": initial_step3_phase,
+        "backend_error": backend_error,
+        "backend_errors_json": json.dumps(backend_errors or {}),
+        "backend_error_step": backend_error_step,
+        "backend_error_field": backend_error_field,
+        "restore_draft": restore_draft,
+    }
+
+
+def _first_tunnel_error(errors):
+    field_steps = {
+        "last_name": 1,
+        "first_name": 1,
+        "city": 1,
+        "email": 2,
+        "phone": 2,
+        "birth_date": 2,
+        "gender": 2,
+        "current_level": 2,
+        "branch_id": 3,
+        "formation_slug": 3,
+        "documents": 3,
+    }
+    for field_name, step_no in field_steps.items():
+        if field_name in errors:
+            return field_name, step_no, errors[field_name]
+    return "", 1, ""
+
+
+def admission_tunnel(request):
+    branches = Branch.objects.filter(is_active=True, accepts_online_registration=True).order_by("name")
+    form_data, cycle_filter, initial_step, initial_step3_phase, restore_draft = _initial_tunnel_state(request)
     backend_error = ""
     backend_errors = {}
     backend_error_step = 1
     backend_error_field = ""
-    initial_step = 1
-    initial_step3_phase = "school"
 
     if request.method == "POST":
         form_data = {
@@ -104,6 +245,7 @@ def admission_tunnel(request):
             "branch_city": request.POST.get("branch_city", "").strip(),
             "campus_image": request.POST.get("campus_image", "").strip(),
         }
+        restore_draft = False
         initial_step = 4
         if form_data.get("formation_slug"):
             initial_step3_phase = "documents"
@@ -117,166 +259,170 @@ def admission_tunnel(request):
             ("email", "Le champ email est obligatoire.", 2),
             ("phone", "Veuillez renseigner votre numero de telephone.", 2),
             ("birth_date", "Veuillez renseigner votre date de naissance.", 2),
+            ("gender", "Veuillez selectionner votre genre.", 2),
             ("current_level", "Veuillez selectionner votre niveau d'etudes.", 2),
             ("branch_id", "Veuillez selectionner un campus.", 3),
             ("formation_slug", "Veuillez selectionner une formation.", 3),
         ]
 
-        for field_name, field_message, step_no in required_fields:
+        for field_name, field_message, _step_no in required_fields:
             if not form_data.get(field_name):
                 backend_errors[field_name] = field_message
-                if not backend_error:
-                    backend_error = f"Etape {step_no} : {field_message}"
-                    backend_error_step = step_no
-                    backend_error_field = field_name
+        if form_data["email"]:
+            try:
+                validate_email(form_data["email"])
+            except ValidationError:
+                backend_errors["email"] = "Saisissez une adresse email valide."
 
-        if backend_errors:
-            initial_step = backend_error_step
-            if backend_error_step == 3:
-                initial_step3_phase = "school" if backend_error_field == "branch_id" else "program"
-        else:
-            programme = Programme.objects.filter(is_active=True, slug=form_data["formation_slug"]).first()
-            branch = Branch.objects.filter(
-                id=form_data["branch_id"],
-                is_active=True,
-                accepts_online_registration=True,
-            ).first()
-            if not programme or not branch:
-                if not branch:
-                    backend_errors["branch_id"] = "Le campus selectionne n'est plus disponible."
-                    backend_error = f"Etape 3 : {backend_errors['branch_id']}"
-                    backend_error_step = 3
-                    backend_error_field = "branch_id"
-                    initial_step3_phase = "school"
-                if not programme:
-                    backend_errors["formation_slug"] = "La formation selectionnee n'est plus disponible."
-                    if not backend_error:
-                        backend_error = f"Etape 3 : {backend_errors['formation_slug']}"
-                        backend_error_step = 3
-                        backend_error_field = "formation_slug"
-                    initial_step3_phase = "program"
-                initial_step = 3
+        birth_date = parse_date(form_data["birth_date"]) if form_data["birth_date"] else None
+        if form_data["birth_date"] and not birth_date:
+            backend_errors["birth_date"] = "Saisissez une date de naissance valide."
+        elif birth_date and birth_date > timezone.localdate():
+            backend_errors["birth_date"] = "La date de naissance ne peut pas etre dans le futur."
+
+        if form_data["gender"] and form_data["gender"] not in {"male", "female"}:
+            backend_errors["gender"] = "Veuillez selectionner un genre valide."
+        if form_data["current_level"] and form_data["current_level"] not in TUNNEL_CYCLES:
+            backend_errors["current_level"] = "Veuillez selectionner un niveau d'etudes valide."
+        field_max_lengths = {
+            "last_name": 150,
+            "first_name": 150,
+            "city": 100,
+            "email": 254,
+            "phone": 30,
+            "birth_place": 150,
+        }
+        for field_name, max_length in field_max_lengths.items():
+            if len(form_data[field_name]) > max_length:
+                backend_errors[field_name] = "Cette valeur est trop longue."
+        if len(form_data["phone"]) > 30:
+            backend_errors["phone"] = "Le numero de telephone est trop long."
+
+        programme = None
+        if form_data["formation_slug"]:
+            programme = (
+                Programme.objects.filter(is_active=True, slug=form_data["formation_slug"])
+                .select_related("cycle")
+                .first()
+            )
+            if not programme:
+                backend_errors["formation_slug"] = "La formation selectionnee n'est plus disponible."
             else:
-                academic_year_name = get_current_academic_year_name()
-                if not academic_year_name:
-                    backend_error = "Aucune annee academique active n'est configuree."
-                    backend_error_step = 3
-                    backend_error_field = "formation_slug"
-                    initial_step = 3
-                    initial_step3_phase = "program"
-                    formation_cards = []
-                    return render(
-                        request,
-                        "admissions/tunnel.html",
-                        {
-                            "formation_cards": formation_cards,
-                            "selected_cycle": cycle_filter,
-                            "branches": branches,
-                            "initial_form_json": json.dumps(form_data),
-                            "initial_step": initial_step,
-                            "initial_step3_phase": initial_step3_phase,
-                            "backend_error": backend_error,
-                            "backend_errors_json": json.dumps(backend_errors),
-                            "backend_error_step": backend_error_step,
-                            "backend_error_field": backend_error_field,
-                        },
+                form_data["formation"] = programme.title
+                programme_cycle = _programme_cycle_key(programme)
+                if not programme_cycle:
+                    backend_errors["formation_slug"] = "Le cycle de cette formation n'est pas pris en charge par le tunnel."
+                elif form_data["current_level"] and programme_cycle != form_data["current_level"]:
+                    backend_errors["formation_slug"] = "La formation choisie ne correspond pas au niveau selectionne."
+
+        branch = None
+        if form_data["branch_id"]:
+            if form_data["branch_id"].isdigit():
+                branch = Branch.objects.filter(
+                    id=int(form_data["branch_id"]),
+                    is_active=True,
+                    accepts_online_registration=True,
+                ).first()
+            if not branch:
+                backend_errors["branch_id"] = "Le campus selectionne n'est plus disponible."
+            else:
+                form_data["branch_name"] = branch.name
+                form_data["branch_city"] = branch.city
+                form_data["campus_image"] = branch.image.url if branch.image else ""
+
+        academic_year_name = ""
+        if not backend_errors:
+            academic_year_name = get_current_academic_year_name()
+            if not academic_year_name:
+                backend_errors["formation_slug"] = "Aucune annee academique active n'est configuree."
+
+        if not backend_errors:
+            email_in_use = Candidature.objects.filter(
+                email__iexact=form_data["email"],
+                programme=programme,
+                academic_year=academic_year_name,
+            ).exists()
+            if email_in_use:
+                backend_errors["email"] = "Cette adresse email est deja utilisee pour cette formation cette annee."
+
+        uploaded_documents = []
+        if not backend_errors:
+            programme_documents = programme.required_documents.select_related("document")
+            for programme_document in programme_documents:
+                file_key = f"document_{programme_document.document.id}"
+                uploaded_file = request.FILES.get(file_key)
+                if uploaded_file:
+                    extension = Path(uploaded_file.name).suffix.lower()
+                    if extension not in TUNNEL_DOCUMENT_EXTENSIONS:
+                        backend_errors["documents"] = "Un document utilise un format non autorise."
+                        break
+                    if uploaded_file.size > TUNNEL_MAX_DOCUMENT_SIZE:
+                        backend_errors["documents"] = "Chaque document doit peser au maximum 10 Mo."
+                        break
+                    uploaded_documents.append((programme_document.document, uploaded_file))
+
+        if not backend_errors:
+            entry_year = 4 if _programme_cycle_key(programme) == "master" else 1
+            try:
+                with transaction.atomic():
+                    candidature = Candidature.objects.create(
+                        programme=programme,
+                        branch=branch,
+                        academic_year=academic_year_name,
+                        entry_year=entry_year,
+                        first_name=form_data["first_name"],
+                        last_name=form_data["last_name"],
+                        birth_date=form_data["birth_date"],
+                        birth_place=form_data["birth_place"] or form_data["city"],
+                        gender=form_data["gender"],
+                        phone=form_data["phone"],
+                        email=form_data["email"],
+                        city=form_data["city"],
+                        country="Mali",
                     )
 
-                entry_year = 4 if form_data["current_level"].lower() == "master" else 1
-                email_in_use = Candidature.objects.filter(
-                    email__iexact=form_data["email"],
-                    programme=programme,
-                    academic_year=academic_year_name,
-                ).exists()
-                if email_in_use:
-                    backend_errors["email"] = "Cette adresse email est deja utilisee pour cette formation cette annee."
-                    backend_error = f"Etape 2 : {backend_errors['email']}"
-                    backend_error_step = 2
-                    backend_error_field = "email"
-                    initial_step = 2
-                    initial_step3_phase = "program"
-                    formation_cards = []
-                    return render(
-                        request,
-                        "admissions/tunnel.html",
-                        {
-                            "formation_cards": formation_cards,
-                            "selected_cycle": cycle_filter,
-                            "branches": branches,
-                            "initial_form_json": json.dumps(form_data),
-                            "initial_step": initial_step,
-                            "initial_step3_phase": initial_step3_phase,
-                            "backend_error": backend_error,
-                            "backend_errors_json": json.dumps(backend_errors),
-                            "backend_error_step": backend_error_step,
-                            "backend_error_field": backend_error_field,
-                        },
-                    )
-
-                programme_documents = programme.required_documents.select_related("document")
-                uploaded_documents = []
-
-                for programme_document in programme_documents:
-                    file_key = f"document_{programme_document.document.id}"
-                    uploaded_file = request.FILES.get(file_key)
-                    if uploaded_file:
-                        uploaded_documents.append((programme_document.document, uploaded_file))
-
-                try:
-                    with transaction.atomic():
-                        candidature = Candidature.objects.create(
-                            programme=programme,
-                            branch=branch,
-                            academic_year=academic_year_name,
-                            entry_year=entry_year,
-                            first_name=form_data["first_name"],
-                            last_name=form_data["last_name"],
-                            birth_date=form_data["birth_date"],
-                            birth_place=form_data["birth_place"] or form_data["city"],
-                            gender=form_data["gender"] if form_data["gender"] in {"male", "female"} else "male",
-                            phone=form_data["phone"],
-                            email=form_data["email"],
-                            city=form_data["city"],
-                            country="Mali",
+                    for document_type, uploaded_file in uploaded_documents:
+                        CandidatureDocument.objects.create(
+                            candidature=candidature,
+                            document_type=document_type,
+                            file=uploaded_file,
                         )
 
-                        for document_type, uploaded_file in uploaded_documents:
-                            CandidatureDocument.objects.create(
-                                candidature=candidature,
-                                document_type=document_type,
-                                file=uploaded_file,
-                            )
+                messages.success(request, "Votre candidature a ete enregistree avec succes.")
+                return redirect("admissions:done", candidature_id=candidature.id)
+            except IntegrityError:
+                backend_errors["email"] = "Cette adresse email est deja utilisee pour cette formation cette annee."
+            except Exception:
+                logger.exception("Echec de creation d'une candidature depuis le tunnel")
+                backend_errors["documents"] = "Une erreur technique est survenue. Reessayez dans un instant."
 
-                    messages.success(request, "Votre candidature a ete enregistree avec succes.")
-                    return redirect("admissions:done", candidature_id=candidature.id)
-                except IntegrityError:
-                    backend_errors["email"] = "Cette adresse email est deja utilisee pour cette formation cette annee."
-                    backend_error = f"Etape 2 : {backend_errors['email']}"
-                    backend_error_step = 2
-                    backend_error_field = "email"
-                    initial_step = 2
-                    initial_step3_phase = "program"
-                except Exception:
-                    backend_error = "Une erreur technique est survenue. Reessayez dans un instant."
-                    initial_step = 3
+        if backend_errors:
+            backend_error_field, backend_error_step, error_message = _first_tunnel_error(backend_errors)
+            backend_error = f"Etape {backend_error_step} : {error_message}"
+            initial_step = backend_error_step
+            if backend_error_step == 3:
+                if backend_error_field == "branch_id":
+                    initial_step3_phase = "school"
+                elif backend_error_field == "documents":
                     initial_step3_phase = "documents"
+                else:
+                    initial_step3_phase = "program"
 
-    formation_cards = []
     return render(
         request,
         "admissions/tunnel.html",
-        {
-            "formation_cards": formation_cards,
-            "selected_cycle": cycle_filter,
-            "branches": branches,
-            "initial_form_json": json.dumps(form_data),
-            "initial_step": initial_step,
-            "initial_step3_phase": initial_step3_phase,
-            "backend_error": backend_error,
-            "backend_errors_json": json.dumps(backend_errors),
-            "backend_error_step": backend_error_step,
-            "backend_error_field": backend_error_field,
-        },
+        _tunnel_context(
+            form_data=form_data,
+            cycle_filter=cycle_filter,
+            branches=branches,
+            initial_step=initial_step,
+            initial_step3_phase=initial_step3_phase,
+            backend_error=backend_error,
+            backend_errors=backend_errors,
+            backend_error_step=backend_error_step,
+            backend_error_field=backend_error_field,
+            restore_draft=restore_draft,
+        ),
     )
 
 

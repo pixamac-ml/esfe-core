@@ -26,6 +26,21 @@ class MemoireAdmin(admin.ModelAdmin):
     search_fields = ["titre", "auteurs", "mots_cles"]
     prepopulated_fields = {"slug": ("titre",)}
     readonly_fields = ["nb_pages", "nombre_vues", "date_publication"]
+    fieldsets = [
+        (None, {
+            "fields": ["titre", "slug", "auteurs", "encadreur", "filiere", "niveau", "annee"]
+        }),
+        ("Contenu", {
+            "fields": ["resume", "mots_cles", "fichier_source", "image"]
+        }),
+        ("Publication", {
+            "fields": ["statut", "est_mis_en_avant"]
+        }),
+        ("Statistiques", {
+            "fields": ["nb_pages", "nombre_vues", "date_depot", "date_publication"],
+            "classes": ["collapse"],
+        }),
+    ]
     inlines = [PageMemoireInline]
     actions = ["regenerer_pages"]
 

@@ -1,0 +1,37 @@
+{% load component_tags %}
+<div data-ui-core="product-grid">
+  {% if loading %}
+    <div class="grid {{ columns_class }} gap-4">
+      {% for _ in "123456" %}
+        <div class="animate-pulse rounded-ui-card border border-ui-border bg-ui-surface">
+          <div class="aspect-square bg-ui-surface-muted"></div>
+          <div class="space-y-2 p-3">
+            <div class="h-4 w-3/4 rounded bg-ui-surface-muted"></div>
+            <div class="h-3 w-1/2 rounded bg-ui-surface-muted"></div>
+            <div class="h-6 w-1/3 rounded bg-ui-surface-muted"></div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% elif products %}
+    <div class="grid {{ columns_class }} gap-4">
+      {% for product in products %}
+        {% component "shop.product_card"
+          product_id=product.id
+          name=product.name
+          image_url=product.image_url
+          category=product.category
+          price=product.price
+          stock=product.stock
+          is_available=product.is_available
+          action_url=product.action_url
+        %}{% endcomponent %}
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="flex flex-col items-center justify-center rounded-ui-card border border-ui-border bg-ui-surface p-12 text-center">
+      <i data-lucide="package-open" class="mb-3 h-12 w-12 text-ui-text-muted/30"></i>
+      <p class="text-sm text-ui-text-muted">{{ empty_message }}</p>
+    </div>
+  {% endif %}
+</div>

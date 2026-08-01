@@ -207,7 +207,7 @@ def import_notes_file(*, actor, branch, academic_class, semester, file):
     if semester.academic_class_id != academic_class.id:
         raise ValidationError("Le semestre ne correspond pas a la classe.")
 
-    result = import_grades(file, academic_class, semester)
+    result = import_grades(file, academic_class, semester, session_type="normal")
     has_critical_errors = bool(result.skipped_invalid_scores or result.skipped_unknown_students)
     log_support_action(
         actor=actor,

@@ -1,0 +1,24 @@
+{% load component_tags %}
+<section
+  class="relative overflow-hidden rounded-ui-card border bg-ui-surface shadow-ui-card {% if tone == 'primary' %}border-ui-primary/40{% elif tone == 'warning' %}border-ui-warning/40{% elif tone == 'danger' %}border-ui-danger/40{% else %}border-ui-border{% endif %}"
+  data-ui-core="panel"
+  {% if collapsible %}x-data="{ open: {{ open|yesno:'true,false' }} }"{% endif %}
+>
+  {% if title or subtitle or component_vars.is_filled.header %}
+    <header class="flex items-start justify-between gap-4 border-b border-ui-border {% if density == 'compact' %}px-4 py-3{% else %}px-5 py-4{% endif %}">
+      <div class="min-w-0">
+        {% if title %}<h2 class="break-words text-base font-bold text-ui-text">{{ title }}</h2>{% endif %}
+        {% if subtitle %}<p class="mt-1 text-sm text-ui-text-muted">{{ subtitle }}</p>{% endif %}
+      </div>
+      <div class="flex items-center gap-2">
+        {% slot "header" %}{% endslot %}
+        {% if collapsible %}<button type="button" @click="open = !open" :aria-expanded="open" class="grid h-9 w-9 place-items-center rounded-ui-button hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" aria-label="Afficher ou masquer"><i data-lucide="chevron-down" class="h-4 w-4"></i></button>{% endif %}
+      </div>
+    </header>
+  {% endif %}
+  <div {% if collapsible %}x-show="open"{% endif %} class="{% if padding %}{% if density == 'compact' %}p-4{% else %}p-5{% endif %}{% endif %} {% if scrollable %}max-h-ui-panel overflow-auto{% endif %}">
+    {% if error %}{% component "ui_core.alert" title="Contenu indisponible" message=error tone="danger" %}{% endcomponent %}{% else %}{% slot "default" %}{% endslot %}{% endif %}
+  </div>
+  {% if component_vars.is_filled.footer %}<footer class="border-t border-ui-border px-5 py-3">{% slot "footer" %}{% endslot %}</footer>{% endif %}
+  {% if loading %}{% component "ui_core.loading_overlay" loading=True %}{% endcomponent %}{% endif %}
+</section>

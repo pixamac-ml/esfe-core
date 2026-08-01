@@ -5,7 +5,7 @@ from django.urls import reverse
 from branches.models import Branch
 
 
-USER_MANAGER = get_user_model()
+USER_MANAGER = get_user_model().objects
 
 
 class DirectorDashboardRenderTests(TestCase):
@@ -25,8 +25,9 @@ class DirectorDashboardRenderTests(TestCase):
 
     def test_director_dashboard_renders(self):
         self.client.force_login(self.user)
-        response = self.client.get(reverse("accounts_portal:director_dashboard"))
+        response = self.client.get(reverse("accounts_portal:portal_dashboard"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Dashboard Direction des Études")
-        self.assertContains(response, "academic_sidebar")
-        self.assertContains(response, "academic_page_header")
+        self.assertContains(response, 'data-ui-core="app-shell"')
+        self.assertContains(response, 'data-ui-core="app-sidebar"')
+        self.assertContains(response, 'data-ui-core="app-topbar"')

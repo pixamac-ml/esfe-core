@@ -1,0 +1,37 @@
+{% load component_tags %}
+<div data-ui-core="student-identity-card" class="rounded-ui-card border border-ui-border bg-ui-surface p-4">
+  <div class="flex items-center gap-4">
+    <div class="relative flex-shrink-0">
+      {% if photo_url %}
+        <img src="{{ photo_url }}" alt="{{ full_name }}" class="h-14 w-14 rounded-full object-cover ring-2 ring-ui-border" loading="lazy">
+      {% else %}
+        <div class="flex h-14 w-14 items-center justify-center rounded-full bg-ui-info/15 text-lg font-bold text-ui-info">
+          {{ full_name|truncatechars:2 }}
+        </div>
+      {% endif %}
+      {% if not is_active %}
+        <span class="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-ui-surface bg-ui-danger" aria-label="Inactif"></span>
+      {% endif %}
+    </div>
+    <div class="min-w-0 flex-1">
+      <p class="truncate text-sm font-bold text-ui-text">{{ full_name|default:"Étudiant" }}</p>
+      {% if matricule %}
+        <p class="text-xs text-ui-text-muted">Mat. : {{ matricule }}</p>
+      {% endif %}
+      {% if classe %}
+        <p class="text-xs text-ui-text-muted">{{ classe }}{% if niveau %} · {{ niveau }}{% endif %}</p>
+      {% endif %}
+      {% if filiere %}
+        <p class="text-xs text-ui-text-muted">{{ filiere }}</p>
+      {% endif %}
+    </div>
+  </div>
+  {% if detail_url and detail_url != "#" %}
+    <div class="mt-3 border-t border-ui-border pt-3">
+      <a href="{{ detail_url }}" class="inline-flex items-center gap-1 text-xs font-medium text-ui-info hover:underline focus-visible:outline-none">
+        Voir le dossier
+        <i data-lucide="external-link" class="h-3 w-3"></i>
+      </a>
+    </div>
+  {% endif %}
+</div>

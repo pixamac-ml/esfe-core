@@ -1149,11 +1149,50 @@ class ECGrade(models.Model):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
+        allow_locked_update = kwargs.pop("allow_locked_update", False)
         if self.normal_score is None and self.note is not None:
             self.normal_score = self.note
 
+        if self.enrollment_id and self.ec_id and not allow_locked_update:
+            semester_status = self.ec.ue.semester.status
+            if self._state.adding:
+                if semester_status in {
+                    Semester.STATUS_NORMAL_LOCKED,
+                    Semester.STATUS_FINALIZED,
+                    Semester.STATUS_PUBLISHED,
+                }:
+                    raise ValidationError(
+                        "Impossible d'ajouter une note normale dans une session cloturee ou publiee."
+                    )
+            else:
+                previous = type(self).objects.filter(pk=self.pk).values(
+                    "normal_score",
+                    "retake_score",
+                ).first()
+                if previous:
+                    normal_changed = previous["normal_score"] != self.normal_score
+                    retake_changed = previous["retake_score"] != self.retake_score
+                    if normal_changed and semester_status != Semester.STATUS_NORMAL_ENTRY:
+                        raise ValidationError(
+                            "La session normale est cloturee. Une correction OTP est obligatoire."
+                        )
+                    if retake_changed and semester_status != Semester.STATUS_RETAKE_ENTRY:
+                        raise ValidationError(
+                            "La session de rattrapage est cloturee ou inactive. Une correction OTP est obligatoire."
+                        )
+
         self.full_clean()
         apply_ec_grade(self)
+        if kwargs.get("update_fields") is not None:
+            kwargs["update_fields"] = set(kwargs["update_fields"]) | {
+                "note",
+                "normal_score",
+                "retake_score",
+                "final_score",
+                "note_coefficient",
+                "credit_obtained",
+                "is_validated",
+            }
         super().save(*args, **kwargs)
 
 
@@ -1641,6 +1680,37 @@ class AcademicBulletin(models.Model):
         return f"{self.reference} - {self.student}"
 
     def save(self, *args, **kwargs):
+        allow_published_update = kwargs.pop("allow_published_update", False)
+        if self.pk and not allow_published_update:
+            previous = type(self).objects.filter(pk=self.pk).values(
+                "student_id",
+                "enrollment_id",
+                "academic_year_id",
+                "academic_class_id",
+                "branch_id",
+                "semester_id",
+                "bulletin_type",
+                "status",
+                "reference",
+                "average",
+                "total_credits",
+                "credits_obtained",
+                "decision",
+                "mention",
+                "snapshot",
+                "generated_by_id",
+                "generated_at",
+                "published_by_id",
+                "published_at",
+                "pdf_file",
+            ).first()
+            if previous and previous["status"] == self.STATUS_PUBLISHED:
+                current = {
+                    key: str(getattr(self, key)) if key == "pdf_file" else getattr(self, key)
+                    for key in previous
+                }
+                if current != previous:
+                    raise ValidationError("Un bulletin publie est definitif et ne peut plus etre modifie.")
         if not self.reference and self.enrollment_id:
             prefix = "BUL-S" if self.bulletin_type == self.TYPE_SEMESTER else "BUL-A"
             suffix = f"-S{self.semester.number}" if self.semester_id else ""
@@ -1648,6 +1718,7 @@ class AcademicBulletin(models.Model):
                 f"{prefix}-{self.enrollment.academic_year.name.replace('-', '')}-"
                 f"{self.enrollment.branch.code.upper()}-{str(self.enrollment_id).zfill(5)}{suffix}"
             )
+        self.full_clean()
         super().save(*args, **kwargs)
 
     def clean(self):

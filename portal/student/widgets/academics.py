@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from academics.models import AcademicEnrollment, EC, ECGrade
+from academics.models import AcademicBulletin, AcademicEnrollment, EC, ECGrade, Semester
 
 
 def _format_decimal(value):
@@ -107,7 +107,12 @@ def get_academics_widget(user):
     total_credits = sum((ec.credit_required or 0) for ec in ecs)
     semester_numbers = sorted({ec.ue.semester.number for ec in ecs if getattr(ec.ue, "semester", None)})
     enrollment = snapshot["academic_enrollment"]
-    grades = list(ECGrade.objects.filter(enrollment=enrollment).select_related("ec", "ec__ue", "ec__ue__semester")) if enrollment else []
+    grades = list(
+        ECGrade.objects.filter(
+            enrollment=enrollment,
+            ec__ue__semester__status=Semester.STATUS_PUBLISHED,
+        ).select_related("ec", "ec__ue", "ec__ue__semester")
+    ) if enrollment else []
     scored = [grade.final_score for grade in grades if grade.final_score is not None]
     average = sum(scored) / len(scored) if scored else None
     credits_obtained = sum((grade.credit_obtained or Decimal("0")) for grade in grades)
@@ -119,7 +124,9 @@ def get_academics_widget(user):
     active_semester = None
     if academic_class is not None:
         active_semester = (
-            academic_class.semesters.exclude(status="FINALIZED")
+            academic_class.semesters.exclude(
+                status__in=[Semester.STATUS_FINALIZED, Semester.STATUS_PUBLISHED]
+            )
             .order_by("number")
             .first()
             or academic_class.semesters.order_by("-number").first()
@@ -164,6 +171,14 @@ def get_academics_widget(user):
         "error": "danger",
     }
 
+    published_bulletins = list(
+        AcademicBulletin.objects.filter(
+            enrollment=enrollment,
+            student=snapshot["student"],
+            status=AcademicBulletin.STATUS_PUBLISHED,
+        ).select_related("semester", "academic_year").order_by("semester__number", "bulletin_type")
+    ) if enrollment and snapshot["student"] else []
+
     return {
         "average": f"{average:.2f}/20" if average is not None else "Non disponible",
         "credits": f"{_format_decimal(credits_obtained)}/{_format_decimal(total_credits)}",
@@ -185,5 +200,6 @@ def get_academics_widget(user):
         "semester": ", ".join(f"S{number}" for number in semester_numbers) if semester_numbers else "Non disponible",
         "progress": 100 if snapshot["academic_status"] == "assigned" else 25,
         "status_message": snapshot["academic_status_message"],
+        "published_bulletins": published_bulletins,
     }
 

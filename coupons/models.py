@@ -32,6 +32,20 @@ class Coupon(models.Model):
         (DISCOUNT_FIXED, "Montant fixe (FCFA)"),
     )
 
+    AVAILABILITY_ACTIVE = "active"
+    AVAILABILITY_DISABLED = "disabled"
+    AVAILABILITY_SCHEDULED = "scheduled"
+    AVAILABILITY_EXPIRED = "expired"
+    AVAILABILITY_EXHAUSTED = "exhausted"
+
+    AVAILABILITY_LABELS = {
+        AVAILABILITY_ACTIVE: "Actif",
+        AVAILABILITY_DISABLED: "Désactivé",
+        AVAILABILITY_SCHEDULED: "Programmé",
+        AVAILABILITY_EXPIRED: "Expiré",
+        AVAILABILITY_EXHAUSTED: "Épuisé",
+    }
+
     code = models.CharField(
         max_length=32,
         unique=True,
@@ -116,21 +130,31 @@ class Coupon(models.Model):
 
     @property
     def redemptions_count(self):
+        if hasattr(self, "usage_count"):
+            return self.usage_count
         return self.redemptions.count()
 
-    def is_currently_valid(self):
+    @property
+    def availability_status(self):
+        """Retourne l'état métier réel du coupon, pas seulement is_active."""
         now = timezone.now()
 
         if not self.is_active:
-            return False
+            return self.AVAILABILITY_DISABLED
         if now < self.valid_from:
-            return False
+            return self.AVAILABILITY_SCHEDULED
         if self.valid_until and now > self.valid_until:
-            return False
+            return self.AVAILABILITY_EXPIRED
         if self.max_redemptions is not None and self.redemptions_count >= self.max_redemptions:
-            return False
+            return self.AVAILABILITY_EXHAUSTED
+        return self.AVAILABILITY_ACTIVE
 
-        return True
+    @property
+    def availability_status_label(self):
+        return self.AVAILABILITY_LABELS[self.availability_status]
+
+    def is_currently_valid(self):
+        return self.availability_status == self.AVAILABILITY_ACTIVE
 
     def applies_to(self, *, branch, programme):
         branch_ok = not self.branches.exists() or self.branches.filter(pk=branch.pk).exists()

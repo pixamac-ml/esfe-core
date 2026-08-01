@@ -1,0 +1,19 @@
+<div
+  x-data="uiOverlay({{ open|yesno:'true,false' }})"
+  @keydown.escape.window="if (open) close()"
+  @ui-overlay-open.window="if ($event.detail.id === '{{ dialog_id }}') show()"
+  @ui-overlay-close.window="if ($event.detail.id === '{{ dialog_id }}') close()"
+  data-ui-core="confirm-dialog"
+>
+  {% if trigger_label %}<button type="button" @click="show()" class="rounded-ui-button border border-ui-border px-4 py-2 text-sm font-semibold hover:bg-ui-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus">{{ trigger_label }}</button>{% endif %}
+  <div x-show="open" x-cloak class="fixed inset-0 z-50 grid place-items-center bg-ui-overlay/45 p-4" role="alertdialog" aria-modal="true" aria-labelledby="{{ dialog_id }}-title" aria-describedby="{{ dialog_id }}-message">
+  <section x-ref="dialog" tabindex="-1" @keydown.tab="trap($event)" class="w-full max-w-md rounded-ui-modal bg-ui-surface p-5 shadow-ui-modal focus:outline-none">
+    <h2 id="{{ dialog_id }}-title" class="text-lg font-bold text-ui-text">{{ title }}</h2>
+    <p id="{{ dialog_id }}-message" class="mt-2 text-sm text-ui-text-muted">{{ message }}</p>
+    <div class="mt-5 flex justify-end gap-2">
+      <button type="button" @click="close()" class="rounded-ui-button border border-ui-border px-4 py-2 text-sm font-semibold hover:bg-ui-surface-muted">{{ cancel_label }}</button>
+      <button type="button" data-ui-confirm-accept="{{ dialog_id }}" {% if action_url %}hx-post="{{ action_url }}" {% if target %}hx-target="{{ target }}" hx-swap="innerHTML"{% endif %} @htmx:after-request="if ($event.detail.successful) close()"{% endif %} class="rounded-ui-button px-4 py-2 text-sm font-semibold text-ui-on-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus {% if tone == 'primary' %}bg-ui-primary{% else %}bg-ui-danger{% endif %}">{{ confirm_label }}</button>
+    </div>
+  </section>
+  </div>
+</div>

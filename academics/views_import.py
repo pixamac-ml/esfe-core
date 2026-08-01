@@ -30,9 +30,17 @@ def download_template(request, class_id: int, semester_id: int):
     if semester.academic_class_id != academic_class.id:
         return HttpResponse("Semestre hors classe.", status=400)
 
-    output = generate_import_template(academic_class=academic_class, semester=semester)
+    session_type = (request.GET.get("session_type") or "normal").strip().lower()
+    try:
+        output = generate_import_template(
+            academic_class=academic_class,
+            semester=semester,
+            session_type=session_type,
+        )
+    except ValueError as exc:
+        return HttpResponse(str(exc), status=400)
 
-    filename = f"import-notes-{academic_class.id}-S{semester.number}-{semester.id}.xlsx"
+    filename = f"import-notes-{session_type}-{academic_class.id}-S{semester.number}-{semester.id}.xlsx"
     response = HttpResponse(
         output.getvalue(),
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -57,6 +65,7 @@ def upload_grades(request):
     class_id = request.POST.get("class_id")
     semester_id = request.POST.get("semester_id")
     excel_file = request.FILES.get("file")
+    session_type = (request.POST.get("session_type") or "normal").strip().lower()
 
     if not class_id or not semester_id or not excel_file:
         return JsonResponse(
@@ -76,7 +85,12 @@ def upload_grades(request):
         return JsonResponse({"ok": False, "error": "Semestre hors classe."}, status=400)
 
     try:
-        result = import_grades(excel_file, academic_class=academic_class, semester=semester)
+        result = import_grades(
+            excel_file,
+            academic_class=academic_class,
+            semester=semester,
+            session_type=session_type,
+        )
     except Exception as exc:
         return JsonResponse({"ok": False, "error": str(exc)}, status=400)
 

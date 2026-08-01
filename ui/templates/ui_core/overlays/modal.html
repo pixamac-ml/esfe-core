@@ -1,0 +1,20 @@
+{% load component_tags %}
+<div
+  x-data="uiOverlay({{ open|yesno:'true,false' }})"
+  @keydown.escape.window="if (open) close()"
+  @ui-overlay-open.window="if ($event.detail.id === '{{ modal_id }}') show()"
+  @ui-overlay-close.window="if ($event.detail.id === '{{ modal_id }}') close()"
+  data-ui-core="modal"
+>
+  {% if trigger_label %}<button type="button" @click="show()" {% if content_url %}hx-get="{{ content_url }}" hx-target="#{{ modal_id }}-content" hx-swap="innerHTML"{% endif %} class="rounded-ui-button border border-ui-border px-4 py-2 text-sm font-semibold hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus">{{ trigger_label }}</button>{% endif %}
+  <div x-show="open" x-cloak class="fixed inset-0 z-50 grid place-items-center bg-ui-overlay/45 p-4" role="dialog" aria-modal="true" aria-labelledby="{{ modal_id }}-title">
+  <section x-ref="dialog" tabindex="-1" @keydown.tab="trap($event)" class="max-h-ui-overlay w-full {{ size_class }} overflow-auto rounded-ui-modal bg-ui-surface shadow-ui-modal focus:outline-none" @click.outside="close()">
+    <header class="flex items-center justify-between border-b border-ui-border px-5 py-4">
+      <h2 id="{{ modal_id }}-title" class="text-base font-bold">{{ title|default:"Fenêtre" }}</h2>
+      <button type="button" @click="close()" class="grid h-9 w-9 place-items-center rounded-ui-button hover:bg-ui-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" aria-label="Fermer"><i data-lucide="x" class="h-4 w-4"></i></button>
+    </header>
+    <div id="{{ modal_id }}-content" class="relative min-h-20 p-5">{% slot "default" %}{% endslot %}</div>
+    {% if component_vars.is_filled.footer %}<footer class="border-t border-ui-border px-5 py-4">{% slot "footer" %}{% endslot %}</footer>{% endif %}
+  </section>
+  </div>
+</div>

@@ -130,6 +130,21 @@ class AcademicBulletinAdmin(admin.ModelAdmin):
     search_fields = ("reference", "student__matricule", "student__user__username", "student__user__email")
     readonly_fields = ("reference", "snapshot", "generated_at", "published_at", "created_at", "updated_at")
 
+    def get_readonly_fields(self, request, obj=None):
+        if obj and obj.status == AcademicBulletin.STATUS_PUBLISHED:
+            return tuple(field.name for field in self.model._meta.concrete_fields)
+        return super().get_readonly_fields(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if obj and obj.status == AcademicBulletin.STATUS_PUBLISHED:
+            return False
+        return super().has_delete_permission(request, obj)
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        actions.pop("delete_selected", None)
+        return actions
+
 
 @admin.register(AcademicDiplomaAward)
 class AcademicDiplomaAwardAdmin(admin.ModelAdmin):

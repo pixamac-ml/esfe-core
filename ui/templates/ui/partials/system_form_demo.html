@@ -1,0 +1,15 @@
+{% load component_tags %}
+<form id="ui-form-demo" hx-post="{% url 'ui:system_demo_form' %}" hx-target="#ui-form-demo" hx-swap="outerHTML" class="space-y-4" data-ui-demo="form" novalidate>
+  {% csrf_token %}
+  {% if success %}{% component "ui_core.alert" title="Validation réussie" message="Le serveur a validé les données fictives." tone="success" dismissible=True %}{% endcomponent %}{% endif %}
+  <div class="grid gap-4 md:grid-cols-2">
+    {% component "ui_core.form_field" id="demo-name" name="name" label="Nom affiché" value=values.name required=True error=errors.name help_text="Deux caractères minimum." %}{% endcomponent %}
+    {% component "ui_core.form_field" id="demo-email" name="email" label="Adresse email" type="email" value=values.email required=True error=errors.email %}{% endcomponent %}
+    {% component "ui_core.form_field" id="demo-context" name="context" label="Densité préférée" type="select" value=values.context options=form_density_options %}{% endcomponent %}
+    {% component "ui_core.form_field" id="demo-disabled" name="disabled" label="Champ désactivé" value="Non modifiable" disabled=True %}{% endcomponent %}
+  </div>
+  <div class="flex flex-wrap justify-end gap-2 border-t border-ui-border pt-4">
+    <button type="button" @click="$el.closest('form').reset()" class="rounded-ui-button border border-ui-border px-4 py-2 text-sm font-semibold hover:bg-ui-surface-hover">Réinitialiser localement</button>
+    <button type="submit" class="rounded-ui-button bg-ui-primary px-4 py-2 text-sm font-semibold text-ui-on-primary">Valider par HTMX</button>
+  </div>
+</form>

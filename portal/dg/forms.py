@@ -1,4 +1,5 @@
 from datetime import timedelta
+import re
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -79,10 +80,15 @@ class DgRecruitmentForm(forms.Form):
 
 class DgCouponForm(forms.Form):
     INPUT_CLASS = "mt-1 h-12 w-full rounded-xl border border-slate-200 px-3 text-sm font-bold"
+    DATETIME_FORMAT = "%Y-%m-%dT%H:%M"
 
     code = forms.CharField(
         max_length=32,
-        widget=forms.TextInput(attrs={"class": INPUT_CLASS, "placeholder": "Ex: MASTER-DG-2026"}),
+        widget=forms.TextInput(attrs={
+            "class": f"{INPUT_CLASS} uppercase",
+            "placeholder": "Ex: MASTER-DG-2026",
+            "autocomplete": "off",
+        }),
     )
     label = forms.CharField(
         max_length=150,
@@ -110,10 +116,18 @@ class DgCouponForm(forms.Form):
     )
     valid_from = forms.DateTimeField(
         required=False,
-        widget=forms.DateTimeInput(attrs={"class": INPUT_CLASS, "type": "datetime-local"}),
+        input_formats=[DATETIME_FORMAT],
+        widget=forms.DateTimeInput(
+            format=DATETIME_FORMAT,
+            attrs={"class": INPUT_CLASS, "type": "datetime-local"},
+        ),
     )
     valid_until = forms.DateTimeField(
-        widget=forms.DateTimeInput(attrs={"class": INPUT_CLASS, "type": "datetime-local"}),
+        input_formats=[DATETIME_FORMAT],
+        widget=forms.DateTimeInput(
+            format=DATETIME_FORMAT,
+            attrs={"class": INPUT_CLASS, "type": "datetime-local"},
+        ),
     )
     max_redemptions = forms.IntegerField(
         min_value=1,
@@ -148,8 +162,21 @@ class DgCouponForm(forms.Form):
         )
         return Programme.objects.filter(id__in=programme_ids).order_by("title")
 
+    def clean_code(self):
+        code = (self.cleaned_data.get("code") or "").strip().upper()
+        if not re.fullmatch(r"[A-Z0-9_-]+", code):
+            raise ValidationError(
+                "Utilisez uniquement des lettres, chiffres, tirets et underscores, sans espace."
+            )
+        return code
+
     def clean(self):
         cleaned = super().clean()
+        discount_type = cleaned.get("discount_type")
+        value = cleaned.get("value")
+        if discount_type == Coupon.DISCOUNT_PERCENTAGE and value is not None and value > 100:
+            self.add_error("value", "Un pourcentage doit être compris entre 1 et 100.")
+
         valid_from = cleaned.get("valid_from") or timezone.now()
         valid_until = cleaned.get("valid_until")
         self.long_validity_warning = bool(

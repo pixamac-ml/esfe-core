@@ -641,7 +641,7 @@ def save_grade_confirm_otp(request):
         else:
             grade.normal_score = otp_request.requested_score
         apply_ec_grade(grade)
-        grade.save()
+        grade.save(allow_locked_update=True)
         grade.refresh_from_db()
         compute_ue_result(grade.ec.ue, grade.enrollment)
         compute_semester_result(grade.ec.ue.semester, grade.enrollment)

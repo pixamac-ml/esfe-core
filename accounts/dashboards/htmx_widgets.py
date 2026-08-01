@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 
-from django.db.models import Q, Sum
+from django.db.models import Sum
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.utils import timezone
@@ -9,6 +9,7 @@ from django.views.decorators.http import require_GET
 from admissions.models import Candidature
 from accounts.models import BranchCashMovement, BranchExpense, PayrollEntry, Profile, TeacherHonorariumEntry
 from accounts.services.manager_intelligence import build_manager_intelligence_context, get_branch_cash_balance
+from coupons.services.querysets import active_coupons_for_branch
 from inscriptions.models import Inscription
 from payments.models import Payment
 from students.models import Student
@@ -186,20 +187,10 @@ def widget_active_sessions(request: HttpRequest) -> HttpResponse:
 @manager_required
 @require_GET
 def widget_active_coupons(request: HttpRequest) -> HttpResponse:
-    from coupons.models import Coupon
-
-    branch = request.branch
-    candidates = (
-        Coupon.objects.filter(is_active=True)
-        .filter(Q(branches__isnull=True) | Q(branches=branch))
-        .distinct()
-        .order_by("-created_at")
-    )
-    active_coupons = [coupon for coupon in candidates if coupon.is_currently_valid()][:5]
     return render(
         request,
         "accounts/dashboard/partials/widget_active_coupons.html",
-        {"coupons": active_coupons},
+        {"coupons": active_coupons_for_branch(request.branch)},
     )
 
 

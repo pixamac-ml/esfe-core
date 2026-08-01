@@ -1,0 +1,22 @@
+{% load component_tags %}
+<header class="sticky top-0 z-30 flex h-ui-topbar items-center justify-between border-b border-ui-border bg-ui-surface/95 px-ui-mobile shadow-ui-dropdown backdrop-blur md:px-ui-tablet lg:px-ui-desktop" data-ui-core="app-topbar">
+  <div class="min-w-0">
+    <div class="flex items-center gap-2">
+      <button type="button" @click="mobileNavOpen = true" class="grid h-9 w-9 shrink-0 place-items-center rounded-ui-button text-ui-text-muted hover:bg-ui-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus lg:hidden" aria-label="Ouvrir la navigation"><i data-lucide="menu" class="h-5 w-5"></i></button>
+      <h1 class="truncate text-base font-bold text-ui-text">{{ title|default:"Portail ESFE" }}</h1>
+    </div>
+    {% if context_label %}<p class="truncate text-xs text-ui-text-muted">{{ context_label }}</p>{% endif %}
+  </div>
+  <div class="flex items-center gap-2">
+    {% slot "actions" %}{% endslot %}
+    {% if show_notifications_button %}
+      {% if notifications_url %}<a href="{{ notifications_url }}" class="relative grid h-10 w-10 place-items-center rounded-ui-button text-ui-text-muted hover:bg-ui-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" aria-label="Notifications">{% else %}<button type="button" class="relative grid h-10 w-10 place-items-center rounded-ui-button text-ui-text-muted hover:bg-ui-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" aria-label="Notifications">{% endif %}
+        <i data-lucide="bell" class="h-5 w-5" aria-hidden="true"></i>
+        {% if notification_count %}
+          <span class="js-notification-unread-count absolute right-0 top-0 grid min-h-4 min-w-4 place-items-center rounded-ui-badge bg-ui-danger px-1 text-ui-micro font-bold text-ui-on-primary">{{ notification_count }}</span>
+        {% endif %}
+      {% if notifications_url %}</a>{% else %}</button>{% endif %}
+    {% endif %}
+    {% if user_name %}<span class="hidden max-w-44 truncate text-sm font-semibold sm:block">{{ user_name }}</span>{% endif %}
+  </div>
+</header>

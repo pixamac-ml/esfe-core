@@ -12,6 +12,10 @@ from django.utils import timezone
 
 from academics.services.academic_positioning import get_positioning_context
 from accounts.models import Profile
+from accounts.services.manager_workspace_access import (
+    manager_full_access_required,
+    manager_workspace_required,
+)
 from branches.models import Branch
 from inscriptions.models import Inscription
 from payments.models import CashPaymentSession, PaymentAgent
@@ -25,28 +29,21 @@ PAYABLE_INSCRIPTION_STATUSES: set[str] = {
 
 
 def manager_required(view_func: Callable[..., HttpResponse]) -> Callable[..., HttpResponse]:
-    def wrapper(request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
-        if settings.AUTH_POLICY_V2_ENABLED:
-            from accounts.access_context import get_request_access_context
-            from accounts.policy_v2 import decide
+    """Keep non-Finance manager workflows restricted to the annex manager."""
 
-            context = get_request_access_context(request)
-            decision = decide(context, allowed_positions={"annex_manager"})
-            if not decision.allowed:
-                return HttpResponse("Non autorise", status=403)
-            request.branch = context.branch
-            return view_func(request, *args, **kwargs)
-        from accounts.dashboards.helpers import is_manager, get_user_branch
+    return login_required(manager_full_access_required(view_func))
 
-        if not is_manager(request.user):
-            return HttpResponse("Non autorise", status=403)
-        branch = get_user_branch(request.user)
-        if not branch:
-            return HttpResponse("Annexe non trouvee", status=403)
-        request.branch = branch
-        return view_func(request, *args, **kwargs)
 
-    return login_required(wrapper)
+def manager_capability_required(capability: str):
+    """Authorize one precise capability in the shared manager workspace."""
+
+    def decorator(view_func: Callable[..., HttpResponse]) -> Callable[..., HttpResponse]:
+        return login_required(manager_workspace_required(capability)(view_func))
+
+    return decorator
+
+
+manager_finance_required = manager_capability_required
 
 
 def get_current_agent(user: AbstractBaseUser, branch: Branch) -> PaymentAgent | None:

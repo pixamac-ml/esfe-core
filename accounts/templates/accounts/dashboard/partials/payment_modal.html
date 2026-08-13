@@ -1,17 +1,11 @@
 {% load component_tags %}
-<div class="space-y-0">
-<div class="sticky top-0 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-6 py-4 flex items-center justify-between rounded-t-3xl">
-            <div>
-                <h2 class="text-xl font-bold">Paiement {{ payment.reference }}</h2>
-                <p class="text-sm text-green-100">{{ payment.inscription.candidature.full_name }}</p>
-            </div>
-            <button onclick="closeDashboardModal()" class="w-10 h-10 rounded-xl hover:bg-white/15 transition">
-                {% component "icon" name="x" %}{% endcomponent %}
-            </button>
+<div class="space-y-6" data-manager-payment-detail>
+    <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-ui-primary">Paiement {{ payment.reference }}</p>
+        <h2 class="mt-1 text-xl font-bold text-ui-text">{{ payment.inscription.candidature.full_name }}</h2>
     </div>
-</div>
 
-    <div class="p-6 space-y-6">
+    <div class="space-y-6">
             <div class="text-center py-2">
                 <p class="text-sm text-slate-500 mb-2">Montant</p>
                 <p class="text-4xl font-bold text-slate-900">{{ payment.amount|floatformat:0 }} FCFA</p>
@@ -67,7 +61,7 @@
                 {% endif %}
                 <form
                     hx-post="{% url 'accounts:htmx_payment_correct_confirm_otp' payment.id %}"
-                    hx-target="#modal-content"
+                    hx-target="#manager-modal-content"
                     hx-swap="innerHTML"
                     hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                     class="flex flex-col gap-4 sm:flex-row sm:items-end">
@@ -82,7 +76,7 @@
                     </button>
                 </form>
             </div>
-            {% elif payment.status == 'validated' %}
+            {% elif payment.status == 'validated' and manager_capabilities.can_correct_payment %}
             <div class="rounded-2xl border border-amber-200 bg-amber-50 p-5 space-y-4">
                 <div>
                     <h3 class="text-sm font-semibold uppercase tracking-wide text-amber-800">Correction controlee</h3>
@@ -96,7 +90,7 @@
                 {% endif %}
                 <form
                     hx-post="{% url 'accounts:htmx_payment_correct' payment.id %}"
-                    hx-target="#modal-content"
+                    hx-target="#manager-modal-content"
                     hx-swap="innerHTML"
                     hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                     class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -153,7 +147,7 @@
             </div>
         </div>
 
-        <div class="sticky bottom-0 bg-white border-t border-slate-100 px-6 py-4 flex items-center justify-between gap-3 rounded-b-3xl">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-ui-border pt-4">
             <a href="{% url 'inscriptions:public_detail' payment.inscription.public_token %}"
                target="_blank"
                rel="noopener noreferrer"
@@ -169,7 +163,7 @@
             {% else %}
             <div></div>
             {% endif %}
-            <button onclick="closeDashboardModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition">Fermer</button>
+            <button type="button" onclick="window.dispatchEvent(new CustomEvent('ui-overlay-close',{detail:{id:'manager-modal'}}))" class="inline-flex h-ui-control items-center rounded-ui-button border border-ui-border px-4 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">Fermer</button>
     </div>
 </div>
 <script>

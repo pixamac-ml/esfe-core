@@ -1,0 +1,36 @@
+{% load component_tags %}
+{% if director_fragment_response and timetable_tabs %}{% include "portal/staff/director/partials/timetable/_tabs_oob.html" %}{% endif %}
+<div class="space-y-5">
+  {% component "ui_core.panel" title="Choisir la classe" subtitle="Contrôlez le rendu final avant l'impression." %}
+    {% include "portal/staff/director/partials/timetable/_class_selector.html" %}
+  {% endcomponent %}
+
+  {% if timetable_selected_class %}
+    {% if timetable_grid.slots %}
+      <section class="overflow-hidden rounded-ui-card border border-ui-border bg-ui-surface shadow-ui-sm">
+        <header class="flex flex-col gap-4 border-b border-ui-border px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div class="min-w-0">
+            <p class="text-xs font-semibold text-ui-primary">Aperçu avant impression</p>
+            <h2 class="mt-1 truncate text-base font-bold text-ui-text">{{ timetable_selected_class.display_name }}</h2>
+            <p class="mt-1 text-xs text-ui-text-muted">{{ timetable_selected_class.programme.title }} · {{ timetable_grid.total_hours }} h/semaine</p>
+          </div>
+          <a href="{% url 'accounts_portal:schedule_class_print' timetable_selected_class.id %}?source=weekly&week_start={{ timetable_week_start|date:'Y-m-d' }}"
+             target="_blank"
+             rel="noopener"
+             class="ui-focus-ring inline-flex h-ui-control items-center justify-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong">
+            <i data-lucide="printer" class="h-4 w-4" aria-hidden="true"></i>Ouvrir la version imprimable
+          </a>
+        </header>
+        {% include "portal/staff/director/partials/timetable/_week_navigator.html" %}
+        {% include "portal/staff/director/partials/timetable/_grid.html" with editable=0 %}
+      </section>
+      {% if timetable_grid.missing_room_count %}
+        {% component "ui_core.alert" title="Impression à vérifier" message="Au moins un cours n'a pas encore de salle; complétez la grille avant de l'afficher dans l'école." tone="warning" %}{% endcomponent %}
+      {% endif %}
+    {% else %}
+      {% component "ui_core.empty_state" title="Grille vide" message="Passez dans Construire pour ajouter les cours de cette classe avant l'impression." icon="calendar-x-2" %}{% endcomponent %}
+    {% endif %}
+  {% else %}
+    {% component "ui_core.empty_state" title="Sélectionnez une classe" message="Choisissez la classe dont vous voulez contrôler et imprimer l'emploi du temps." icon="printer" %}{% endcomponent %}
+  {% endif %}
+</div>

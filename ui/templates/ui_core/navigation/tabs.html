@@ -1,6 +1,32 @@
-<div class="overflow-x-auto" data-ui-core="tabs" x-data="{ active: '{{ active|escapejs }}' }">
+<div class="overflow-x-auto" data-ui-core="tabs" x-data="{ active: '{{ active|escapejs }}' }" @{{ subview_event }}.window="if ($event.detail && $event.detail.id) active = $event.detail.id">
   <div class="flex min-w-max border-b border-ui-border" role="tablist" aria-label="Navigation secondaire">
     {% for item in items %}
+      {% if item.href %}
+      <a
+        href="{{ item.href }}"
+        id="{{ id }}-{{ item.id }}-tab"
+        role="tab"
+        data-{{ subview_attr }}="{{ item.id }}"
+        :aria-selected="active === '{{ item.id|escapejs }}'"
+        :aria-current="active === '{{ item.id|escapejs }}' ? 'page' : null"
+        aria-controls="{{ item.hx_target|cut:'#' }}"
+        {% if item.disabled %}aria-disabled="true" tabindex="-1"{% endif %}
+        {% if item.hx_get %}hx-get="{{ item.hx_get }}"{% endif %}
+        {% if item.hx_target %}hx-target="{{ item.hx_target }}"{% endif %}
+        hx-swap="{{ item.hx_swap|default:'innerHTML' }}"
+        {% if item.hx_push_url %}hx-push-url="{{ item.hx_push_url }}"{% endif %}
+        {% if item.hx_indicator %}hx-indicator="{{ item.hx_indicator }}"{% endif %}
+        {% if item.hx_sync %}hx-sync="{{ item.hx_sync }}"{% endif %}
+        hx-disabled-elt="this"
+        @click="active = '{{ item.id|escapejs }}'; $nextTick(() => $el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' }))"
+        class="inline-flex items-center gap-2 border-b-2 px-4 font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ui-focus {% if density == 'compact' %}py-2 text-xs{% else %}py-3 text-sm{% endif %}"
+        :class="active === '{{ item.id|escapejs }}' ? 'border-ui-primary text-ui-primary' : 'border-transparent text-ui-text-muted hover:border-ui-border hover:text-ui-text'"
+      >
+        {% if item.icon %}<i data-lucide="{{ item.icon }}" class="h-4 w-4" aria-hidden="true"></i>{% endif %}
+        {{ item.label }}
+        {% if item.count != None %}<span class="rounded-ui-badge bg-ui-surface-muted px-2 py-0.5 text-ui-micro">{{ item.count }}</span>{% endif %}
+      </a>
+      {% else %}
       <button
         type="button"
         id="{{ id }}-{{ item.id }}-tab"
@@ -16,6 +42,7 @@
         {{ item.label }}
         {% if item.count != None %}<span class="rounded-ui-badge bg-ui-surface-muted px-2 py-0.5 text-ui-micro">{{ item.count }}</span>{% endif %}
       </button>
+      {% endif %}
     {% endfor %}
   </div>
 </div>

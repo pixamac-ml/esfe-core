@@ -1,0 +1,81 @@
+{% load component_tags %}
+<div class="space-y-5">
+  {% if director_fragment_response %}
+    <span id="director-programme-class-count" hx-swap-oob="innerHTML">{{ programme_metrics.classes }}</span>
+    <span id="director-programme-ue-count" hx-swap-oob="innerHTML">{{ programme_metrics.ues }}</span>
+  {% endif %}
+
+  <form method="get"
+        hx-get="{% url 'accounts_portal:director_programme_subcontent' %}"
+        hx-target="#director-programme-subcontent"
+        hx-swap="innerHTML"
+        hx-trigger="change from:select, submit"
+        hx-indicator="#director-programme-loading"
+        hx-sync="#director-programme-subcontent:replace"
+        class="flex min-w-0 flex-col gap-3 border-y border-ui-border py-4 sm:flex-row sm:items-end">
+    <input type="hidden" name="view" value="maquettes">
+    <label class="min-w-0 flex-1">
+      <span class="mb-1.5 block text-sm font-semibold text-ui-text">Classe académique</span>
+      <select name="class_id" class="h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text focus:border-ui-focus focus:ring-ui-focus">
+        {% for academic_class in programme_classes_page.paginator.object_list %}
+          <option value="{{ academic_class.id }}" {% if programme_selected_class.id == academic_class.id %}selected{% endif %}>{{ academic_class.display_name }}</option>
+        {% empty %}
+          <option value="">Aucune classe active</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% if programme_selected_class %}
+    <button type="button"
+            hx-get="{% url 'accounts_portal:director_drawer' %}?panel=programme&class_id={{ programme_selected_class.id }}"
+            hx-target="#director-drawer-content"
+            hx-swap="innerHTML"
+            hx-disabled-elt="this"
+            class="ui-focus-ring inline-flex h-ui-control items-center justify-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong disabled:opacity-50">
+      <i data-lucide="panel-right-open" class="h-4 w-4" aria-hidden="true"></i>Gérer la maquette
+    </button>
+    {% endif %}
+  </form>
+
+  {% if programme_selected_class %}
+    <div class="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {% component "ui_core.stat_card" label="Semestres" value=programme_structure_totals.semesters icon="layers-3" tone="primary" compact=True %}{% endcomponent %}
+      {% component "ui_core.stat_card" label="UE" value=programme_structure_totals.ues icon="library-big" tone="info" compact=True %}{% endcomponent %}
+      {% component "ui_core.stat_card" label="Matières" value=programme_structure_totals.ecs icon="book-open-check" tone="success" compact=True %}{% endcomponent %}
+      {% component "ui_core.stat_card" label="Crédits configurés" value=programme_structure_totals.credits icon="badge-cent" tone="warning" compact=True %}{% endcomponent %}
+    </div>
+
+    {% component "ui_core.panel" title=programme_selected_class.display_name subtitle="Lecture de la maquette active. Les modifications s'effectuent dans le drawer." padding=False %}
+      {% if programme_structure_rows %}
+        <div class="divide-y divide-ui-border">
+          {% for row in programme_structure_rows %}
+          <section class="p-5">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 class="text-sm font-bold text-ui-text">Semestre {{ row.semester.number }}</h3>
+                <p class="mt-1 text-xs text-ui-text-muted">{{ row.ues|length }} UE · {{ row.ec_count }} matière(s) · {{ row.credits }} crédit(s)</p>
+              </div>
+              {% if row.is_empty %}{% component "ui_core.status_badge" label="À compléter" tone="warning" %}{% endcomponent %}{% endif %}
+            </div>
+            {% if row.ues %}
+              <div class="mt-4 divide-y divide-ui-border border-y border-ui-border">
+                {% for ue in row.ues %}
+                <div class="flex min-w-0 flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div class="min-w-0"><p class="break-words text-sm font-semibold text-ui-text">{{ ue.code }} · {{ ue.title }}</p><p class="mt-0.5 text-xs text-ui-text-muted">{{ ue.active_ecs|length }} matière(s) · {{ ue.credit_required }} crédit(s)</p></div>
+                  {% component "ui_core.status_badge" label=ue.get_structure_status_display tone="neutral" %}{% endcomponent %}
+                </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="mt-4 text-sm text-ui-text-muted">Aucune unité d'enseignement dans ce semestre.</p>
+            {% endif %}
+          </section>
+          {% endfor %}
+        </div>
+      {% else %}
+        {% component "ui_core.empty_state" title="Maquette vide" message="Ouvrez le drawer pour ajouter les semestres et les unités d'enseignement." icon="library-big" %}{% endcomponent %}
+      {% endif %}
+    {% endcomponent %}
+  {% else %}
+    {% component "ui_core.empty_state" title="Aucune classe active" message="Créez une classe avant de construire sa maquette pédagogique." icon="school" %}{% endcomponent %}
+  {% endif %}
+</div>

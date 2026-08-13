@@ -146,7 +146,7 @@ class PortalDashboardTemplateContractTests(SimpleTestCase):
         "ANNEX_MANAGER": "accounts/dashboard/manager_dashboard.html",
         "SECRETARY": "secretary/dashboard.html",
         "ADMISSIONS_OFFICER": "portal/staff/admissions_dashboard.html",
-        "ACADEMIC_SUPERVISOR": "portal/staff/supervisor_dashboard.html",
+        "ACADEMIC_SUPERVISOR": "portal/staff/director_dashboard.html",
         "DIRECTOR_OF_STUDIES": "portal/staff/director_dashboard.html",
         "IT_SUPPORT": "portal/staff/informaticien_dashboard_v2.html",
         "MARKETING_MANAGER": "marketing/dashboard.html",

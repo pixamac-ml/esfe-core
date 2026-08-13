@@ -1,0 +1,21 @@
+{% load component_tags %}
+<section class="min-w-0 space-y-5">
+  {% component "ui_core.page_header" eyebrow="Espace personnel" title="Mon salaire" subtitle="Consultez uniquement vos fiches de paie, vos versements et vos justificatifs." %}
+    {% fill "actions" %}
+      <div class="flex items-center gap-1 rounded-ui-button border border-ui-border bg-ui-surface p-1">
+        <a href="{% url 'accounts_portal:portal_dashboard' %}?section=salaire&view={{ salary_subview }}&period={{ salary_prev_period }}" hx-get="{% url 'accounts_portal:director_salary_subcontent' %}?view={{ salary_subview }}&period={{ salary_prev_period }}" hx-target="#director-salary-subcontent" hx-swap="innerHTML" class="ui-focus-ring grid h-8 w-8 place-items-center rounded-ui-button text-ui-text hover:bg-ui-surface-hover" title="Mois précédent" aria-label="Mois précédent"><i data-lucide="chevron-left" class="h-4 w-4"></i></a>
+        <span class="min-w-32 px-2 text-center text-xs font-semibold capitalize text-ui-text">{{ salary_period_label }}</span>
+        <a href="{% url 'accounts_portal:portal_dashboard' %}?section=salaire&view={{ salary_subview }}&period={{ salary_next_period }}" hx-get="{% url 'accounts_portal:director_salary_subcontent' %}?view={{ salary_subview }}&period={{ salary_next_period }}" hx-target="#director-salary-subcontent" hx-swap="innerHTML" class="ui-focus-ring grid h-8 w-8 place-items-center rounded-ui-button text-ui-text hover:bg-ui-surface-hover" title="Mois suivant" aria-label="Mois suivant"><i data-lucide="chevron-right" class="h-4 w-4"></i></a>
+      </div>
+    {% endfill %}
+  {% endcomponent %}
+
+  {% component "ui_core.tabs" id="director-salary-tabs" items=salary_tabs active=salary_subview density="compact" %}{% endcomponent %}
+  <div class="relative min-w-0">
+    <div id="director-salary-loading" class="htmx-indicator pointer-events-none absolute inset-0 z-20">{% component "ui_core.loading_overlay" loading=True label="Chargement de votre salaire" %}{% endcomponent %}</div>
+    <div id="director-salary-subcontent" class="min-w-0" aria-live="polite">
+      {% if salary_subview == "history" %}{% include "portal/staff/director/partials/salary/history.html" %}
+      {% else %}{% include "portal/staff/director/partials/salary/overview.html" %}{% endif %}
+    </div>
+  </div>
+</section>

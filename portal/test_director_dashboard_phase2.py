@@ -113,6 +113,9 @@ class DirectorDashboardPhaseTwoTests(TestCase):
         response = self.client.get(reverse("accounts_portal:portal_dashboard"))
 
         self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "portal/staff/director_dashboard.html")
+        self.assertContains(response, 'data-certified-dashboard-shell="true"')
+        self.assertContains(response, 'data-dashboard-role="director_of_studies"')
         self.assertEqual(response.content.count(b'data-ui-core="app-shell"'), 1)
         self.assertEqual(response.content.count(b'data-ui-core="app-sidebar"'), 1)
         self.assertEqual(response.content.count(b'data-ui-core="app-topbar"'), 1)
@@ -120,6 +123,16 @@ class DirectorDashboardPhaseTwoTests(TestCase):
         self.assertNotContains(response, "academic_drawer")
         self.assertNotContains(response, "academic_modal")
         self.assertNotContains(response, "Candidater")
+
+    def test_certified_shell_context_is_adapted_to_director_role(self):
+        response = self.client.get(reverse("accounts_portal:portal_dashboard"))
+
+        shell = response.context["dashboard_shell"]
+        self.assertEqual(shell["certified_template"], "portal/staff/director_dashboard.html")
+        self.assertEqual(shell["role"], "director_of_studies")
+        self.assertEqual(shell["key"], "director")
+        self.assertEqual(shell["workspace_id"], "director-workspace")
+        self.assertEqual(shell["active_section"], "home")
 
     def test_dashboard_uses_ui_core_kpis_panels_table_and_overlays(self):
         response = self.client.get(reverse("accounts_portal:portal_dashboard"))
@@ -226,7 +239,7 @@ class DirectorDashboardPhaseTwoTests(TestCase):
         )
         self.assertContains(
             response,
-            f'hx-get="{reverse("accounts_portal:director_workspace")}?section=notifications"',
+            f'hx-get="{reverse("accounts_portal:director_workspace")}?section=messagerie"',
         )
         self.assertNotContains(
             response,
@@ -257,7 +270,7 @@ class DirectorDashboardPhaseTwoTests(TestCase):
         self.assertNotContains(account, 'data-ui-core="app-shell"')
 
         self.assertEqual(notifications.status_code, 200)
-        self.assertContains(notifications, 'data-director-section="notifications"')
+        self.assertContains(notifications, 'data-director-section="messagerie"')
         self.assertContains(notifications, 'id="director-notification-detail"')
         self.assertNotContains(notifications, 'data-ui-core="app-shell"')
 
@@ -302,6 +315,7 @@ class DirectorDashboardPhaseTwoTests(TestCase):
     def test_dashboard_script_is_external_and_ui_core_driven(self):
         response = self.client.get(reverse("accounts_portal:portal_dashboard"))
 
+        self.assertContains(response, "src/js/portal/certified_dashboard_shell.js")
         self.assertContains(response, "src/js/portal/director_dashboard.js")
         self.assertContains(response, "src/js/ui_core/index.js")
         self.assertNotContains(response, "function deDashboard()")
@@ -354,14 +368,26 @@ class DirectorEvaluationsSubwindowsTests(TestCase):
             {"section": "evaluations"},
         )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "data-eval-tab")
-        self.assertContains(response, "Vue d'ensemble")
+        self.assertContains(response, 'id="director-result-tabs-overview-tab"')
+        self.assertContains(response, "Vue d&#x27;ensemble")
+        self.assertContains(response, "Validation et publication")
+        self.assertNotContains(response, "Planifier")
+        self.assertNotContains(response, "Programmées")
+        self.assertContains(response, "director-results-subcontent")
+        self.assertContains(response, "director-results-loading")
+        self.assertContains(response, "Résultats et notes")
+
+    def test_sessions_section_owns_planning_subnavigation(self):
+        response = self.client.get(
+            reverse("accounts_portal:director_workspace"),
+            {"section": "evaluations_calendar"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="director-session-tabs-overview-tab"')
+        self.assertContains(response, "Sessions")
         self.assertContains(response, "Planifier")
-        self.assertContains(response, "Programmees")
-        self.assertContains(response, "Validation")
-        self.assertContains(response, "director-section-subcontent")
-        self.assertContains(response, "eval-subcontent-loading")
-        self.assertContains(response, "Resultats et notes")
+        self.assertContains(response, "Programmées")
+        self.assertContains(response, "director-session-subcontent")
 
     def test_evaluations_subcontent_default_is_overview(self):
         response = self.client.get(
@@ -369,27 +395,27 @@ class DirectorEvaluationsSubwindowsTests(TestCase):
             {"view": "overview"},
         )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "planifiees au total")
-        self.assertContains(response, "Acces rapides")
+        self.assertContains(response, "Traitement des résultats")
+        self.assertContains(response, "Bulletins")
 
     def test_evaluations_subcontent_create(self):
         response = self.client.get(
-            reverse("accounts_portal:director_evaluations_subcontent"),
+            reverse("accounts_portal:director_exam_sessions_subcontent"),
             {"view": "create"},
         )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Planifier une nouvelle evaluation")
+        self.assertContains(response, "Planifier une évaluation")
         self.assertContains(response, "hx-post")
-        self.assertContains(response, "de-ecs-by-class-data")
-        self.assertContains(response, "eval-create-loading")
+        self.assertContains(response, "director-evaluation-ec-field")
+        self.assertContains(response, "director-evaluation-form-loading")
 
     def test_evaluations_subcontent_scheduled(self):
         response = self.client.get(
-            reverse("accounts_portal:director_evaluations_subcontent"),
+            reverse("accounts_portal:director_exam_sessions_subcontent"),
             {"view": "scheduled"},
         )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "evaluation planifiee")
+        self.assertContains(response, "Aucune évaluation programmée")
 
     def test_evaluations_subcontent_validation(self):
         response = self.client.get(
@@ -397,7 +423,7 @@ class DirectorEvaluationsSubwindowsTests(TestCase):
             {"view": "validation"},
         )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Validation des notes")
+        self.assertContains(response, "Classes et semestres")
 
     def test_evaluations_subcontent_unknown_view_defaults_to_overview(self):
         response = self.client.get(
@@ -405,7 +431,7 @@ class DirectorEvaluationsSubwindowsTests(TestCase):
             {"view": "nonexistent"},
         )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "planifiees au total")
+        self.assertContains(response, "Traitement des résultats")
 
     def test_evaluations_subcontent_requires_authentication(self):
         self.client.logout()
@@ -433,17 +459,25 @@ class DirectorEvaluationsSubwindowsTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_each_subcontent_returns_unique_fragment(self):
-        fragments = {}
-        for view in ("overview", "create", "scheduled", "validation"):
+        result_fragments = {}
+        for view in ("overview", "validation"):
             response = self.client.get(
                 reverse("accounts_portal:director_evaluations_subcontent"),
                 {"view": view},
             )
             self.assertEqual(response.status_code, 200)
-            fragments[view] = response.content.decode()
-        self.assertNotEqual(fragments["overview"], fragments["create"])
-        self.assertNotEqual(fragments["create"], fragments["scheduled"])
-        self.assertNotEqual(fragments["scheduled"], fragments["validation"])
+            result_fragments[view] = response.content.decode()
+        self.assertNotEqual(result_fragments["overview"], result_fragments["validation"])
+
+        session_fragments = {}
+        for view in ("overview", "sessions", "create", "scheduled"):
+            response = self.client.get(
+                reverse("accounts_portal:director_exam_sessions_subcontent"),
+                {"view": view},
+            )
+            self.assertEqual(response.status_code, 200)
+            session_fragments[view] = response.content.decode()
+        self.assertEqual(len(set(session_fragments.values())), 4)
 
     def test_workspace_evaluations_has_htmx_indicator(self):
         response = self.client.get(
@@ -451,7 +485,7 @@ class DirectorEvaluationsSubwindowsTests(TestCase):
             {"section": "evaluations"},
         )
         self.assertContains(response, "hx-indicator")
-        self.assertContains(response, "eval-subcontent-loading")
+        self.assertContains(response, "director-results-loading")
         self.assertContains(response, "htmx-indicator")
 
     def test_workspace_evaluations_tabs_use_correct_target(self):
@@ -460,9 +494,30 @@ class DirectorEvaluationsSubwindowsTests(TestCase):
             {"section": "evaluations"},
         )
         content = response.content.decode()
-        self.assertIn('hx-target="#director-section-subcontent"', content)
+        self.assertIn('hx-target="#director-results-subcontent"', content)
         self.assertIn('hx-swap="innerHTML"', content)
         self.assertIn("hx-push-url", content)
+
+    def test_subcontent_pushes_full_dashboard_url(self):
+        response = self.client.get(
+            reverse("accounts_portal:director_exam_sessions_subcontent"),
+            {"view": "scheduled", "evaluation_status": "planned"},
+        )
+        self.assertEqual(
+            response.headers["HX-Push-Url"],
+            reverse("accounts_portal:portal_dashboard")
+            + "?view=scheduled&evaluation_status=planned&section=evaluations_calendar",
+        )
+
+    def test_initial_validation_has_no_unprocessed_oob_counters(self):
+        response = self.client.get(
+            reverse("accounts_portal:director_workspace"),
+            {"section": "evaluations", "view": "validation"},
+        )
+        content = response.content.decode()
+        self.assertEqual(content.count('id="director-validation-count"'), 1)
+        self.assertEqual(content.count('id="director-publication-count"'), 1)
+        self.assertNotIn('hx-swap-oob="innerHTML"', content)
 
     def test_workspace_evaluations_has_no_global_overflow(self):
         response = self.client.get(

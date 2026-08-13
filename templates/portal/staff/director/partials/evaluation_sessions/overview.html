@@ -1,0 +1,42 @@
+{% load component_tags %}
+<div class="space-y-5">
+  <div class="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    {% component "ui_core.stat_card" label="Sessions officielles" value=exam_session_total icon="calendar-range" tone="primary" description="Examens et rattrapages" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Sessions à venir" value=exam_session_upcoming_count icon="clock-3" tone="info" description="Périodes non terminées" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Évaluations planifiées" value=eval_event_total icon="clipboard-check" tone="success" description="Par classe et matière" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Évaluations à venir" value=eval_event_upcoming_count icon="calendar-clock" tone="warning" description="Hors annulations" compact=True %}{% endcomponent %}
+  </div>
+
+  {% component "ui_core.panel" title="Accès directs" subtitle="Ouvrez uniquement l'espace nécessaire." padding=False %}
+    <div class="grid divide-y divide-ui-border sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+      {% for item in session_tabs %}
+        {% if item.id != "overview" %}
+        <a href="{{ item.href }}"
+           hx-get="{{ item.hx_get }}"
+           hx-target="{{ item.hx_target }}"
+           hx-swap="innerHTML"
+           hx-push-url="{{ item.hx_push_url }}"
+           hx-indicator="{{ item.hx_indicator }}"
+           hx-sync="{{ item.hx_sync }}"
+           data-director-subview-link="{{ item.id }}"
+           class="ui-focus-ring flex min-w-0 items-center gap-3 p-4 text-left hover:bg-ui-surface-hover">
+          <span class="grid h-9 w-9 shrink-0 place-items-center rounded-ui-button bg-ui-primary-soft text-ui-primary">
+            <i data-lucide="{{ item.icon }}" class="h-4 w-4" aria-hidden="true"></i>
+          </span>
+          <span class="min-w-0">
+            <strong class="block text-sm text-ui-text">{{ item.label }}</strong>
+            <span class="mt-0.5 block text-xs text-ui-text-muted">
+              {% if item.id == "sessions" %}Périodes officielles d'examens{% elif item.id == "create" %}Classe, matière, enseignant et horaire{% else %}Liste, filtres et annulations{% endif %}
+            </span>
+          </span>
+          <i data-lucide="chevron-right" class="ml-auto h-4 w-4 shrink-0 text-ui-text-muted" aria-hidden="true"></i>
+        </a>
+        {% endif %}
+      {% endfor %}
+    </div>
+  {% endcomponent %}
+
+  {% if not exam_session_total and not eval_event_total %}
+    {% component "ui_core.alert" title="Aucune planification dans cette annexe" message="Commencez par créer une session officielle ou planifier une évaluation pour une classe." tone="neutral" %}{% endcomponent %}
+  {% endif %}
+</div>

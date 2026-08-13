@@ -1,0 +1,1520 @@
+PLAN DE PAUFINAGE COMPLET DES DASHBOARDS ESFE
+=============================================
+
+Date : 13 aout 2026
+Reference visuelle et structurelle : dashboard certifie du Directeur des etudes
+Moule commun : templates/portal/staff/director_dashboard.html
+
+
+MON AVIS
+========
+
+Oui, le constat est juste.
+
+La premiere migration a unifie la coque active : sidebar, topbar, workspace,
+loader, drawer, modale, notifications et contexte de role passent maintenant
+par le moule certifie du DE.
+
+Mais le contenu interne de plusieurs dashboards reste encore historique :
+grands templates monolithiques, CSS local, tableaux ecrits a la main, cartes
+KPI dupliquees, filtres non normalises et JavaScript propre a chaque page.
+
+La prochaine phase ne doit donc pas recreer les dashboards. Elle doit migrer
+progressivement chaque workspace vers les composants UI Core, tout en gardant :
+
+- les services metier existants ;
+- les permissions serveur existantes ;
+- le filtrage obligatoire par annexe ;
+- les workflows HTMX existants ;
+- les regles metier critiques ;
+- le meme moule DE pour tous les roles.
+
+La bonne methode est d'avancer dashboard par dashboard, et section par section
+pour les plus gros. Chaque dashboard doit etre termine et valide avant de
+passer au suivant.
+
+
+DECISION D'ARCHITECTURE CONFIRMEE
+=================================
+
+Finance et Admissions font partie du dashboard Gestionnaire.
+
+Ils ne constituent pas deux dashboards metier autonomes dans l'architecture
+cible. Ce sont deux modules du meme workspace operationnel Gestionnaire :
+
+- le Gestionnaire accede a l'ensemble des modules autorises de son annexe ;
+- le role Finance entre dans ce meme dashboard avec le module Finance en point
+  d'entree et uniquement les capacites financieres qui lui sont accordees ;
+- le role Admissions entre dans ce meme dashboard avec le module Admissions en
+  point d'entree et uniquement les capacites d'admission qui lui sont accordees.
+
+Les vues et templates finance.html et admissions.html peuvent rester pendant
+la migration comme adaptateurs techniques. Ils ne doivent cependant plus faire
+evoluer une navigation, un contexte ou une presentation parallele. Leur cible
+est de reutiliser le builder, les sections et les composants du Gestionnaire,
+puis d'etre reduits a un simple point d'entree ou supprimes lorsqu'aucune URL ne
+dependra plus d'eux.
+
+Le contexte effectif depend donc de deux choses distinctes :
+
+- le scope de donnees, principalement l'annexe autorisee ;
+- les capabilities du role, qui determinent les modules, donnees et actions
+  visibles dans le workspace Gestionnaire.
+
+Le role ne choisit jamais une nouvelle coque. Il ne fait que parametrer le meme
+dashboard Gestionnaire a l'interieur du moule certifie DE.
+
+
+ETAT REEL OBSERVE
+=================
+
+Le nombre d'appels de composants ci-dessous ne signifie pas que le dashboard
+est vraiment componentise : dans plusieurs cas, presque tous les appels ne
+servent qu'a afficher une icone.
+
+1. Famille Gestionnaire
+   - environ 1 871 lignes dans le template principal ;
+   - 93 appels de composants, dont 91 appels au composant icon ;
+   - environ 127 classes CSS historiques dashboard-* ;
+   - migration du contenu encore tres partielle ;
+   - le point d'entree historique Finance fait environ 748 lignes, avec cartes,
+     filtres et tableaux encore ecrits directement dans le template ;
+   - le point d'entree historique Admissions fait environ 1 253 lignes, avec
+     beaucoup de structure HTML/Tailwind repetee ;
+   - ces deux points d'entree doivent converger vers les modules Finance et
+     Admissions du Gestionnaire, et non devenir des dashboards autonomes.
+
+2. Secretariat
+   - le template principal est deja mince ;
+   - il delegue au composant secretary_workspace ;
+   - les composants internes restent cependant issus de l'ancien systeme et
+     doivent etre alignes sur UI Core.
+
+3. Direction generale
+   - environ 1 785 lignes ;
+   - 29 appels de composants, tous pour des icones ;
+   - environ 155 classes CSS historiques dg-* ;
+   - c'est le plus gros chantier visuel avec le Gestionnaire.
+
+4. Informatique
+   - environ 706 lignes ;
+   - aucun composant dans le template principal ;
+   - les modules sont bien separes fonctionnellement, mais pas encore rendus
+     avec le vocabulaire UI Core commun.
+
+5. Marketing
+   - le template principal est petit, mais il inclut des partials et depend
+     encore d'un gros style historique mk-* dans son ancienne base ;
+   - aucun composant UI Core dans le template principal.
+
+6. Superadmin
+   - environ 455 lignes dans le dashboard principal ;
+   - aucun composant UI Core dans ce template ;
+   - le contenu repose encore sur les cartes et tableaux de l'ancien layout.
+
+Conclusion de l'audit : le shell est unifie, mais les workspaces ne le sont pas
+encore completement. Il faut maintenant normaliser la presentation interne et
+absorber Finance et Admissions dans le contexte fonctionnel du Gestionnaire.
+
+
+OBJECTIF FINAL
+==============
+
+Chaque dashboard doit devenir une configuration metier du meme systeme de
+composants, et non une nouvelle interface independante.
+
+La chaine cible sera :
+
+  permissions et scope serveur
+        -> services/selectors metier filtres par annexe
+        -> builder de presentation propre au role
+        -> contexte UI normalise
+        -> composants UI Core
+        -> moule certifie DE
+
+Un template ne devra plus calculer la logique metier. Il devra seulement
+assembler des composants a partir d'un contexte deja prepare.
+
+
+CONTRAT DE CONTEXTE COMMUN
+==========================
+
+Chaque dashboard devra fournir, selon ses besoins, les cles normalisees
+suivantes :
+
+- dashboard_shell : role, scope, navigation, titres et overlays ;
+- page_header : eyebrow, titre, sous-titre et actions autorisees ;
+- scope_context : annexe, periode, annee academique et filtres verrouilles ;
+- kpis : liste de cartes avec label, valeur, icone, ton, tendance et lien ;
+- alerts : alertes autorisees et deja filtrees ;
+- tabs : sections ou sous-vues disponibles pour le role ;
+- filters : definition des champs, choix, valeurs actives et URL de reset ;
+- table : headers, rows, statut, actions, pagination et etat vide ;
+- panels : panneaux secondaires et informations contextuelles ;
+- quick_actions : uniquement les actions permises cote serveur ;
+- capabilities : droits explicites utilises pour afficher ou masquer une action ;
+- overlays : contenu et endpoints du drawer, de la modale et de la confirmation ;
+- feedback : succes, avertissement, erreur et etat de chargement.
+
+Les querysets Django et les objets sensibles ne devront pas etre transformes
+en permissions dans le template. Le builder de presentation recevra seulement
+des donnees deja scopees et autorisees.
+
+
+COMPOSANTS A UTILISER EN PRIORITE
+=================================
+
+Structure :
+
+- ui_core.page_header ;
+- ui_core.page_section ;
+- ui_core.content_grid ;
+- ui_core.panel ;
+- ui_core.breadcrumb si un parcours le justifie.
+
+Donnees :
+
+- ui_core.stat_card ;
+- ui_core.data_table ;
+- ui_core.status_badge ;
+- ui_core.progress_bar ;
+- ui_core.timeline ;
+- ui_core.chart_panel ;
+- ui_core.empty_state.
+
+Navigation et filtres :
+
+- ui_core.tabs ;
+- ui_core.filter_bar ;
+- ui_core.form_field ;
+- les composants forms input, select, date_picker, switch et upload_zone
+  lorsque le formulaire le justifie.
+
+Feedback et actions :
+
+- ui_core.alert ;
+- ui_core.loading_overlay ;
+- ui_core.toast ;
+- ui_core.drawer ;
+- ui_core.modal ;
+- ui_core.confirm_dialog.
+
+Compte et notifications :
+
+- account.profile_dropdown ;
+- account.profile_view ;
+- account.profile_editor ;
+- account.security_settings ;
+- account.preference_settings ;
+- notifications.bell ;
+- notifications.list.
+
+Un composant metier specialise ne sera cree que lorsqu'une structure exprime
+un vrai concept metier reutilisable. Il ne devra jamais recreer un panel, une
+table, une modale ou une sidebar generique deja disponible dans UI Core.
+
+
+REGLES DE PERSONNALISATION PAR ROLE
+===================================
+
+La personnalisation doit passer par les donnees et les proprietes des
+composants, pas par une nouvelle coque HTML.
+
+Chaque role peut adapter :
+
+- le libelle et l'ordre des modules ;
+- les KPI visibles ;
+- les tons des statuts ;
+- les filtres autorises ;
+- les colonnes des tableaux ;
+- les actions rapides ;
+- les endpoints HTMX ;
+- le contenu du drawer et de la modale ;
+- le niveau de lecture global ou par annexe.
+
+Chaque role ne peut pas adapter :
+
+- la structure generale du shell ;
+- la convention de sidebar et topbar ;
+- le comportement du loader ;
+- la convention des overlays ;
+- les regles d'accessibilite ;
+- les tokens de couleur, d'espacement et de rayon ;
+- les controles serveur de permission et d'annexe.
+
+
+ORDRE DE REALISATION RECOMMANDE
+==============================
+
+L'ordre est volontaire. Le module Finance du Gestionnaire sert de premier
+pilote car son workspace historique est plus petit. Les patterns valides seront
+ensuite reutilises dans le module Admissions, puis dans les autres contextes.
+
+
+ETAPE 0 - DURCIR LE SOCLE COMMUN
+================================
+
+But : fixer les conventions avant de toucher huit interfaces.
+
+Travaux :
+
+- documenter le schema de contexte commun ;
+- verifier les API des composants UI Core existants ;
+- ajouter seulement les variantes generiques reellement manquantes ;
+- fixer une convention unique pour les lignes de table et les actions ;
+- fixer une convention unique pour filtre + pagination + HTMX ;
+- fixer une convention de presentation des montants FCFA et des dates ;
+- fixer les tons officiels des statuts metier ;
+- ajouter des helpers de presentation partages ;
+- ajouter un test qui interdit un second app_shell, une seconde sidebar ou une
+  seconde topbar dans un dashboard certifie.
+
+Livrable : une petite documentation UI et des tests du contrat, sans modifier
+encore les services metier.
+
+Critere de sortie : le meme jeu de composants suffit pour commencer les modules
+Finance et Admissions du Gestionnaire sans ajouter de CSS specifique de shell.
+
+
+ETAPE 1 - GESTIONNAIRE : MODULE FINANCE
+=======================================
+
+Il s'agit du premier module du dashboard Gestionnaire, pas d'un dashboard
+Finance autonome. Le role Finance utilisera ce meme module avec un menu reduit,
+un point d'entree financier et des capabilities plus restreintes.
+
+Contexte a construire :
+
+- manager_workspace_context commun ;
+- manager_navigation filtree par capabilities ;
+- finance_page_header ;
+- finance_scope_context avec annexe verrouillee pour un role local ;
+- finance_kpis : aujourd'hui, semaine, total valide et paiements en attente ;
+- payment_filters ;
+- payment_rows ;
+- pending_enrollment_rows ;
+- cash_session_rows ;
+- finance_quick_actions ;
+- finance_capabilities.
+
+Composants principaux :
+
+- ui_core.page_header ;
+- ui_core.stat_card ;
+- ui_core.filter_bar ;
+- ui_core.data_table ;
+- ui_core.status_badge ;
+- ui_core.panel ;
+- ui_core.alert ;
+- ui_core.empty_state ;
+- ui_core.loading_overlay ;
+- ui_core.confirm_dialog.
+
+Points sensibles :
+
+- aucun paiement d'une autre annexe ;
+- montants et statuts normalises ;
+- session cash clairement separee du paiement valide ;
+- parcours de reinscription conserve ;
+- aucune validation uniquement cote JavaScript.
+
+Critere de sortie : plus de carte KPI ou tableau financier ecrit a la main dans
+finance.html. Ce point d'entree rend le module Finance du Gestionnaire avec le
+contexte du role connecte, et le CSS fin-* devenu inutile est supprime.
+
+
+ETAPE 2 - GESTIONNAIRE : MODULE ADMISSIONS
+==========================================
+
+Il s'agit du deuxieme module du dashboard Gestionnaire, pas d'un dashboard
+Admissions autonome. Le role Admissions utilisera ce meme module avec la
+navigation et les actions correspondant exactement a ses capabilities.
+
+Contexte a construire :
+
+- manager_workspace_context commun ;
+- manager_navigation filtree par capabilities ;
+- admissions_page_header ;
+- admissions_scope_context ;
+- admissions_kpis ;
+- candidature_funnel ;
+- candidature_filters ;
+- candidature_rows ;
+- pending_document_rows ;
+- accepted_without_inscription_rows ;
+- recent_activity_timeline ;
+- admissions_capabilities.
+
+Composants principaux :
+
+- ui_core.page_header ;
+- ui_core.stat_card ;
+- ui_core.progress_bar pour le funnel ;
+- ui_core.filter_bar ;
+- ui_core.data_table ;
+- ui_core.status_badge ;
+- ui_core.timeline ;
+- ui_core.panel ;
+- ui_core.empty_state ;
+- ui_core.drawer et ui_core.modal.
+
+Points sensibles :
+
+- filtrage strict des candidatures par annexe ;
+- les filtres d'annexe seulement pour un role global autorise ;
+- documents a valider lies uniquement aux candidatures visibles ;
+- actions accepter, completer ou refuser derivees des capabilities serveur ;
+- creation d'inscription conservee apres acceptation.
+
+Critere de sortie : admissions.html devient un point d'entree vers le module
+Admissions du Gestionnaire, compose de partials et composants communs. Les
+cartes, listes et tableaux repetes disparaissent.
+
+
+ETAPE 3 - DASHBOARD SECRETARIAT
+===============================
+
+Le Secretariat est deja mieux decoupe. Il faut normaliser ses composants, pas
+le reecrire.
+
+Contexte a harmoniser :
+
+- secretary_page_header ;
+- secretary_scope_context ;
+- secretary_kpis ;
+- registry_rows ;
+- visit_rows ;
+- appointment_rows ;
+- deposit_rows ;
+- meeting_rows ;
+- task_rows ;
+- secretary_capabilities.
+
+Travaux :
+
+- remplacer progressivement les panels sg-* par ui_core.panel ;
+- remplacer les KPI internes par ui_core.stat_card ;
+- remplacer les tableaux par ui_core.data_table ;
+- remplacer badges et etats vides par UI Core ;
+- raccorder toutes les actions au drawer certifie sg-drawer ;
+- normaliser les filtres et paginations HTMX ;
+- conserver secretary_workspace comme orchestrateur temporaire, puis le
+  reduire lorsqu'il ne fera plus que composer des sections UI Core.
+
+Points sensibles :
+
+- aucune perte du registre, des visiteurs, rendez-vous, depots, reunions,
+  rapports, salaire, notifications et parametres ;
+- tous les resultats limites a l'annexe du secretaire ;
+- HTMX doit continuer de cibler secretary-workspace ou sg-drawer-content selon
+  la nature de l'action.
+
+Critere de sortie : aucun composant de layout secretary_sidebar ou
+secretary_topbar n'est rendu dans le workspace, et les composants internes
+reposent majoritairement sur UI Core.
+
+
+ETAPE 4 - DASHBOARD INFORMATIQUE
+================================
+
+Contexte a construire par module :
+
+- it_page_header ;
+- it_scope_context ;
+- health_kpis ;
+- notes_workflow ;
+- structure_rows ;
+- import_state ;
+- archive_rows ;
+- account_rows ;
+- support_rows ;
+- supervision_alerts ;
+- audit_rows ;
+- catalog_rows ;
+- it_capabilities.
+
+Composants principaux :
+
+- ui_core.page_header et ui_core.tabs ;
+- ui_core.stat_card ;
+- ui_core.data_table ;
+- ui_core.status_badge ;
+- ui_core.alert ;
+- ui_core.progress_bar ;
+- ui_core.filter_bar ;
+- ui_core.panel ;
+- ui_core.drawer et ui_core.modal ;
+- composants metier informaticien deja presents : audit_log_table,
+  import_panel, settings_panel, supervision_panel et support_panel ;
+- composants notes existants conserves provisoirement pour la maquette et le
+  workflow des notes, en attendant leur chantier specialise.
+
+Points sensibles :
+
+- l'informaticien d'annexe ne voit jamais une autre annexe ;
+- les actions comptes sont toujours controlees cote serveur ;
+- imports avec apercu, erreurs ligne par ligne et confirmation ;
+- notes, support, audit et parametrage ne doivent pas etre melanges ;
+- les composants informaticien doivent eux-memes reutiliser UI Core lorsqu'ils
+  representent une table, un panel ou un feedback generique ;
+- ne pas precipiter la refonte de la maquette de notes pendant la migration du
+  contexte general du dashboard.
+
+Critere de sortie : le grand dashboard.html IT devient un orchestrateur court,
+les modules sont des workspaces independants et aucun layout parallele ne
+subsiste.
+
+
+ETAPE 5 - FINALISATION DU DASHBOARD GESTIONNAIRE
+================================================
+
+C'est le chantier metier le plus important. Il doit etre traite en sous-etapes,
+sans tenter une reecriture unique des 1 871 lignes. Les modules Finance et
+Admissions realises aux etapes 1 et 2 sont deja des parties de ce dashboard ;
+cette etape finalise le socle et les autres modules.
+
+5A. Vue globale
+
+- page header et barre de scope ;
+- KPI de l'annexe ;
+- flux operationnel ;
+- alertes et recommandations ;
+- actions rapides autorisees.
+
+5B. Consolidation Admissions, inscriptions et paiements
+
+- reutilisation du module Admissions deja migre a l'etape 2 ;
+- tables, filtres, statuts, pagination et drawers communs ;
+- conservation des endpoints HTMX existants ;
+- aucune duplication entre le contexte complet Gestionnaire et le contexte
+  restreint du role Admissions.
+
+5C. Salaires staff et honoraires enseignants
+
+- deux sections et deux contextes strictement distincts ;
+- salaires auto-generes, jamais crees manuellement ;
+- honoraires calcules a partir des heures validees et du tarif ;
+- workflow verifier -> corriger -> valider -> payer ;
+- confirmations et OTP conserves.
+
+5D. Depenses, caisse et versements bancaires
+
+- filtres et tableaux UI Core ;
+- solde de caisse visible ;
+- champs banque, reference, date, montant, justificatif et commentaire ;
+- alertes de coherence et operations orphelines.
+
+5E. Rapports et cloture mensuelle
+
+- periodes jour, semaine, mois et personnalisee ;
+- recettes, depenses, salaires, honoraires, dons et boutique ;
+- export Excel et etat financier ;
+- cloture sous forme d'archive consultable ;
+- aucune suppression de l'historique.
+
+5F. Boutique, dons et compte
+
+- composants de catalogue et de table reutilisables ;
+- formulaires dans la modale ou le drawer certifie ;
+- espace compte standardise.
+
+Contexte cible : une famille de builders de presentation Gestionnaire par
+grande section, avec une couche commune pour le scope, la navigation, les
+capabilities, les montants et les statuts. Les roles Gestionnaire, Finance et
+Admissions consomment cette meme famille de builders.
+
+Critere de sortie : manager_dashboard.html ne contient plus la logique et le
+CSS de onze applications en une seule page. Chaque section est un workspace
+compose de composants UI Core et de petits partials metier. Finance et
+Admissions ne possedent plus de presentation parallele.
+
+
+ETAPE 6 - DASHBOARD MARKETING
+=============================
+
+Contexte a construire :
+
+- marketing_page_header ;
+- marketing_scope_context global ;
+- audience_kpis ;
+- campaign_rows ;
+- announcement_rows ;
+- prospect_rows ;
+- media_rows ;
+- recommendations ;
+- marketing_capabilities.
+
+Composants principaux :
+
+- ui_core.page_header ;
+- ui_core.stat_card ;
+- ui_core.chart_panel ;
+- ui_core.filter_bar ;
+- ui_core.data_table ;
+- ui_core.status_badge ;
+- ui_core.panel ;
+- ui_core.progress_bar ;
+- ui_core.drawer et ui_core.modal ;
+- account et notifications communs.
+
+Points sensibles :
+
+- la vue globale doit etre explicite et reservee au role marketing ;
+- les filtres annexe, formation, cycle et classe doivent etre coherents ;
+- audiences estimees avant diffusion ;
+- separation claire communication interne / campagne externe ;
+- aucun gros bloc CSS mk-* dans la base du dashboard termine.
+
+Critere de sortie : les partials marketing sont rendus avec UI Core et la base
+historique ne fournit plus le design du workspace.
+
+
+ETAPE 7 - DASHBOARD DIRECTION GENERALE
+======================================
+
+Le DG reste global par autorisation. Son filtre d'annexe est un filtre de
+lecture, pas un changement de permission.
+
+Contexte a construire :
+
+- executive_page_header ;
+- executive_scope_context ;
+- executive_kpis ;
+- branch_performance_rows ;
+- priority_alert_rows ;
+- workflow_rows ;
+- schedule_summary ;
+- finance_summary ;
+- staff_rows ;
+- analytics_series ;
+- realtime_state ;
+- executive_capabilities.
+
+Composants principaux :
+
+- ui_core.page_header ;
+- ui_core.stat_card ;
+- ui_core.chart_panel ;
+- ui_core.data_table ;
+- ui_core.status_badge ;
+- ui_core.alert ;
+- ui_core.tabs ;
+- ui_core.filter_bar ;
+- ui_core.panel ;
+- ui_core.timeline ;
+- ui_core.drawer, modal et confirm_dialog.
+
+Points sensibles :
+
+- vue consolidee de toutes les annexes ;
+- filtre annexe et periode conserve dans toutes les sections ;
+- versements bancaires visibles par annexe ;
+- alertes, arbitrages, recrutements et validations controles cote serveur ;
+- graphiques alimentes par des series preparees en Python ;
+- aucun calcul de decision dans le JavaScript du template.
+
+Critere de sortie : suppression progressive des 155 classes dg-* et reduction
+forte du template monolithique, sans perdre les workflows executifs.
+
+
+ETAPE 8 - DASHBOARD SUPERADMIN
+==============================
+
+Contexte a construire :
+
+- superadmin_page_header ;
+- global_platform_kpis ;
+- trend_series ;
+- pending_application_rows ;
+- recent_payment_rows ;
+- platform_alerts ;
+- superadmin_quick_actions ;
+- superadmin_capabilities.
+
+Composants principaux :
+
+- ui_core.page_header ;
+- ui_core.stat_card ;
+- ui_core.chart_panel ;
+- ui_core.data_table ;
+- ui_core.status_badge ;
+- ui_core.alert ;
+- ui_core.panel ;
+- ui_core.tabs ;
+- ui_core.empty_state.
+
+Points sensibles :
+
+- garder la distinction entre dashboard de pilotage et Django Admin ;
+- ne jamais exposer une action superadmin dans un contexte d'un autre role ;
+- tendances et compteurs construits cote serveur ;
+- cette etape concerne d'abord le landing dashboard. Les pages CRUD pourront
+  ensuite etre transformees en workspaces dans une phase separee.
+
+Critere de sortie : le cockpit superadmin utilise le meme langage visuel que le
+DE tout en conservant son contexte global et ses actions exclusives.
+
+
+PHASE SECONDAIRE - COMPOSANTS METIER COMPLEXES
+==============================================
+
+La creation de composants qui n'existent pas encore est importante, mais elle
+ne doit pas bloquer la migration actuelle des contextes et des composants UI
+Core deja disponibles.
+
+Priorite immediate :
+
+- reutiliser les composants generiques existants ;
+- adapter correctement les donnees, les capabilities et le scope du role ;
+- remplacer les duplications certaines ;
+- noter precisement les manques sans inventer trop vite une mauvaise API.
+
+Un petit composant generique manquant pourra etre cree pendant une etape si son
+contrat est clair et reutilisable. En revanche, un composant metier complexe
+aura son propre audit, son propre prototype et ses propres tests.
+
+Cas prioritaire a traiter plus tard : la maquette de saisie et de calcul des
+notes. Elle ne doit pas etre reduite a un simple tableau editable. Son chantier
+devra verifier au minimum :
+
+- les regles de calcul, coefficients ou credits et arrondis ;
+- les notes absentes, dispensees, rattrapages et corrections ;
+- les droits de saisie, de validation, de verrouillage et de publication ;
+- l'isolation par annexe, annee, classe, matiere et evaluation ;
+- la saisie rapide au clavier, les erreurs par cellule et l'accessibilite ;
+- les etats non enregistre, enregistrement, conflit, succes et echec ;
+- la recalculation cote serveur et les tests des resultats ;
+- l'import eventuel, l'historique des changements et la tracabilite.
+
+Methode pour cette maquette :
+
+1. auditer les composants notes existants et les regles metier reelles ;
+2. ecrire les cas de calcul et de permission sous forme de tests ;
+3. produire un prototype d'interaction ;
+4. definir une API de composant stable ;
+5. implementer puis valider sur des donnees representatives.
+
+Cette maquette recevra donc plus de temps dans une phase dediee. Les composants
+notes existants ne seront ni supprimes ni recrees a l'aveugle pendant la simple
+migration visuelle des dashboards.
+
+
+METHODE DE TRAVAIL POUR CHAQUE DASHBOARD
+========================================
+
+Chaque etape suivra exactement ce cycle :
+
+1. Audit
+   - inventorier sections, endpoints, permissions, contextes et CSS ;
+   - identifier les donnees globales et celles filtrees par annexe ;
+   - relever les tests existants.
+
+2. Contrat de presentation
+   - creer ou completer le builder de presentation du role ;
+   - normaliser KPI, tableaux, filtres, statuts et actions ;
+   - exposer des capabilities explicites.
+
+3. Migration d'une section
+   - remplacer le HTML repete par UI Core ;
+   - conserver les URLs et actions metier ;
+   - utiliser le drawer, la modale et le loader certifies ;
+   - enregistrer un composant metier complexe manquant dans le chantier
+     secondaire au lieu de bloquer toute la migration.
+
+4. Verification
+   - rendu complet et rendu HTMX ;
+   - permissions positives et negatives ;
+   - test inter-annexes pour les roles locaux ;
+   - etats vide, erreur, chargement et donnees volumineuses ;
+   - mobile, clavier et accessibilite minimale.
+
+5. Nettoyage
+   - retirer uniquement le CSS et le JavaScript devenus inutiles ;
+   - ne pas supprimer un ancien bloc avant que tous ses usages soient migres ;
+   - documenter le resultat dans le rapport du dashboard.
+
+6. Validation de fin d'etape
+   - tests du dashboard ;
+   - tests des services metier touches ;
+   - python manage.py check ;
+   - verification JavaScript ;
+   - build Tailwind ;
+   - comparaison visuelle des sections critiques.
+
+
+CRITERES OBLIGATOIRES AVANT DE DECLARER UN DASHBOARD TERMINE
+============================================================
+
+- une seule coque certifiee DE ;
+- une seule sidebar et une seule topbar ;
+- navigation adaptee au role ;
+- Finance et Admissions rendus comme modules du Gestionnaire, jamais comme
+  nouvelles coques ou interfaces autonomes ;
+- scope global ou annexe clairement affiche ;
+- aucun acces inter-annexes non autorise ;
+- composants UI Core pour layout, KPI, tableaux, statuts, filtres et feedback ;
+- aucun tableau generique duplique a la main ;
+- aucun nouveau CSS de shell propre au role ;
+- aucun calcul metier important dans le template ;
+- permissions de chaque action controlees cote serveur ;
+- etats vide, chargement, erreur et acces refuse presents ;
+- drawer, modale et confirmation du shell utilises ;
+- HTMX conserve l'URL, le focus, l'etat actif et les messages ;
+- responsive et navigation clavier verifies ;
+- tests de rendu, permission et isolation par annexe au vert ;
+- CSS historique retire seulement apres preuve qu'il n'est plus utilise.
+
+
+DECISION RECOMMANDEE
+====================
+
+Commencer par le module Finance du dashboard Gestionnaire.
+
+Son point d'entree historique est suffisamment petit pour valider rapidement le
+contrat commun du Gestionnaire, les KPI, les filtres, les tableaux, les statuts
+et les overlays. Une fois ce module termine, le meme patron sera applique au
+module Admissions du Gestionnaire, puis a Secretariat et IT.
+
+Le reste du Gestionnaire et le DG seront traites apres ces pilotes, car leurs
+templates sont les plus gros et leurs workflows sont les plus sensibles. Les
+roles Gestionnaire, Finance et Admissions partageront le meme workspace, les
+memes builders et les memes composants ; seuls le point d'entree, la navigation,
+le scope et les capabilities changeront selon l'utilisateur.
+
+Les composants metier complexes encore incomplets seront ensuite travailles
+dans une phase dediee. La maquette de saisie et de calcul des notes est
+explicitement reservee a ce chantier approfondi afin de ne pas sacrifier les
+regles de calcul, les permissions, l'ergonomie ou la tracabilite.
+
+Le travail sera donc fait pas a pas : un meme systeme, un seul moule DE, un
+dashboard Gestionnaire contenant Finance et Admissions, puis des contextes de
+role precisement adaptes. C'est la bonne suite de la migration actuelle.
+
+
+
+
+# MISSION — FINALISATION DU DASHBOARD GESTIONNAIRE
+
+Nous entrons maintenant dans la phase de finalisation fonctionnelle et visuelle du **dashboard Gestionnaire**.
+
+Le shell global des dashboards est déjà validé et uniformisé.
+
+Le dashboard certifié du **Directeur des Études** constitue désormais le **moule unique de tous les dashboards du système**.
+
+Tu ne dois donc plus créer, reconstruire ou maintenir plusieurs architectures de dashboard.
+
+L’objectif de cette phase est uniquement de **migrer, réorganiser et adapter le contenu métier du Gestionnaire à l’intérieur du shell existant**, en réutilisant au maximum les composants déjà présents dans la bibliothèque UI Core.
+
+---
+
+## 1. RÈGLE D’ARCHITECTURE ABSOLUE
+
+Il n’existe désormais qu’un seul système de dashboard.
+
+Le rôle utilisateur détermine :
+
+* les données accessibles ;
+* les modules visibles ;
+* la navigation ;
+* les KPI ;
+* les tableaux ;
+* les filtres ;
+* les actions ;
+* les permissions ;
+* le scope d’annexe ;
+* les endpoints HTMX accessibles.
+
+Le rôle utilisateur ne doit jamais déterminer :
+
+* une nouvelle sidebar ;
+* une nouvelle topbar ;
+* un nouveau shell ;
+* un nouveau loader ;
+* un nouveau système de modal ;
+* un nouveau drawer ;
+* une architecture HTML indépendante ;
+* un nouveau système de notifications.
+
+La coque certifiée du Directeur des Études doit rester l’unique référence.
+
+---
+
+# 2. OBJECTIF DU DASHBOARD GESTIONNAIRE
+
+Le dashboard Gestionnaire représente le workspace opérationnel administratif et financier de l’établissement.
+
+Il doit regrouper notamment :
+
+* vue globale ;
+* admissions ;
+* inscriptions ;
+* paiements ;
+* finance ;
+* caisse ;
+* dépenses ;
+* versements bancaires ;
+* salaires du personnel ;
+* honoraires enseignants ;
+* rapports ;
+* clôtures mensuelles ;
+* boutique ;
+* dons ;
+* notifications ;
+* compte utilisateur.
+
+Ces éléments sont des **modules ou sections du même dashboard Gestionnaire**.
+
+Ils ne doivent pas devenir des dashboards indépendants.
+
+---
+
+# 3. CAS PARTICULIER : FINANCE ET ADMISSIONS
+
+Finance et Admissions doivent être intégrés au dashboard Gestionnaire.
+
+Ils peuvent actuellement posséder :
+
+* leurs anciennes vues ;
+* leurs anciennes URLs ;
+* leurs anciens templates ;
+* certains endpoints historiques.
+
+Ces éléments peuvent rester temporairement comme **adaptateurs techniques** pendant la migration.
+
+En revanche, ils ne doivent plus posséder :
+
+* leur propre shell ;
+* leur propre sidebar ;
+* leur propre topbar ;
+* leur propre langage visuel ;
+* leur propre architecture de composants ;
+* leur propre CSS de dashboard.
+
+Le rôle `Finance` doit entrer dans le workspace Gestionnaire directement sur le module Finance.
+
+Le rôle `Admissions` doit entrer dans le workspace Gestionnaire directement sur le module Admissions.
+
+Le rôle `Gestionnaire` accède aux modules correspondant à ses permissions.
+
+Ainsi :
+
+```text
+Utilisateur
+    ↓
+permissions + annexe + capabilities
+    ↓
+workspace Gestionnaire
+    ↓
+module autorisé
+    ↓
+UI Core
+    ↓
+shell certifié Directeur des Études
+```
+
+---
+
+# 4. NE PAS RECRÉER LES COMPOSANTS
+
+Avant de développer une interface, rechercher systématiquement dans la bibliothèque existante si le besoin est déjà couvert.
+
+Utiliser en priorité les composants UI Core déjà disponibles.
+
+## Structure
+
+* `ui_core.page_header`
+* `ui_core.page_section`
+* `ui_core.content_grid`
+* `ui_core.panel`
+* `ui_core.breadcrumb`
+
+## Données
+
+* `ui_core.stat_card`
+* `ui_core.data_table`
+* `ui_core.status_badge`
+* `ui_core.progress_bar`
+* `ui_core.timeline`
+* `ui_core.chart_panel`
+* `ui_core.empty_state`
+
+## Navigation et filtres
+
+* `ui_core.tabs`
+* `ui_core.filter_bar`
+* `ui_core.form_field`
+* composants input
+* select
+* date picker
+* switch
+* upload zone
+
+## Actions et feedback
+
+* `ui_core.alert`
+* `ui_core.loading_overlay`
+* `ui_core.toast`
+* `ui_core.drawer`
+* `ui_core.modal`
+* `ui_core.confirm_dialog`
+
+## Compte et notifications
+
+* `account.profile_dropdown`
+* `account.profile_view`
+* `account.profile_editor`
+* `account.security_settings`
+* `account.preference_settings`
+* `notifications.bell`
+* `notifications.list`
+
+Ne crée pas un nouveau composant si un composant existant peut remplir le besoin grâce à son contexte ou à ses propriétés.
+
+---
+
+# 5. AUCUN RETOUR À L’ANCIEN DESIGN
+
+Pendant cette migration, ne réintroduis pas les anciens éléments uniquement parce qu’ils sont déjà présents dans les templates historiques.
+
+À supprimer progressivement lorsqu’ils ne sont plus utilisés :
+
+* cartes KPI écrites manuellement ;
+* tableaux HTML génériques écrits directement dans les pages ;
+* anciennes modales ;
+* anciens drawers ;
+* anciennes sidebars ;
+* anciennes topbars ;
+* CSS `dashboard-*` ;
+* CSS `fin-*` ;
+* autres CSS historiques spécifiques au rôle ;
+* JavaScript local reproduisant une fonction déjà prise en charge par le shell ou UI Core.
+
+La migration doit aller dans une seule direction :
+
+```text
+ancien système
+    ↓
+UI Core
+    ↓
+shell DE
+```
+
+Jamais l’inverse.
+
+---
+
+# 6. NE PAS TOUCHER INUTILEMENT AU BACKEND MÉTIER
+
+Cette phase est principalement une phase :
+
+* d’orchestration ;
+* de présentation ;
+* de structuration ;
+* de réutilisation de composants ;
+* d’harmonisation du contexte.
+
+Les services métier existants doivent être conservés lorsqu’ils fonctionnent correctement.
+
+Ne réécris pas inutilement :
+
+* les services ;
+* les selectors ;
+* les permissions ;
+* les workflows ;
+* les URLs ;
+* les endpoints HTMX ;
+* les règles financières ;
+* les règles d’admission ;
+* les règles d’inscription ;
+* les règles de paiement.
+
+Modifier le backend uniquement lorsqu’une adaptation est réellement nécessaire pour fournir un contexte UI propre.
+
+---
+
+# 7. CONSTRUIRE DES BUILDERS DE PRÉSENTATION
+
+Le template ne doit pas calculer la logique métier.
+
+Préparer les données en Python avant leur rendu.
+
+La chaîne cible est :
+
+```text
+permissions serveur
+        ↓
+scope utilisateur / annexe
+        ↓
+services ou selectors métier
+        ↓
+builder de présentation
+        ↓
+contexte normalisé
+        ↓
+composants UI Core
+        ↓
+template
+```
+
+Les builders Gestionnaire doivent préparer notamment :
+
+* `manager_workspace_context`
+* `manager_navigation`
+* `page_header`
+* `scope_context`
+* `kpis`
+* `alerts`
+* `tabs`
+* `filters`
+* `table`
+* `panels`
+* `quick_actions`
+* `capabilities`
+* `overlays`
+* `feedback`
+
+Ne passe pas au template la responsabilité de déterminer les permissions.
+
+---
+
+# 8. CAPABILITIES EXPLICITES
+
+Les actions visibles doivent être déterminées par le serveur.
+
+Exemples :
+
+```python
+capabilities = {
+    "can_validate_payment": True,
+    "can_edit_payment": False,
+    "can_create_expense": True,
+    "can_validate_salary": False,
+    "can_view_global_finance": False,
+}
+```
+
+Puis le template consomme uniquement ces droits.
+
+Ne déduis pas une autorisation importante :
+
+* avec JavaScript ;
+* à partir d’un bouton visible ;
+* à partir du nom du rôle directement dans le template ;
+* à partir de données non sécurisées côté client.
+
+---
+
+# 9. ISOLATION PAR ANNEXE
+
+C’est une règle de sécurité obligatoire.
+
+Un Gestionnaire local ne doit jamais obtenir les données d’une autre annexe.
+
+Le filtrage doit être effectué côté serveur.
+
+Cela concerne notamment :
+
+* admissions ;
+* inscriptions ;
+* étudiants ;
+* paiements ;
+* caisse ;
+* dépenses ;
+* salaires ;
+* honoraires ;
+* boutique ;
+* dons ;
+* rapports ;
+* documents ;
+* historiques.
+
+Ne jamais charger toutes les données puis les masquer dans le template.
+
+---
+
+# 10. ORGANISATION DU TRAVAIL
+
+Ne tente pas de refondre tout le Gestionnaire en une seule opération.
+
+Nous travaillons désormais **section par section**.
+
+Pour chaque section :
+
+### Étape A — Audit
+
+Identifier :
+
+* template actuel ;
+* vue ;
+* services ;
+* endpoints ;
+* permissions ;
+* querysets ;
+* HTMX ;
+* JavaScript ;
+* CSS ;
+* composants existants.
+
+### Étape B — Mapping UI Core
+
+Déterminer quels composants existants remplacent chaque bloc historique.
+
+Exemple :
+
+```text
+ancienne KPI card
+→ ui_core.stat_card
+
+ancien tableau paiement
+→ ui_core.data_table
+
+anciens filtres
+→ ui_core.filter_bar
+
+ancien panneau
+→ ui_core.panel
+
+ancienne modale
+→ ui_core.modal
+
+ancien drawer
+→ ui_core.drawer
+```
+
+### Étape C — Builder
+
+Créer ou améliorer le contexte Python.
+
+### Étape D — Migration
+
+Remplacer progressivement l’HTML historique.
+
+### Étape E — Validation
+
+Tester :
+
+* rendu normal ;
+* rendu HTMX ;
+* permissions ;
+* annexe ;
+* état vide ;
+* état erreur ;
+* loading ;
+* responsive ;
+* clavier ;
+* gros volumes de données.
+
+### Étape F — Nettoyage
+
+Supprimer uniquement les éléments devenus réellement inutilisés.
+
+---
+
+# 11. ORDRE DE TRAVAIL DU GESTIONNAIRE
+
+Continuer dans cet ordre :
+
+## Phase 1 — Finance
+
+Finaliser complètement le module Finance.
+
+Inclure :
+
+* KPI financiers ;
+* paiements ;
+* paiements en attente ;
+* sessions de caisse ;
+* filtres ;
+* statuts ;
+* actions rapides ;
+* confirmations ;
+* capabilities ;
+* scope annexe.
+
+Aucune carte et aucun tableau financier générique ne doivent rester écrits à la main.
+
+---
+
+## Phase 2 — Admissions
+
+Une fois Finance certifié, appliquer le même pattern à Admissions.
+
+Inclure :
+
+* KPI ;
+* funnel ;
+* candidatures ;
+* dossiers incomplets ;
+* documents ;
+* candidatures acceptées ;
+* inscriptions en attente ;
+* activité récente ;
+* filtres ;
+* drawer de détail ;
+* actions autorisées.
+
+---
+
+## Phase 3 — Vue globale Gestionnaire
+
+Construire la vue globale à partir des composants déjà validés.
+
+Elle doit afficher uniquement les informations réellement utiles au Gestionnaire :
+
+* situation de l’annexe ;
+* alertes ;
+* admissions ;
+* inscriptions ;
+* finances ;
+* caisse ;
+* opérations urgentes ;
+* actions rapides.
+
+Éviter un dashboard décoratif rempli de statistiques sans utilité opérationnelle.
+
+---
+
+## Phase 4 — Salaires staff
+
+Séparer clairement les salaires du personnel.
+
+Conserver le workflow métier existant.
+
+---
+
+## Phase 5 — Honoraires enseignants
+
+Traiter les honoraires séparément des salaires staff.
+
+Ils doivent dépendre des heures et règles métier prévues.
+
+Ne jamais fusionner artificiellement ces deux concepts.
+
+---
+
+## Phase 6 — Dépenses / caisse / banque
+
+Harmoniser :
+
+* dépenses ;
+* caisse ;
+* versements ;
+* références ;
+* justificatifs ;
+* états ;
+* alertes de cohérence.
+
+---
+
+## Phase 7 — Rapports et clôtures
+
+Réutiliser les données métier existantes et les présenter avec UI Core.
+
+Prévoir :
+
+* journalier ;
+* hebdomadaire ;
+* mensuel ;
+* période personnalisée ;
+* exports ;
+* archives de clôture.
+
+---
+
+## Phase 8 — Boutique et dons
+
+Migrer ensuite les derniers modules opérationnels.
+
+---
+
+# 12. HTMX
+
+Tous les workflows HTMX existants qui fonctionnent doivent être conservés.
+
+Veiller systématiquement à :
+
+* garder l’URL correcte ;
+* conserver le module actif ;
+* conserver les filtres ;
+* conserver la pagination ;
+* gérer le loader ;
+* gérer les erreurs ;
+* restituer le focus lorsque nécessaire ;
+* mettre à jour le drawer ou la modal du shell ;
+* éviter le rechargement complet lorsqu’il n’est pas nécessaire.
+
+---
+
+# 13. RESPONSIVE
+
+Le dashboard doit rester cohérent :
+
+* desktop ;
+* laptop ;
+* tablette ;
+* mobile.
+
+Ne construis pas un deuxième HTML uniquement pour mobile.
+
+Les composants doivent s’adapter grâce au système responsive existant.
+
+---
+
+# 14. CSS
+
+Interdiction de créer un nouveau gros fichier CSS spécifique au Gestionnaire pour reproduire ce qui existe déjà dans UI Core.
+
+La personnalisation doit passer par :
+
+* les props ;
+* les variantes ;
+* les tokens ;
+* les composants ;
+* Tailwind ;
+* les helpers communs.
+
+Un CSS spécifique n’est acceptable que pour une nécessité métier réellement exceptionnelle.
+
+---
+
+# 15. COMPOSANTS MÉTIER
+
+Il est possible qu’une section métier nécessite un composant spécialisé.
+
+Avant d’en créer un :
+
+1. vérifier UI Core ;
+2. vérifier les composants métier existants ;
+3. vérifier si une composition de composants existants suffit ;
+4. vérifier que le concept sera réellement réutilisable.
+
+Ne crée pas un composant métier uniquement pour encapsuler du HTML d’une seule page.
+
+Un composant métier spécialisé doit représenter un véritable concept métier.
+
+---
+
+# 16. NE PAS CASSER LES WORKFLOWS CRITIQUES
+
+Pendant la migration, préserver notamment :
+
+* validation des admissions ;
+* transformation admission → inscription ;
+* paiements ;
+* réinscriptions ;
+* caisse ;
+* dépenses ;
+* salaires ;
+* honoraires ;
+* OTP ;
+* validations ;
+* historiques ;
+* clôtures ;
+* exports ;
+* permissions ;
+* notifications.
+
+Une amélioration visuelle ne doit jamais modifier silencieusement une règle métier.
+
+---
+
+# 17. DÉFINITION DE « TERMINÉ »
+
+Une section ne peut être considérée comme terminée que si :
+
+* elle utilise le shell DE ;
+* elle utilise les composants UI Core adaptés ;
+* elle n’introduit aucune sidebar ou topbar parallèle ;
+* son contexte est préparé côté Python ;
+* ses capabilities sont explicites ;
+* le filtrage par annexe est sécurisé côté serveur ;
+* ses tableaux sont normalisés ;
+* ses statuts sont normalisés ;
+* ses filtres sont normalisés ;
+* ses overlays utilisent le système commun ;
+* HTMX fonctionne ;
+* les états vide/loading/error existent ;
+* le responsive fonctionne ;
+* les permissions positives et négatives sont testées ;
+* aucun ancien CSS nécessaire n’a été supprimé prématurément ;
+* le CSS devenu inutile a été retiré ;
+* les tests concernés passent.
+
+---
+
+# 18. TESTS OBLIGATOIRES
+
+À la fin de chaque section :
+
+```bash
+python manage.py check
+```
+
+Puis exécuter les tests ciblés :
+
+* rendu ;
+* permissions ;
+* isolation annexe ;
+* endpoints HTMX ;
+* workflows métier concernés.
+
+Puis :
+
+* vérifier le JavaScript ;
+* lancer le build Tailwind ;
+* vérifier le responsive ;
+* comparer visuellement avec le dashboard Directeur des Études.
+
+---
+
+# 19. PRIORITÉ IMMÉDIATE
+
+Ne commence pas plusieurs modules simultanément.
+
+La priorité actuelle est :
+
+**Dashboard Gestionnaire → Module Finance.**
+
+Termine Finance proprement avant de poursuivre Admissions.
+
+Utilise Finance comme premier pilote pour valider définitivement :
+
+* le builder Gestionnaire ;
+* le contexte normalisé ;
+* la navigation par capability ;
+* les KPI ;
+* les filtres ;
+* les tableaux ;
+* les statuts ;
+* les drawers ;
+* les confirmations ;
+* les permissions ;
+* l’isolation par annexe.
+
+Une fois Finance validé, appliquer exactement le même langage architectural aux autres sections.
+
+---
+
+# 20. RÈGLE FINALE
+
+À partir de maintenant, ne raisonne plus en :
+
+> « créer le dashboard Finance »,
+> « créer le dashboard Admissions »,
+> « créer un nouveau dashboard Gestionnaire ».
+
+Raisonne en :
+
+> **« rendre le contexte métier Finance dans le workspace Gestionnaire existant »**
+
+ou :
+
+> **« rendre le contexte Admissions dans le workspace Gestionnaire existant »**
+
+Le système cible doit être :
+
+**une seule architecture, un seul shell, une seule bibliothèque de composants, plusieurs contextes métier contrôlés par les rôles, les capabilities et le scope serveur.**
+
+Ne recrée rien qui existe déjà.
+
+Réutilise, adapte, compose, nettoie et teste.

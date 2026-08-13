@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 
 from django.urls import NoReverseMatch, reverse
 
-from accounts.access import can_access, get_user_scope
+from accounts.access import can_access, get_user_position, get_user_scope
 
 
 def _url(name, fallback="#"):
@@ -70,6 +70,78 @@ def build_navigation(user, *, current_path="", badges=None):
     return groups
 
 
+def build_supervisor_navigation(
+    user,
+    *,
+    active_section="home",
+    badges=None,
+    selected_class_id=None,
+):
+    """Build the UI Core navigation for an authorized academic supervisor."""
+
+    if get_user_position(user) != "academic_supervisor":
+        return []
+
+    badges = badges or {}
+    groups = (
+        (
+            "Pilotage",
+            (
+                ("home", "Vue générale", "layout-dashboard"),
+                ("classes", "Classes", "school"),
+            ),
+        ),
+        (
+            "Supervision opérationnelle",
+            (
+                ("attendance", "Présence étudiants", "list-checks"),
+                ("teachers", "Présence enseignants", "user-check"),
+            ),
+        ),
+        (
+            "Organisation",
+            (
+                ("schedule", "Emploi du temps", "calendar-range"),
+            ),
+        ),
+        (
+            "Transmission",
+            (
+                ("signals", "Signalements", "send"),
+                ("reports", "Rapports", "file-text"),
+            ),
+        ),
+    )
+    dashboard_url = _url("accounts_portal:portal_dashboard")
+    workflow_url = _url("accounts_portal:supervisor_workflow_workspace")
+    navigation = []
+
+    for label, sections in groups:
+        items = []
+        for key, item_label, icon in sections:
+            params = {"section": key}
+            if selected_class_id and key not in {"signals"}:
+                params["class_id"] = selected_class_id
+            query = urlencode(params)
+            items.append(
+                {
+                    "label": item_label,
+                    "url": f"{dashboard_url}?{query}",
+                    "icon": icon,
+                    "active": key == active_section,
+                    "badge": badges.get(key),
+                    "disabled": dashboard_url == "#" or workflow_url == "#",
+                    "hx_get": f"{workflow_url}?{query}",
+                    "hx_target": "#supervisor-workspace",
+                    "hx_swap": "innerHTML",
+                    "hx_push_url": f"{dashboard_url}?{query}",
+                    "nav_key": key,
+                }
+            )
+        navigation.append({"label": label, "items": items})
+    return navigation
+
+
 def build_director_navigation(user, *, active_section="home", badges=None):
     """Build navigation for an already authorized academic director."""
 
@@ -87,9 +159,12 @@ def build_director_navigation(user, *, active_section="home", badges=None):
         ("evaluations_calendar", "Sessions d'évaluations", "clipboard-check"),
         ("evaluations", "Résultats et notes", "bar-chart-3"),
         ("enseignants", "Enseignants", "users"),
+        ("transferts", "Transferts", "arrow-left-right"),
         ("programme", "Programmes et classes", "book-open"),
         ("planification", "Emploi du temps", "calendar-range"),
         ("correspondances", "Documents", "mail"),
+        ("messagerie", "Messagerie interne", "messages-square"),
+        ("salaire", "Mon salaire", "badge-dollar-sign"),
     )
     dashboard_url = _url("accounts_portal:portal_dashboard")
     workspace_url = _url("accounts_portal:director_workspace")

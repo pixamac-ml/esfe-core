@@ -17,6 +17,7 @@ from accounts.dashboards.htmx_utils import (
     _render_manager_academic_positioning_modal,
     get_active_cash_session,
     get_current_agent,
+    manager_capability_required,
     manager_required,
 )
 
@@ -34,30 +35,38 @@ def _get_manager_inscription(request: HttpRequest, pk: int) -> Inscription:
 
 
 def _build_inscription_detail_context(request: HttpRequest, inscription: Inscription, *, coupon_error: str = "") -> dict:
-    manager_agent = get_current_agent(request.user, request.branch)
-    active_cash_session = get_active_cash_session(inscription)
+    access = request.manager_workspace_access
+    manager_agent = (
+        get_current_agent(request.user, request.branch)
+        if access.can("manage_cash_sessions")
+        else None
+    )
+    active_cash_session = get_active_cash_session(inscription) if manager_agent else None
     return {
         "inscription": inscription,
         "payments": inscription.payments.all().order_by("-created_at"),
         "manager_agent": manager_agent,
         "active_cash_session": active_cash_session,
         "can_create_cash_session": (
-            manager_agent
+            access.can("manage_cash_sessions")
+            and manager_agent
             and inscription.status in PAYABLE_INSCRIPTION_STATUSES
             and inscription.balance > 0
             and active_cash_session is None
         ),
         "can_apply_coupon": (
-            not inscription.is_paid
+            access.can("apply_coupon")
+            and not inscription.is_paid
             and not hasattr(inscription, "coupon_redemption")
             and inscription.status not in [Inscription.STATUS_CANCELLED, Inscription.STATUS_EXPIRED]
         ),
         "existing_coupon_redemption": getattr(inscription, "coupon_redemption", None),
         "coupon_error": coupon_error,
+        "manager_capabilities": access.capabilities_context(),
     }
 
 
-@manager_required
+@manager_capability_required("view_inscriptions")
 @require_GET
 def inscription_detail(request: HttpRequest, pk: int) -> HttpResponse:
     inscription = _get_manager_inscription(request, pk)
@@ -155,7 +164,7 @@ def coupon_preview(request: HttpRequest) -> HttpResponse:
     )
 
 
-@manager_required
+@manager_capability_required("create_inscription")
 @require_GET
 def inscription_positioning_modal(request: HttpRequest, pk: int) -> HttpResponse:
     candidature = get_object_or_404(
@@ -171,7 +180,7 @@ def inscription_positioning_modal(request: HttpRequest, pk: int) -> HttpResponse
     return _render_manager_academic_positioning_modal(request, candidature)
 
 
-@manager_required
+@manager_capability_required("create_inscription")
 @require_POST
 def inscription_create(request: HttpRequest, pk: int) -> HttpResponse:
     candidature = get_object_or_404(

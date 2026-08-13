@@ -1,59 +1,23 @@
 {% load component_tags %}
-{% include "portal/staff/supervisor/partials/_sidebar_nav_inner.html" %}
-{% include "portal/staff/supervisor/partials/_work_head_inner.html" %}
+<div
+  data-supervisor-section="{{ section|default:'home' }}"
+  data-supervisor-view="{{ active_view|default:'overview' }}"
+  data-selected-class-id="{{ selected_class_id|default:'' }}"
+  class="space-y-5"
+>
+  {% component "ui_core.page_header" eyebrow=crumb title=panel_title subtitle=panel_lede %}{% endcomponent %}
 
-<div class="panel">
-{% if branch is None %}
-  {% component "empty_state" icon="alert-triangle" title="Aucune annexe rattachée" message="Veuillez contacter l'administrateur pour associer une annexe à ce compte." %}{% endcomponent %}
-
-{% elif section == 'home' %}
-  {% include "portal/staff/supervisor/partials/panel_home.html" %}
-
-{% elif section == 'classes' %}
-  {% include "portal/staff/supervisor/partials/panel_classes.html" %}
-
-{% elif section == 'attendance' %}
-  {% if selected_class %}
-    {% include "portal/staff/supervisor/partials/panel_attendance.html" %}
+  {% if branch %}
+    {% component "ui_core.tabs" id="supervisor-section-tabs" items=supervisor_tabs active=active_view density="compact" subview_event="supervisor-subview" subview_attr="supervisor-subview" %}{% endcomponent %}
+    <div class="relative min-h-48">
+      <div id="supervisor-section-loading" class="htmx-indicator pointer-events-none absolute inset-0 z-20">
+        {% component "ui_core.loading_overlay" loading=True label="Chargement de la supervision" %}{% endcomponent %}
+      </div>
+      <div id="supervisor-section-content" aria-live="polite">
+        {% include "portal/staff/supervisor/partials/subcontent.html" %}
+      </div>
+    </div>
   {% else %}
-    {% include "portal/staff/supervisor/partials/_pick_class_prompt.html" %}
+    {% component "ui_core.empty_state" icon="triangle-alert" title="Aucune annexe rattachée" message="Contactez l'administrateur afin d'associer ce compte à une annexe." %}{% endcomponent %}
   {% endif %}
-
-{% elif section == 'attendance_report' %}
-  {% if selected_class %}
-    {% include "portal/staff/supervisor/partials/panel_attendance_report.html" %}
-  {% else %}
-    {% include "portal/staff/supervisor/partials/_pick_class_prompt.html" %}
-  {% endif %}
-
-{% elif section == 'teachers' %}
-  {% include "portal/staff/supervisor/partials/panel_teachers.html" %}
-
-{% elif section == 'teachers_report' %}
-  {% include "portal/staff/supervisor/partials/panel_teachers_report.html" %}
-
-{% elif section == 'schedule' %}
-  {% if selected_class %}
-    {% include "portal/staff/supervisor/partials/panel_schedule.html" %}
-  {% else %}
-    {% include "portal/staff/supervisor/partials/_pick_class_prompt.html" %}
-  {% endif %}
-
-{% elif section == 'courses' %}
-  {% if selected_class %}
-    {% include "portal/staff/supervisor/partials/panel_courses.html" %}
-  {% else %}
-    {% include "portal/staff/supervisor/partials/_pick_class_prompt.html" %}
-  {% endif %}
-
-{% elif section == 'students' %}
-  {% if selected_class %}
-    {% include "portal/staff/supervisor/partials/panel_students.html" %}
-  {% else %}
-    {% include "portal/staff/supervisor/partials/_pick_class_prompt.html" %}
-  {% endif %}
-
-{% else %}
-  {% include "portal/staff/supervisor/partials/panel_home.html" %}
-{% endif %}
 </div>

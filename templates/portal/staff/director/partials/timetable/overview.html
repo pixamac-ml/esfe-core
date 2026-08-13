@@ -1,0 +1,46 @@
+{% load component_tags %}
+{% if director_fragment_response and timetable_tabs %}{% include "portal/staff/director/partials/timetable/_tabs_oob.html" %}{% endif %}
+<div class="space-y-5">
+  <div class="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    {% component "ui_core.stat_card" label="Classes actives" value=timetable_metrics.classes icon="school" tone="primary" description="Dans votre annexe" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Grilles prêtes" value=timetable_metrics.configured_classes icon="calendar-check-2" tone="success" description="Au moins un cours placé" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="À préparer" value=timetable_metrics.classes_to_configure icon="calendar-x-2" tone="warning" description="Classes sans créneau" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Cours hebdomadaires" value=timetable_metrics.slots icon="book-open-check" tone="info" description="Créneaux actifs" compact=True %}{% endcomponent %}
+  </div>
+
+  {% component "ui_core.panel" title="Emplois du temps par classe" subtitle="Ouvrez une classe pour construire ou reprendre sa semaine." padding=False %}
+    {% if timetable_class_cards %}
+      <div class="divide-y divide-ui-border">
+        {% for item in timetable_class_cards %}
+          <a href="{% url 'accounts_portal:portal_dashboard' %}?section=planification&view=builder&class_id={{ item.class.id }}&week_start={{ timetable_week_start|date:'Y-m-d' }}"
+             hx-get="{% url 'accounts_portal:director_timetable_subcontent' %}?view=builder&class_id={{ item.class.id }}&week_start={{ timetable_week_start|date:'Y-m-d' }}"
+             hx-target="#director-timetable-subcontent"
+             hx-swap="innerHTML"
+             hx-push-url="true"
+             hx-indicator="#director-timetable-loading"
+             data-director-subview-link="builder"
+             class="ui-focus-ring grid min-w-0 gap-3 px-4 py-3 hover:bg-ui-surface-hover sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
+            <span class="min-w-0">
+              <strong class="block truncate text-sm text-ui-text">{{ item.class.display_name }}</strong>
+              <span class="mt-0.5 block truncate text-xs text-ui-text-muted">{{ item.class.programme.title }} · {{ item.class.academic_year.name }}</span>
+            </span>
+            <span class="text-xs font-semibold text-ui-text-muted">{{ item.student_count }} étudiant(s)</span>
+            <span class="inline-flex items-center gap-2 text-xs font-semibold {% if item.is_configured %}text-ui-success{% else %}text-ui-warning{% endif %}">
+              <span class="h-2 w-2 rounded-full {% if item.is_configured %}bg-ui-success{% else %}bg-ui-warning{% endif %}" aria-hidden="true"></span>
+              {% if item.is_configured %}{{ item.slot_count }} cours{% else %}À préparer{% endif %}
+              <i data-lucide="chevron-right" class="h-4 w-4" aria-hidden="true"></i>
+            </span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      {% component "ui_core.empty_state" title="Aucune classe active" message="Créez d'abord une classe académique pour préparer son emploi du temps." icon="school" %}{% endcomponent %}
+    {% endif %}
+  {% endcomponent %}
+
+  {% if timetable_metrics.classes_to_configure %}
+    {% component "ui_core.alert" title="Des grilles restent à préparer" message="Commencez par les classes sans cours hebdomadaire afin de disposer d'un planning complet pour l'annexe." tone="warning" %}{% endcomponent %}
+  {% elif timetable_metrics.classes %}
+    {% component "ui_core.alert" title="Toutes les classes ont une grille" message="Vérifiez les salles puis utilisez l'aperçu avant l'impression et l'affichage." tone="success" %}{% endcomponent %}
+  {% endif %}
+</div>

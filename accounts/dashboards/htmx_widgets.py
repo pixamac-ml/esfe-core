@@ -9,6 +9,7 @@ from django.views.decorators.http import require_GET
 from admissions.models import Candidature
 from accounts.models import BranchCashMovement, BranchExpense, PayrollEntry, Profile, TeacherHonorariumEntry
 from accounts.services.manager_intelligence import build_manager_intelligence_context, get_branch_cash_balance
+from accounts.services.manager_dashboard_presentation import build_cash_stat_card, build_payment_stat_card
 from coupons.services.querysets import active_coupons_for_branch
 from inscriptions.models import Inscription
 from payments.models import Payment
@@ -40,6 +41,11 @@ def widget_cash_balance(request: HttpRequest) -> HttpResponse:
             "cash_in_month": cash_in_month,
             "cash_out_month": cash_out_month,
             "net_month": cash_in_month - cash_out_month,
+            "stat_card": build_cash_stat_card(
+                balance=balance,
+                cash_in_month=cash_in_month,
+                cash_out_month=cash_out_month,
+            ),
         },
     )
 
@@ -161,6 +167,13 @@ def widget_today_payments(request: HttpRequest) -> HttpResponse:
             "month_total": month_total,
             "pending_count": pending_count,
             "pending_amount": pending_amount,
+            "stat_card": build_payment_stat_card(
+                month_total=month_total,
+                today_total=today_total,
+                today_count=today_count,
+                pending_count=pending_count,
+                pending_amount=pending_amount,
+            ),
         },
     )
 

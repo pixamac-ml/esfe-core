@@ -1,0 +1,69 @@
+{% load component_tags %}
+{% if director_fragment_response and timetable_tabs %}{% include "portal/staff/director/partials/timetable/_tabs_oob.html" %}{% endif %}
+<div class="space-y-5">
+  {% if toast %}
+    {% component "ui_core.alert" title="Emploi du temps" message=toast.message tone=toast.level %}{% endcomponent %}
+  {% endif %}
+
+  {% component "ui_core.panel" title="Choisir la classe" subtitle="La grille se charge dès que vous changez de classe." %}
+    {% include "portal/staff/director/partials/timetable/_class_selector.html" %}
+  {% endcomponent %}
+
+  {% if timetable_selected_class %}
+    <section class="overflow-hidden rounded-ui-card border border-ui-border bg-ui-surface shadow-ui-sm">
+      <header class="flex flex-col gap-4 border-b border-ui-border px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+        <div class="min-w-0">
+          <p class="text-xs font-semibold text-ui-primary">Grille hebdomadaire récurrente</p>
+          <h2 class="mt-1 truncate text-base font-bold text-ui-text">{{ timetable_selected_class.display_name }}</h2>
+          <p class="mt-1 text-xs text-ui-text-muted">{{ timetable_selected_class.programme.title }} · {{ timetable_grid.slots|length }} cours · {{ timetable_grid.total_hours }} h/semaine</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <button type="button"
+                  title="Ajouter un cours"
+                  hx-get="{% url 'accounts_portal:director_timetable_slot_drawer' %}?class_id={{ timetable_selected_class.id }}&week_start={{ timetable_week_start|date:'Y-m-d' }}"
+                  hx-target="#director-drawer-content"
+                  hx-swap="innerHTML"
+                  class="ui-focus-ring inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong">
+            <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>Ajouter un cours
+          </button>
+          <a href="{% url 'accounts_portal:schedule_class_print' timetable_selected_class.id %}?source=weekly&week_start={{ timetable_week_start|date:'Y-m-d' }}"
+             target="_blank"
+             rel="noopener"
+             class="ui-focus-ring inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">
+            <i data-lucide="printer" class="h-4 w-4" aria-hidden="true"></i>Imprimer
+          </a>
+        </div>
+      </header>
+
+      {% include "portal/staff/director/partials/timetable/_week_navigator.html" %}
+      {% include "portal/staff/director/partials/timetable/_grid.html" with editable=1 %}
+
+      <footer class="flex flex-col gap-3 border-t border-ui-border bg-ui-surface-muted/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <p class="text-xs text-ui-text-muted">Les cours créés ici forment la grille officielle réutilisée chaque semaine.</p>
+        <form method="post"
+              hx-post="{% url 'accounts_portal:director_timetable_action' %}"
+              hx-target="#director-timetable-subcontent"
+              hx-swap="innerHTML"
+              hx-disabled-elt="button[type=submit]">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="materialize_month">
+          <input type="hidden" name="class_id" value="{{ timetable_selected_class.id }}">
+          {% if timetable_week_start %}<input type="hidden" name="week_start" value="{{ timetable_week_start|date:'Y-m-d' }}">{% endif %}
+          <button type="submit" class="ui-focus-ring inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover disabled:opacity-50">
+            <i data-lucide="refresh-cw" class="h-4 w-4" aria-hidden="true"></i>Actualiser les 4 prochaines semaines
+          </button>
+        </form>
+      </footer>
+    </section>
+
+    {% if not timetable_subject_count %}
+      {% component "ui_core.alert" title="Aucune matière disponible" message="Complétez d'abord la maquette pédagogique de cette classe avant de placer ses cours." tone="warning" %}{% endcomponent %}
+    {% elif not timetable_teacher_count %}
+      {% component "ui_core.alert" title="Aucun enseignant disponible" message="Créez ou rattachez un enseignant actif à cette annexe avant de placer les cours." tone="warning" %}{% endcomponent %}
+    {% elif timetable_grid.missing_room_count %}
+      {% component "ui_core.alert" title="Des salles restent à renseigner" message="Complétez la salle de chaque cours avant d'imprimer la grille destinée à l'affichage." tone="warning" %}{% endcomponent %}
+    {% endif %}
+  {% else %}
+    {% component "ui_core.empty_state" title="Sélectionnez une classe" message="Choisissez la classe à organiser; sa semaine apparaîtra immédiatement sous le sélecteur." icon="calendar-days" %}{% endcomponent %}
+  {% endif %}
+</div>

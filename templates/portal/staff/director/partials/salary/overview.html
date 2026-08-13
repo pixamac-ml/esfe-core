@@ -1,0 +1,43 @@
+{% load component_tags humanize %}
+{% if salary_entry %}
+<div class="space-y-6">
+  <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    {% component "ui_core.stat_card" label="Salaire brut" value=salary_entry.base_salary|add:salary_entry.allowances|intcomma|add:" FCFA" icon="badge-dollar-sign" tone="primary" %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Retenues et avances" value=salary_entry.deductions|add:salary_entry.advances|intcomma|add:" FCFA" icon="circle-minus" tone="warning" %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Net à payer" value=salary_entry.net_salary|intcomma|add:" FCFA" icon="wallet-cards" tone="success" %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Déjà versé" value=salary_entry.paid_amount|intcomma|add:" FCFA" icon="circle-check" tone="info" %}{% endcomponent %}
+  </div>
+
+  <div class="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
+    <section class="min-w-0 border-y border-ui-border py-5">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div><p class="text-xs font-semibold uppercase text-ui-text-muted">Fiche {{ salary_reference }}</p><h2 class="mt-1 text-lg font-bold capitalize text-ui-text">{{ salary_period_label }}</h2></div>
+        {% if salary_entry.status == "paid" %}{% component "ui_core.status_badge" label="Payé" tone="success" %}{% endcomponent %}
+        {% elif salary_entry.status == "partial" %}{% component "ui_core.status_badge" label="Paiement partiel" tone="warning" %}{% endcomponent %}
+        {% elif salary_entry.status == "ready" %}{% component "ui_core.status_badge" label="Disponible" tone="info" %}{% endcomponent %}
+        {% else %}{% component "ui_core.status_badge" label="En préparation" tone="neutral" %}{% endcomponent %}{% endif %}
+      </div>
+      <dl class="mt-5 grid gap-x-6 gap-y-4 sm:grid-cols-2">
+        <div><dt class="text-xs text-ui-text-muted">Salaire de base</dt><dd class="mt-1 text-sm font-bold text-ui-text">{{ salary_entry.base_salary|intcomma }} FCFA</dd></div>
+        <div><dt class="text-xs text-ui-text-muted">Primes et indemnités</dt><dd class="mt-1 text-sm font-bold text-ui-text">{{ salary_entry.allowances|intcomma }} FCFA</dd></div>
+        <div><dt class="text-xs text-ui-text-muted">Retenues</dt><dd class="mt-1 text-sm font-bold text-ui-text">{{ salary_entry.deductions|intcomma }} FCFA</dd></div>
+        <div><dt class="text-xs text-ui-text-muted">Avances</dt><dd class="mt-1 text-sm font-bold text-ui-text">{{ salary_entry.advances|intcomma }} FCFA</dd></div>
+        <div><dt class="text-xs text-ui-text-muted">Fiche préparée le</dt><dd class="mt-1 text-sm font-semibold text-ui-text">{{ salary_entry.created_at|date:"d/m/Y à H:i" }}</dd></div>
+        <div><dt class="text-xs text-ui-text-muted">Dernier paiement</dt><dd class="mt-1 text-sm font-semibold text-ui-text">{% if salary_entry.paid_at %}{{ salary_entry.paid_at|date:"d/m/Y à H:i" }}{% else %}Non effectué{% endif %}</dd></div>
+      </dl>
+      {% if salary_entry.notes %}<div class="mt-5 border-l-2 border-ui-border pl-3 text-sm leading-6 text-ui-text-muted">{{ salary_entry.notes|linebreaksbr }}</div>{% endif %}
+      <div class="mt-5 flex flex-wrap gap-2 border-t border-ui-border pt-4">
+        <a href="{% url 'accounts:payslip_download' salary_entry.pk %}" class="ui-focus-ring inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary"><i data-lucide="download" class="h-4 w-4"></i>Télécharger la fiche</a>
+      </div>
+    </section>
+
+    <aside class="border-l border-ui-border pl-5">
+      <h2 class="text-sm font-bold text-ui-text">Versements enregistrés</h2>
+      {% if salary_payment_movements %}<div class="mt-3 divide-y divide-ui-border">{% for movement in salary_payment_movements %}<div class="py-3"><div class="flex items-center justify-between gap-3"><span class="text-sm font-bold text-ui-text">{{ movement.amount|intcomma }} FCFA</span><span class="text-xs text-ui-text-muted">{{ movement.movement_date|date:"d/m/Y" }}</span></div><p class="mt-1 break-all text-[11px] text-ui-text-muted">Caisse annexe · {{ movement.source_reference|default:movement.reference }}</p></div>{% endfor %}</div>
+      {% else %}<p class="mt-3 text-sm leading-6 text-ui-text-muted">Aucun versement n’est encore rattaché à cette fiche.</p>{% endif %}
+    </aside>
+  </div>
+</div>
+{% else %}
+  {% component "ui_core.empty_state" title="Aucune fiche pour ce mois" message="Votre fiche apparaîtra ici dès sa préparation automatique par le service habilité." icon="badge-dollar-sign" %}{% endcomponent %}
+{% endif %}

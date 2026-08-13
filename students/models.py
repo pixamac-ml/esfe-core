@@ -460,6 +460,12 @@ class StudentAttendance(models.Model):
     )
     arrival_time = models.TimeField(null=True, blank=True)
     justification = models.TextField(blank=True)
+    is_justified = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text="Indique si l'absence a ete justifiee par un motif recevable.",
+    )
+    observation = models.TextField(blank=True)
     recorded_by = models.ForeignKey(
         User,
         on_delete=models.PROTECT,
@@ -523,6 +529,12 @@ class StudentAttendance(models.Model):
         if self.status != self.STATUS_LATE and self.arrival_time:
             errors["arrival_time"] = "L'heure d'arrivee n'est renseignee que pour un retard."
 
+        if self.status != self.STATUS_ABSENT and self.is_justified:
+            errors["is_justified"] = "Seule une absence peut etre marquee comme justifiee."
+
+        if self.is_justified and not (self.justification or "").strip():
+            errors["justification"] = "Le motif est obligatoire pour une absence justifiee."
+
         if errors:
             raise ValidationError(errors)
 
@@ -562,6 +574,13 @@ class TeacherAttendance(models.Model):
     )
     arrival_time = models.TimeField(null=True, blank=True)
     justification = models.TextField(blank=True)
+    course_delivered = models.BooleanField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Constat du surveillant : le cours programme a-t-il ete assure ?",
+    )
+    observation = models.TextField(blank=True)
     recorded_by = models.ForeignKey(
         User,
         on_delete=models.PROTECT,
@@ -609,6 +628,9 @@ class TeacherAttendance(models.Model):
         if self.status != self.STATUS_LATE and self.arrival_time:
             errors["arrival_time"] = "L'heure d'arrivee n'est renseignee que pour un retard."
 
+        if self.status == self.STATUS_ABSENT and self.course_delivered is True:
+            errors["course_delivered"] = "Un enseignant absent ne peut pas avoir assure le cours."
+
         if errors:
             raise ValidationError(errors)
 
@@ -619,7 +641,7 @@ class TeacherAttendance(models.Model):
 
 class AttendanceRollSheet(models.Model):
     """
-    Feuille d'appel journaliere par classe (workflow surveillant : brouillon / valide).
+    Feuille d'appel par seance reelle (workflow surveillant : brouillon / valide).
     La saisie detaillee reste dans StudentAttendance (par seance).
     """
 
@@ -681,8 +703,8 @@ class AttendanceRollSheet(models.Model):
         verbose_name_plural = "Feuilles d'appel (classe / jour)"
         constraints = [
             models.UniqueConstraint(
-                fields=["branch", "academic_class", "date"],
-                name="students_unique_roll_sheet_branch_class_date",
+                fields=["branch", "academic_class", "schedule_event"],
+                name="students_unique_roll_sheet_branch_class_event",
             )
         ]
         indexes = [
@@ -808,6 +830,21 @@ class StudentCase(models.Model):
         related_name="student_cases",
         db_index=True,
     )
+    academic_class = models.ForeignKey(
+        "academics.AcademicClass",
+        on_delete=models.PROTECT,
+        related_name="student_signalments",
+        null=True,
+        blank=True,
+    )
+    schedule_event = models.ForeignKey(
+        "academics.AcademicScheduleEvent",
+        on_delete=models.PROTECT,
+        related_name="student_signalments",
+        null=True,
+        blank=True,
+    )
+    occurred_on = models.DateField(null=True, blank=True, db_index=True)
     case_type = models.CharField(max_length=40, choices=TYPE_CHOICES, db_index=True)
     status = models.CharField(
         max_length=20,
@@ -934,6 +971,21 @@ class TeacherCase(models.Model):
         related_name="teacher_cases",
         db_index=True,
     )
+    academic_class = models.ForeignKey(
+        "academics.AcademicClass",
+        on_delete=models.PROTECT,
+        related_name="teacher_signalments",
+        null=True,
+        blank=True,
+    )
+    schedule_event = models.ForeignKey(
+        "academics.AcademicScheduleEvent",
+        on_delete=models.PROTECT,
+        related_name="teacher_signalments",
+        null=True,
+        blank=True,
+    )
+    occurred_on = models.DateField(null=True, blank=True, db_index=True)
     case_type = models.CharField(max_length=40, choices=TYPE_CHOICES, db_index=True)
     status = models.CharField(
         max_length=20,

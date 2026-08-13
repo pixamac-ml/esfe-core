@@ -83,37 +83,6 @@
     });
   };
 
-  document.addEventListener("alpine:init", () => {
-    window.Alpine.data("uiOverlay", (initiallyOpen) => ({
-      open: Boolean(initiallyOpen),
-      opener: null,
-      show() {
-        this.opener = document.activeElement;
-        this.open = true;
-        document.documentElement.classList.add("overflow-hidden");
-        this.$nextTick(() => this.$refs.dialog && this.$refs.dialog.focus());
-      },
-      close() {
-        this.open = false;
-        document.documentElement.classList.remove("overflow-hidden");
-        this.$nextTick(() => this.opener && this.opener.focus());
-      },
-      trap(event) {
-        const nodes = [...this.$refs.dialog.querySelectorAll("a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])")];
-        if (!nodes.length) return;
-        const first = nodes[0];
-        const last = nodes[nodes.length - 1];
-        if (event.shiftKey && document.activeElement === first) {
-          event.preventDefault();
-          last.focus();
-        } else if (!event.shiftKey && document.activeElement === last) {
-          event.preventDefault();
-          first.focus();
-        }
-      }
-    }));
-  });
-
   document.addEventListener("DOMContentLoaded", () => UI.init(document));
   document.addEventListener("ui:toast", (event) => UI.toast(event.detail));
   document.body.addEventListener("htmx:configRequest", (event) => {

@@ -3,12 +3,14 @@
   method="{{ method }}"
   class="rounded-ui-card border border-ui-border bg-ui-surface p-4"
   data-ui-core="filter-bar"
-  {% if target %}hx-get="{{ action }}" hx-target="{{ target }}" hx-swap="{{ swap }}"{% endif %}
+  {% if target %}{% if method == "post" %}hx-post="{{ action }}"{% else %}hx-get="{{ action }}"{% endif %} hx-target="{{ target }}" hx-swap="{{ swap }}"{% endif %}
+  {% if select %}hx-select="{{ select }}"{% endif %}
   {% if trigger %}hx-trigger="{{ trigger }}"{% endif %}
   {% if indicator %}hx-indicator="{{ indicator }}"{% endif %}
   {% if sync %}hx-sync="{{ sync }}"{% endif %}
 >
   {% if method == "post" %}{% csrf_token %}{% endif %}
+  {% for field in hidden_fields %}<input type="hidden" name="{{ field.name }}" value="{{ field.value }}">{% endfor %}
   <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
     {% for filter in filters %}
       <label class="min-w-40 flex-1 text-sm font-semibold text-ui-text">

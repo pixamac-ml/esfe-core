@@ -1,4 +1,4 @@
-{% extends "base_app.html" %}
+{% extends dashboard_parent|default:"base_app.html" %}
 {% load static %}
 {% load component_tags %}
 
@@ -246,6 +246,9 @@ input[type="file"]::file-selector-button {
 {% endblock %}
 
 {% block content %}
+{% if dashboard_shell %}
+{{ block.super }}
+{% else %}
 <div x-data="secretaryShell()" class="sg-shell"
      @secretary-drawer-close.window="drawerOpen = false"
      @secretary-drawer-open.window="drawerOpen = true"
@@ -291,6 +294,7 @@ input[type="file"]::file-selector-button {
   {# ═══════ TOAST STACK ═══════ #}
   <div id="sg-toast-stack" class="sg-live-toast-stack" aria-live="polite" aria-atomic="true"></div>
 </div>
+{% endif %}
 
 {# ═══════ JAVASCRIPT ═══════ #}
 <script>
@@ -323,8 +327,13 @@ function secretaryShell() {
           if (this.commandOpen) this.$nextTick(() => document.getElementById('command-input')?.focus());
         }
       });
+      {% if dashboard_shell %}
+      window.sgOpenDrawer  = () => window.dispatchEvent(new CustomEvent('ui-overlay-open', { detail: { id: 'sg-drawer' } }));
+      window.sgCloseDrawer = () => window.dispatchEvent(new CustomEvent('ui-overlay-close', { detail: { id: 'sg-drawer' } }));
+      {% else %}
       window.sgOpenDrawer  = () => window.dispatchEvent(new CustomEvent('secretary-drawer-open'));
       window.sgCloseDrawer = () => window.dispatchEvent(new CustomEvent('secretary-drawer-close'));
+      {% endif %}
       // Navigation HTMX — appelé depuis les templates si nécessaire
       window.sgGoTo = function(section) {
         htmx.ajax('GET', '?section=' + section, {

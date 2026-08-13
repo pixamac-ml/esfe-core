@@ -1,32 +1,21 @@
-<div id="sg-att-row-{{ row.student.id }}" class="row" style="flex-wrap:wrap">
-  <div class="pic" style="background:#3d4f63">{{ row.student.full_name|slice:":2"|upper }}</div>
-  <div class="main"><b>{{ row.student.full_name }}</b><span>{{ row.student.matricule }}</span></div>
-  <span class="tail">
-    {% if not roll_locked %}
-      <button type="button"
-              class="att-state {% if row.justification %}att-justifie{% elif row.status == 'present' %}att-present{% elif row.status == 'late' %}att-retard{% else %}att-absent{% endif %}"
-              hx-post="{% url 'accounts_portal:supervisor_attendance_toggle_student' %}"
-              hx-target="#sg-att-row-{{ row.student.id }}"
-              hx-swap="outerHTML"
-              hx-vals='{"schedule_event_id":"{{ selected_event.id }}","student_id":"{{ row.student.id }}","status":"{{ row.next_status }}","justification":"{{ row.justification|default:""|escapejs }}"}'
-      >{% if row.justification %}Justifié{% elif row.status == "present" %}Présent{% elif row.status == "late" %}Retard{% else %}Absent{% endif %}</button>
-    {% else %}
-      <span class="chip mute">{% if row.status == "present" %}Présent{% elif row.status == "late" %}Retard{% else %}Absent{% endif %}</span>
-    {% endif %}
-  </span>
-  <div style="flex:1 0 100%;margin-top:8px">
-    <label class="f-l" style="margin-top:0">Motif absence (optionnel)</label>
-    <input type="text"
-           class="f-i"
-           value="{{ row.justification }}"
-           {% if roll_locked %}disabled{% endif %}
-           hx-post="{% url 'accounts_portal:supervisor_attendance_toggle_student' %}"
-           hx-trigger="change"
-           hx-target="#sg-att-row-{{ row.student.id }}"
-           hx-swap="outerHTML"
-           hx-vals='{"schedule_event_id":"{{ selected_event.id }}","student_id":"{{ row.student.id }}","status":"{{ row.status }}"}'
-           name="justification"
-    >
+{% load component_tags %}
+<div id="sg-att-row-{{ row.student.id }}" class="p-4">
+  <div class="mb-3 flex items-center gap-3">
+    <span class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-ui-primary-soft text-xs font-black text-ui-primary">{{ row.student.full_name|slice:":2"|upper }}</span>
+    <span class="min-w-0 flex-1"><strong class="block truncate text-sm text-ui-text">{{ row.student.full_name }}</strong><span class="text-xs text-ui-text-muted">{{ row.student.matricule }}</span></span>
+    {% if row.status == "present" %}{% component "ui_core.status_badge" label="Présent" tone="success" %}{% endcomponent %}{% elif row.status == "late" %}{% component "ui_core.status_badge" label="En retard" tone="warning" %}{% endcomponent %}{% else %}{% if row.is_justified %}{% component "ui_core.status_badge" label="Absence justifiée" tone="info" %}{% endcomponent %}{% else %}{% component "ui_core.status_badge" label="Absent" tone="danger" %}{% endcomponent %}{% endif %}{% endif %}
   </div>
+  {% if attendance_workflow.can_edit or not roll_locked and attendance_workflow == None %}
+    <form method="post" class="grid gap-3 lg:grid-cols-12" hx-post="{% url 'accounts_portal:supervisor_attendance_toggle_student' %}" hx-target="#sg-att-row-{{ row.student.id }}" hx-swap="outerHTML">
+      {% csrf_token %}<input type="hidden" name="schedule_event_id" value="{{ selected_event.id }}"><input type="hidden" name="student_id" value="{{ row.student.id }}">
+      <label class="text-xs font-bold text-ui-text-muted lg:col-span-2">Statut<select name="status" class="mt-2 h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text"><option value="present" {% if row.status == "present" %}selected{% endif %}>Présent</option><option value="absent" {% if row.status == "absent" %}selected{% endif %}>Absent</option><option value="late" {% if row.status == "late" %}selected{% endif %}>En retard</option></select></label>
+      <label class="text-xs font-bold text-ui-text-muted lg:col-span-2">Heure d'arrivée<input type="time" name="arrival_time" value="{% if row.arrival_time %}{{ row.arrival_time|time:'H:i' }}{% endif %}" class="mt-2 h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text"></label>
+      <label class="flex items-center gap-2 self-end pb-3 text-xs font-bold text-ui-text-muted lg:col-span-2"><input type="checkbox" name="is_justified" class="rounded-ui-input border-ui-border text-ui-primary" {% if row.is_justified %}checked{% endif %}>Absence justifiée</label>
+      <label class="text-xs font-bold text-ui-text-muted lg:col-span-3">Motif de justification<input type="text" name="justification" value="{{ row.justification }}" class="mt-2 h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text"></label>
+      <label class="text-xs font-bold text-ui-text-muted lg:col-span-3">Observation factuelle<input type="text" name="observation" value="{{ row.observation }}" class="mt-2 h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text"></label>
+      <div class="lg:col-span-12 lg:text-right"><button class="ui-focus-ring h-ui-control rounded-ui-button bg-ui-primary px-4 text-sm font-bold text-white">Enregistrer ce constat</button></div>
+    </form>
+  {% else %}
+    <dl class="grid gap-2 text-xs text-ui-text-muted sm:grid-cols-3"><div><dt class="font-bold">Heure d'arrivée</dt><dd class="mt-1 text-ui-text">{{ row.arrival_time|time:"H:i"|default:"—" }}</dd></div><div><dt class="font-bold">Justification</dt><dd class="mt-1 text-ui-text">{{ row.justification|default:"—" }}</dd></div><div><dt class="font-bold">Observation</dt><dd class="mt-1 text-ui-text">{{ row.observation|default:"—" }}</dd></div></dl>
+  {% endif %}
 </div>
-

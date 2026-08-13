@@ -1,0 +1,495 @@
+ANALYSE — DASHBOARDS SURVEILLANT GENERAL / DIRECTEUR DES ETUDES
+Date : 13 aout 2026
+
+CONCLUSION COURTE
+================
+Le Surveillant general et le Directeur des etudes entrent deja par la meme URL
+canonique : /portal/dashboard/. En revanche, apres cette entree commune, ils
+utilisent deux renderers, deux templates de page, deux espaces HTMX et deux
+contrats de contexte differents.
+
+Donc : le dashboard du Surveillant reprend bien le meme systeme visuel UI Core
+que celui du Directeur des etudes (app shell, sidebar, topbar, drawer, modal,
+confirm dialog), mais il n'utilise PAS le « moule » unique du dashboard DE.
+Il s'agit de deux dashboards paralleles qui se ressemblent. Le contexte ne se
+selectionne pas encore dans un unique dashboard selon le role.
+
+PRECISION FONCTIONNELLE IMPORTANTE
+==================================
+Le dashboard du Directeur des etudes (DE) est le dashboard certifie du projet.
+Il constitue le moule officiel de TOUS les dashboards du systeme de gestion.
+La cible n'est donc pas de creer une nouvelle troisieme coque generique en
+parallele. Il faut conserver le moule DE comme source unique, puis lui passer
+une configuration et des contextes differents selon le role connecte.
+
+En pratique : le Surveillant general doit etre rendu dans la coque DE, avec la
+meme structure, les memes conventions de composants, le meme comportement de
+navigation/workspace et les memes points d'extension. Seuls changent le titre,
+les menus, les capacites, les donnees et les fragments metier autorises.
+
+ETAT ACTUEL CONSTATE
+====================
+1. Entree unique : OUI
+
+- portal/views/views.py:4150, portal_dashboard(), determine la position.
+- director_of_studies appelle _render_director_dashboard().
+- academic_supervisor importe puis appelle _render_supervisor_dashboard().
+- Les anciennes URLs /portal/director/ et /portal/supervisor/ ramènent vers
+  cette entree canonique dans les cas normaux.
+
+Cela va dans la bonne direction : l'URL principale est unique.
+
+2. Coque visuelle commune : PARTIELLEMENT OUI
+
+- templates/portal/staff/director_dashboard.html
+- templates/portal/staff/supervisor_dashboard.html
+
+Ces deux pages instancient les memes composants UI Core : ui_core.app_shell,
+ui_core.app_sidebar, ui_core.app_topbar, ui_core.drawer, ui_core.modal et
+ui_core.confirm_dialog. Elles etendent aussi toutes deux portal/app_base.html.
+
+Mais elles dupliquent la structure de la coque. Elles different notamment par
+la navigation, la topbar, les IDs, le script JavaScript et le chargement du
+workspace :
+
+- DE : #director-workspace, rendu initial directement dans la page ;
+- SG : #supervisor-workspace, rendu HTMX declenche au chargement de la page ;
+- DE : director_dashboard.js et fragments propres au directeur ;
+- SG : supervisor_dashboard.js et fragments propres au surveillant.
+
+Le resultat est donc une meme famille graphique, pas un seul template shell.
+
+3. Contexte de donnees : NON, il est separe
+
+Directeur des etudes
+--------------------
+- _render_director_dashboard() (portal/views/views.py:442) appelle
+  _build_director_workspace_context() (ligne 756), puis
+  build_director_dashboard_presentation().
+- Ce contexte tres large contient les programmes/classes, semestres,
+  enseignants, planning, evaluations, calendrier, transferts, documents,
+  messagerie, salaire, etc.
+- Le workspace DE et ses sous-vues sont rendus par de nombreux endpoints
+  director_* et par les templates sous templates/portal/staff/director/.
+
+Surveillant general
+-------------------
+- _render_supervisor_dashboard() (portal/views/supervisor.py:150) construit
+  un contexte leger de coque, puis build_supervisor_dashboard_presentation().
+- Les donnees metier sont surtout produites apres coup par
+  build_supervisor_workspace_context() dans
+  portal/services/supervisor_workspace_service.py:278.
+- Ses sections sont propres au SG : classes, presence etudiants, presence
+  enseignants, EDT en lecture, signalements et rapports.
+- Ses sous-vues sont sous templates/portal/staff/supervisor/ et passent par
+  supervisor_workflow_workspace et de nombreux endpoints supervisor_*.
+
+Il n'existe donc pas aujourd'hui un objet de contexte commun du type
+"dashboard academique + modules autorises selon role".
+
+4. Perimetre par annexe : BIEN PROTEGE SUR CES DEUX DASHBOARDS
+
+Les deux renderers resolvent l'annexe via _resolve_director_branch(), qui
+delegue a academics.permissions.require_director_branch_scope(). Pour le SG,
+_resolve_supervisor_branch() ajoute explicitement academic_supervisor parmi
+les positions limitees a une annexe.
+
+Cette regle retourne 403 lorsqu'un Directeur des etudes ou un Surveillant
+general n'a pas d'annexe. Les requetes de classes, presences, planning et
+signalements visibles dans les builders sont filtrees par branch. Les tests
+actuels couvrent deja l'absence d'annexe du SG et du DE, ainsi que l'isolement
+de l'annexe du DE.
+
+C'est la contrainte a conserver absolument pendant l'unification : le role
+ne doit jamais etre la seule condition de filtrage ; branch doit toujours
+rester un filtre serveur sur les querysets et sur chaque action POST.
+
+5. Point de vigilance important
+
+Le fichier portal/services/supervisor_dashboard_service.py contient encore
+build_supervisor_dashboard_context(), un ancien builder tres complet. La
+recherche montre qu'il n'est plus appele par le rendu courant du SG ; le flux
+actuel utilise supervisor_workspace_service.py. Il ne faut ni le reprendre
+aveuglement ni le supprimer sans tests : c'est de la dette technique qui
+risque de faire croire qu'il existe un contexte SG unique alors que ce n'est
+pas celui produit en production.
+
+REPONSE A LA QUESTION « LE SG UTILISE-T-IL LE MOULE DU DE ? »
+==============================================================
+Non, pas au sens architectural souhaite.
+
+Oui, au sens design system : meme base portal/app_base.html et memes composants
+UI Core.
+
+Non, au sens « un seul dashboard pour tous les roles avec contexte adapte » :
+deux templates principaux, deux renderers, deux builders de contexte, deux
+registries de navigation, deux workspaces et deux familles de routes restent
+en place.
+
+ARCHITECTURE CIBLE RECOMMANDEE
+==============================
+Conserver les endpoints metier et les permissions par action, mais faire du
+dashboard DE existant l'unique coque et l'unique contrat de rendu. L'idee est
+un Dashboard de gestion unique fonde sur le moule DE certifie, avec des modules
+declares et filtres par role/capacite.
+
+1. Une seule vue de coque, derivee du DE certifie
+
+    portal_dashboard(request)
+      -> resolve_dashboard_role_and_capabilities(request.user)
+      -> build_role_dashboard_context(request, role, branch)
+      -> render("portal/staff/director_dashboard.html", context)
+
+Le nom du template pourra etre neutralise plus tard si necessaire, mais son
+contenu et son contrat doivent provenir du dashboard DE certifie. La vue resout
+une fois : user, position, role canonique, branch, scope, capacites, section et
+sous-vue. Elle ne choisit plus entre un template DE et un template SG.
+
+2. Un contrat de contexte explicite
+
+Exemple de cles communes :
+
+    dashboard = {
+      "role": "academic_supervisor" | "director_of_studies",
+      "branch": branch,
+      "is_global_scope": False,
+      "title": "...",
+      "subtitle": "...",
+      "navigation": [...],
+      "active_section": "...",
+      "active_view": "...",
+      "capabilities": {...},
+      "workspace_url": "...",
+      "notification_count": 0,
+    }
+
+Les donnees de chaque module restent sous des namespaces (attendance_*,
+programme_*, timetable_*, etc.) pour ne pas casser les fragments existants.
+
+3. Un registre declaratif de modules
+
+Chaque module declare : cle, libelle, icone, template, context_builder,
+capacite requise et modes lecture/ecriture. Exemple :
+
+    attendance : SG lecture/ecriture ; DE lecture ou pilotage selon regle
+    timetable  : SG lecture ; DE lecture/ecriture
+    programme  : DE seulement
+    evaluations: DE seulement
+    signals    : SG creation/transmission ; DE consultation/traitement si voulu
+
+La navigation est construite a partir de ce registre et des capacites. Ainsi,
+un module interdit n'apparait pas, mais son endpoint continue aussi de refuser
+l'acces cote serveur.
+
+4. Une seule coque DE, avec les fragments metier conserves
+
+Faire evoluer templates/portal/staff/director_dashboard.html pour qu'il recoive
+dashboard.navigation, dashboard.title, dashboard.context_label et
+dashboard.workspace_url. Le conteneur et le JavaScript peuvent ensuite adopter
+des noms neutres, mais le comportement certifie du DE doit rester la reference.
+Les fragments DE et SG existants peuvent etre reutilises au debut ; seul le
+dispatch du workspace devient commun.
+
+5. Les droits restent serveur et fins
+
+Ne jamais se contenter de masquer les boutons. Les endpoints de modification
+DE doivent continuer a exiger les droits DE ; les actions SG doivent continuer
+a exiger les droits SG. Un helper de capacites peut centraliser la decision,
+mais chaque POST doit verifier role/capacite ET branch de l'objet cible.
+
+PLAN DE MIGRATION SANS CASSER LES WORKFLOWS
+===========================================
+Phase 1 — Ajouter le contrat commun, sans supprimer quoi que ce soit.
+- Creer un builder de coque commun et un registre des modules/capacites.
+- Faire produire la navigation DE et SG depuis ce registre.
+- Conserver les builders de contexte metier existants au depart.
+
+Phase 2 — Unifier le template shell.
+- Generaliser director_dashboard.html, le moule certifie, pour tous les roles.
+- Adapter son workspace et son script afin qu'ils acceptent une configuration
+  de role, sans maintenir une autre coque supervisor_dashboard.html.
+- Garder temporairement les templates de fragments DE et SG.
+
+Phase 3 — Unifier le dispatcher de workspace.
+- Une vue workspace academique selectionne le builder/fragment autorise par
+  module et capacite.
+- Les routes director_* et supervisor_* qui effectuent de vraies actions
+  restent en place, avec leurs permissions ; seules les routes de rendu sont
+  progressivement redirigees vers le dispatcher commun.
+
+Phase 4 — Nettoyer apres verification.
+- Retirer les shells doubles, les navigation builders doubles et le code SG
+  obsolete/non utilise uniquement apres que les tests de regression passent.
+
+TESTS A AJOUTER AVANT ET PENDANT LA MIGRATION
+==============================================
+- Meme template shell pour un SG et un DE ; titres, navigation et modules
+  adaptes au role.
+- SG : aucun lien/bouton d'ecriture DE (programme, evaluations, calendrier,
+  affectations) et les URLs correspondantes repondent 403.
+- DE : les modules DE autorises restent accessibles ; les modules SG eventuels
+  respectent la matrice lecture/ecriture decidee.
+- Pour SG et DE : aucun objet d'une autre annexe n'est visible ni modifiable,
+  y compris via URL/ID forge.
+- Compte sans annexe : 403 pour shell, workspace et actions.
+- Requetes HTMX : le fragment recu contient toutes les cles de contexte
+  attendues ; ne pas s'appuyer sur le contexte de la page parente.
+- Tests de navigation : une capacite absente retire l'element de menu et
+  l'endpoint refuse quand meme la requete directe.
+
+DECISION RECOMMANDEE
+====================
+Faire cette unification en prenant le dashboard DE certifie comme moule unique.
+Il faut generaliser son contrat de contexte et lui fournir une navigation, des
+modules, des fragments et des capacites adaptes au role. Le SG a un perimetre
+metier different et plusieurs actions doivent rester en lecture seule, mais
+cela ne justifie pas une deuxieme coque. Le bon objectif est : une seule entree,
+le seul moule DE, un seul contrat de dashboard et des contextes adaptes par
+role — tout en conservant les protections strictes par annexe et par action.
+
+CE QUE JE VAIS FAIRE CONCRETEMENT
+=================================
+Etat actuel : l'analyse est terminee, mais la migration du code n'a pas encore
+ete executee. Voici exactement comment l'implementation doit etre realisee.
+
+1. Conserver director_dashboard.html comme unique moule certifie.
+
+2. Generaliser les elements actuellement nommes director_* afin que la coque
+   accepte une configuration dynamique : titre, navigation, contexte affiche,
+   URL du workspace, tiroirs, modales, notifications et actions de topbar.
+
+3. Introduire un contexte commun, par exemple dashboard_config, contenant au
+   minimum : role, branch, titre, sous-titre, navigation, section active,
+   sous-vue active, capacites, workspace_url et compteurs de notifications.
+
+4. Faire passer director_of_studies et academic_supervisor par le meme renderer
+   principal et le meme template director_dashboard.html.
+
+5. Adapter les builders existants sans melanger les metiers :
+   - le builder DE continue de produire programmes, evaluations, enseignants,
+     calendrier, transferts, documents, messagerie et salaire ;
+   - le builder SG continue de produire presences, classes, suivi des cours,
+     signalements et rapports ;
+   - le renderer commun injecte uniquement le contexte autorise pour le role.
+
+6. Faire charger les fragments SG dans le workspace du moule DE. Les fragments
+   metier peuvent rester separes au debut ; c'est la coque principale qui doit
+   devenir unique en premier.
+
+7. Conserver les endpoints d'action et leurs permissions serveur. Un bouton
+   masque ne constitue jamais une permission. Chaque action doit verifier le
+   role/capacite et l'annexe de l'objet vise.
+
+8. Garantir le filtrage obligatoire par annexe dans tous les querysets. Un SG
+   ou un DE rattache a une annexe ne doit jamais lire ou modifier les donnees
+   d'une autre annexe, meme avec une URL ou un identifiant forge.
+
+9. Ajouter les tests avant le nettoyage :
+   - meme template principal pour DE et SG ;
+   - contexte, titre, navigation et modules adaptes au role ;
+   - refus 403 des actions non autorisees ;
+   - refus 403 sans annexe ;
+   - aucune fuite inter-annexe ;
+   - fragments HTMX complets et fonctionnels.
+
+10. Supprimer la coque supervisor_dashboard.html, son chargement parallele et
+    le code devenu obsolete uniquement lorsque tous les tests sont valides.
+
+FLUX CIBLE
+==========
+/portal/dashboard/
+        |
+        v
+Detection du role, des capacites et de l'annexe
+        |
+        v
+Construction du contexte adapte au role
+        |
+        v
+director_dashboard.html (moule certifie et unique)
+        |
+        v
+Workspace, modules, fragments et actions autorises
+
+En resume : je ne creerai pas un nouveau dashboard generique. Je generaliserai
+le dashboard DE certifie pour qu'il devienne reellement le seul dashboard de
+gestion. Le Surveillant general utilisera ce meme moule avec ses contextes,
+menus, fragments et permissions propres.
+
+REGLE GENERALE POUR TOUT LE SYSTEME DE GESTION
+==============================================
+Cette decision ne concerne pas uniquement le Directeur des etudes et le
+Surveillant general. A partir de maintenant, TOUS les dashboards du systeme de
+gestion ESFE doivent utiliser le dashboard DE certifie comme moule unique.
+
+Cela concerne notamment les espaces gestionnaire, finance, admissions,
+secretariat, direction generale, informatique, marketing et tout nouveau role
+de gestion ajoute ulterieurement.
+
+La regle d'architecture est la suivante :
+
+- une seule coque principale, issue du dashboard DE certifie ;
+- une seule convention de navigation, topbar, workspace, tiroirs et modales ;
+- une seule entree canonique de dashboard lorsque le routage fonctionnel le
+  permet ;
+- un contexte construit dynamiquement selon le role et le perimetre ;
+- des menus, modules, fragments, indicateurs et actions adaptes au role ;
+- des permissions controlees cote serveur pour chaque action ;
+- un filtrage obligatoire par annexe pour tous les roles a perimetre local ;
+- aucune nouvelle coque de dashboard creee pour un role particulier.
+
+Les applications peuvent conserver leurs services, builders, fragments et
+workflows metier specialises. En revanche, elles ne doivent plus posseder leur
+propre shell de dashboard concurrent. Toute evolution visuelle ou structurelle
+du systeme de gestion doit etre faite dans le moule DE commun, puis beneficier
+a tous les roles via leur configuration de contexte.
+
+Cette regle devient la reference pour les prochaines migrations et pour tout
+nouveau dashboard du projet.
+
+IMPLEMENTATION REALISEE LE 13 AOUT 2026
+=======================================
+La premiere migration de production est maintenant codee et verifiee.
+
+1. Le template certifie du DE est devenu configurable
+------------------------------------------------------
+templates/portal/staff/director_dashboard.html ne contient plus un shell
+fige pour le seul DE. Il consomme maintenant dashboard_shell pour la
+navigation, le titre, le contexte, le workspace, la topbar, les overlays,
+les styles et les scripts propres au role.
+
+2. Un contrat central obligatoire a ete ajoute
+----------------------------------------------
+portal/services/certified_dashboard_shell.py definit le contrat unique et la
+constante CERTIFIED_DASHBOARD_TEMPLATE. Il genere aussi les identifiants HTML
+stables du workspace, du loader, du drawer, de la modale et de la confirmation.
+
+3. Le DE et le SG utilisent reellement le meme template
+-------------------------------------------------------
+- Le DE construit son dashboard_shell puis rend director_dashboard.html.
+- Le SG construit son contexte metier avec build_supervisor_workspace_context,
+  construit son dashboard_shell puis rend exactement director_dashboard.html.
+- supervisor_dashboard.html n'est plus utilise par le renderer canonique.
+- Les fragments metier SG restent separes, mais ils sont injectes dans le
+  workspace du moule certifie DE.
+
+4. Le comportement commun est centralise
+-----------------------------------------
+static/src/js/portal/certified_dashboard_shell.js gere pour les deux roles
+l'etat de chargement HTMX, la navigation active et les attributs d'accessibilite.
+director_dashboard.js et supervisor_dashboard.js restent des adaptateurs pour
+les interactions strictement propres a leurs workflows.
+
+5. Notifications sans doublon
+------------------------------
+Le shell certifie possede sa cloche dans la topbar. Le widget flottant global
+est donc desactive uniquement pour les pages qui utilisent ce contrat, afin
+d'eviter deux acces aux notifications sur le meme dashboard.
+
+6. Regle inscrite dans AGENTS.md
+-------------------------------
+Tout nouveau dashboard de gestion doit obligatoirement utiliser
+build_certified_dashboard_shell() et director_dashboard.html. La creation d'un
+nouveau shell par role est interdite. Les anciens dashboards non encore migres
+doivent etre bascules progressivement vers ce contrat.
+
+7. Verification effectuee
+-------------------------
+- python manage.py check --settings=config.settings_test_local : OK
+- python manage.py check avec les reglages du projet : OK
+- verification syntaxique des scripts JavaScript : OK
+- 41 tests cibles du contrat, du DE, du SG, du routage, du registre des roles,
+  des templates, des permissions et de l'isolation par annexe : OK
+
+ETAT EXACT DE LA MIGRATION GLOBALE
+=================================
+Le moule unique et son contrat sont maintenant raccordes a tous les dashboards
+de gestion identifies dans cette analyse :
+
+- Direction des etudes ;
+- Surveillance generale ;
+- Gestionnaire d'annexe ;
+- Finance ;
+- Admissions ;
+- Secretariat ;
+- Direction generale / Direction generale adjointe ;
+- Informatique ;
+- Marketing ;
+- Super administration.
+
+PHASE 2 REALISEE LE 13 AOUT 2026
+================================
+
+1. Adaptateur commun de role
+----------------------------
+build_role_dashboard_shell() construit maintenant, pour chaque role :
+
+- le role effectif ;
+- le perimetre global ou l'annexe ;
+- les groupes et liens de navigation autorises ;
+- la section active ;
+- les identifiants stables du workspace et des overlays ;
+- le nombre de notifications ;
+- la topbar, le titre et les fragments propres au role.
+
+La fonction build_certified_navigation() normalise les navigations sans prendre
+de decision d'autorisation. Les permissions restent controlees par les vues,
+les policies et les services metier existants.
+
+2. Anciens shells retires des pages actives
+-------------------------------------------
+Les pages principales des huit dashboards historiques heritent desormais du
+template certifie portal/staff/director_dashboard.html. Leurs anciennes
+sidebars et topbars ne sont plus rendues sur les routes actives. Les workspaces,
+formulaires, scripts et services metier sont conserves afin de ne pas casser
+les workflows existants.
+
+Les bases historiques de Secretariat, Marketing et Superadmin utilisent un
+parent dynamique uniquement pour permettre cette migration progressive : les
+pages de dashboard prennent le parent DE, tandis que leurs autres pages CRUD
+continuent de fonctionner avec leur layout historique tant qu'elles ne sont
+pas transformees en workspaces.
+
+3. Respect du contexte et de l'annexe
+-------------------------------------
+Les dashboards locaux affichent et transportent l'annexe du compte :
+Gestionnaire, Finance, Admissions, Secretariat et Informatique. Leurs requetes
+metier restent filtrees par les helpers, policies et querysets deja en place.
+
+Les roles explicitement globaux conservent leur lecture multi-annexes :
+Direction generale, Marketing et Superadmin. Ce caractere global est affiche
+dans le contexte du shell et ne provient jamais d'un choix arbitraire du
+template.
+
+4. Validation automatisee ajoutee
+---------------------------------
+portal/test_certified_management_dashboards.py ouvre les dashboards des roles
+locaux et globaux et verifie :
+
+- un statut HTTP 200 ;
+- l'heritage reel du template DE certifie ;
+- la presence du marqueur data-certified-dashboard-shell ;
+- une seule sidebar UI Core et une seule topbar UI Core ;
+- le role transmis dans dashboard_shell ;
+- une navigation non vide ;
+- la presence de l'annexe dans le contexte des roles locaux.
+
+Conclusion : il n'existe plus plusieurs coques actives pour ces dashboards de
+gestion. Il existe un moule DE unique et des workspaces/contextes par role.
+
+CONTROLES FINAUX DE LA PHASE 2
+==============================
+
+- 41 tests cibles du shell DE, DE, SG, gestionnaire, DG, IT, secretariat,
+  superadmin et integration multi-roles : OK ;
+- 15 tests de regression gestionnaire, smoke tests secretariat et controle
+  d'acces superadmin : OK ;
+- python manage.py check avec les reglages normaux : OK ;
+- python manage.py check avec config.settings_test_local : OK ;
+- compilation Python des applications touchees : OK ;
+- verification syntaxique des adaptateurs JavaScript : OK ;
+- reconstruction Tailwind static/public/css/main.css : OK.
+
+Un template secretary/meeting_list.html manquant, detecte par le smoke test du
+secretariat pendant la validation, a egalement ete ajoute afin que toutes les
+pages de liste testees continuent de repondre correctement.

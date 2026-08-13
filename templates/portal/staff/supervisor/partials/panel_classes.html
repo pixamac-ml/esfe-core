@@ -1,26 +1,25 @@
 {% load component_tags %}
-{% if not selected_class %}
-  {% component "dashboard_card" padding="none" %}
-    {% fill "default" %}
-      <div class="card-h"><h3>Classes — {{ branch.name|default:"Annexe" }}</h3><span class="hint">{{ class_picker_items|length }} classe{{ class_picker_items|length|pluralize }}</span></div>
-      <div class="card-b">
-        {% for item in class_picker_items %}
-          <button type="button" class="row clickable w-full text-left" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=classes&class_id={{ item.id }}" hx-target="#supervisor-workspace" hx-push-url="true">
-            <span class="pic">{{ item.label|slice:":2"|upper }}</span><span class="main"><b>{{ item.label }}</b><span>{{ item.student_count }} étudiant{{ item.student_count|pluralize }}</span></span><span class="tail"><i data-lucide="chevron-right" class="i"></i></span>
-          </button>
-        {% empty %}{% component "empty_state" icon="layout-grid" title="Aucune classe active" message="Aucune classe active disponible dans votre annexe." %}{% endcomponent %}{% endfor %}
-      </div>
-    {% endfill %}
-  {% endcomponent %}
-{% else %}
-  <div class="space-y-4">
-    {% component "page_header" title=selected_class.display_name subtitle="Accès rapide aux opérations de suivi de la classe" %}
-      {% fill "actions" %}<button type="button" class="btn" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=classes" hx-target="#supervisor-workspace" hx-push-url="true">Changer de classe</button>{% endfill %}
-    {% endcomponent %}
-    <div class="grid gap-3 md:grid-cols-3">
-      <button type="button" class="card p-4 text-left" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=attendance&class_id={{ selected_class_id }}" hx-target="#supervisor-workspace" hx-push-url="true"><span class="hint">Présences</span><strong class="mt-2 block">Faire l'appel</strong></button>
-      <button type="button" class="card p-4 text-left" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=schedule&class_id={{ selected_class_id }}" hx-target="#supervisor-workspace" hx-push-url="true"><span class="hint">Organisation</span><strong class="mt-2 block">Voir l'emploi du temps</strong></button>
-      <button type="button" class="card p-4 text-left" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=students&class_id={{ selected_class_id }}" hx-target="#supervisor-workspace" hx-push-url="true"><span class="hint">Effectif</span><strong class="mt-2 block">Consulter les étudiants</strong></button>
-    </div>
+<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+  {% component "ui_core.stat_card" label="Classes actives" value=total_classes icon="school" tone="primary" description="Dans votre annexe" compact=True %}{% endcomponent %}
+  {% component "ui_core.stat_card" label="Classe sélectionnée" value=selected_class_label|default:"—" icon="focus" tone="info" description="Contexte courant" compact=True %}{% endcomponent %}
+</div>
+
+{% component "ui_core.panel" title="Classes de l'annexe" subtitle="Consultation des effectifs et accès aux présences" padding=False %}
+  <div class="divide-y divide-ui-border">
+    {% for item in class_picker_items %}
+      <a
+        href="{{ supervisor_dashboard_base_url }}?section=classes&view=students&class_id={{ item.id }}"
+        hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=classes&view=students&class_id={{ item.id }}"
+        hx-target="#supervisor-workspace"
+        hx-push-url="{{ supervisor_dashboard_base_url }}?section=classes&view=students&class_id={{ item.id }}"
+        class="ui-focus-ring flex items-center gap-4 px-5 py-4 hover:bg-ui-surface-hover"
+      >
+        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ui-primary-soft text-sm font-black text-ui-primary">{{ item.label|slice:":2"|upper }}</span>
+        <span class="min-w-0 flex-1"><strong class="block truncate text-sm text-ui-text">{{ item.label }}</strong><span class="mt-1 block text-xs text-ui-text-muted">{{ item.student_count }} étudiant{{ item.student_count|pluralize }}</span></span>
+        <span class="text-xs font-semibold text-ui-primary">Consulter</span><i data-lucide="chevron-right" class="h-4 w-4 text-ui-text-muted"></i>
+      </a>
+    {% empty %}
+      <div class="p-5">{% component "ui_core.empty_state" icon="school" title="Aucune classe active" message="La Direction des études n'a publié aucune classe dans cette annexe." %}{% endcomponent %}</div>
+    {% endfor %}
   </div>
-{% endif %}
+{% endcomponent %}

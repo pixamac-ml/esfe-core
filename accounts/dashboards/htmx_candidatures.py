@@ -10,11 +10,21 @@ from django.utils.text import slugify
 from django.views.decorators.http import require_GET, require_POST
 
 from admissions.models import Candidature, CandidatureDocument
+from accounts.services.manager_dashboard_presentation import build_candidature_table_row
 
-from accounts.dashboards.htmx_utils import manager_required
+from accounts.dashboards.htmx_utils import manager_capability_required
 
 
-@manager_required
+def _candidature_row_context(request, candidature):
+    return {
+        "candidature_row": build_candidature_table_row(
+            candidature,
+            request.manager_workspace_access.capabilities,
+        )
+    }
+
+
+@manager_capability_required("view_admissions")
 @require_GET
 def candidature_detail(request: HttpRequest, pk: int) -> HttpResponse:
     candidature = get_object_or_404(
@@ -29,11 +39,12 @@ def candidature_detail(request: HttpRequest, pk: int) -> HttpResponse:
         {
             "candidature": candidature,
             "documents": documents,
+            "manager_capabilities": request.manager_workspace_access.capabilities_context(),
         },
     )
 
 
-@manager_required
+@manager_capability_required("view_admissions")
 @require_GET
 def candidature_document_download(request: HttpRequest, pk: int) -> FileResponse:
     document = get_object_or_404(
@@ -52,7 +63,7 @@ def candidature_document_download(request: HttpRequest, pk: int) -> FileResponse
     )
 
 
-@manager_required
+@manager_capability_required("manage_admissions")
 @require_POST
 def candidature_under_review(request: HttpRequest, pk: int) -> HttpResponse:
     candidature = get_object_or_404(Candidature, pk=pk, branch=request.branch)
@@ -68,7 +79,7 @@ def candidature_under_review(request: HttpRequest, pk: int) -> HttpResponse:
     response = render(
         request,
         "accounts/dashboard/partials/manager_candidature_row.html",
-        {"candidature": candidature},
+        _candidature_row_context(request, candidature),
     )
     response["HX-Trigger"] = json.dumps(
         {
@@ -82,7 +93,7 @@ def candidature_under_review(request: HttpRequest, pk: int) -> HttpResponse:
     return response
 
 
-@manager_required
+@manager_capability_required("manage_admissions")
 @require_POST
 def candidature_accept(request: HttpRequest, pk: int) -> HttpResponse:
     candidature = get_object_or_404(Candidature, pk=pk, branch=request.branch)
@@ -97,7 +108,7 @@ def candidature_accept(request: HttpRequest, pk: int) -> HttpResponse:
     response = render(
         request,
         "accounts/dashboard/partials/manager_candidature_row.html",
-        {"candidature": candidature},
+        _candidature_row_context(request, candidature),
     )
     response["HX-Trigger"] = json.dumps(
         {
@@ -109,7 +120,7 @@ def candidature_accept(request: HttpRequest, pk: int) -> HttpResponse:
     return response
 
 
-@manager_required
+@manager_capability_required("manage_admissions")
 @require_POST
 def candidature_reject(request: HttpRequest, pk: int) -> HttpResponse:
     candidature = get_object_or_404(Candidature, pk=pk, branch=request.branch)
@@ -125,7 +136,7 @@ def candidature_reject(request: HttpRequest, pk: int) -> HttpResponse:
     response = render(
         request,
         "accounts/dashboard/partials/manager_candidature_row.html",
-        {"candidature": candidature},
+        _candidature_row_context(request, candidature),
     )
     response["HX-Trigger"] = json.dumps(
         {
@@ -136,7 +147,7 @@ def candidature_reject(request: HttpRequest, pk: int) -> HttpResponse:
     return response
 
 
-@manager_required
+@manager_capability_required("manage_admissions")
 @require_POST
 def candidature_to_complete(request: HttpRequest, pk: int) -> HttpResponse:
     candidature = get_object_or_404(Candidature, pk=pk, branch=request.branch)
@@ -152,7 +163,7 @@ def candidature_to_complete(request: HttpRequest, pk: int) -> HttpResponse:
     response = render(
         request,
         "accounts/dashboard/partials/manager_candidature_row.html",
-        {"candidature": candidature},
+        _candidature_row_context(request, candidature),
     )
     response["HX-Trigger"] = json.dumps(
         {
@@ -163,7 +174,7 @@ def candidature_to_complete(request: HttpRequest, pk: int) -> HttpResponse:
     return response
 
 
-@manager_required
+@manager_capability_required("delete_candidature")
 @require_POST
 def candidature_delete(request: HttpRequest, pk: int) -> HttpResponse:
     candidature = get_object_or_404(

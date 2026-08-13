@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from accounts.forms import ProfileForm, UserPreferenceForm
@@ -9,6 +10,7 @@ from accounts.models import PayrollEntry, Profile, UserPreference
 from notifier.models import NotificationMessage
 from notification_center.selectors import get_user_notifications, get_user_unread_count
 from notifier.services import NotificationBus
+from portal.services import build_role_dashboard_shell
 from .forms import AnnouncementForm, CampaignForm, MarketingMediaForm, MarketingSettingsForm, ProspectLeadForm
 from .models import Announcement, Campaign, MarketingMedia, MarketingSettings, ProspectLead
 from .permissions import marketing_required
@@ -89,6 +91,38 @@ def _build_account_context(request, *, selected_notification=None, profile_form=
 def dashboard(request):
     context = build_marketing_dashboard_context(request)
     context.update(_build_account_context(request))
+    context.update(
+        build_role_dashboard_shell(
+            request,
+            role="marketing_manager",
+            key="marketing",
+            title="Marketing digital",
+            subtitle="Communication et campagnes",
+            active_section="overview",
+            dashboard_url=reverse("marketing:dashboard"),
+            context_label="Pilotage global - Toutes les annexes",
+            groups=[
+                {
+                    "label": "Pilotage",
+                    "items": [
+                        {"key": "overview", "label": "Dashboard principal", "icon": "chart-no-axes-combined"},
+                        {"key": "announcements", "label": "Communication interne", "icon": "bell", "url": reverse("marketing:announcement_create")},
+                        {"key": "campaigns", "label": "Campagnes externes", "icon": "mail-open", "url": reverse("marketing:campaign_create")},
+                        {"key": "media", "label": "Bibliotheque media", "icon": "images", "url": reverse("marketing:media_create")},
+                        {"key": "prospects", "label": "Prospects et audiences", "icon": "users", "url": reverse("marketing:prospect_create")},
+                    ],
+                },
+                {
+                    "label": "Configuration",
+                    "items": [
+                        {"key": "settings", "label": "Parametres marketing", "icon": "sliders-horizontal", "url": reverse("marketing:settings")},
+                        {"key": "account", "label": "Mon compte", "icon": "user-cog", "url": reverse("accounts_portal:system_profile")},
+                    ],
+                },
+            ],
+            modal_title="Operation marketing",
+        )
+    )
     return render(request, "marketing/dashboard.html", context)
 
 

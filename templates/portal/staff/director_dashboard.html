@@ -1,35 +1,47 @@
 {% extends "portal/app_base.html" %}
 {% load static component_tags %}
 
-{% block title %}Dashboard Direction des Études{% endblock %}
+{% block title %}{{ dashboard_shell.page_title|default:page_title }}{% endblock %}
 
 {% block extra_head %}
-  <script defer src="{% static 'src/js/portal/director_dashboard.js' %}"></script>
+  {{ block.super }}
+  {% if dashboard_shell.stylesheet_path %}
+    <link rel="stylesheet" href="{% static dashboard_shell.stylesheet_path %}">
+  {% endif %}
+  <script defer src="{% static 'src/js/portal/certified_dashboard_shell.js' %}"></script>
+  {% if dashboard_shell.script_path %}
+    <script defer src="{% static dashboard_shell.script_path %}"></script>
+  {% endif %}
 {% endblock %}
 
 {% block content %}
+<div
+  data-certified-dashboard-shell="true"
+  data-dashboard-role="{{ dashboard_shell.role }}"
+  data-dashboard-key="{{ dashboard_shell.key }}"
+>
 {% component "ui_core.app_shell" %}
   {% fill "sidebar" %}
     {% component "ui_core.app_sidebar"
-      groups=director_navigation
+      groups=dashboard_shell.navigation
       brand="ESFE Mali"
-      subtitle="Direction des Études"
-      user_name=request.user.get_full_name|default:request.user.username
-      user_meta=director_context_label
+      subtitle=dashboard_shell.subtitle
+      user_name=dashboard_shell.user_name
+      user_meta=dashboard_shell.context_label
     %}{% endcomponent %}
   {% endfill %}
 
   {% fill "topbar" %}
     {% component "ui_core.app_topbar"
-      title="Direction des Études"
-      context_label=director_context_label
+      title=dashboard_shell.title
+      context_label=dashboard_shell.context_label
       user_name=""
       notification_count=notification_count
-      notifications_url=""
-      show_notifications_button=False
+      notifications_url=dashboard_shell.notifications_url
+      show_notifications_button=dashboard_shell.show_notifications_button
     %}
       {% fill "actions" %}
-        {% include "portal/staff/director/partials/topbar_fragments.html" %}
+        {% include dashboard_shell.topbar_template %}
       {% endfill %}
     {% endcomponent %}
   {% endfill %}
@@ -37,7 +49,7 @@
   {% fill "default" %}
     <div class="relative">
       <div
-        id="director-loading"
+        id="{{ dashboard_shell.loading_id }}"
         class="hidden fixed left-1/2 top-20 z-40 -translate-x-1/2 rounded-ui-button border border-ui-border bg-ui-surface px-4 py-2 text-sm font-semibold text-ui-text shadow-ui-dropdown"
         role="status"
         aria-live="polite"
@@ -47,28 +59,33 @@
           Mise à jour
         </span>
       </div>
-      <div id="director-workspace" tabindex="-1" aria-live="polite" aria-busy="false">
-        {% if director_active_section == "home" %}
-          {% include "portal/staff/director/partials/home.html" %}
-        {% else %}
-          {% include "portal/staff/director/partials/workspace.html" %}
-        {% endif %}
+      <div
+        id="{{ dashboard_shell.workspace_id }}"
+        data-dashboard-workspace="{{ dashboard_shell.key }}"
+        tabindex="-1"
+        aria-live="polite"
+        aria-busy="false"
+      >
+        {% block dashboard_content %}
+          {% include dashboard_shell.workspace_template %}
+        {% endblock %}
       </div>
     </div>
 
-    {% component "ui_core.drawer" id="director-drawer" title="Détail" size="wide" %}
+    {% component "ui_core.drawer" id=dashboard_shell.drawer_id title=dashboard_shell.drawer_title size="wide" %}
       {% fill "default" %}
-        <p class="text-sm text-ui-text-muted">Sélectionnez un élément pour afficher ses détails.</p>
+        <p class="text-sm text-ui-text-muted">{{ dashboard_shell.empty_drawer_message }}</p>
       {% endfill %}
     {% endcomponent %}
 
-    {% component "ui_core.modal" id="director-modal" title="Formulaire" size="wide" %}
+    {% component "ui_core.modal" id=dashboard_shell.modal_id title=dashboard_shell.modal_title size="wide" %}
       {% fill "default" %}
-        <p class="text-sm text-ui-text-muted">Sélectionnez une action pour ouvrir le formulaire.</p>
+        <p class="text-sm text-ui-text-muted">{{ dashboard_shell.empty_modal_message }}</p>
       {% endfill %}
     {% endcomponent %}
 
-    {% component "ui_core.confirm_dialog" id="director-confirm" title="Confirmer l'action" message="Cette action nécessite votre confirmation." confirm_label="Confirmer" cancel_label="Annuler" %}{% endcomponent %}
+    {% component "ui_core.confirm_dialog" id=dashboard_shell.confirm_id title="Confirmer l'action" message="Cette action nécessite votre confirmation." confirm_label="Confirmer" cancel_label="Annuler" %}{% endcomponent %}
   {% endfill %}
 {% endcomponent %}
+</div>
 {% endblock %}

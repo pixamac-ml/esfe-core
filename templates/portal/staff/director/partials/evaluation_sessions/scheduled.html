@@ -1,0 +1,119 @@
+{% load component_tags %}
+<div class="space-y-5">
+  {% if director_fragment_response %}<span id="director-evaluation-count" hx-swap-oob="innerHTML">{{ eval_event_total }}</span>{% endif %}
+  {% if toast %}
+    {% if toast.level == "success" %}
+      {% component "ui_core.alert" title="Évaluations programmées" message=toast.message tone="success" %}{% endcomponent %}
+    {% else %}
+      {% component "ui_core.alert" title="Action non effectuée" message=toast.message tone="danger" %}{% endcomponent %}
+    {% endif %}
+  {% endif %}
+
+  <form method="get"
+        hx-get="{% url 'accounts_portal:director_exam_sessions_subcontent' %}"
+        hx-target="#director-session-subcontent"
+        hx-swap="innerHTML"
+        hx-trigger="submit, change from:select"
+        hx-indicator="#director-session-loading"
+        hx-sync="#director-session-subcontent:replace"
+        class="grid min-w-0 gap-3 border-y border-ui-border py-4 sm:grid-cols-2 xl:grid-cols-[minmax(12rem,1fr)_12rem_12rem_minmax(14rem,1fr)_auto]">
+    <input type="hidden" name="view" value="scheduled">
+    <label class="min-w-0">
+      <span class="sr-only">Rechercher une évaluation</span>
+      <input type="search" name="evaluation_q" value="{{ evaluation_q }}" placeholder="Titre, matière ou salle" class="h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text focus:border-ui-focus focus:ring-ui-focus">
+    </label>
+    <label>
+      <span class="sr-only">Filtrer par statut</span>
+      <select name="evaluation_status" class="h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text focus:border-ui-focus focus:ring-ui-focus">
+        <option value="">Tous les statuts</option>
+        {% for value, label in evaluation_status_choices %}<option value="{{ value }}" {% if evaluation_status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>
+      <span class="sr-only">Filtrer par type</span>
+      <select name="evaluation_type" class="h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text focus:border-ui-focus focus:ring-ui-focus">
+        <option value="">Tous les types</option>
+        {% for value, label in evaluation_type_choices %}<option value="{{ value }}" {% if evaluation_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="min-w-0">
+      <span class="sr-only">Filtrer par classe</span>
+      <select name="evaluation_class" class="h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text focus:border-ui-focus focus:ring-ui-focus">
+        <option value="">Toutes les classes</option>
+        {% for academic_class in classes %}<option value="{{ academic_class.id }}" {% if evaluation_class == academic_class.id|stringformat:'s' %}selected{% endif %}>{{ academic_class.display_name }}</option>{% endfor %}
+      </select>
+    </label>
+    <button type="submit" class="ui-focus-ring inline-flex h-ui-control items-center justify-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-4 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">
+      <i data-lucide="search" class="h-4 w-4" aria-hidden="true"></i>Rechercher
+    </button>
+  </form>
+
+  <div id="director-evaluation-list-region" class="min-w-0">
+    {% if eval_events_by_class %}
+      <div class="space-y-5">
+        {% for group in eval_events_by_class %}
+        <section class="min-w-0" aria-labelledby="evaluation-class-{{ group.academic_class.id }}">
+          <div class="mb-2 flex min-w-0 items-center gap-2">
+            <i data-lucide="users" class="h-4 w-4 shrink-0 text-ui-primary" aria-hidden="true"></i>
+            <h3 id="evaluation-class-{{ group.academic_class.id }}" class="min-w-0 break-words text-sm font-bold text-ui-text">{{ group.academic_class.display_name }}</h3>
+            <span class="ml-auto shrink-0 text-xs font-semibold text-ui-text-muted">{{ group.events|length }} sur cette page</span>
+          </div>
+          <div class="divide-y divide-ui-border border-y border-ui-border">
+            {% for evt in group.events %}
+            <article class="flex min-w-0 flex-col gap-4 py-4 lg:flex-row lg:items-start lg:justify-between">
+              <div class="flex min-w-0 gap-3">
+                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button {% if evt.event_type == 'exam' %}bg-ui-danger-soft text-ui-danger{% else %}bg-ui-warning-soft text-ui-warning{% endif %}">
+                  <i data-lucide="{% if evt.event_type == 'exam' %}file-check{% else %}activity{% endif %}" class="h-5 w-5" aria-hidden="true"></i>
+                </span>
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <h4 class="break-words text-sm font-bold text-ui-text">{{ evt.title }}</h4>
+                    {% if evt.status == "planned" %}
+                      {% component "ui_core.status_badge" label=evt.get_status_display tone="info" %}{% endcomponent %}
+                    {% elif evt.status == "ongoing" or evt.status == "completed" %}
+                      {% component "ui_core.status_badge" label=evt.get_status_display tone="success" %}{% endcomponent %}
+                    {% elif evt.status == "cancelled" %}
+                      {% component "ui_core.status_badge" label=evt.get_status_display tone="danger" %}{% endcomponent %}
+                    {% elif evt.status == "postponed" %}
+                      {% component "ui_core.status_badge" label=evt.get_status_display tone="warning" %}{% endcomponent %}
+                    {% else %}
+                      {% component "ui_core.status_badge" label=evt.get_status_display tone="neutral" %}{% endcomponent %}
+                    {% endif %}
+                  </div>
+                  <p class="mt-1 break-words text-xs font-semibold text-ui-text-muted">{{ evt.ec.title }} · {{ evt.teacher.get_full_name|default:evt.teacher.username }}</p>
+                  <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ui-text-muted">
+                    <span><i data-lucide="calendar" class="mr-1 inline h-3.5 w-3.5" aria-hidden="true"></i>{{ evt.start_datetime|date:"d/m/Y" }}</span>
+                    <span><i data-lucide="clock" class="mr-1 inline h-3.5 w-3.5" aria-hidden="true"></i>{{ evt.start_datetime|time:"H:i" }} à {{ evt.end_datetime|time:"H:i" }}</span>
+                    {% if evt.location %}<span><i data-lucide="map-pin" class="mr-1 inline h-3.5 w-3.5" aria-hidden="true"></i>{{ evt.location }}</span>{% endif %}
+                  </div>
+                  {% if evt.description %}<p class="mt-2 max-w-3xl break-words text-sm text-ui-text-muted">{{ evt.description }}</p>{% endif %}
+                </div>
+              </div>
+              {% if evt.status != 'cancelled' and evt.status != 'completed' %}
+              <details class="relative shrink-0">
+                <summary class="ui-focus-ring inline-flex h-9 cursor-pointer list-none items-center gap-2 rounded-ui-button border border-ui-danger/30 bg-ui-danger-soft px-3 text-xs font-semibold text-ui-danger">
+                  <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>Annuler
+                </summary>
+                <form method="post" hx-post="{% url 'accounts_portal:director_evaluation_action' %}" hx-target="#director-session-subcontent" hx-swap="innerHTML" hx-disabled-elt="button[type=submit]" class="absolute right-0 z-10 mt-2 w-72 max-w-[85vw] space-y-3 rounded-ui-card border border-ui-border bg-ui-surface p-3 shadow-ui-dropdown">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="cancel">
+                  <input type="hidden" name="event_id" value="{{ evt.id }}">
+                  <label class="block text-xs font-semibold text-ui-text">Motif
+                    <textarea name="reason" rows="2" required class="mt-1 min-h-20 w-full rounded-ui-input border border-ui-border px-3 py-2 text-sm" placeholder="Motif de l'annulation"></textarea>
+                  </label>
+                  <button type="submit" class="ui-focus-ring h-9 w-full rounded-ui-button bg-ui-danger px-3 text-xs font-semibold text-white">Confirmer l'annulation</button>
+                </form>
+              </details>
+              {% endif %}
+            </article>
+            {% endfor %}
+          </div>
+        </section>
+        {% endfor %}
+      </div>
+      {% include "portal/staff/director/partials/_pagination.html" with page_obj=eval_events_page page_param="events_page" query_suffix=evaluation_query_suffix target_id="#director-evaluation-list-region" hx_select="#director-evaluation-list-region" pagination_url_name="accounts_portal:director_exam_sessions_subcontent" indicator_id="#director-session-loading" %}
+    {% else %}
+      {% component "ui_core.empty_state" title="Aucune évaluation programmée" message="Planifiez une évaluation ou ajustez les filtres affichés." icon="calendar-clock" %}{% endcomponent %}
+    {% endif %}
+  </div>
+</div>

@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends dashboard_parent|default:"base.html" %}
 {% load static %}
 {% load humanize %}
 
@@ -410,6 +410,9 @@
 {% block public_cookie_consent %}{% endblock %}
 
 {% block content %}
+{% if dashboard_shell %}
+{{ block.super }}
+{% else %}
 <div x-data="superadminLayout()" x-init="init()" @keydown.window="handleShortcuts($event)" class="superadmin-shell">
     <div id="htmx-progress"></div>
     <div class="mobile-overlay" x-show="mobileMenu" x-transition.opacity @click="mobileMenu = false" x-cloak></div>
@@ -654,6 +657,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 
 <script>
 function superadminLayout() {

@@ -1,0 +1,1314 @@
+RAPPORT DETAILLE — MIGRATION ET ETAT DU DASHBOARD SURVEILLANT GENERAL
+=====================================================================
+
+Projet : ESFE Core
+Date du rapport : 1er août 2026
+Dashboard de référence : Directeur des études (DE)
+Dashboard concerné : Surveillant général / position "academic_supervisor"
+
+
+1. OBJECTIF DE L'INTERVENTION
+=============================
+
+L'objectif de cette première intervention n'était pas encore de redéfinir toutes
+les attributions métier du Surveillant général. Le travail réalisé a consisté à
+remettre son dashboard sur la bonne architecture visuelle et technique, en
+prenant le dashboard du Directeur des études comme moule de référence.
+
+Le dashboard DE sert ici de référence pour :
+
+- le shell général de l'application ;
+- la sidebar et la topbar ;
+- la navigation interne par fragments HTMX ;
+- les drawers, confirmations et notifications visuelles ;
+- la stabilité des URL ;
+- l'organisation entre présentation, navigation et logique métier ;
+- le comportement responsive attendu.
+
+Important : reprendre le moule du DE ne signifie pas donner au Surveillant les
+mêmes permissions que le DE. Le design et l'architecture sont communs, mais les
+attributions métier doivent rester propres à chaque position.
+
+
+2. SITUATION AVANT LA MIGRATION
+===============================
+
+Le dashboard Surveillant utilisait encore une ancienne structure indépendante :
+
+- héritage depuis "base_app.html" au lieu de "portal/app_base.html" ;
+- shell spécifique avec les classes historiques "shell", "rail" et "work" ;
+- composants spécialisés "supervisor_sidebar", "supervisor_topbar" et
+  "supervisor_workspace" ;
+- navigation partiellement reconstruite dans les fragments HTMX ;
+- coexistence d'URL de dashboard et d'URL de fragments comme pages complètes ;
+- redirections historiques utilisant des ancres telles que "#absences" et
+  "#courses" ;
+- route V2 de la position Surveillant pointant encore vers une route de
+  compatibilité intermédiaire ;
+- interactions JavaScript propres à cet ancien shell ;
+- risque de requêtes non filtrées lorsqu'un Surveillant ne possédait pas
+  d'annexe correctement rattachée.
+
+Cette situation pouvait provoquer :
+
+- des changements de design entre deux dashboards ;
+- des liens directs ouvrant un fragment sans le shell complet ;
+- des retours arrière ou rafraîchissements incohérents ;
+- des états actifs de navigation incorrects ;
+- des redirections vers des zones qui n'existent plus dans le nouveau design ;
+- et surtout un risque de visibilité inter-annexes dans certains cas non
+  correctement bornés.
+
+
+3. MIGRATION DU SHELL VERS UI CORE
+==================================
+
+Le template principal suivant a été migré :
+
+  templates/portal/staff/supervisor_dashboard.html
+
+Il utilise maintenant :
+
+- "portal/app_base.html" ;
+- "ui_core.app_shell" ;
+- "ui_core.app_sidebar" ;
+- "ui_core.app_topbar" ;
+- "ui_core.page_header" ;
+- "ui_core.drawer" ;
+- "ui_core.confirm_dialog".
+
+Les éléments concrets ajoutés au shell sont :
+
+- une sidebar UI Core organisée par groupes fonctionnels ;
+- une topbar affichant le contexte de l'annexe ;
+- un sélecteur de classe actif et responsive ;
+- le compteur des notifications non lues ;
+- un bouton de déconnexion POST avec jeton CSRF ;
+- un indicateur de chargement pour les requêtes HTMX ;
+- un workspace unique identifié par "#supervisor-workspace" ;
+- un drawer UI Core unique pour les fiches et formulaires secondaires ;
+- une boîte de confirmation UI Core pour les actions sensibles.
+
+L'ancienne feuille CSS métier du Surveillant est encore chargée pour préserver
+la présentation interne des tableaux, plannings et formulaires qui n'ont pas
+encore tous été réécrits en composants UI Core. Le shell, lui, est désormais
+celui de la bibliothèque commune.
+
+
+4. NOUVELLE NAVIGATION DU SURVEILLANT
+=====================================
+
+Une navigation dédiée a été ajoutée dans :
+
+  ui/services/navigation.py
+
+Fonction ajoutée :
+
+  build_supervisor_navigation(...)
+
+Elle construit les groupes suivants :
+
+PILOTAGE
+
+- Vue générale ;
+- Classes.
+
+PRESENCES ET ASSIDUITE
+
+- Appel du jour ;
+- Rapport mensuel ;
+- Étudiants.
+
+SUIVI DES ENSEIGNANTS
+
+- Présence du jour ;
+- Rapport hebdomadaire.
+
+ORGANISATION
+
+- Emploi du temps ;
+- Cours et séances ;
+- Cas disciplinaires.
+
+Chaque entrée possède maintenant :
+
+- une URL canonique de page complète ;
+- une URL de fragment HTMX ;
+- une cible HTMX commune ;
+- une clé de navigation stable ;
+- un état actif ;
+- un éventuel badge, notamment pour les cas ouverts ;
+- la conservation de la classe active lorsque la section en dépend.
+
+La fonction a également été exportée depuis :
+
+  ui/services/__init__.py
+
+
+5. SERVICE DE PRESENTATION AJOUTE
+=================================
+
+Un nouveau service a été créé :
+
+  portal/services/supervisor_dashboard_presentation.py
+
+Son rôle est de préparer les données strictement nécessaires au shell UI Core,
+sans déplacer la logique métier des services existants.
+
+Il fournit notamment :
+
+- la navigation du Surveillant ;
+- la section active ;
+- le libellé de l'annexe ;
+- l'URL canonique du dashboard ;
+- l'URL du fragment actif ;
+- l'URL utilisée par le sélecteur de classe ;
+- le compteur et l'URL des notifications.
+
+Cette séparation évite de reconstruire des contrats de présentation directement
+dans le template principal.
+
+
+6. CANONICALISATION DES URL ET DES REDIRECTIONS
+================================================
+
+L'entrée officielle du dashboard Surveillant est maintenant :
+
+  /portal/dashboard/?section=<section>
+
+Exemples :
+
+  /portal/dashboard/?section=home
+  /portal/dashboard/?section=attendance&class_id=12
+  /portal/dashboard/?section=schedule&class_id=12
+  /portal/dashboard/?section=cases
+
+Les endpoints "workflow" et "cases" sont désormais considérés comme des
+endpoints de fragments :
+
+- une requête HTMX reçoit uniquement le contenu du workspace ;
+- une requête normale reçue directement sur un endpoint de fragment est
+  redirigée vers l'URL canonique du dashboard.
+
+La position "academic_supervisor" a été modifiée dans :
+
+  accounts/position_registry.py
+
+Elle pointe directement vers "accounts_portal:portal_dashboard". Elle ne passe
+donc plus par une redirection intermédiaire après connexion lorsque le routage
+V2 est activé.
+
+L'ancienne route :
+
+  /portal/supervisor/
+
+est conservée uniquement comme alias de compatibilité pour les anciens favoris
+ou liens déjà diffusés. Elle redirige vers l'entrée canonique et n'est plus la
+cible principale du registre de position.
+
+Les anciennes redirections d'actions ont aussi été corrigées :
+
+- "#absences" a été remplacé par "?section=attendance" ;
+- "#courses" a été remplacé par "?section=courses".
+
+Les boutons et formulaires HTMX modifiés utilisent eux aussi une URL canonique
+pour l'historique du navigateur. Cela évite qu'un rafraîchissement ouvre un
+fragment isolé ou une ancienne page.
+
+
+7. ADAPTATEUR JAVASCRIPT UI CORE
+================================
+
+Le fichier suivant a été ajouté :
+
+  static/src/js/portal/supervisor_dashboard.js
+
+Il assure les comportements suivants :
+
+- activation visuelle de la bonne entrée de navigation ;
+- synchronisation de la classe sélectionnée avec tous les liens concernés ;
+- mise à jour de l'URL canonique sans créer une fausse page ;
+- synchronisation du sélecteur de classe avec la section active ;
+- masquage du sélecteur dans la section des cas disciplinaires ;
+- affichage et retrait de l'état de chargement du workspace ;
+- ouverture du drawer UI Core avant le chargement de son contenu ;
+- fermeture du drawer depuis les anciens événements applicatifs ;
+- conversion des confirmations HTMX vers "ui_core.confirm_dialog" ;
+- conversion des anciens événements "toast" vers le système ESFE UI ;
+- remise au point clavier sur le workspace après un remplacement HTMX.
+
+Le but de cet adaptateur est d'assurer la transition sans casser immédiatement
+tous les anciens fragments métier.
+
+
+8. FRAGMENTS ET PANNEAUX MODIFIES
+================================
+
+Les workspaces suivants utilisent maintenant un en-tête UI Core et exposent
+explicitement leur section et leur classe active :
+
+  templates/portal/staff/supervisor/partials/workflow_workspace.html
+  templates/portal/staff/supervisor/partials/cases_workspace.html
+
+Un fragment de topbar a été ajouté :
+
+  templates/portal/staff/supervisor/partials/topbar_actions.html
+
+Les panneaux suivants ont été ajustés pour pousser l'URL canonique du dashboard
+et non l'URL technique du fragment :
+
+- panel_home.html ;
+- panel_classes.html ;
+- panel_attendance.html ;
+- panel_attendance_report.html ;
+- panel_students.html ;
+- panel_teachers_report.html.
+
+Les styles d'impression des rapports de présence étudiant et de régularité
+enseignant ont été adaptés afin de masquer la sidebar et la topbar UI Core lors
+de l'impression.
+
+
+9. RENFORCEMENT DU FILTRAGE OBLIGATOIRE PAR ANNEXE
+==================================================
+
+Le filtrage par annexe est la règle de sécurité la plus importante de ce
+dashboard.
+
+Avant cette intervention, plusieurs vues du Surveillant utilisaient une
+résolution d'annexe plus permissive. Lorsqu'aucune annexe n'était trouvée,
+certaines fonctions pouvaient construire des querysets trop larges.
+
+Une résolution obligatoire a été introduite dans :
+
+  portal/views/supervisor.py
+  portal/views/supervisor_cases.py
+
+Elle s'appuie sur le même mécanisme de portée académique stricte que le DE, en
+ajoutant explicitement la position "academic_supervisor" parmi les positions
+autorisées et obligatoirement rattachées à une annexe.
+
+Conséquences :
+
+- un Surveillant sans annexe reçoit une interdiction HTTP 403 ;
+- le sélecteur de classe reçoit toujours l'annexe du compte ;
+- les classes sont recherchées dans cette annexe seulement ;
+- les étudiants sont recherchés dans cette annexe et dans la classe active ;
+- les enseignants sont recherchés dans cette annexe ;
+- les séances, feuilles d'appel et présences sont bornées à l'annexe ;
+- les cas étudiants et enseignants sont bornés à l'annexe ;
+- les convocations et remplacements sont bornés à l'annexe ;
+- les impressions individuelles sont bornées à l'annexe.
+
+Toutes les fonctions principales de "portal/views/supervisor.py" qui utilisaient
+l'ancienne résolution ont été basculées vers la résolution obligatoire.
+
+
+10. ATTRIBUTIONS ACTUELLEMENT PRESENTES DANS LE CODE
+====================================================
+
+Cette section décrit ce que le dashboard permet techniquement aujourd'hui. Elle
+ne signifie pas que toutes ces attributions ont déjà été validées par la
+Direction de l'ESFE.
+
+10.1 Pilotage quotidien
+-----------------------
+
+La page d'accueil présente actuellement :
+
+- le taux de présence du jour ;
+- le nombre d'appels encore en attente ;
+- le nombre d'enseignants absents ;
+- le nombre de cas disciplinaires ouverts ;
+- les séances du jour ;
+- les appels non faits ;
+- les alertes d'absences répétées ;
+- des raccourcis vers les sections opérationnelles.
+
+10.2 Suivi des classes
+----------------------
+
+Le Surveillant peut actuellement :
+
+- sélectionner une classe de son annexe ;
+- consulter l'effectif actif ;
+- consulter les indicateurs de présence de la classe ;
+- accéder à l'emploi du temps de la classe ;
+- accéder aux étudiants de la classe ;
+- consulter les matières et enseignants liés au planning.
+
+10.3 Appel et présence des étudiants
+------------------------------------
+
+Le workflow actuel permet :
+
+- d'ouvrir une feuille d'appel ;
+- de sélectionner une séance du jour ;
+- de marquer un étudiant présent, absent ou en retard ;
+- d'ajouter une justification ;
+- de valider la feuille d'appel ;
+- de rouvrir une feuille validée pour correction ;
+- de consulter un rapport mensuel par classe ;
+- d'imprimer un relevé individuel de présence.
+
+10.4 Suivi des enseignants
+--------------------------
+
+Le dashboard permet actuellement :
+
+- de consulter les enseignants attendus le jour même ;
+- de voir leur présence ou leur absence ;
+- de voir leur ponctualité ;
+- de voir si l'appel ou le cahier de séance a été complété ;
+- de modifier la présence d'un enseignant ;
+- d'affecter un enseignant remplaçant à une séance ;
+- de signaler un incident concernant un enseignant ;
+- de consulter un rapport hebdomadaire ;
+- d'imprimer un relevé individuel de régularité.
+
+10.5 Emploi du temps et planification
+-------------------------------------
+
+Le Surveillant possède actuellement des actions importantes :
+
+- consulter le planning hebdomadaire d'une classe ;
+- créer ou modifier des créneaux hebdomadaires ;
+- désactiver un créneau ;
+- créer rapidement une séance ponctuelle ;
+- matérialiser les créneaux sur une semaine ;
+- matérialiser les créneaux sur un mois ;
+- choisir une matière, un enseignant, une salle et des horaires ;
+- créer directement un événement de cours planifié.
+
+10.6 Cours et cahier de séance
+------------------------------
+
+Le code permet actuellement au Surveillant :
+
+- de consulter les séances d'une classe ;
+- de créer une séance ;
+- de créer ou mettre à jour un cahier de séance ;
+- de renseigner le statut du cours ;
+- de renseigner le contenu traité ;
+- de renseigner le devoir donné ;
+- d'ajouter des observations.
+
+10.7 Étudiants, discipline et cas
+---------------------------------
+
+Le dashboard permet actuellement :
+
+- de rechercher un étudiant de la classe ;
+- d'ouvrir sa fiche dans un drawer ;
+- de consulter son historique de présence ;
+- de consulter ses alertes actives ;
+- de consulter ses cas disciplinaires ;
+- de créer un nouveau cas étudiant ;
+- de créer un cas enseignant à partir d'un signalement ;
+- d'ouvrir le détail d'un cas étudiant ou enseignant ;
+- d'ajouter une note interne ;
+- de faire avancer le cas dans son workflow ;
+- de transmettre le cas au Directeur des études.
+
+10.8 Convocations
+-----------------
+
+Le dashboard permet actuellement :
+
+- d'ouvrir un formulaire de convocation ;
+- de cibler un étudiant ou un enseignant selon le contexte ;
+- de créer une convocation rattachée à l'annexe ;
+- d'associer une convocation à un cas ;
+- de déclencher le mécanisme de notification prévu par le service.
+
+
+11. ATTRIBUTIONS QUI DOIVENT ETRE REVUES EN PRIORITE
+====================================================
+
+Le point le plus important pour la prochaine étape est de décider si les
+capacités techniques ci-dessus correspondent réellement à la fonction du
+Surveillant général à l'ESFE.
+
+11.1 Validation et réouverture des appels
+-----------------------------------------
+
+Question à trancher :
+
+- le Surveillant peut-il ouvrir l'appel uniquement si l'enseignant ne le fait
+  pas, ou peut-il toujours le faire ?
+- peut-il valider définitivement un appel ?
+- peut-il rouvrir seul un appel déjà validé ?
+- la réouverture doit-elle exiger un motif obligatoire ?
+- le DE doit-il être informé de chaque correction après validation ?
+- faut-il conserver un historique avant/après de chaque modification ?
+
+Risque actuel : le pouvoir de rouvrir et de corriger existe techniquement, mais
+le niveau d'autorisation et la traçabilité métier doivent être confirmés.
+
+11.2 Présence des enseignants
+-----------------------------
+
+Questions à trancher :
+
+- le Surveillant constate-t-il seulement la présence ou valide-t-il une donnée
+  ayant un impact administratif ou financier ?
+- qui peut corriger une présence enseignant après la journée ?
+- un retard doit-il contenir une heure d'arrivée et une justification ?
+- une absence doit-elle créer automatiquement une alerte au DE ?
+- la présence enseignant doit-elle influencer les honoraires ou seulement
+  servir de signal opérationnel ?
+
+Règle à protéger : le dashboard Surveillant ne doit pas devenir un dashboard de
+paie ni modifier directement les honoraires enseignants.
+
+11.3 Modification de l'emploi du temps
+---------------------------------------
+
+Le Surveillant peut actuellement créer et modifier des créneaux, créer une
+séance et matérialiser une semaine ou un mois.
+
+Questions à trancher :
+
+- le Surveillant prépare-t-il un brouillon ou publie-t-il directement ?
+- la validation finale appartient-elle au DE ?
+- peut-il changer l'enseignant, la matière, la salle et les horaires ?
+- peut-il désactiver un créneau déjà utilisé ?
+- faut-il une justification pour toute modification d'un planning publié ?
+- quelles notifications doivent partir vers l'enseignant, les étudiants et le
+  DE après une modification ?
+
+Recommandation : introduire clairement les états "brouillon", "soumis",
+"validé/publié", "modifié" et "annulé" si le DE doit garder la validation.
+
+11.4 Cahier de séance
+---------------------
+
+Questions à trancher :
+
+- le contenu pédagogique doit-il être saisi uniquement par l'enseignant ?
+- le Surveillant doit-il seulement constater qu'il manque ?
+- peut-il corriger le contenu ou uniquement demander une correction ?
+- doit-il pouvoir renseigner le cahier lorsque l'enseignant est empêché ?
+- toute modification par le Surveillant doit-elle être signalée au DE et à
+  l'enseignant ?
+
+Risque actuel : le code permet au Surveillant de créer ou modifier le contenu,
+le devoir et les observations d'un cahier de séance.
+
+11.5 Affectation des remplaçants
+--------------------------------
+
+Questions à trancher :
+
+- le Surveillant peut-il décider seul du remplaçant ?
+- doit-il proposer un remplaçant puis attendre l'accord du DE ?
+- faut-il vérifier automatiquement les conflits d'horaire et les compétences
+  liées à la matière ?
+- l'enseignant remplacé, le remplaçant et la classe sont-ils notifiés ?
+- faut-il conserver l'identité de l'auteur et la raison du remplacement ?
+
+11.6 Cas disciplinaires
+-----------------------
+
+Questions à trancher :
+
+- quelles catégories de cas le Surveillant peut-il créer ?
+- peut-il traiter de la même manière un cas étudiant et un cas enseignant ?
+- quelles étapes peut-il faire avancer lui-même ?
+- à quel niveau la transmission au DE devient-elle obligatoire ?
+- peut-il fermer un cas ou seulement le transmettre ?
+- quelles notes sont visibles par le DE, l'étudiant, l'enseignant ou le
+  secrétariat ?
+- faut-il distinguer observation, avertissement, incident grave et sanction ?
+
+11.7 Convocations
+-----------------
+
+Questions à trancher :
+
+- le Surveillant peut-il convoquer directement un enseignant ?
+- une convocation grave doit-elle être validée par le DE ?
+- faut-il une signature, un numéro de document ou un modèle officiel ?
+- comment tracer l'envoi, la remise, la lecture et la présence au rendez-vous ?
+- les convocations doivent-elles produire un document imprimable archivé ?
+
+11.8 Rapports et impressions
+----------------------------
+
+Questions à trancher :
+
+- quels rapports sont seulement consultables ?
+- quels rapports peuvent être imprimés ou exportés ?
+- quelles données personnelles doivent être masquées ?
+- faut-il ajouter des rapports journalier, hebdomadaire et mensuel à transmettre
+  au DE ?
+- faut-il un journal des exports et impressions sensibles ?
+
+11.9 Alertes et indicateurs
+---------------------------
+
+Les seuils doivent être définis avec le métier :
+
+- nombre d'absences déclenchant une alerte ;
+- retard enseignant considéré comme anomalie ;
+- délai avant qu'un appel non fait soit signalé ;
+- durée maximale d'un cas ouvert ;
+- niveau de gravité nécessitant une transmission automatique au DE.
+
+11.10 Limites explicites du rôle
+--------------------------------
+
+Il faudra écrire noir sur blanc ce que le Surveillant ne peut jamais faire.
+
+Exemples recommandés à confirmer :
+
+- aucun accès inter-annexes ;
+- aucune gestion de salaire staff ;
+- aucune gestion d'honoraire enseignant ;
+- aucune validation financière ;
+- aucune modification d'admission ou d'inscription ;
+- aucune sanction définitive réservée au DE ou à la Direction ;
+- aucune modification du dossier académique permanent sans workflow validé.
+
+
+12. DETTE TECHNIQUE ENCORE PRESENTE
+===================================
+
+La migration du shell est terminée, mais le domaine Surveillant doit encore être
+nettoyé techniquement.
+
+12.1 Vue principale trop volumineuse
+------------------------------------
+
+  portal/views/supervisor.py
+
+contient encore de nombreuses responsabilités : dashboard, présences, planning,
+cours, étudiants, enseignants, remplacements et convocations. Il faudra le
+découper en vues ou contrôleurs par domaine, sur le modèle des dashboards les
+mieux structurés du projet.
+
+12.2 Templates historiques en double
+-------------------------------------
+
+Le dossier des templates contient encore :
+
+- des variantes "sg_*" ;
+- des variantes sans préfixe ;
+- l'ancienne sidebar ;
+- l'ancien en-tête de workspace ;
+- d'anciens composants de confirmation.
+
+Ils ont été conservés pour éviter une suppression risquée pendant la migration.
+Il faudra identifier ceux qui ne sont plus appelés, les déprécier, puis les
+supprimer avec des tests de non-régression.
+
+12.3 CSS métier encore lié à l'ancien design
+---------------------------------------------
+
+  static/portal/css/supervisor_dashboard.css
+
+reste nécessaire pour plusieurs panneaux. Une seconde passe devra remplacer
+progressivement ses styles de structure par les tokens et composants UI Core,
+tout en conservant uniquement les styles réellement propres au planning et aux
+tableaux métier.
+
+12.4 Coexistence d'anciens et nouveaux endpoints
+------------------------------------------------
+
+Certaines anciennes actions POST restent présentes pour compatibilité avec des
+tests ou parcours historiques, alors que les nouveaux panneaux utilisent des
+actions HTMX plus fines. Il faudra décider quels endpoints deviennent la source
+officielle, migrer tous les consommateurs, puis retirer les doublons.
+
+12.5 Audit et journalisation
+----------------------------
+
+Les actions les plus sensibles doivent avoir une stratégie homogène d'audit :
+
+- validation et réouverture d'appel ;
+- correction de présence ;
+- modification d'emploi du temps ;
+- affectation d'un remplaçant ;
+- modification d'un cahier de séance ;
+- création et progression d'un cas ;
+- création d'une convocation.
+
+Il faut vérifier, action par action, si l'auteur, la date, l'ancienne valeur, la
+nouvelle valeur, le motif et l'annexe sont enregistrés.
+
+12.6 Validation visuelle manuelle
+---------------------------------
+
+Les tests automatisés sont passés, mais une recette manuelle dans un navigateur
+reste nécessaire sur :
+
+- ordinateur ;
+- tablette ;
+- téléphone ;
+- sidebar mobile ;
+- sélecteur de classe ;
+- navigation arrière/avant ;
+- drawers et confirmations ;
+- impressions ;
+- erreurs réseau HTMX ;
+- données volumineuses.
+
+
+13. TESTS ET VERIFICATIONS REALISES
+===================================
+
+Un nouveau fichier de tests a été ajouté :
+
+  portal/test_supervisor_dashboard_ui_core.py
+
+Il vérifie notamment :
+
+- l'utilisation du shell UI Core ;
+- la présence de la sidebar, topbar, drawer et confirmation ;
+- l'absence de l'ancien shell ;
+- les URL canoniques de navigation ;
+- le chargement HTMX dans le workspace ;
+- le retour d'un fragment sans shell complet ;
+- la redirection d'un endpoint de fragment vers le dashboard canonique ;
+- la redirection canonique de la section des cas ;
+- la route directe définie dans le registre de position ;
+- le passage obligatoire de l'annexe au sélecteur de classe ;
+- le refus d'accès d'un Surveillant sans annexe.
+
+Résultats obtenus :
+
+- 13 tests ciblés du dashboard, du routage et des actions : OK ;
+- 13 tests du planificateur Surveillant : OK ;
+- 33 tests UI Core exécutés pendant la migration : OK ;
+- "python manage.py check" : OK, aucune anomalie ;
+- vérification de syntaxe JavaScript : OK ;
+- "git diff --check" : OK ;
+- vérification des migrations : aucune migration à créer ;
+- compilation Tailwind : OK.
+
+Les avertissements GLib/UWP observés pendant certains tests proviennent de
+l'environnement Windows et non de Django ou du dashboard Surveillant.
+
+
+14. FICHIERS PRINCIPAUX AJOUTES
+===============================
+
+- portal/services/supervisor_dashboard_presentation.py
+- portal/test_supervisor_dashboard_ui_core.py
+- static/src/js/portal/supervisor_dashboard.js
+- templates/portal/staff/supervisor/partials/topbar_actions.html
+- RAPPORT_MIGRATION_DASHBOARD_SURVEILLANT.txt
+
+
+15. FICHIERS PRINCIPAUX MODIFIES
+================================
+
+- accounts/position_registry.py
+- accounts/tests.py
+- portal/views/supervisor.py
+- portal/views/supervisor_cases.py
+- templates/portal/staff/supervisor_dashboard.html
+- templates/portal/staff/supervisor/partials/workflow_workspace.html
+- templates/portal/staff/supervisor/partials/cases_workspace.html
+- templates/portal/staff/supervisor/partials/panel_home.html
+- templates/portal/staff/supervisor/partials/panel_classes.html
+- templates/portal/staff/supervisor/partials/panel_attendance.html
+- templates/portal/staff/supervisor/partials/panel_attendance_report.html
+- templates/portal/staff/supervisor/partials/panel_students.html
+- templates/portal/staff/supervisor/partials/panel_teachers_report.html
+- ui/services/navigation.py
+- ui/services/__init__.py
+- static/public/css/main.css, régénéré par le build Tailwind
+
+
+16. CE QUI N'A PAS ETE FAIT DANS CETTE PREMIERE PASSE
+=====================================================
+
+Pour éviter toute ambiguïté, les éléments suivants n'ont pas encore été validés
+ou entièrement refondus :
+
+- la définition officielle des attributions du Surveillant ;
+- la matrice complète lecture/création/modification/validation/transmission ;
+- la séparation définitive des responsabilités entre enseignant, Surveillant,
+  DE, secrétaire et Direction générale ;
+- la refonte UI Core de chaque tableau et formulaire interne ;
+- la suppression des anciens templates et endpoints ;
+- l'audit complet de la journalisation métier ;
+- la recette visuelle manuelle sur tous les formats d'écran ;
+- la création de nouveaux workflows d'approbation par le DE ;
+- la modification des modèles de données ou l'ajout de migrations.
+
+
+17. PROCHAINE ETAPE RECOMMANDEE
+===============================
+
+La prochaine étape ne devrait pas commencer par ajouter de nouveaux boutons.
+Elle devrait commencer par une MATRICE OFFICIELLE DES ATTRIBUTIONS DU
+SURVEILLANT GENERAL.
+
+Pour chaque fonction, cette matrice doit indiquer :
+
+- l'objet concerné ;
+- ce que le Surveillant peut lire ;
+- ce qu'il peut créer ;
+- ce qu'il peut modifier ;
+- ce qu'il peut valider ;
+- ce qu'il peut rouvrir ou annuler ;
+- ce qu'il doit transmettre au DE ;
+- ce qui exige une justification ;
+- ce qui exige une notification ;
+- ce qui doit être audité ;
+- ce qui lui est strictement interdit.
+
+Ordre de travail recommandé :
+
+ETAPE 1 — Valider les attributions
+
+- appel étudiant ;
+- présence enseignant ;
+- emploi du temps ;
+- remplacement ;
+- cahier de séance ;
+- discipline ;
+- convocation ;
+- rapports.
+
+ETAPE 2 — Définir les workflows d'approbation
+
+- actions autonomes du Surveillant ;
+- actions soumises au DE ;
+- actions réservées au DE ;
+- notifications et délais attendus.
+
+ETAPE 3 — Renforcer l'audit et les permissions
+
+- journal avant/après ;
+- motif obligatoire ;
+- contrôles de statut ;
+- verrouillage après validation ;
+- tests inter-annexes et tests de permissions négatives.
+
+ETAPE 4 — Refaire les sous-fenêtres métier
+
+- composants UI Core ;
+- formulaires homogènes ;
+- états vides ;
+- erreurs claires ;
+- confirmations adaptées au niveau de risque.
+
+ETAPE 5 — Nettoyer l'historique technique
+
+- supprimer les templates inutilisés ;
+- retirer les endpoints doublons ;
+- découper "portal/views/supervisor.py" ;
+- réduire le CSS spécifique ;
+- documenter le dashboard final.
+
+
+18. CONCLUSION
+==============
+
+Le dashboard Surveillant est maintenant raccordé au bon moule technique et
+visuel : UI Core, navigation stable, URL canonique, fragments HTMX, drawers,
+confirmations, notifications et filtrage obligatoire par annexe.
+
+Cette migration règle la base architecturale et met fin à l'ancien shell comme
+entrée principale. Elle ne valide cependant pas automatiquement toutes les
+attributions actuellement présentes dans le code.
+
+Le principal chantier restant est donc un audit métier approfondi. Les pouvoirs
+les plus sensibles à revoir sont la réouverture des appels, la présence des
+enseignants, la modification de l'emploi du temps, l'affectation des
+remplaçants, la modification du cahier de séance, les cas disciplinaires et les
+convocations.
+
+Une fois la matrice d'attributions validée, le dashboard pourra être simplifié,
+sécurisé et finalisé sans reproduire les mauvaises redirections ou les anciens
+parcours incohérents.
+
+
+MISSION — RECONSTRUCTION OFFICIELLE DU DASHBOARD DU SURVEILLANT GÉNÉRAL SELON LE MOULE UNIQUE ESFE
+
+Tu travailles sur le projet ESFE Core.
+
+Le dashboard du Directeur des Études est désormais le dashboard de référence de toute la plateforme.
+
+Il constitue :
+
+le shell officiel ;
+l'architecture officielle ;
+le modèle officiel ;
+le workflow officiel ;
+les composants officiels.
+
+À partir de maintenant, aucun nouveau dashboard parallèle ne doit être créé.
+
+Tous les rôles utiliseront ce même moule.
+
+1. PRINCIPE ARCHITECTURAL (DÉFINITIF)
+
+Il existe désormais :
+
+UN SEUL DASHBOARD
+
+UN SEUL APP SHELL
+
+UNE SEULE SIDEBAR
+
+UNE SEULE TOPBAR
+
+UN SEUL WORKSPACE
+
+UNE SEULE LIBRAIRIE UI CORE
+
+UNE SEULE BIBLIOTHÈQUE DE COMPONENTS
+
+Le Directeur des Études est uniquement le premier dashboard ayant utilisé ce moule.
+
+Il ne devient pas un dashboard spécial.
+
+Il devient le modèle officiel.
+
+Le dashboard du Surveillant Général doit donc être une configuration métier de ce dashboard.
+
+Il ne doit plus exister :
+
+supervisor shell
+supervisor sidebar
+supervisor topbar
+supervisor dashboard parallèle
+portail spécifique
+composants structurels spécifiques
+
+Tout doit désormais utiliser les composants communs.
+
+2. RÉUTILISATION DE LA LIBRAIRIE UI
+
+Avant de créer un composant :
+
+Toujours respecter cette règle.
+
+1. Chercher dans UI Core
+
+2. Chercher dans les Components métier
+
+3. Réutiliser
+
+4. Composer
+
+5. Créer uniquement si aucun composant n'existe
+
+6. Ajouter immédiatement ce nouveau composant dans la bibliothèque commune
+
+Le dashboard du Surveillant ne doit quasiment jamais recréer de composants.
+
+Il doit réutiliser ceux déjà stabilisés lors de la construction du dashboard du Directeur des Études.
+
+3. NOUVELLE DÉFINITION MÉTIER DU SURVEILLANT
+
+Après validation avec la Direction Générale, le rôle du Surveillant Général est redéfini.
+
+Le Surveillant Général n'est plus responsable de l'organisation pédagogique.
+
+Il est responsable de la supervision opérationnelle des cours.
+
+Sa mission est :
+
+contrôler la présence des étudiants ;
+contrôler la présence des enseignants ;
+suivre l'assiduité ;
+constater les anomalies ;
+enregistrer les incidents ;
+transmettre les situations au Directeur des Études.
+
+Il ne décide pas.
+
+Il ne planifie pas.
+
+Il ne modifie pas l'organisation académique.
+
+4. CE QU'IL DOIT POUVOIR CONSULTER
+
+Le Surveillant doit consulter uniquement :
+
+les classes de son annexe ;
+les étudiants ;
+les enseignants ;
+les séances prévues aujourd'hui ;
+l'emploi du temps publié ;
+les salles ;
+les matières ;
+les feuilles d'appel ;
+les historiques de présence ;
+les alertes d'assiduité ;
+les signalements ;
+les rapports déjà transmis.
+
+Toutes ces données sont en lecture sauf celles qu'il est autorisé à renseigner.
+
+5. EMPLOI DU TEMPS
+
+Le Surveillant ne crée jamais un emploi du temps.
+
+Le workflow officiel est :
+
+Directeur des Études
+
+↓
+
+Création de l'emploi du temps
+
+↓
+
+Publication
+
+↓
+
+Tous les utilisateurs reçoivent leur planning
+
+↓
+
+Le Surveillant consulte
+
+↓
+
+Le Surveillant ouvre la séance concernée
+
+↓
+
+Le Surveillant effectue l'appel
+
+Le Surveillant ne peut pas :
+
+modifier l'emploi du temps ;
+créer un créneau ;
+supprimer un cours ;
+déplacer une séance.
+6. PRÉSENCE DES ÉTUDIANTS
+
+Le cœur du dashboard devient :
+
+Présence des étudiants
+
+Pour chaque séance provenant de l'emploi du temps :
+
+Le Surveillant ouvre la séance.
+
+Pour chaque étudiant :
+
+présent
+absent
+retard
+absence justifiée
+absence non justifiée
+observation
+
+Les présences doivent être liées à la séance réelle.
+
+Le Surveillant ne crée pas une séance fictive.
+
+7. PRÉSENCE DES ENSEIGNANTS
+
+Même logique.
+
+Pour chaque séance :
+
+présent
+absent
+retard
+heure d'arrivée
+cours assuré
+cours non assuré
+observation
+
+Il constate uniquement.
+
+Il ne modifie jamais l'affectation de l'enseignant.
+
+8. ASSIDUITÉ
+
+Le système calcule automatiquement :
+
+nombre de présences ;
+absences ;
+retards ;
+taux d'assiduité ;
+historique ;
+alertes.
+
+Le Surveillant consulte ces informations.
+
+Il ne modifie jamais les calculs.
+
+9. INCIDENTS
+
+Le Surveillant peut créer uniquement un signalement.
+
+Exemples :
+
+étudiant absent de manière répétée ;
+enseignant absent ;
+cours non assuré ;
+perturbation ;
+retard important ;
+incident disciplinaire.
+
+Chaque signalement doit être rattaché :
+
+à une séance ;
+à une classe ;
+à une personne ;
+à une date ;
+à une annexe.
+
+Le Surveillant décrit uniquement les faits.
+
+10. FIN DU WORKFLOW SURVEILLANT
+
+Le workflow du Surveillant s'arrête ici :
+
+Observation
+
+↓
+
+Présence
+
+↓
+
+Absence
+
+↓
+
+Retard
+
+↓
+
+Incident
+
+↓
+
+Signalement
+
+↓
+
+Transmission
+
+Il ne décide jamais de la suite.
+
+11. DÉBUT DU WORKFLOW DIRECTEUR DES ÉTUDES
+
+Le Directeur reçoit automatiquement :
+
+les signalements ;
+les absences répétées ;
+les incidents ;
+les alertes.
+
+Le Directeur décide ensuite :
+
+classement ;
+suivi ;
+entretien ;
+convocation ;
+procédure disciplinaire.
+12. CONVOCATIONS
+
+Le Surveillant ne crée plus les convocations.
+
+Le workflow officiel devient :
+
+Présences
+
+↓
+
+Signalement
+
+↓
+
+Directeur des Études
+
+↓
+
+Décision
+
+↓
+
+Création de la convocation
+
+↓
+
+Génération PDF
+
+↓
+
+Envoi par mail
+
+↓
+
+Version imprimable
+
+↓
+
+Remise à l'étudiant
+
+↓
+
+Entretien
+
+↓
+
+Clôture
+
+Le Surveillant peut consulter le statut de la convocation.
+
+Il ne la crée pas.
+
+13. STRUCTURE DU DASHBOARD
+
+Conserver le moule du Directeur des Études.
+
+Créer uniquement les sections métier.
+
+Exemple :
+
+Accueil
+
+Classes
+
+Présence étudiants
+
+Présence enseignants
+
+Emploi du temps
+
+Signalements
+
+Rapports
+
+Chaque section doit utiliser les sous-fenêtres déjà validées dans le dashboard du Directeur.
+
+Exemple :
+
+Présence étudiants
+
+[ Vue d'ensemble ]
+
+[ Appel du jour ]
+
+[ Historique ]
+
+[ Alertes ]
+
+Même logique pour les autres sections.
+
+14. COMPONENTS
+
+Réutiliser les composants déjà créés.
+
+Ne créer un nouveau composant que si aucun équivalent n'existe.
+
+Si un nouveau composant est nécessaire :
+
+il doit être générique ;
+documenté ;
+ajouté immédiatement dans UI Core ou dans la bibliothèque métier.
+
+Aucun composant métier ne doit être codé directement dans le dashboard.
+
+15. FRONTEND
+
+Le dashboard du Surveillant doit avoir exactement la même qualité que celui du Directeur :
+
+HTMX ;
+navigation instantanée ;
+sous-fenêtres ;
+drawer ;
+modal ;
+pagination ;
+filtres ;
+responsive ;
+loaders ;
+notifications ;
+profil in-dashboard.
+
+Ne jamais recréer une autre architecture.
+
+16. BACKEND
+
+Vérifier que les permissions correspondent à la nouvelle définition métier.
+
+Supprimer ou désactiver les anciennes fonctionnalités qui ne sont plus conformes.
+
+Conserver les workflows existants lorsqu'ils restent valides.
+
+Adapter les vues, services et permissions si nécessaire.
+
+Ne pas modifier les modèles sans justification.
+
+Ne créer aucune migration si elle n'est pas indispensable.
+
+17. AUDIT FINAL
+
+À la fin, produire :
+
+docs/ui/SUPERVISOR_DASHBOARD_FINAL_REPORT.md
+
+Le rapport devra contenir :
+
+composants réutilisés ;
+nouveaux composants créés ;
+composants supprimés ;
+permissions supprimées ;
+nouvelles permissions ;
+vues modifiées ;
+services modifiés ;
+conformité avec le moule commun ;
+conformité avec les décisions métier ;
+tests exécutés ;
+captures du dashboard ;
+points restant à traiter.
+18. VALIDATIONS OBLIGATOIRES
+
+Exécuter :
+
+python manage.py check
+
+python manage.py makemigrations --check --dry-run
+
+python manage.py test
+
+npm run build:css
+
+Tester :
+
+connexion ;
+navigation ;
+profil ;
+notifications ;
+présence étudiants ;
+présence enseignants ;
+signalements ;
+emploi du temps ;
+responsive ;
+HTMX ;
+absence de rechargement complet ;
+permissions ;
+annexe ;
+erreurs console.
+19. INTERDICTIONS
+
+Ne pas :
+
+créer un nouveau dashboard ;
+recréer un shell ;
+recréer une sidebar ;
+recréer une topbar ;
+copier les permissions du Directeur ;
+créer des composants déjà existants ;
+casser UI Core ;
+casser les dashboards déjà migrés ;
+faire un commit ;
+faire un push.
+Objectif final
+
+Le dashboard du Surveillant Général doit devenir une instance du moule commun, spécialisée dans la supervision de l'assiduité et des présences, tout en s'appuyant exclusivement sur les composants, patterns UI et architecture validés avec le dashboard du Directeur des Études. Une fois cette migration terminée, ce même principe devra être appliqué à tous les autres rôles de la plateforme (Gestionnaire, Enseignant, Étudiant, Informaticien, etc.), sans recréer d'architectures parallèles.

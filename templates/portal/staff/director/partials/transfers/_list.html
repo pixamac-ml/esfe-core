@@ -1,0 +1,46 @@
+{% load component_tags %}
+{% if transfer_rows_page.object_list %}
+<div id="director-transfer-list" class="divide-y divide-ui-border border-b border-ui-border">
+  {% for transfer in transfer_rows_page.object_list %}
+  <article class="grid gap-4 py-5 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,auto)] xl:items-start">
+    <div class="min-w-0">
+      <div class="flex flex-wrap items-center gap-2">
+        <h3 class="text-sm font-bold text-ui-text">{% if transfer.enrollment %}{{ transfer.enrollment.student.get_full_name|default:transfer.enrollment.student.username }}{% else %}{{ transfer.incoming_details.first_name }} {{ transfer.incoming_details.last_name }}{% endif %}</h3>
+        {% if transfer.transfer_type == "internal" %}{% component "ui_core.status_badge" label="Interne" tone="info" %}{% endcomponent %}
+        {% elif transfer.transfer_type == "incoming" %}{% component "ui_core.status_badge" label="Entrant" tone="success" %}{% endcomponent %}
+        {% else %}{% component "ui_core.status_badge" label="Sortant" tone="accent" %}{% endcomponent %}{% endif %}
+        {% if transfer.status == "submitted" %}{% component "ui_core.status_badge" label="Soumis" tone="warning" %}{% endcomponent %}
+        {% elif transfer.status == "under_review" %}{% component "ui_core.status_badge" label="En étude" tone="info" %}{% endcomponent %}
+        {% elif transfer.status == "awaiting_documents" %}{% component "ui_core.status_badge" label="Pièces attendues" tone="warning" %}{% endcomponent %}
+        {% elif transfer.status == "approved" %}{% component "ui_core.status_badge" label="Approuvé" tone="success" %}{% endcomponent %}
+        {% elif transfer.status == "completed" %}{% component "ui_core.status_badge" label="Terminé" tone="success" %}{% endcomponent %}
+        {% elif transfer.status == "rejected" %}{% component "ui_core.status_badge" label="Rejeté" tone="danger" %}{% endcomponent %}
+        {% else %}{% component "ui_core.status_badge" label=transfer.get_status_display tone="neutral" %}{% endcomponent %}{% endif %}
+      </div>
+      <p class="mt-1 text-sm text-ui-text-muted">
+        {% if transfer.transfer_type == "incoming" %}{{ transfer.incoming_details.origin_school }} <span class="mx-1">→</span> {{ transfer.incoming_details.requested_class.display_name }}
+        {% else %}{{ transfer.source_class.display_name }}{% if transfer.target_class %}<span class="mx-1">→</span>{{ transfer.target_class.display_name }}{% elif transfer.target_school_name %}<span class="mx-1">→</span>{{ transfer.target_school_name }}{% endif %}{% endif %}
+      </p>
+      <p class="mt-1 line-clamp-2 text-xs leading-5 text-ui-text-muted">{{ transfer.reason }}</p>
+      <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-medium text-ui-text-muted"><span>Réf. {{ transfer.reference|stringformat:"s"|slice:":8"|upper }}</span><span>{{ transfer.created_at|date:"d/m/Y à H:i" }}</span><span>{{ transfer.documents.count }} pièce{{ transfer.documents.count|pluralize }}</span><span>{{ transfer.history.count }} action{{ transfer.history.count|pluralize }}</span></div>
+      {% if transfer.transfer_type == "outgoing" %}<div class="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold"><span class="{% if transfer.outgoing_details.academic_check_completed %}text-ui-success{% else %}text-ui-warning{% endif %}">Académique</span><span class="{% if transfer.outgoing_details.administrative_check_completed %}text-ui-success{% else %}text-ui-warning{% endif %}">Administratif</span><span class="{% if transfer.outgoing_details.financial_check_completed %}text-ui-success{% else %}text-ui-warning{% endif %}">Financier</span></div>{% endif %}
+      {% if transfer.transfer_type == "incoming" and transfer.incoming_details.candidature %}<p class="mt-2 text-xs font-semibold text-ui-success">Candidature #{{ transfer.incoming_details.candidature_id }} ouverte dans le circuit d’admission.</p>{% endif %}
+    </div>
+    <div class="flex min-w-0 flex-col items-end gap-2">
+      <button type="button" hx-get="{% url 'accounts_portal:director_transfer_detail' transfer.pk %}" hx-target="#director-drawer-content" hx-swap="innerHTML" hx-on::after-request="window.deOpenDrawer && window.deOpenDrawer()" class="ui-focus-ring inline-flex h-9 items-center gap-2 rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text"><i data-lucide="folder-open" class="h-4 w-4"></i>Dossier</button>
+      {% if transfer.attachment %}<a href="{{ transfer.attachment.url }}" target="_blank" rel="noopener" class="ui-focus-ring grid h-9 w-9 place-items-center rounded-ui-button border border-ui-border text-ui-text hover:bg-ui-surface-hover" title="Ouvrir la pièce jointe" aria-label="Ouvrir la pièce jointe"><i data-lucide="paperclip" class="h-4 w-4"></i></a>{% endif %}
+      {% if transfer.status == "submitted" or transfer.status == "under_review" or transfer.status == "awaiting_documents" %}
+      <form method="post" hx-post="{% url 'accounts_portal:director_transfer_review' %}" hx-target="#director-transfer-subcontent" hx-swap="innerHTML" hx-indicator="#director-transfer-loading" class="w-full max-w-md space-y-2">
+        {% csrf_token %}<input type="hidden" name="transfer_id" value="{{ transfer.id }}"><input name="decision_note" placeholder="Note de décision" class="h-9 w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-xs text-ui-text">
+        {% if transfer.transfer_type == "outgoing" %}<div class="grid gap-1.5 text-[11px] font-semibold text-ui-text sm:grid-cols-3"><label class="flex items-center gap-1.5"><input type="checkbox" name="academic_check_completed" {% if transfer.outgoing_details.academic_check_completed %}checked{% endif %}>Académique</label><label class="flex items-center gap-1.5"><input type="checkbox" name="administrative_check_completed" {% if transfer.outgoing_details.administrative_check_completed %}checked{% endif %}>Administratif</label><label class="flex items-center gap-1.5"><input type="checkbox" name="financial_check_completed" {% if transfer.outgoing_details.financial_check_completed %}checked{% endif %}>Financier</label></div>{% endif %}
+        <div class="flex flex-wrap justify-end gap-2">{% if transfer.status == "submitted" %}<button name="action" value="start_review" class="ui-focus-ring inline-flex h-9 items-center gap-1.5 rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text"><i data-lucide="scan-search" class="h-4 w-4"></i>Étudier</button>{% endif %}{% if transfer.status != "awaiting_documents" %}<button name="action" value="request_documents" class="ui-focus-ring inline-flex h-9 items-center gap-1.5 rounded-ui-button border border-ui-warning px-3 text-xs font-semibold text-ui-warning"><i data-lucide="file-question" class="h-4 w-4"></i>Pièces</button>{% endif %}<button name="action" value="approve" class="ui-focus-ring inline-flex h-9 items-center gap-1.5 rounded-ui-button bg-ui-success px-3 text-xs font-semibold text-white"><i data-lucide="check" class="h-4 w-4"></i>Approuver</button><button name="action" value="reject" class="ui-focus-ring inline-flex h-9 items-center gap-1.5 rounded-ui-button border border-ui-danger px-3 text-xs font-semibold text-ui-danger"><i data-lucide="x" class="h-4 w-4"></i>Refuser</button></div>
+      </form>
+      {% elif transfer.status == "approved" and transfer.transfer_type == "outgoing" %}<form method="post" hx-post="{% url 'accounts_portal:director_transfer_review' %}" hx-target="#director-transfer-subcontent" hx-swap="innerHTML">{% csrf_token %}<input type="hidden" name="transfer_id" value="{{ transfer.id }}"><button name="action" value="handover" class="ui-focus-ring inline-flex h-9 items-center gap-2 rounded-ui-button bg-ui-primary px-3 text-xs font-semibold text-ui-on-primary"><i data-lucide="package-check" class="h-4 w-4"></i>Confirmer la remise</button></form>{% endif %}
+    </div>
+  </article>
+  {% endfor %}
+  {% include "portal/staff/director/partials/_pagination.html" with page_obj=transfer_rows_page page_param="transfer_page" query_suffix=transfer_query_suffix target_id="#director-transfer-subcontent" pagination_url_name="accounts_portal:director_transfers_subcontent" indicator_id="#director-transfer-loading" %}
+</div>
+{% else %}
+  {% component "ui_core.empty_state" title="Aucun dossier dans cette vue" message="Modifiez les filtres ou créez une nouvelle demande de transfert." icon="arrow-left-right" %}{% endcomponent %}
+{% endif %}

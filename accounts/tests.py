@@ -1323,7 +1323,8 @@ class PortalPhaseOneTests(TestCase):
 		response = self.client.get(reverse("accounts_portal:portal_dashboard"))
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "Dashboard Surveillant General")
-		self.assertContains(response, "Pilotage des classes, du temps, des enseignants et de la discipline")
+		self.assertContains(response, 'data-certified-dashboard-shell="true"')
+		self.assertContains(response, 'data-dashboard-role="academic_supervisor"')
 
 	def test_portal_dashboard_renders_director_dashboard_from_single_entry(self):
 		director = self._create_user("portal_director", role="executive", position="director_of_studies")
@@ -1462,8 +1463,9 @@ class PortalPhaseOneTests(TestCase):
 		response = self.client.get(reverse("accounts_portal:portal_dashboard"))
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, "Dashboard Directeur")
-		self.assertContains(response, "Direction generale")
+		self.assertContains(response, 'data-certified-dashboard-shell="true"')
+		self.assertContains(response, 'data-dashboard-role="executive_director"')
+		self.assertContains(response, "Direction générale")
 
 	def test_portal_dashboard_redirects_superadmin_to_superadmin_dashboard(self):
 		superadmin = USER_MANAGER.create_superuser(
@@ -1855,9 +1857,9 @@ class PortalPhaseOneTests(TestCase):
 		response = self.client.get(reverse("accounts_portal:portal_dashboard"))
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "Dashboard Informaticien")
-		self.assertContains(response, "Support technique, accès et santé du portail")
-		self.assertContains(response, "Gestion des notes")
-		self.assertContains(response, "Inscriptions sans affectation")
+		self.assertContains(response, 'data-certified-dashboard-shell="true"')
+		self.assertContains(response, 'data-dashboard-role="it_support"')
+		self.assertContains(response, "Administration IT")
 
 	def test_it_user_can_access_grade_dashboard(self):
 		it_user = self._create_user("portal_it_grades", position="it_support")
@@ -2412,7 +2414,7 @@ class PortalPhaseOneTests(TestCase):
 
 		self.assertRedirects(
 			response,
-			f"{reverse('accounts_portal:portal_dashboard')}#absences",
+			f"{reverse('accounts_portal:portal_dashboard')}?section=attendance",
 			fetch_redirect_response=False,
 		)
 		attendance = StudentAttendance.objects.get(student=student, schedule_event=schedule_event)
@@ -2438,7 +2440,7 @@ class PortalPhaseOneTests(TestCase):
 
 		self.assertRedirects(
 			response,
-			f"{reverse('accounts_portal:portal_dashboard')}#absences",
+			f"{reverse('accounts_portal:portal_dashboard')}?section=attendance",
 			fetch_redirect_response=False,
 		)
 		attendance = TeacherAttendance.objects.get(teacher=teacher, schedule_event=schedule_event)
@@ -2465,7 +2467,7 @@ class PortalPhaseOneTests(TestCase):
 
 		self.assertRedirects(
 			response,
-			f"{reverse('accounts_portal:portal_dashboard')}#courses",
+			f"{reverse('accounts_portal:portal_dashboard')}?section=courses",
 			fetch_redirect_response=False,
 		)
 		lesson_log = LessonLog.objects.get(schedule_event=schedule_event)

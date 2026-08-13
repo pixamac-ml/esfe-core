@@ -757,6 +757,22 @@ def get_class_week_schedule(academic_class: AcademicClass, week_start):
     return _build_week_grid(events, normalized)
 
 
+def get_published_class_week_schedule(academic_class: AcademicClass, week_start):
+    """Return only dated sessions visible outside the academic planning workflow."""
+
+    queryset, normalized = _week_queryset(
+        AcademicScheduleEvent.objects.filter(academic_class=academic_class),
+        week_start,
+    )
+    queryset = queryset.exclude(
+        status__in={
+            AcademicScheduleEvent.STATUS_DRAFT,
+            AcademicScheduleEvent.STATUS_CANCELLED,
+        }
+    )
+    return _build_week_grid(list(queryset), normalized)
+
+
 def get_class_week_schedule_with_weekly_slots(academic_class: AcademicClass, week_start):
     schedule = get_class_week_schedule(academic_class, week_start)
     weekly_slots = list_weekly_slots_for_class(academic_class, active_only=True)

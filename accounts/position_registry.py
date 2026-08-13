@@ -34,7 +34,7 @@ POSITION_REGISTRY = {
     "payment_agent": PositionDefinition("payment_agent", "Agent de paiement", CATEGORY_ADMIN, SCOPE_BRANCH, "accounts_portal:portal_finance", "payment_agent", True),
     "secretary": PositionDefinition("secretary", "Secrétaire", CATEGORY_ADMIN, SCOPE_BRANCH, "accounts_portal:portal_secretary", "secretary", True),
     "admissions": PositionDefinition("admissions", "Agent des admissions", CATEGORY_ADMIN, SCOPE_BRANCH, "accounts_portal:portal_admissions", "admissions", True),
-    "academic_supervisor": PositionDefinition("academic_supervisor", "Surveillant général", CATEGORY_ADMIN, SCOPE_BRANCH, "accounts_portal:portal_supervisor", "academic_supervisor", True),
+    "academic_supervisor": PositionDefinition("academic_supervisor", "Surveillant général", CATEGORY_ADMIN, SCOPE_BRANCH, "accounts_portal:portal_dashboard", "academic_supervisor", True),
     "it_support": PositionDefinition("it_support", "Informaticien", CATEGORY_ADMIN, SCOPE_BRANCH, "accounts_portal:portal_it_v2", "it_support", True),
     "director_of_studies": PositionDefinition("director_of_studies", "Directeur des études", CATEGORY_ADMIN, SCOPE_BRANCH, "accounts_portal:portal_director", "director_of_studies", True),
     "marketing_manager": PositionDefinition("marketing_manager", "Responsable marketing", CATEGORY_ADMIN, SCOPE_GLOBAL, "marketing:dashboard", "marketing_manager", False),

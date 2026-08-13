@@ -1,71 +1,48 @@
 {% load component_tags %}
+<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+  {% for card in supervisor_kpi_cards %}
+    {% component "ui_core.stat_card" label=card.label value=card.value icon=card.icon tone=card.tone description=card.hint compact=True %}{% endcomponent %}
+  {% endfor %}
+</div>
 
-<div class="space-y-4">
-  {% component "kpi_row" cards=supervisor_kpi_cards columns=4 %}{% endcomponent %}
-
-  <div class="grid gap-4 xl:grid-cols-2">
-    {% component "dashboard_card" padding="none" %}
-      {% fill "default" %}
-        <div class="card-h">
-          <h3>Alertes du jour</h3>
-          <span class="hint">Cliquez pour traiter</span>
-        </div>
-        <div class="card-b">
-          {% for alert in home_alerts %}
-            <button type="button" class="row clickable w-full text-left"
-                    hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section={{ alert.section }}{% if selected_class_id %}&class_id={{ selected_class_id }}{% endif %}"
-                    hx-include="#sg-class-selector" hx-target="#supervisor-workspace" hx-push-url="true">
-              <span class="dot" style="background:var(--{{ alert.level }})"></span>
-              <span class="main"><b>{{ alert.message }}</b></span>
-              <span class="tail"><i data-lucide="chevron-right" class="i" aria-hidden="true"></i></span>
-            </button>
-          {% empty %}
-            {% component "empty_state" icon="check-circle" title="Aucune alerte" message="Tout est sous contrôle pour le moment." compact=True %}{% endcomponent %}
-          {% endfor %}
-        </div>
-      {% endfill %}
-    {% endcomponent %}
-
-    {% component "dashboard_card" padding="none" %}
-      {% fill "default" %}
-        <div class="card-h">
-          <h3>Séances du jour{% if selected_class %} — {{ selected_class.display_name }}{% endif %}</h3>
-          <span class="src-badge">Source académique</span>
-        </div>
-        <div class="card-b">
-          {% for row in home_today_sessions %}
-            <button type="button" class="row clickable w-full text-left"
-                    hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=attendance{% if selected_class_id %}&class_id={{ selected_class_id }}{% endif %}"
-                    hx-include="#sg-class-selector" hx-target="#supervisor-workspace" hx-push-url="true">
-              <span class="pic">{{ row.time_range|slice:":5" }}</span>
-              <span class="main"><b>{{ row.subject_title }}</b><span>{{ row.teacher_name }} · {{ row.room }} · {{ row.class_name }}</span></span>
-              <span class="tail">
-                {% if row.course_started_flag %}
-                  {% component "status_badge" label="Appel fait" tone="success" %}{% endcomponent %}
-                {% else %}
-                  {% component "status_badge" label="À faire" tone="warning" %}{% endcomponent %}
-                {% endif %}
-              </span>
-            </button>
-          {% empty %}
-            {% component "empty_state" icon="calendar" title="Aucune séance" message="Aucun cours programmé aujourd'hui." compact=True %}{% endcomponent %}
-          {% endfor %}
-        </div>
-      {% endfill %}
-    {% endcomponent %}
-  </div>
-
-  {% if selected_class %}
-    <div class="grid gap-3 md:grid-cols-3">
-      <button type="button" class="card p-4 text-left" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=attendance&class_id={{ selected_class_id }}" hx-target="#supervisor-workspace" hx-push-url="true">
-        <span class="hint">Action prioritaire</span><strong class="mt-2 block">Faire l'appel</strong>
-      </button>
-      <button type="button" class="card p-4 text-left" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=schedule&class_id={{ selected_class_id }}" hx-target="#supervisor-workspace" hx-push-url="true">
-        <span class="hint">Planning</span><strong class="mt-2 block">Voir l'emploi du temps</strong>
-      </button>
-      <button type="button" class="card p-4 text-left" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=courses&class_id={{ selected_class_id }}" hx-target="#supervisor-workspace" hx-push-url="true">
-        <span class="hint">Cours</span><strong class="mt-2 block">Ajouter un cours</strong>
-      </button>
+<div class="grid gap-5 xl:grid-cols-2">
+  {% component "ui_core.panel" title="Alertes du jour" subtitle="Points qui demandent une vérification opérationnelle" padding=False %}
+    <div class="divide-y divide-ui-border">
+      {% for alert in home_alerts %}
+        <a
+          href="{{ supervisor_dashboard_base_url }}?section={{ alert.section }}"
+          hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section={{ alert.section }}"
+          hx-target="#supervisor-workspace"
+          hx-push-url="{{ supervisor_dashboard_base_url }}?section={{ alert.section }}"
+          class="ui-focus-ring flex items-center gap-3 px-5 py-4 hover:bg-ui-surface-hover"
+        >
+          <span class="grid h-9 w-9 shrink-0 place-items-center rounded-ui-button {% if alert.level == 'bad' %}bg-ui-danger-soft text-ui-danger{% else %}bg-ui-warning-soft text-ui-warning{% endif %}"><i data-lucide="triangle-alert" class="h-4 w-4"></i></span>
+          <span class="min-w-0 flex-1 text-sm font-semibold text-ui-text">{{ alert.message }}</span>
+          <i data-lucide="chevron-right" class="h-4 w-4 text-ui-text-muted"></i>
+        </a>
+      {% empty %}
+        <div class="p-5">{% component "ui_core.empty_state" icon="circle-check-big" title="Aucune alerte" message="Aucun point urgent n'est détecté dans votre annexe aujourd'hui." compact=True %}{% endcomponent %}</div>
+      {% endfor %}
     </div>
-  {% endif %}
+  {% endcomponent %}
+
+  {% component "ui_core.panel" title="Séances du jour" subtitle="Planning publié par la Direction des études" padding=False %}
+    <div class="divide-y divide-ui-border">
+      {% for row in home_today_sessions %}
+        <a
+          href="{{ supervisor_dashboard_base_url }}?section=attendance&view=call&class_id={{ row.class_id }}&schedule_event_id={{ row.event_id }}"
+          hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=attendance&view=call&class_id={{ row.class_id }}&schedule_event_id={{ row.event_id }}"
+          hx-target="#supervisor-workspace"
+          hx-push-url="{{ supervisor_dashboard_base_url }}?section=attendance&view=call&class_id={{ row.class_id }}&schedule_event_id={{ row.event_id }}"
+          class="ui-focus-ring flex items-center gap-3 px-5 py-4 hover:bg-ui-surface-hover"
+        >
+          <span class="w-24 shrink-0 text-sm font-bold tabular-nums text-ui-primary">{{ row.time_range }}</span>
+          <span class="min-w-0 flex-1"><strong class="block truncate text-sm text-ui-text">{{ row.subject_title }}</strong><span class="mt-1 block truncate text-xs text-ui-text-muted">{{ row.class_name }} · {{ row.teacher_name }} · {{ row.room }}</span></span>
+          {% if row.course_started_flag %}{% component "ui_core.status_badge" label="Appel renseigné" tone="success" %}{% endcomponent %}{% else %}{% component "ui_core.status_badge" label="À renseigner" tone="warning" %}{% endcomponent %}{% endif %}
+        </a>
+      {% empty %}
+        <div class="p-5">{% component "ui_core.empty_state" icon="calendar-x" title="Aucune séance" message="Aucun cours publié n'est prévu aujourd'hui." compact=True %}{% endcomponent %}</div>
+      {% endfor %}
+    </div>
+  {% endcomponent %}
 </div>

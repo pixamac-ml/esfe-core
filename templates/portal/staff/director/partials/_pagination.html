@@ -1,31 +1,57 @@
 {% if page_obj and page_obj.paginator.num_pages > 1 %}
 {% with pname=page_param|default:"classes_page" htmx_target=target_id|default:"#director-workspace" htmx_select=hx_select|default:"" %}
-<div class="flex flex-wrap items-center justify-between gap-3 border-t border-[color:var(--line)] px-6 py-3">
-  <div>
+<nav class="flex flex-wrap items-center justify-between gap-3 border-t border-ui-border py-3" aria-label="Pagination">
+  <div class="flex items-center gap-2">
     {% if page_obj.has_previous %}
     <button type="button"
-      hx-get="{% url 'accounts_portal:director_workspace' %}?{{ query_suffix }}&{{ pname }}={{ page_obj.previous_page_number }}"
+      hx-get="{% if pagination_url_name %}{% url pagination_url_name %}{% else %}{% url 'accounts_portal:director_workspace' %}{% endif %}?{{ query_suffix }}&{{ pname }}=1"
       hx-target="{{ htmx_target }}" hx-swap="outerHTML"
       {% if htmx_select %}hx-select="{{ htmx_select }}"{% endif %}
+      {% if indicator_id %}hx-indicator="{{ indicator_id }}"{% endif %}
+      hx-sync="{{ htmx_target }}:replace"
       hx-disabled-elt="this"
-      class="inline-flex items-center justify-center rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2 text-sm font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface)]">
-      <i data-lucide="chevron-left" class="w-4 h-4 mr-1"></i>Precedent
+      class="ui-focus-ring grid h-9 w-9 place-items-center rounded-ui-button border border-ui-border bg-ui-surface text-ui-text hover:bg-ui-surface-hover"
+      aria-label="Première page" title="Première page">
+      <i data-lucide="chevrons-left" class="h-4 w-4" aria-hidden="true"></i>
+    </button>
+    <button type="button"
+      hx-get="{% if pagination_url_name %}{% url pagination_url_name %}{% else %}{% url 'accounts_portal:director_workspace' %}{% endif %}?{{ query_suffix }}&{{ pname }}={{ page_obj.previous_page_number }}"
+      hx-target="{{ htmx_target }}" hx-swap="outerHTML"
+      {% if htmx_select %}hx-select="{{ htmx_select }}"{% endif %}
+      {% if indicator_id %}hx-indicator="{{ indicator_id }}"{% endif %}
+      hx-sync="{{ htmx_target }}:replace"
+      hx-disabled-elt="this"
+      class="ui-focus-ring inline-flex h-9 items-center gap-1 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">
+      <i data-lucide="chevron-left" class="h-4 w-4" aria-hidden="true"></i>Précédent
     </button>
     {% endif %}
   </div>
-  <p class="text-xs font-black text-[color:var(--muted)]">Page {{ page_obj.number }}/{{ page_obj.paginator.num_pages }} · {{ page_obj.paginator.count }} element(s)</p>
-  <div>
+  <p class="text-xs font-semibold text-ui-text-muted">Page {{ page_obj.number }}/{{ page_obj.paginator.num_pages }} · {{ page_obj.paginator.count }} élément(s)</p>
+  <div class="flex items-center gap-2">
     {% if page_obj.has_next %}
     <button type="button"
-      hx-get="{% url 'accounts_portal:director_workspace' %}?{{ query_suffix }}&{{ pname }}={{ page_obj.next_page_number }}"
+      hx-get="{% if pagination_url_name %}{% url pagination_url_name %}{% else %}{% url 'accounts_portal:director_workspace' %}{% endif %}?{{ query_suffix }}&{{ pname }}={{ page_obj.next_page_number }}"
       hx-target="{{ htmx_target }}" hx-swap="outerHTML"
       {% if htmx_select %}hx-select="{{ htmx_select }}"{% endif %}
+      {% if indicator_id %}hx-indicator="{{ indicator_id }}"{% endif %}
+      hx-sync="{{ htmx_target }}:replace"
       hx-disabled-elt="this"
-      class="inline-flex items-center justify-center rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-4 py-2 text-sm font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface)]">
-      Suivant<i data-lucide="chevron-right" class="w-4 h-4 ml-1"></i>
+      class="ui-focus-ring inline-flex h-9 items-center gap-1 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">
+      Suivant<i data-lucide="chevron-right" class="h-4 w-4" aria-hidden="true"></i>
+    </button>
+    <button type="button"
+      hx-get="{% if pagination_url_name %}{% url pagination_url_name %}{% else %}{% url 'accounts_portal:director_workspace' %}{% endif %}?{{ query_suffix }}&{{ pname }}={{ page_obj.paginator.num_pages }}"
+      hx-target="{{ htmx_target }}" hx-swap="outerHTML"
+      {% if htmx_select %}hx-select="{{ htmx_select }}"{% endif %}
+      {% if indicator_id %}hx-indicator="{{ indicator_id }}"{% endif %}
+      hx-sync="{{ htmx_target }}:replace"
+      hx-disabled-elt="this"
+      class="ui-focus-ring grid h-9 w-9 place-items-center rounded-ui-button border border-ui-border bg-ui-surface text-ui-text hover:bg-ui-surface-hover"
+      aria-label="Dernière page" title="Dernière page">
+      <i data-lucide="chevrons-right" class="h-4 w-4" aria-hidden="true"></i>
     </button>
     {% endif %}
   </div>
-</div>
+</nav>
 {% endwith %}
 {% endif %}

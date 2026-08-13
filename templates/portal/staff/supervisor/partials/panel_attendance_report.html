@@ -1,49 +1,21 @@
-{% load humanize component_tags %}
-<style>@media print {.no-print,.shell,.rail,.work-head,#topbar-loader{display:none!important}body{background:#fff!important}}</style>
+{% load component_tags %}
+{% if attendance_report_class %}
+  <div class="flex flex-wrap items-center justify-between gap-3 rounded-ui-card border border-ui-border bg-ui-surface p-4">
+    <div class="flex items-center gap-2">
+      <a class="ui-focus-ring grid h-ui-control w-ui-control place-items-center rounded-ui-button border border-ui-border text-ui-text hover:bg-ui-surface-hover" href="{{ supervisor_dashboard_base_url }}?section={{ section }}&view={{ active_view }}&class_id={{ attendance_report_class.id }}&month={{ attendance_report_prev_month|date:'Y-m' }}" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section={{ section }}&view={{ active_view }}&fragment=subcontent&class_id={{ attendance_report_class.id }}&month={{ attendance_report_prev_month|date:'Y-m' }}" hx-target="#supervisor-section-content" hx-push-url="{{ supervisor_dashboard_base_url }}?section={{ section }}&view={{ active_view }}&class_id={{ attendance_report_class.id }}&month={{ attendance_report_prev_month|date:'Y-m' }}" aria-label="Mois précédent"><i data-lucide="chevron-left" class="h-4 w-4"></i></a>
+      <strong class="px-2 text-sm text-ui-text">{{ attendance_report_month|date:"F Y" }}</strong>
+      <a class="ui-focus-ring grid h-ui-control w-ui-control place-items-center rounded-ui-button border border-ui-border text-ui-text hover:bg-ui-surface-hover" href="{{ supervisor_dashboard_base_url }}?section={{ section }}&view={{ active_view }}&class_id={{ attendance_report_class.id }}&month={{ attendance_report_next_month|date:'Y-m' }}" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section={{ section }}&view={{ active_view }}&fragment=subcontent&class_id={{ attendance_report_class.id }}&month={{ attendance_report_next_month|date:'Y-m' }}" hx-target="#supervisor-section-content" hx-push-url="{{ supervisor_dashboard_base_url }}?section={{ section }}&view={{ active_view }}&class_id={{ attendance_report_class.id }}&month={{ attendance_report_next_month|date:'Y-m' }}" aria-label="Mois suivant"><i data-lucide="chevron-right" class="h-4 w-4"></i></a>
+    </div>
+    <button type="button" onclick="window.print()" class="ui-focus-ring h-ui-control rounded-ui-button border border-ui-border px-4 text-sm font-bold text-ui-text hover:bg-ui-surface-hover"><i data-lucide="printer" class="mr-2 inline h-4 w-4"></i>Imprimer</button>
+  </div>
 
-<div class="space-y-4">
-  {% component "toolbar" class_str="no-print" %}
-    {% fill "left" %}
-      <a class="btn" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=attendance_report&class_id={{ attendance_report_class.id }}&month={{ attendance_report_prev_month|date:'Y-m' }}" hx-target="#supervisor-workspace" hx-push-url="true" hx-indicator="#topbar-loader"><i data-lucide="chevron-left" class="i"></i>Mois précédent</a>
-      <span class="btn ghost cursor-default">{{ attendance_report_month|date:"F Y" }}</span>
-      <a class="btn" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=attendance_report&class_id={{ attendance_report_class.id }}&month={{ attendance_report_next_month|date:'Y-m' }}" hx-target="#supervisor-workspace" hx-push-url="true" hx-indicator="#topbar-loader">Mois suivant<i data-lucide="chevron-right" class="i"></i></a>
-    {% endfill %}
-    {% fill "right" %}<button type="button" class="btn primary" onclick="window.print()"><i data-lucide="printer" class="i"></i>Imprimer</button>{% endfill %}
+  {% component "ui_core.panel" title=attendance_report_class.display_name subtitle="Synthèse mensuelle des présences par séance" padding=False %}
+    {% if attendance_report_rows %}
+      <div class="overflow-x-auto"><table class="w-full min-w-ui-table text-left text-sm"><thead class="bg-ui-surface-muted text-xs uppercase text-ui-text-muted"><tr><th class="px-4 py-3">Étudiant</th><th class="px-3 py-3 text-center">Présent</th><th class="px-3 py-3 text-center">Absent</th><th class="px-3 py-3 text-center">Justifié</th><th class="px-3 py-3 text-center">Retard</th><th class="px-3 py-3 text-center">Séances</th><th class="px-4 py-3 text-center">Taux</th><th class="px-4 py-3 text-right">Fiche</th></tr></thead><tbody class="divide-y divide-ui-border">
+      {% for row in attendance_report_rows %}<tr class="hover:bg-ui-surface-hover"><td class="px-4 py-3"><strong class="block text-ui-text">{{ row.student.full_name }}</strong><span class="text-xs text-ui-text-muted">{{ row.student.matricule }}</span></td><td class="px-3 py-3 text-center font-bold text-ui-success">{{ row.present }}</td><td class="px-3 py-3 text-center">{{ row.absent }}</td><td class="px-3 py-3 text-center">{{ row.justified }}</td><td class="px-3 py-3 text-center">{{ row.late }}</td><td class="px-3 py-3 text-center font-semibold">{{ row.total }}</td><td class="px-4 py-3 text-center">{% if row.rate >= 75 %}{% component "ui_core.status_badge" label=row.rate|stringformat:"s%%" tone="success" %}{% endcomponent %}{% elif row.rate >= 50 %}{% component "ui_core.status_badge" label=row.rate|stringformat:"s%%" tone="warning" %}{% endcomponent %}{% elif row.rate != None %}{% component "ui_core.status_badge" label=row.rate|stringformat:"s%%" tone="danger" %}{% endcomponent %}{% else %}—{% endif %}</td><td class="px-4 py-3 text-right"><a class="text-xs font-bold text-ui-primary hover:underline" target="_blank" rel="noopener" href="{% url 'accounts_portal:supervisor_student_attendance_print' row.student.id %}?class_id={{ attendance_report_class.id }}&month={{ attendance_report_month|date:'Y-m' }}">Imprimer</a></td></tr>{% endfor %}
+      </tbody></table></div>
+    {% else %}<div class="p-5">{% component "ui_core.empty_state" icon="calendar-x" title="Aucune donnée" message="Aucun appel n'a été enregistré pour cette classe pendant ce mois." %}{% endcomponent %}</div>{% endif %}
   {% endcomponent %}
-
-  {% component "alert" tone="info" title=attendance_report_class.display_name message="Synthèse mensuelle des présences, absences justifiées et retards." %}{% endcomponent %}
-
-  {% component "dashboard_card" padding="none" %}
-    {% fill "default" %}
-      <div class="card-h"><h3>Rapport de présence — {{ attendance_report_month|date:"F Y" }}</h3><span class="src-badge no-print">{{ attendance_report_total_students }} étudiant{{ attendance_report_total_students|pluralize }}</span></div>
-      {% if attendance_report_rows %}
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead><tr class="border-b border-[color:var(--line)] bg-[color:var(--surface-2)] text-left text-xs uppercase text-[color:var(--muted)]">
-              <th class="px-4 py-3">Étudiant</th><th class="px-3 py-3 text-center">Présent</th><th class="px-3 py-3 text-center">Absent</th><th class="px-3 py-3 text-center">Justifié</th><th class="px-3 py-3 text-center">Retard</th><th class="px-3 py-3 text-center">Séances</th><th class="px-4 py-3 text-center">Taux</th><th class="no-print px-4 py-3 text-right">Fiche</th>
-            </tr></thead>
-            <tbody class="divide-y divide-[color:var(--line)]">
-              {% for row in attendance_report_rows %}
-                <tr class="transition hover:bg-[color:var(--card-soft)]">
-                  <td class="px-4 py-3"><strong class="block">{{ row.student.full_name }}</strong><span class="text-xs text-[color:var(--muted)]">{{ row.student.matricule }}</span></td>
-                  <td class="px-3 py-3 text-center font-bold text-[color:var(--success)]">{{ row.present }}</td>
-                  <td class="px-3 py-3 text-center">{% if row.absent %}{% component "status_badge" label=row.absent tone="danger" %}{% endcomponent %}{% else %}—{% endif %}</td>
-                  <td class="px-3 py-3 text-center">{% if row.justified %}{% component "status_badge" label=row.justified tone="info" %}{% endcomponent %}{% else %}—{% endif %}</td>
-                  <td class="px-3 py-3 text-center">{% if row.late %}{% component "status_badge" label=row.late tone="warning" %}{% endcomponent %}{% else %}—{% endif %}</td>
-                  <td class="px-3 py-3 text-center font-semibold">{{ row.total }}</td>
-                  <td class="px-4 py-3 text-center">
-                    {% if row.rate is None %}—{% elif row.rate >= 75 %}{% component "status_badge" label=row.rate|stringformat:"s%%" tone="success" %}{% endcomponent %}{% elif row.rate >= 50 %}{% component "status_badge" label=row.rate|stringformat:"s%%" tone="warning" %}{% endcomponent %}{% else %}{% component "status_badge" label=row.rate|stringformat:"s%%" tone="danger" %}{% endcomponent %}{% endif %}
-                  </td>
-                  <td class="no-print px-4 py-3 text-right"><a class="btn" target="_blank" rel="noopener" href="{% url 'accounts_portal:supervisor_student_attendance_print' row.student.id %}?class_id={{ attendance_report_class.id }}&month={{ attendance_report_month|date:'Y-m' }}">Imprimer</a></td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      {% else %}
-        <div class="p-6">{% component "empty_state" icon="calendar-x" title="Aucune donnée ce mois" message="Aucun appel enregistré pour cette classe pendant la période sélectionnée." %}{% endcomponent %}</div>
-      {% endif %}
-    {% endfill %}
-  {% endcomponent %}
-  <p class="text-right text-xs text-[color:var(--muted)]">Rapport généré le {{ today|date:"d F Y" }} — Surveillant général</p>
-</div>
+{% else %}
+  {% component "ui_core.empty_state" icon="school" title="Sélectionnez une classe" message="Choisissez une classe dans la barre supérieure pour consulter son historique d'assiduité." %}{% endcomponent %}
+{% endif %}

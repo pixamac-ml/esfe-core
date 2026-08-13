@@ -1,129 +1,39 @@
-{# Vue d'ensemble — Resultats & Notes #}
-<div class="space-y-6">
-  {# KPIs rapides — Pattern A (plain numeric, 4 colonnes) #}
-  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-    <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 shadow-sm">
-      <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">Evaluations</p>
-      <p class="mt-2 text-3xl font-black text-slate-900">{{ eval_event_total }}</p>
-      <p class="mt-1 text-xs font-semibold text-slate-500">planifiees au total</p>
-    </div>
-    <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 shadow-sm">
-      <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">A venir</p>
-      <p class="mt-2 text-3xl font-black text-[color:var(--school-primary)]">{{ eval_event_upcoming_count }}</p>
-      <p class="mt-1 text-xs font-semibold text-slate-500">evaluation(s) prochaine(s)</p>
-    </div>
-    <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 shadow-sm">
-      <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--success)]">A valider</p>
-      <p class="mt-2 text-3xl font-black text-[color:var(--success)]">{{ ready_to_validate_count }}</p>
-      <p class="mt-1 text-xs font-semibold text-slate-500">classe(s) prete(s)</p>
-    </div>
-    <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 shadow-sm">
-      <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--warning)]">A publier</p>
-      <p class="mt-2 text-3xl font-black text-[color:var(--warning)]">{{ ready_to_publish|length }}</p>
-      <p class="mt-1 text-xs font-semibold text-slate-500">classe(s) en attente</p>
-    </div>
+{% load component_tags %}
+<div class="space-y-5">
+  <div class="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    {% component "ui_core.stat_card" label="Semestres suivis" value=total_semesters icon="layers-3" tone="primary" description="Dans votre annexe" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="À valider" value=ready_to_validate_count icon="badge-check" tone="warning" description="Notes complètes" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="À publier" value=ready_to_publish|length icon="send" tone="info" description="Semestres finalisés" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Résultats publiés" value=published_count icon="circle-check-big" tone="success" description="Bulletins disponibles" compact=True %}{% endcomponent %}
   </div>
 
-  {# Acces rapides — Pattern B (cards with icon + action) #}
-  <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm overflow-hidden">
-    <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <i data-lucide="layers" class="w-5 h-5 text-[color:var(--school-primary)]"></i>
-        <h3 class="text-sm font-black text-slate-900">Acces rapides</h3>
+  {% component "ui_core.panel" title="Traitement des résultats" subtitle="La validation, la publication et les bulletins suivent le même workflow académique." padding=False %}
+    <div class="grid divide-y divide-ui-border md:grid-cols-2 md:divide-x md:divide-y-0">
+      <a href="{% url 'accounts_portal:portal_dashboard' %}?section=evaluations&view=validation"
+         hx-get="{% url 'accounts_portal:director_evaluations_subcontent' %}?view=validation&validation_scope=actionable"
+         hx-target="#director-results-subcontent"
+         hx-swap="innerHTML"
+         hx-push-url="{% url 'accounts_portal:portal_dashboard' %}?section=evaluations&view=validation&validation_scope=actionable"
+         hx-indicator="#director-results-loading"
+         hx-sync="#director-results-subcontent:replace"
+         data-director-subview-link="validation"
+         class="ui-focus-ring flex min-w-0 items-center gap-3 p-4 hover:bg-ui-surface-hover">
+        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button bg-ui-warning-soft text-ui-warning"><i data-lucide="badge-check" class="h-5 w-5" aria-hidden="true"></i></span>
+        <span class="min-w-0"><strong class="block text-sm text-ui-text">Validation et publication</strong><span class="mt-0.5 block text-xs text-ui-text-muted">Traiter uniquement les classes qui demandent une décision.</span></span>
+        <i data-lucide="chevron-right" class="ml-auto h-4 w-4 shrink-0 text-ui-text-muted" aria-hidden="true"></i>
+      </a>
+      <div class="flex min-w-0 items-center gap-3 p-4">
+        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button bg-ui-success-soft text-ui-success"><i data-lucide="file-text" class="h-5 w-5" aria-hidden="true"></i></span>
+        <span class="min-w-0"><strong class="block text-sm text-ui-text">Bulletins</strong><span class="mt-0.5 block text-xs text-ui-text-muted">La génération reste disponible dans le drawer d'un semestre publié.</span></span>
       </div>
     </div>
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-0 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
-      <button type="button"
-        hx-get="{% url 'accounts_portal:director_evaluations_subcontent' %}?view=create"
-        hx-target="#director-section-subcontent" hx-swap="innerHTML"
-        hx-push-url="{% url 'accounts_portal:director_workspace' %}?section=evaluations&view=create"
-        hx-indicator="#eval-subcontent-loading"
-        class="group flex items-center gap-3 px-6 py-4 text-left transition hover:bg-slate-50">
-        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[color:var(--school-primary)] text-white transition group-hover:opacity-90">
-          <i data-lucide="plus" class="w-4 h-4"></i>
-        </span>
-        <div class="min-w-0">
-          <p class="text-sm font-black text-slate-900 group-hover:text-[color:var(--school-primary)]">Planifier</p>
-          <p class="text-[11px] text-slate-400">Creer une evaluation</p>
-        </div>
-        <i data-lucide="panel-right-open" class="ml-auto w-4 h-4 shrink-0 text-slate-300 group-hover:text-[color:var(--school-primary)]"></i>
-      </button>
-      <button type="button"
-        hx-get="{% url 'accounts_portal:director_evaluations_subcontent' %}?view=scheduled"
-        hx-target="#director-section-subcontent" hx-swap="innerHTML"
-        hx-push-url="{% url 'accounts_portal:director_workspace' %}?section=evaluations&view=scheduled"
-        hx-indicator="#eval-subcontent-loading"
-        class="group flex items-center gap-3 px-6 py-4 text-left transition hover:bg-slate-50">
-        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[color:var(--school-primary)] text-white transition group-hover:opacity-90">
-          <i data-lucide="calendar-clock" class="w-4 h-4"></i>
-        </span>
-        <div class="min-w-0">
-          <p class="text-sm font-black text-slate-900 group-hover:text-[color:var(--school-primary)]">Programmees</p>
-          <p class="text-[11px] text-slate-400">{{ eval_event_total }} evaluation(s)</p>
-        </div>
-        <i data-lucide="panel-right-open" class="ml-auto w-4 h-4 shrink-0 text-slate-300 group-hover:text-[color:var(--school-primary)]"></i>
-      </button>
-      <button type="button"
-        hx-get="{% url 'accounts_portal:director_evaluations_subcontent' %}?view=validation"
-        hx-target="#director-section-subcontent" hx-swap="innerHTML"
-        hx-push-url="{% url 'accounts_portal:director_workspace' %}?section=evaluations&view=validation"
-        hx-indicator="#eval-subcontent-loading"
-        class="group flex items-center gap-3 px-6 py-4 text-left transition hover:bg-slate-50">
-        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[color:var(--school-primary)] text-white transition group-hover:opacity-90">
-          <i data-lucide="check-circle" class="w-4 h-4"></i>
-        </span>
-        <div class="min-w-0">
-          <p class="text-sm font-black text-slate-900 group-hover:text-[color:var(--school-primary)]">Validation</p>
-          <p class="text-[11px] text-slate-400">{{ ready_to_validate_count }} a valider</p>
-        </div>
-        <i data-lucide="panel-right-open" class="ml-auto w-4 h-4 shrink-0 text-slate-300 group-hover:text-[color:var(--school-primary)]"></i>
-      </button>
-    </div>
-  </div>
+  {% endcomponent %}
 
-  {# Alertes si necessaire — Pattern alerte inline #}
   {% if ready_to_validate_count %}
-  <div class="rounded-2xl border border-[color:var(--warning)]/20 bg-[color:var(--warning-soft)] px-6 py-4">
-    <div class="flex items-center gap-3">
-      <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[color:var(--warning)] text-white">
-        <i data-lucide="alert-triangle" class="w-4 h-4"></i>
-      </div>
-      <div class="min-w-0">
-        <p class="text-sm font-black text-slate-900">{{ ready_to_validate_count }} classe(s) en attente de validation</p>
-        <p class="text-xs text-slate-500">Des notes sont pretes a etre validees ou publiees.</p>
-      </div>
-      <button type="button"
-        hx-get="{% url 'accounts_portal:director_evaluations_subcontent' %}?view=validation"
-        hx-target="#director-section-subcontent" hx-swap="innerHTML"
-        hx-push-url="{% url 'accounts_portal:director_workspace' %}?section=evaluations&view=validation"
-        hx-indicator="#eval-subcontent-loading"
-        class="ml-auto shrink-0 inline-flex items-center justify-center rounded-lg border border-[color:var(--warning)] bg-[color:var(--warning)] px-4 py-2 text-xs font-bold text-white transition hover:opacity-90">
-        Voir
-      </button>
-    </div>
-  </div>
-  {% endif %}
-
-  {# Classes candidates au diplome #}
-  {% if diploma_candidate_classes %}
-  <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm overflow-hidden">
-    <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <i data-lucide="award" class="w-5 h-5 text-[color:var(--school-primary)]"></i>
-        <h3 class="text-sm font-black text-slate-900">Classes candidates au diplome</h3>
-      </div>
-      <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-500">{{ diploma_candidate_classes|length }}</span>
-    </div>
-    <div class="divide-y divide-slate-100">
-      {% for item in diploma_candidate_classes %}
-      <div class="px-6 py-4 flex items-center justify-between gap-4 hover:bg-slate-50">
-        <div class="min-w-0">
-          <p class="font-bold text-slate-900">{{ item.class.display_name }}</p>
-          <p class="text-xs text-slate-400 mt-0.5">{{ item.student_count }} etudiant(s) · {{ item.awards_count }} diplome(s) genere(s)</p>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-  </div>
+    {% component "ui_core.alert" title="Des résultats attendent votre validation" message="Vérifiez les notes complètes et les anomalies avant de prendre une décision." tone="warning" %}{% endcomponent %}
+  {% elif ready_to_publish %}
+    {% component "ui_core.alert" title="Des résultats peuvent être publiés" message="La publication finale nécessite la confirmation OTP prévue par le workflow." tone="primary" %}{% endcomponent %}
+  {% else %}
+    {% component "ui_core.alert" title="Aucune décision immédiate" message="Aucun semestre n'est actuellement prêt à valider ou à publier dans cette annexe." tone="neutral" %}{% endcomponent %}
   {% endif %}
 </div>

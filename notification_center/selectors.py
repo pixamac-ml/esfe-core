@@ -13,8 +13,10 @@ def get_user_notifications(user, *, limit=None, channel=None, include_archived=F
     )
 
 
-def get_user_messages(user, *, limit=None, channel=None, include_archived=False):
+def get_user_messages(user, *, limit=None, channel=None, include_archived=False, include_deleted=False):
     queryset = NotificationMessage.objects.filter(recipient=user).select_related("actor", "event")
+    if not include_deleted:
+        queryset = queryset.filter(deleted_at__isnull=True)
     if not include_archived:
         queryset = queryset.filter(archived_at__isnull=True)
     if channel:
@@ -85,7 +87,7 @@ def get_notification_center_queryset(user, filters=None):
 
 
 def get_notification_center_stats(user):
-    base = NotificationMessage.objects.filter(recipient=user)
+    base = NotificationMessage.objects.filter(recipient=user, deleted_at__isnull=True)
     active = base.filter(archived_at__isnull=True)
     in_app = active.filter(channel=NotificationMessage.CHANNEL_IN_APP)
     return {
@@ -113,7 +115,7 @@ def get_notification_center_stats(user):
 
 
 def get_notification_filter_options(user):
-    base = NotificationMessage.objects.filter(recipient=user, archived_at__isnull=True)
+    base = NotificationMessage.objects.filter(recipient=user, archived_at__isnull=True, deleted_at__isnull=True)
     return {
         "channels": NotificationMessage.CHANNEL_CHOICES,
         "priorities": NotificationMessage.PRIORITY_CHOICES,

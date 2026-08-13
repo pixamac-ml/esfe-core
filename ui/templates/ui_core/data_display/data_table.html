@@ -24,26 +24,18 @@
             {% for header in headers %}
               <th scope="col" class="px-4 {% if density == 'compact' %}py-2{% else %}py-3{% endif %} font-bold">
                 {% if header.sort_url %}
-                  <button type="button" hx-get="{{ header.sort_url }}" hx-target="#ui-table-demo" hx-swap="outerHTML" class="inline-flex items-center gap-1 hover:text-ui-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus">
+                  <button type="button" hx-get="{{ header.sort_url }}" hx-target="#{{ table_id }}" hx-swap="outerHTML" class="inline-flex items-center gap-1 hover:text-ui-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus">
                     {{ header.label }} <i data-lucide="arrow-up-down" class="h-3.5 w-3.5" aria-hidden="true"></i>
                   </button>
                 {% else %}{{ header.label|default:header }}{% endif %}
               </th>
             {% endfor %}
+            {% if rows.0.actions %}<th scope="col" class="px-4 {% if density == 'compact' %}py-2{% else %}py-3{% endif %} text-right font-bold">Actions</th>{% endif %}
           </tr>
         </thead>
         <tbody class="divide-y divide-ui-border">
           {% for row in rows %}
-            <tr class="hover:bg-ui-surface-hover {% if row.selected %}bg-ui-selected{% endif %}">
-              {% if selectable %}<td class="px-4 {% if density == 'compact' %}py-2{% else %}py-3{% endif %}"><input type="checkbox" aria-label="Sélectionner {{ row.label|default:'la ligne' }}" class="rounded-ui-input border-ui-border text-ui-primary focus:ring-ui-focus"></td>{% endif %}
-              {% for cell in row.cells %}
-                <td class="max-w-sm px-4 {% if density == 'compact' %}py-2{% else %}py-3{% endif %} text-ui-text">
-                  {% if cell.tone %}{% component "ui_core.status_badge" label=cell.value tone=cell.tone %}{% endcomponent %}
-                  {% elif cell.amount %}<span class="font-semibold tabular-nums">{{ cell.value }}</span>
-                  {% else %}<span class="break-words">{{ cell.value|default:"—" }}</span>{% endif %}
-                </td>
-              {% endfor %}
-            </tr>
+            {% include "ui_core/data_display/data_table_row.html" with row=row density=density selectable=selectable csrf_token=csrf_token only %}
           {% endfor %}
         </tbody>
       </table>

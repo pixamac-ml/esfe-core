@@ -1,0 +1,25 @@
+{% load component_tags %}
+<section class="min-w-0 space-y-5">
+  {% component "ui_core.page_header" eyebrow="Mobilité étudiante" title="Transferts" subtitle="Dossiers internes, entrants et sortants avec contrôles, décisions et historique." %}
+    {% fill "actions" %}
+      <span class="inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-xs font-semibold text-ui-text">
+        <i data-lucide="inbox" class="h-4 w-4 text-ui-warning" aria-hidden="true"></i>
+        {{ transfer_metrics.pending|default:0 }} à traiter
+      </span>
+      <button type="button" hx-get="{% url 'accounts_portal:director_transfer_create' %}" hx-target="#director-modal-content" hx-swap="innerHTML" hx-disabled-elt="this" class="ui-focus-ring inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong disabled:opacity-50">
+        <i data-lucide="arrow-left-right" class="h-4 w-4" aria-hidden="true"></i>Nouveau transfert
+      </button>
+    {% endfill %}
+  {% endcomponent %}
+
+  {% component "ui_core.tabs" id="director-transfer-tabs" items=transfer_tabs active=transfer_subview density="compact" %}{% endcomponent %}
+
+  <div class="relative min-w-0">
+    <div id="director-transfer-loading" class="htmx-indicator pointer-events-none absolute inset-0 z-20">{% component "ui_core.loading_overlay" loading=True label="Chargement des transferts" %}{% endcomponent %}</div>
+    <div id="director-transfer-subcontent" class="min-w-0" aria-live="polite">
+      {% if transfer_subview == "pending" %}{% include "portal/staff/director/partials/transfers/pending.html" %}
+      {% elif transfer_subview == "history" %}{% include "portal/staff/director/partials/transfers/history.html" %}
+      {% else %}{% include "portal/staff/director/partials/transfers/overview.html" %}{% endif %}
+    </div>
+  </div>
+</section>

@@ -67,6 +67,7 @@ from academics.services.academic_positioning import get_positioning_context, get
 from community.models import Category as CommunityCategory, Topic, Answer
 from .models import SuperadminCockpitPreference
 from students.services.email import send_payment_confirmation_email
+from portal.services import build_role_dashboard_shell
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -414,6 +415,47 @@ def dashboard(request):
     context['trend_inscriptions_series'] = _daily_series(Inscription, ins_field, ins_is_dt, chart_days)
     context['widget_autorefresh'] = pref.widget_autorefresh
     context['sidebar_collapsed'] = pref.sidebar_collapsed
+
+    dashboard_url = reverse('superadmin:dashboard')
+    context.update(
+        build_role_dashboard_shell(
+            request,
+            role='super_admin',
+            key='superadmin',
+            title='Super administration',
+            subtitle='Centre de pilotage global',
+            active_section='dashboard',
+            dashboard_url=dashboard_url,
+            context_label='Vue globale - Toutes les annexes',
+            groups=[
+                {
+                    'label': 'Pilotage',
+                    'items': [
+                        {'key': 'dashboard', 'label': 'Tableau de bord', 'icon': 'layout-dashboard'},
+                    ],
+                },
+                {
+                    'label': 'Admissions',
+                    'items': [
+                        {'key': 'candidatures', 'label': 'Candidatures', 'icon': 'file-check', 'url': reverse('superadmin:candidature_list'), 'badge': context.get('candidatures_pending') or None},
+                        {'key': 'inscriptions', 'label': 'Inscriptions', 'icon': 'clipboard-list', 'url': reverse('superadmin:inscription_list')},
+                        {'key': 'students', 'label': 'Etudiants', 'icon': 'users', 'url': reverse('superadmin:student_list')},
+                    ],
+                },
+                {
+                    'label': 'Finance et academique',
+                    'items': [
+                        {'key': 'payments', 'label': 'Paiements', 'icon': 'wallet', 'url': reverse('superadmin:payment_list')},
+                        {'key': 'formations', 'label': 'Programmes', 'icon': 'graduation-cap', 'url': reverse('superadmin:formation_list')},
+                        {'key': 'branches', 'label': 'Annexes', 'icon': 'building-2', 'url': reverse('superadmin:branch_list')},
+                        {'key': 'users', 'label': 'Utilisateurs', 'icon': 'user-cog', 'url': reverse('superadmin:user_list')},
+                        {'key': 'settings', 'label': 'Parametres', 'icon': 'settings', 'url': reverse('superadmin:settings')},
+                    ],
+                },
+            ],
+            modal_title='Administration globale',
+        )
+    )
 
     return render(request, 'superadmin/dashboard.html', context)
 

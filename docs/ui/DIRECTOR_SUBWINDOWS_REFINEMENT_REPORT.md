@@ -1,157 +1,201 @@
-# Rapport de raffinement — Sous-fenêtres du dashboard Directeur des Études
+# Rapport de raffinement des sous-fenetres du Directeur des Etudes
 
-Date : 26 juillet 2026
-Branche : `refactor/ui-core-foundation`
+Date : 1er aout 2026
+Branche Git : `refactor/ui-core-foundation`
 
-## 1. Cohérence métier vérifiée
+## 1. Coherence metier verifiee
 
-| Fonction | Section correcte | Vue existante | Action |
-|---|---|---|---|
-| Créer session d'examens (macro) | `evaluations_calendar` | `director_exam_session_action` | `AcademicCalendarEntry` — déjà en place |
-| Publier/annuler session | `evaluations_calendar` | `director_exam_session_action` | `AcademicCalendarEntry` — déjà en place |
-| Planifier une évaluation (classe + EC + date) | `evaluations` | `director_evaluation_action` | `AcademicScheduleEvent` — sous-fenêtre « Planifier » |
-| Lister les évaluations programmées | `evaluations` | `director_evaluations_subcontent` | Sous-fenêtre « Programmées » |
-| Valider les notes d'un semestre | `evaluations` | `director_results_action` | `Semester` — sous-fenêtre « Validation » |
-| Rejeter / Publier (OTP) | `evaluations` | `director_results_action` | `Semester` — drawer evaluations_drawer |
-| Générer les bulletins | `evaluations` | `director_bulletin_action` | PDF bulletins — drawer evaluations_drawer |
-| Vue d'ensemble (KPIs + alertes) | `evaluations` | `director_evaluations_subcontent` | Sous-fenêtre « Vue d'ensemble » |
+La responsabilite des deux sections est maintenant explicite :
 
-Les 4 sous-fenêtres sont correctement placées dans la section `evaluations` (« Résultats & Notes »). Aucune responsabilité n'a été inventée.
-
-## 2. Section finale retenue
-
-**Section : `evaluations`** — alias « Résultats & Notes »
-
-Le titre de la section a été corrigé de « Planification des évaluations » à « Résultats et notes » pour refléter le vrai périmètre : création d'évaluations individuelles + validation/publication des notes + bulletins.
-
-## 3. Sous-fenêtres finales
-
-| Sous-fenêtre | Clé | Contenu | Actions backend |
-|---|---|---|---|
-| Vue d'ensemble | `overview` | 4 KPIs (évaluations, à venir, à valider, à publier), accès rapides, alertes, classes candidates diplome | Lecture seule + navigation |
-| Planifier | `create` | Formulaire création `AcademicScheduleEvent` | POST `director_evaluation_action` |
-| Programmées | `scheduled` | Liste évaluations programmées par classe | POST annulation évaluation |
-| Validation | `validation` | Grille classes + statut workflow + pagination | Drawer evaluations_drawer → validate/publish/reject/bulletins |
-
-## 4. Composants UI Core réutilisés
-
-- Header pattern : `rounded-2xl border bg-[color:var(--card)] shadow-sm px-6 py-5` (identique planification/evaluations_calendar)
-- KPIs : Pattern A (plain numeric, 4 colonnes) — même structure que programme/correspondances
-- Cartes d'action : même pattern que drawer operation (icon + label + panel-right-open)
-- Grille classes : même pattern que planification (`gap-0 divide-y sm:divide-y-0 sm:divide-x`)
-- Alertes : même pattern que planification (border warning + bouton action)
-- État vide : `border-dashed` + icon + titre bold + sous-titre muted
-- Formulaires : `rounded-xl border bg-white px-4 py-2.5 text-sm focus:ring-[color:var(--school-primary)]/30`
-- Badges : `rounded-full bg-[color:xxx-soft] px-2.5 py-0.5 text-[10px] font-bold text-[color:xxx]`
-- Boutons : primary (`rounded-lg border bg-[color:var(--school-primary)] text-white`), secondary (`border bg-[color:var(--card)] hover:bg-slate-50`), danger (`border bg-[color:var(--danger-soft)] text-[color:var(--danger)]`)
-
-## 5. Interactions HTMX
-
-| Élément | `hx-get` | `hx-target` | `hx-swap` | `hx-push-url` | `hx-indicator` |
-|---|---|---|---|---|---|
-| Tab Vue d'ensemble | `director_evaluations_subcontent?view=overview` | `#director-section-subcontent` | `innerHTML` | `director_workspace?section=evaluations&view=overview` | `#eval-subcontent-loading` |
-| Tab Planifier | `director_evaluations_subcontent?view=create` | `#director-section-subcontent` | `innerHTML` | `director_workspace?section=evaluations&view=create` | `#eval-subcontent-loading` |
-| Tab Programmées | `director_evaluations_subcontent?view=scheduled` | `#director-section-subcontent` | `innerHTML` | `director_workspace?section=evaluations&view=scheduled` | `#eval-subcontent-loading` |
-| Tab Validation | `director_evaluations_subcontent?view=validation` | `#director-section-subcontent` | `innerHTML` | `director_workspace?section=evaluations&view=validation` | `#eval-subcontent-loading` |
-| Bouton Accès rapides | `director_evaluations_subcontent?view=...` | `#director-section-subcontent` | `innerHTML` | `director_workspace?section=evaluations&view=...` | `#eval-subcontent-loading` |
-| Carte classe | `director_drawer?panel=evaluations&class_id=...` | `#director-drawer-content` | `innerHTML` | — | — |
-| Annuler évaluation | `director_evaluation_action` POST | `#director-workspace` | `innerHTML` | — | — |
-| Formulaire création | `director_evaluation_action` POST | `#director-workspace` | `innerHTML` | — | `#eval-create-loading` |
-
-Indicateur de chargement : spinner animé + texte « Chargement... » overlay sur `#director-section-subcontent` pendant le chargement HTMX.
-
-## 6. Pagination
-
-La pagination dans la sous-fenêtre « Validation » utilise `_pagination.html` avec :
-- `target_id="#de-grid-evals"` — cible unique de la grille
-- `hx_select="#de-grid-evals"` — extraction partielle de la réponse
-- `query_suffix="section=evaluations&view=validation"` — conservation de la sous-fenêtre active
-- Les boutons Précédent/Suivant remplacent uniquement la grille, pas l'ensemble de la section
-
-## 7. Formulaires
-
-Le formulaire de création suit les patterns existants :
-- Labels `text-xs font-black uppercase tracking-wide text-slate-600`
-- Champs requis avec `required`
-- Désactivation du bouton pendant la requête (`hx-disabled-elt="button[type=submit]"`)
-- Indicateur de chargement HTMX inline (`#eval-create-loading`)
-- Données EC par classe sérialisées en JSON (`de-ecs-by-class-data`)
-- Sélection en cascade classe → EC via Alpine.js (`x-model="selectedClass"`)
-- POST HTMX → validation backend → rendu du workspace complet avec toast
-
-## 8. Actions backend
-
-Aucune action factice. Tous les boutons déclenchent de vraies vues :
-- Création : POST `director_evaluation_action` → `AcademicScheduleEvent.create`
-- Annulation : POST `director_evaluation_action` → `AcademicScheduleEvent` status → cancelled
-- Validation : drawer → POST `director_results_action` → `Semester` status → finalized
-- Publication : drawer → POST `director_results_action` → OTP → `Semester` status → published
-- Bulletins : drawer → POST `director_bulletin_action` → génération PDF
-
-## 9. Données de santé utilisées
-
-Aucune donnée fictive créée. Les exemples dans les placeholders utilisent :
-- « Anatomie » (matière réelle d'école de santé)
-- « Amphi 1 » (salle réaliste)
-- Les classes et matières sont chargées dynamiquement depuis la base via `eval_form_classes` et `eval_form_ecs_json`
-
-## 10. Fichiers modifiés
-
-| Fichier | Changement |
+| Section | Responsabilite finale |
 |---|---|
-| `portal/views/views.py` | +`director_evaluations_subcontent` vue, +`_EVAL_SUBVIEW_TEMPLATES` |
-| `portal/urls.py` | +route `director/evaluations/subcontent/` |
-| `templates/portal/staff/director/partials/workspace.html` | Section évaluations raffinée : header corrigé, tabs avec `hx-indicator`, loading overlay |
-| `templates/portal/staff/director/partials/evaluations/overview.html` | Raffiné : KPIs Pattern A, accès rapides avec `panel-right-open`, alertes, diplome |
-| `templates/portal/staff/director/partials/evaluations/create.html` | Raffiné : labels slate-600, indicateur chargement inline, bouton primary standard |
-| `templates/portal/staff/director/partials/evaluations/scheduled.html` | Raffiné : hover bg-slate-50, badges consistent, état vide dashed |
-| `templates/portal/staff/director/partials/evaluations/validation.html` | Raffiné : `#de-grid-evals` pour pagination, `panel-right-open`, hover states |
-| `portal/test_director_dashboard_phase2.py` | +12 tests ciblés (sub-navigation, HTMX, loading, unicité fragments, cibles) |
+| `Sessions d'evaluations` (`evaluations_calendar`) | Periodes officielles d'examens et de rattrapage, planification d'une evaluation par classe, liste et annulation des evaluations programmees. |
+| `Resultats et notes` (`evaluations`) | Controle des notes, validation ou rejet des semestres, publication OTP et bulletins. |
 
-## 11. Captures
+`Planifier` et `Programmees` ne sont plus rendues sous `Resultats et notes`. Les deux anciens fragments qui entretenaient ce melange ont ete supprimes. La sidebar et la topbar n'ont pas ete modifiees.
 
-Répertoire : `_audit/director_subwindows_refinement/`
+Le filtrage par annexe est applique aux classes, matieres, enseignants, evenements, sessions et actions. Les relations provenant d'une autre annexe sont refusees par les formulaires et les vues.
 
-Les captures écran nécessitent une session navigateur réelle (non automatisables sans Playwright configuré).
+## 2. Sous-fenetres finales
 
-## 12. Tests
+### Sessions d'evaluations
 
-| Test | Résultat |
+| Sous-fenetre | Cle | Contenu |
+|---|---|---|
+| Vue d'ensemble | `overview` | Compteurs courts et acces directs. |
+| Sessions | `sessions` | Sessions officielles, formulaire en brouillon, filtres, pagination et annulation motivee. |
+| Planifier | `create` | Formulaire classe, EC, enseignant, dates, salle et contenu. |
+| Programmees | `scheduled` | Recherche, filtres, regroupement par classe, pagination et annulation motivee. |
+
+### Resultats et notes
+
+| Sous-fenetre | Cle | Contenu |
+|---|---|---|
+| Vue d'ensemble | `overview` | Semestres suivis, decisions attendues, publication et bulletins. |
+| Validation et publication | `validation` | Classes actionnables par defaut, recherche, filtres, pagination et drawer de decision. |
+
+## 3. Composants UI Core reutilises
+
+- `ui_core.page_header`
+- `ui_core.tabs`, etendu pour les liens HTMX accessibles
+- `ui_core.panel`
+- `ui_core.stat_card`
+- `ui_core.status_badge`
+- `ui_core.alert`
+- `ui_core.empty_state`
+- `ui_core.loading_overlay`
+- drawer large existant pour les informations de validation
+
+Le badge de statut preserve maintenant correctement la valeur numerique `0`. Les tailles du drawer compact et du drawer large restent celles du contrat UI Core existant.
+
+## 4. Interactions HTMX
+
+Chaque section possede une cible stable :
+
+- `#director-session-subcontent`
+- `#director-results-subcontent`
+
+Les indicateurs, zones d'erreur et compteurs restent hors des zones remplacees. Les requetes utilisent `hx-sync`, des boutons desactives pendant l'envoi et des URL poussees vers le dashboard complet. Les reponses de fragments ne poussent jamais une URL de fragment.
+
+Le navigateur a confirme :
+
+- changement d'onglet sans rechargement complet ;
+- onglet actif synchronise apres swap ;
+- retour navigateur restaure ;
+- erreurs reseau destinees a une zone visible ;
+- compteurs OOB traites uniquement dans une reponse de fragment ;
+- aucune erreur console ou `pageerror`.
+
+## 5. Formulaires et actions backend
+
+### Evaluation individuelle
+
+- `DirectorEvaluationForm` limite classes, EC et enseignants a l'annexe.
+- L'EC est recharge par HTMX apres selection de la classe.
+- L'enseignant est obligatoire et ne peut pas etre remplace silencieusement par le Directeur des Etudes.
+- Les dates sont validees et les valeurs liees sont conservees apres erreur.
+- La creation passe par `create_schedule_event` avec detection des conflits et journal de changement.
+- L'annulation exige un motif et passe par `cancel_schedule_event`.
+
+### Session officielle
+
+- `DirectorExamSessionForm` gere l'intitule, le type, les dates et la description.
+- La creation reutilise ou cree un calendrier brouillon via `create_calendar`.
+- Les regles sont verifiees par `validate_entry_business_rules`.
+- L'entree est creee par `create_calendar_entry` avec portee annexe et statut brouillon.
+- L'annulation exige un motif, utilise `update_calendar_entry` et journalise l'action.
+- La publication reste dans la section `Calendrier`, sans bouton factice dans `Sessions`.
+
+### Resultats
+
+Les actions existantes de validation, rejet, publication OTP et bulletins restent dans le drawer `Resultats et notes`. Leurs reponses ciblent maintenant `#director-results-subcontent`. L'echec OTP reste dans la modale avec un message visible ; le succes actualise la validation et ses compteurs.
+
+## 6. Listes, filtres et pagination
+
+- Sessions officielles : 8 elements par page.
+- Evaluations programmees : 10 elements par page.
+- Classes de validation : 10 elements par page.
+- La pagination remplace l'enveloppe complete liste + pagination avec `hx-select` et `outerHTML`.
+- Premiere, precedente, suivante et derniere page sont disponibles selon l'etat.
+- La recherche, les filtres, la sous-fenetre et le numero de page sont conserves dans les requetes et l'historique.
+- La validation affiche les classes actionnables par defaut et permet d'afficher toutes les classes.
+
+Le test navigateur a confirme `Suivant`, `Precedent`, page 1, page 2 et la conservation du filtre `planned`.
+
+## 7. Donnees de sante et environnement navigateur
+
+Le parcours visuel utilise `config.settings_test_local` et une base SQLite isolee, automatiquement videe apres le test. Aucune donnee operationnelle n'a ete modifiee.
+
+Les libelles reprennent le domaine de sante deja present dans le projet :
+
+- annexe Bamako Moribabougou ;
+- classe Agent de Sante Communautaire ;
+- EC Agent de Sante Communautaire - Concepts de base ;
+- enseignant rattache a la meme annexe.
+
+Le script reproductible se trouve dans `_audit/director_subwindows_refinement/run_browser_qa.py`. Ses resultats structures sont dans `qa-results.json`.
+
+## 8. Captures
+
+Repertoire : `_audit/director_subwindows_refinement/`
+
+| Capture | Verification |
 |---|---|
-| `python manage.py check` | 0 erreurs |
-| `makemigrations --check --dry-run` | Aucun changement |
-| `test portal.test_director_dashboard_phase2` | 28 tests OK |
-| `test ui` | 108 tests OK |
-| `npm run build:css` | OK |
+| `01-overview-refined.png` | Vue d'ensemble Sessions. |
+| `02-create-refined.png` | Formulaire reel de planification. |
+| `03-scheduled-refined.png` | Liste programmee et message de succes. |
+| `04-validation-refined.png` | Validation avec drawer large ouvert. |
+| `05-pagination-page-1.png` | Premiere page filtree. |
+| `06-pagination-page-2.png` | Deuxieme page filtree. |
+| `07-form-errors.png` | Erreurs par champ. |
+| `08-form-success.png` | Creation reussie et compteur actualise. |
+| `09-mobile.png` | Vue 390 x 844. |
+| `10-tablet.png` | Vue 820 x 1180. |
 
-Tests ajoutés :
-- `test_evaluations_section_shows_subnavigation` — tabs + title + loading
-- `test_evaluations_subcontent_default_is_overview` — KPIs + accès rapides
-- `test_evaluations_subcontent_create` — formulaire + indicateur chargement
-- `test_evaluations_subcontent_scheduled` — état vide
-- `test_evaluations_subcontent_validation` — grille validation
-- `test_evaluations_subcontent_unknown_view_defaults_to_overview`
-- `test_evaluations_subcontent_requires_authentication`
-- `test_evaluations_subcontent_requires_director_position`
-- `test_each_subcontent_returns_unique_fragment`
-- `test_workspace_evaluations_has_htmx_indicator`
-- `test_workspace_evaluations_tabs_use_correct_target`
-- `test_workspace_evaluations_has_no_global_overflow`
+Mesures de debordement global :
 
-## 13. Limites
+| Format | Largeur document | `scrollWidth` | Debordement |
+|---|---:|---:|---|
+| Desktop | 1440 | 1440 | Non |
+| Tablette | 820 | 820 | Non |
+| Mobile | 390 | 390 | Non |
 
-- Les captures écran nécessitent une session navigateur réelle.
-- Les autres sections du dashboard ne sont pas encore converties (pilote uniquement).
-- Le comportement temps réel (WebSocket) n'est pas affecté.
-- La pagination dans les sous-fenêtres recharge la section complète via `director_workspace` puis extrait uniquement la grille via `hx-select` — fonctionnel mais pas ultra-léger.
+## 9. Tests executes
 
-## 14. État Git
+| Commande | Resultat |
+|---|---|
+| `python manage.py check` | OK, aucune anomalie. |
+| `python manage.py makemigrations --check --dry-run` | OK, aucun changement. |
+| `python manage.py test portal.test_director_dashboard_phase2 --settings=config.settings_test_local --keepdb` | 31 tests OK. |
+| `python manage.py test portal.test_director_evaluation_workflows --settings=config.settings_test_local --keepdb` | Inclus dans la passe complete, 9 tests de workflow. |
+| `python manage.py test portal --settings=config.settings_test_local --keepdb` | 67 tests OK. |
+| `python manage.py test ui --settings=config.settings_test_local --keepdb` | 110 tests OK. |
+| `npm run build:css` | OK. |
+| `python _audit/director_subwindows_refinement/run_browser_qa.py` | OK, toutes les assertions navigateur vraies. |
 
-- Branche : `refactor/ui-core-foundation`
-- Worktree : sale avant et après la mission
-- Aucun commit
-- Aucun push
+Une tentative parallele des suites Django a produit un verrou SQLite. Les deux commandes imposees ont ensuite ete relancees sequentiellement et ont reussi ; ce verrou n'est pas une anomalie applicative.
 
----
+## 10. Fichiers concernes
 
-**SOUS-FENÊTRES RAFFINÉES ET PRÊTES POUR VALIDATION VISUELLE**
+Principaux fichiers backend :
+
+- `portal/forms.py`
+- `portal/urls.py`
+- `portal/views/views.py`
+- `portal/services/director/exam_session_service.py`
+- `portal/test_director_dashboard_phase2.py`
+- `portal/test_director_evaluation_workflows.py`
+
+Principaux fichiers frontend :
+
+- `templates/portal/staff/director/partials/workspace.html`
+- `templates/portal/staff/director/partials/evaluation_sessions/*`
+- `templates/portal/staff/director/partials/evaluations/*`
+- `templates/portal/staff/director/partials/_pagination.html`
+- `templates/portal/staff/director/partials/drawers/evaluations_drawer.html`
+- `templates/portal/staff/director/partials/results_otp_modal.html`
+- `static/src/js/portal/director_dashboard.js`
+- `static/public/css/main.css`
+- `ui/templates/ui_core/navigation/tabs.html`
+- `ui/components/ui_core/data_display/status_badge.py`
+- `ui/templates/ui_core/data_display/status_badge.html`
+- `ui/test_ui_core.py`
+
+Les anciens fragments `evaluations/create.html` et `evaluations/scheduled.html` ont ete supprimes apres leur remplacement par `evaluation_sessions/`.
+
+## 11. Limites
+
+- Le reste du dashboard n'a pas ete generalise : ce travail reste limite aux deux sections demandees.
+- La publication OTP n'a pas ete declenchee dans le navigateur QA afin de ne pas envoyer d'email externe ; le drawer, la permission et les routes sont verifies, et les tests Django couvrent le workflow existant.
+- Le script Playwright applique temporairement la politique de boucle Proactor requise par Python 3.14 sous Windows ; l'API est annoncee comme depreciee pour Python 3.16, sans impact actuel sur le produit.
+
+## 12. Etat Git
+
+- Worktree deja modifie avant cette mission et toujours non propre.
+- Aucun changement existant sans rapport n'a ete annule.
+- Aucun commit.
+- Aucun push.
+
+## Verdict
+
+SOUS-FENÊTRES RAFFINÉES ET PRÊTES POUR VALIDATION VISUELLE

@@ -26,6 +26,9 @@ def build_director_exam_sessions_context(*, branch, class_cards):
 
     sessions = list(
         AcademicCalendarEntry.objects.select_related(
+            "calendar",
+            "calendar__branch",
+            "calendar__academic_year",
             "academic_class",
             "semester",
             "created_by",
@@ -38,7 +41,12 @@ def build_director_exam_sessions_context(*, branch, class_cards):
     )
 
     today = timezone.now()
-    upcoming = [s for s in sessions if s.end_datetime >= today][:6]
+    upcoming = [
+        session
+        for session in sessions
+        if session.end_datetime >= today
+        and session.status != AcademicCalendarEntry.STATUS_CANCELLED
+    ][:6]
 
     # Grouper par classe pour affichage
     sessions_by_class = {}
@@ -68,15 +76,18 @@ def build_director_exam_sessions_context(*, branch, class_cards):
 
 def _session_row(entry):
     today = timezone.now()
-    if entry.end_datetime < today:
+    if entry.status == AcademicCalendarEntry.STATUS_CANCELLED:
+        state = "annule"
+        tone = "danger"
+    elif entry.end_datetime < today:
         state = "termine"
-        tone = "muted"
+        tone = "neutral"
     elif entry.start_datetime <= today:
         state = "en_cours"
         tone = "success"
     elif entry.status == AcademicCalendarEntry.STATUS_PUBLISHED:
         state = "publie"
-        tone = "school_primary"
+        tone = "primary"
     else:
         state = "brouillon"
         tone = "warning"
@@ -109,7 +120,7 @@ def get_upcoming_exam_sessions_for_class(*, academic_class, limit=3):
     """
     today = timezone.now()
     sessions = (
-        AcademicCalendarEntry.objects.select_related("semester")
+        AcademicCalendarEntry.objects.select_related("calendar", "semester")
         .filter(
             academic_class=academic_class,
             event_type__in=_EXAM_TYPES,
@@ -127,7 +138,9 @@ def get_upcoming_exam_sessions_for_branch(*, branch, limit=5):
     """
     today = timezone.now()
     sessions = (
-        AcademicCalendarEntry.objects.select_related("academic_class", "semester")
+        AcademicCalendarEntry.objects.select_related(
+            "calendar", "academic_class", "semester"
+        )
         .filter(
             calendar__branch=branch,
             event_type__in=_EXAM_TYPES,

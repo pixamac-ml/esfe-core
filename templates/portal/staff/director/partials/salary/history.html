@@ -1,0 +1,12 @@
+{% load component_tags humanize %}
+<div class="space-y-5">
+  <div><h2 class="text-base font-bold text-ui-text">Historique personnel</h2><p class="mt-1 text-sm text-ui-text-muted">Toutes vos fiches de paie, sans aucune donnée salariale d’un autre employé.</p></div>
+  {% if salary_history_page.object_list %}
+  <div class="overflow-x-auto border-y border-ui-border">
+    <table class="w-full min-w-[760px] text-sm"><thead><tr><th>Période</th><th>Brut</th><th>Retenues</th><th>Net</th><th>Versé</th><th>État</th><th class="text-right">Document</th></tr></thead><tbody>
+      {% for entry in salary_history_page.object_list %}<tr><td class="font-semibold capitalize">{{ entry.period_month|date:"F Y" }}</td><td>{{ entry.base_salary|add:entry.allowances|intcomma }} FCFA</td><td>{{ entry.deductions|add:entry.advances|intcomma }} FCFA</td><td class="font-bold">{{ entry.net_salary|intcomma }} FCFA</td><td>{{ entry.paid_amount|intcomma }} FCFA</td><td>{{ entry.get_status_display }}</td><td class="text-right"><a href="{% url 'accounts:payslip_download' entry.pk %}" class="ui-focus-ring inline-flex h-9 items-center gap-2 rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text"><i data-lucide="download" class="h-4 w-4"></i>PDF</a></td></tr>{% endfor %}
+    </tbody></table>
+    {% include "portal/staff/director/partials/_pagination.html" with page_obj=salary_history_page page_param="salary_page" query_suffix=salary_query_suffix target_id="#director-salary-subcontent" pagination_url_name="accounts_portal:director_salary_subcontent" indicator_id="#director-salary-loading" %}
+  </div>
+  {% else %}{% component "ui_core.empty_state" title="Aucun historique salarial" message="Les fiches mensuelles préparées à votre nom seront conservées ici." icon="history" %}{% endcomponent %}{% endif %}
+</div>

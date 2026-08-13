@@ -1,0 +1,48 @@
+{% load component_tags %}
+<div class="space-y-5">
+  <div class="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    {% component "ui_core.stat_card" label="Classes actives" value=programme_metrics.classes icon="school" tone="primary" description="Dans votre annexe" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Semestres" value=programme_metrics.semesters icon="layers-3" tone="info" description="Rattachés aux classes" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Unités d'enseignement" value=programme_metrics.ues icon="library-big" tone="success" description="UE non archivées" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Matières" value=programme_metrics.ecs icon="book-open-check" tone="warning" description="EC non archivés" compact=True %}{% endcomponent %}
+  </div>
+
+  {% component "ui_core.panel" title="Structure académique" subtitle="Accédez directement au niveau de détail dont vous avez besoin." padding=False %}
+    <div class="grid divide-y divide-ui-border md:grid-cols-2 md:divide-x md:divide-y-0">
+      <a href="{% url 'accounts_portal:portal_dashboard' %}?section=programme&view=classes"
+         hx-get="{% url 'accounts_portal:director_programme_subcontent' %}?view=classes"
+         hx-target="#director-programme-subcontent"
+         hx-swap="innerHTML"
+         hx-push-url="{% url 'accounts_portal:portal_dashboard' %}?section=programme&view=classes"
+         hx-indicator="#director-programme-loading"
+         hx-sync="#director-programme-subcontent:replace"
+         data-director-subview-link="classes"
+         class="ui-focus-ring flex min-w-0 items-center gap-3 p-4 hover:bg-ui-surface-hover">
+        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button bg-ui-primary-soft text-ui-primary"><i data-lucide="school" class="h-5 w-5" aria-hidden="true"></i></span>
+        <span class="min-w-0"><strong class="block text-sm text-ui-text">Classes</strong><span class="mt-0.5 block text-xs text-ui-text-muted">Créer, rechercher et ouvrir une classe académique.</span></span>
+        <i data-lucide="chevron-right" class="ml-auto h-4 w-4 shrink-0 text-ui-text-muted" aria-hidden="true"></i>
+      </a>
+      <a href="{% url 'accounts_portal:portal_dashboard' %}?section=programme&view=maquettes"
+         hx-get="{% url 'accounts_portal:director_programme_subcontent' %}?view=maquettes"
+         hx-target="#director-programme-subcontent"
+         hx-swap="innerHTML"
+         hx-push-url="{% url 'accounts_portal:portal_dashboard' %}?section=programme&view=maquettes"
+         hx-indicator="#director-programme-loading"
+         hx-sync="#director-programme-subcontent:replace"
+         data-director-subview-link="maquettes"
+         class="ui-focus-ring flex min-w-0 items-center gap-3 p-4 hover:bg-ui-surface-hover">
+        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button bg-ui-success-soft text-ui-success"><i data-lucide="library-big" class="h-5 w-5" aria-hidden="true"></i></span>
+        <span class="min-w-0"><strong class="block text-sm text-ui-text">Maquettes pédagogiques</strong><span class="mt-0.5 block text-xs text-ui-text-muted">Contrôler les semestres, UE, matières et crédits.</span></span>
+        <i data-lucide="chevron-right" class="ml-auto h-4 w-4 shrink-0 text-ui-text-muted" aria-hidden="true"></i>
+      </a>
+    </div>
+  {% endcomponent %}
+
+  {% if programme_metrics.incomplete_classes %}
+    {% component "ui_core.alert" title="Des maquettes restent à compléter" message="Certaines classes n'ont pas encore leurs deux semestres, leurs UE ou leurs matières." tone="warning" %}{% endcomponent %}
+  {% elif programme_metrics.classes %}
+    {% component "ui_core.alert" title="Structure renseignée" message="Toutes les classes actives possèdent des semestres, des UE et des matières." tone="success" %}{% endcomponent %}
+  {% else %}
+    {% component "ui_core.alert" title="Aucune classe active" message="Créez la première classe académique de cette annexe pour commencer." tone="neutral" %}{% endcomponent %}
+  {% endif %}
+</div>

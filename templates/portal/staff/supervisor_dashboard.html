@@ -1,53 +1,89 @@
-{% extends "base_app.html" %}
+{% extends "portal/app_base.html" %}
 {% load static component_tags %}
 
 {% block title %}{{ page_title }}{% endblock %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="{% static 'portal/css/supervisor_dashboard.css' %}">
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'portal/css/supervisor_dashboard.css' %}">
+  <script defer src="{% static 'vendor/htmx/htmx-preload.js' %}"></script>
+  <script defer src="{% static 'src/js/portal/supervisor_dashboard.js' %}"></script>
 {% endblock %}
 
 {% block content %}
-<div id="topbar-loader"></div>
-<div class="shell" x-data="{ mobileNav: false }" @keydown.escape.window="mobileNav = false">
-  {% component "supervisor_sidebar" branch=branch user_initials=user_initials user_display_name=user_display_name section=section class_picker_items=class_picker_items selected_class_id=selected_class_id open_cases_count=open_cases_count %}{% endcomponent %}
-  <div class="supervisor-nav-overlay" x-show="mobileNav" x-cloak @click="mobileNav = false" aria-hidden="true"></div>
-  <div class="work">
-    {% component "supervisor_topbar" today=today crumb=crumb panel_title=panel_title panel_lede=panel_lede %}{% endcomponent %}
-    {% component "supervisor_workspace" section=section %}{% endcomponent %}
-  </div>
-</div>
+{% component "ui_core.app_shell" %}
+  {% fill "sidebar" %}
+    {% component "ui_core.app_sidebar"
+      groups=supervisor_navigation
+      brand="ESFE Mali"
+      subtitle="Surveillance générale"
+      user_name=user_display_name
+      user_meta=supervisor_context_label
+    %}{% endcomponent %}
+  {% endfill %}
 
-{% component "drawer" id="supervisor-drawer" content_id="supervisor-drawer-content" kicker="Détail" title="" %}{% endcomponent %}
-{% endblock %}
+  {% fill "topbar" %}
+    {% component "ui_core.app_topbar"
+      title="Surveillance générale"
+      context_label=supervisor_context_label
+      user_name=""
+      notification_count=notification_count
+      notifications_url=notifications_url
+    %}
+      {% fill "actions" %}
+        {% include "portal/staff/supervisor/partials/topbar_actions.html" %}
+      {% endfill %}
+    {% endcomponent %}
+  {% endfill %}
 
-{% block extra_scripts %}
-<script defer src="{% static 'vendor/htmx/htmx-preload.js' %}"></script>
-<script>
-  document.addEventListener("DOMContentLoaded", function () {
-    var bar = document.getElementById("topbar-loader");
-    if (!bar) return;
-    document.body.addEventListener("htmx:beforeRequest", function () {
-      var workspace = document.getElementById("supervisor-workspace");
-      if (workspace) workspace.setAttribute("aria-busy", "true");
-      bar.style.transition = "none";
-      bar.style.width = "0";
-      bar.style.opacity = "1";
-      requestAnimationFrame(function () {
-        bar.style.transition = "width .18s ease, opacity .3s ease";
-        bar.style.width = "35%";
-      });
-      setTimeout(function () { bar.style.width = "80%"; }, 150);
-    });
-    document.body.addEventListener("htmx:afterRequest", function () {
-      var workspace = document.getElementById("supervisor-workspace");
-      if (workspace) workspace.setAttribute("aria-busy", "false");
-      bar.style.width = "100%";
-      setTimeout(function () { bar.style.opacity = "0"; bar.style.width = "0"; }, 220);
-    });
-    document.body.addEventListener("htmx:afterSwap", function () {
-      if (window.lucide) window.lucide.createIcons();
-    });
-  });
-</script>
+  {% fill "default" %}
+    <div class="relative">
+      <div
+        id="supervisor-loading"
+        class="hidden fixed left-1/2 top-20 z-40 -translate-x-1/2 rounded-ui-button border border-ui-border bg-ui-surface px-4 py-2 text-sm font-semibold text-ui-text shadow-ui-dropdown"
+        role="status"
+        aria-live="polite"
+      >
+        <span class="inline-flex items-center gap-2">
+          <i data-lucide="loader-circle" class="h-4 w-4 animate-spin text-ui-primary" aria-hidden="true"></i>
+          Mise à jour
+        </span>
+      </div>
+
+      <div
+        id="supervisor-workspace"
+        tabindex="-1"
+        aria-live="polite"
+        aria-busy="true"
+        hx-get="{{ supervisor_workspace_url }}"
+        hx-trigger="load"
+        hx-target="this"
+        hx-swap="innerHTML"
+      >
+        <div data-supervisor-section="{{ supervisor_active_section }}" data-supervisor-view="{{ supervisor_active_view }}" data-selected-class-id="{{ selected_class_id|default:'' }}" class="space-y-6">
+          {% component "ui_core.page_header" eyebrow=crumb title=panel_title subtitle=panel_lede %}{% endcomponent %}
+          <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
+            {% component "ui_core.panel" %}<div class="h-24 animate-pulse rounded-ui-card bg-ui-surface-muted"></div>{% endcomponent %}
+            {% component "ui_core.panel" %}<div class="h-24 animate-pulse rounded-ui-card bg-ui-surface-muted"></div>{% endcomponent %}
+            {% component "ui_core.panel" %}<div class="h-24 animate-pulse rounded-ui-card bg-ui-surface-muted"></div>{% endcomponent %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% component "ui_core.drawer" id="supervisor-drawer" title="Détail" size="wide" %}
+      {% fill "default" %}
+        <p class="text-sm text-ui-text-muted">Sélectionnez un élément pour afficher ses détails.</p>
+      {% endfill %}
+    {% endcomponent %}
+
+    {% component "ui_core.modal" id="supervisor-modal" title="Supervision" size="wide" %}
+      {% fill "default" %}
+        <p class="text-sm text-ui-text-muted">Le contenu de cette fenêtre sera chargé à la demande.</p>
+      {% endfill %}
+    {% endcomponent %}
+
+    {% component "ui_core.confirm_dialog" id="supervisor-confirm" title="Confirmer l'action" message="Cette action nécessite votre confirmation." confirm_label="Confirmer" cancel_label="Annuler" %}{% endcomponent %}
+  {% endfill %}
+{% endcomponent %}
 {% endblock %}

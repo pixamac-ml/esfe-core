@@ -1,0 +1,24 @@
+{% load component_tags humanize %}
+<div class="space-y-5">
+  {% include "portal/staff/director/partials/transfers/_feedback.html" %}
+  <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    {% component "ui_core.stat_card" label="Dossiers" value=transfer_metrics.total|default:0 icon="folders" tone="neutral" %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="À traiter" value=transfer_metrics.pending|default:0 icon="inbox" tone="warning" %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Internes" value=transfer_metrics.internal|default:0 icon="arrow-right-left" tone="info" %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Entrants / sortants" value=transfer_metrics.incoming|add:transfer_metrics.outgoing|default:0 icon="school" tone="accent" %}{% endcomponent %}
+  </div>
+  <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
+    <section class="min-w-0">
+      <div class="mb-3 flex items-center justify-between gap-3"><div><h2 class="text-base font-bold text-ui-text">Dossiers récents</h2><p class="mt-1 text-sm text-ui-text-muted">Toutes les mobilités enregistrées dans votre annexe.</p></div><a href="{% url 'accounts_portal:portal_dashboard' %}?section=transferts&view=pending" hx-get="{% url 'accounts_portal:director_transfers_subcontent' %}?view=pending" hx-target="#director-transfer-subcontent" hx-swap="innerHTML" class="text-sm font-semibold text-ui-primary">Traiter les demandes</a></div>
+      {% include "portal/staff/director/partials/transfers/_list.html" %}
+    </section>
+    <aside class="border-l border-ui-border pl-5">
+      <h2 class="text-sm font-bold text-ui-text">Parcours contrôlés</h2>
+      <div class="mt-4 space-y-5">
+        <div><span class="grid h-9 w-9 place-items-center rounded-ui-button bg-ui-info/10 text-ui-info"><i data-lucide="arrow-right-left" class="h-4 w-4"></i></span><h3 class="mt-2 text-sm font-semibold text-ui-text">Interne</h3><p class="mt-1 text-xs leading-5 text-ui-text-muted">Même année et même niveau acquis, avec une nouvelle affectation tracée.</p></div>
+        <div><span class="grid h-9 w-9 place-items-center rounded-ui-button bg-ui-warning/10 text-ui-warning"><i data-lucide="school" class="h-4 w-4"></i></span><h3 class="mt-2 text-sm font-semibold text-ui-text">Sortant</h3><p class="mt-1 text-xs leading-5 text-ui-text-muted">La remise finale intervient après les trois contrôles obligatoires.</p></div>
+        <div><span class="grid h-9 w-9 place-items-center rounded-ui-button bg-ui-success/10 text-ui-success"><i data-lucide="user-round-plus" class="h-4 w-4"></i></span><h3 class="mt-2 text-sm font-semibold text-ui-text">Entrant</h3><p class="mt-1 text-xs leading-5 text-ui-text-muted">Une candidature est ouverte, puis suit le circuit normal d’admission.</p></div>
+      </div>
+    </aside>
+  </div>
+</div>

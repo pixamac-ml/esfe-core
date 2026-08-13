@@ -14,7 +14,7 @@ from django.utils import timezone
 
 from academics.models import AcademicScheduleEvent, LessonLog
 from academics.services.schedule_service import complete_schedule_event, start_schedule_event
-from students.models import TeacherAttendance
+from students.models import StudentAttendance, TeacherAttendance
 from students.services.attendance_service import mark_teacher_attendance
 
 User = get_user_model()
@@ -41,7 +41,12 @@ def get_supervisor_today_course_rows(*, branch, target_date=None):
             event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
             is_active=True,
         )
-        .exclude(status=AcademicScheduleEvent.STATUS_CANCELLED)
+        .exclude(
+            status__in={
+                AcademicScheduleEvent.STATUS_DRAFT,
+                AcademicScheduleEvent.STATUS_CANCELLED,
+            }
+        )
         .order_by("start_datetime", "id")
     )
 
@@ -56,6 +61,13 @@ def get_supervisor_today_course_rows(*, branch, target_date=None):
         for row in TeacherAttendance.objects.select_related("teacher", "schedule_event")
         .filter(branch=branch, date=target_date, schedule_event_id__in=event_ids)
     }
+    called_event_ids = set(
+        StudentAttendance.objects.filter(
+            branch=branch,
+            date=target_date,
+            schedule_event_id__in=event_ids,
+        ).values_list("schedule_event_id", flat=True)
+    )
 
     now = timezone.now()
     rows = []
@@ -87,22 +99,16 @@ def get_supervisor_today_course_rows(*, branch, target_date=None):
             teacher_present_code = teacher_att.status
             teacher_present_label = teacher_att.get_status_display()
 
-        course_started_flag = bool(
-            lesson_log
-            and lesson_log.status
-            not in {
-                LessonLog.STATUS_PLANNED,
-                LessonLog.STATUS_CANCELLED,
-            }
-        )
+        course_started_flag = event.id in called_event_ids
 
         exec_open = any(
             log.is_completed is False and log.started_at is not None for log in event.execution_logs.all()
         )
 
         rows.append(
-            {
-                "event_id": event.id,
+              {
+                  "event_id": event.id,
+                  "class_id": event.academic_class_id,
                 "time_range": f"{local_start.strftime('%H:%M')} - {local_end.strftime('%H:%M')}",
                 "class_name": event.academic_class.display_name,
                 "teacher_name": event.teacher.get_full_name() or event.teacher.username,

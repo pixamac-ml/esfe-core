@@ -92,13 +92,18 @@ def teacher_document_notify_pending(sender, instance, created, **kwargs):
 def transfer_request_notify_created(sender, instance, created, **kwargs):
     if not created or instance.status != TransferRequest.STATUS_SUBMITTED:
         return
-    student = instance.enrollment.student
-    student_label = student.get_full_name() or student.username
+    if instance.enrollment_id:
+        student = instance.enrollment.student
+        student_label = student.get_full_name() or student.username
+        source_label = instance.source_class.display_name if instance.source_class_id else "classe non renseignée"
+        body = f"Une demande de transfert a été créée pour {student_label} ({source_label})."
+    else:
+        body = "Une demande de transfert entrant a été créée et doit faire l'objet d'une étude d'équivalence."
     _notify_directors(
         instance.branch,
         event_type="transfer_request_created",
         title="Nouvelle demande de transfert",
-        body=f"Une demande de transfert a ete creee pour {student_label} ({instance.source_class.display_name}).",
+        body=body,
         legacy_source="transfer_request",
         legacy_object_id=str(instance.pk),
     )

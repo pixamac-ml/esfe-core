@@ -51,6 +51,20 @@ Registered in `core/apps.py:CoreConfig.ready()` — explicit imports. All compon
 import ui.components.<category>.<name>.<name>
 ```
 
+## Certified management dashboard shell
+
+`templates/portal/staff/director_dashboard.html` is the certified and canonical
+shell for every ESFE management dashboard. New roles MUST use
+`portal.services.certified_dashboard_shell.build_certified_dashboard_shell()`
+and render this template; do not create another role-specific dashboard shell.
+Role-specific services, workspace fragments and JavaScript adapters are allowed,
+but navigation, title, workspace, overlays and capabilities must be supplied
+through `dashboard_shell`. Every scoped role must keep server-side branch
+filtering on reads and writes. The Director of Studies, Academic Supervisor,
+annex manager, finance, admissions, secretary, executive, IT, marketing, and
+superadmin landing dashboards already use this contract; preserve that
+inheritance when changing them.
+
 ## Template filter gotchas
 
 - `{% load humanize %}` required in **every** template using `intcomma` (including HTMX partials) — Django does not propagate `{% load %}` from parents.

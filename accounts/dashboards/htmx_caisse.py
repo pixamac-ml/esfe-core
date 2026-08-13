@@ -25,13 +25,14 @@ from accounts.dashboards.htmx_utils import (
     PAYABLE_INSCRIPTION_STATUSES,
     get_active_cash_session,
     get_current_agent,
+    manager_finance_required,
     manager_required,
     manager_section_notice_redirect_response,
     manager_section_redirect_response,
 )
 
 
-@manager_required
+@manager_finance_required("manage_cash_sessions")
 @require_POST
 def cash_session_create(request: HttpRequest, pk: int) -> HttpResponse:
     inscription = get_object_or_404(
@@ -103,7 +104,7 @@ def cash_session_create(request: HttpRequest, pk: int) -> HttpResponse:
     )
 
 
-@manager_required
+@manager_finance_required("manage_cash_sessions")
 @require_POST
 def cash_session_regenerate(request: HttpRequest, pk: int) -> HttpResponse:
     manager_agent = get_current_agent(request.user, request.branch)
@@ -132,7 +133,7 @@ def cash_session_regenerate(request: HttpRequest, pk: int) -> HttpResponse:
     )
 
 
-@manager_required
+@manager_finance_required("manage_cash_sessions")
 @require_POST
 def cash_session_complete(request: HttpRequest, pk: int) -> HttpResponse:
     manager_agent = get_current_agent(request.user, request.branch)
@@ -250,7 +251,7 @@ def cash_session_complete(request: HttpRequest, pk: int) -> HttpResponse:
     return response
 
 
-@manager_required
+@manager_finance_required("manage_cash_sessions")
 @require_POST
 def cash_session_cancel(request: HttpRequest, pk: int) -> HttpResponse:
     manager_agent = get_current_agent(request.user, request.branch)

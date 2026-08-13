@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import uuid
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 from academics.models import AcademicClass, AcademicYear, EC, Semester, UE
 from branches.models import Branch
@@ -673,24 +676,40 @@ def transfer_attachment_upload_path(instance, filename):
 
 
 class TransferRequest(models.Model):
-    TYPE_CLASS = "class"
-    TYPE_SCHOOL = "school"
+    TYPE_INTERNAL = "internal"
+    TYPE_OUTGOING = "outgoing"
+    TYPE_INCOMING = "incoming"
+    TYPE_CLASS = TYPE_INTERNAL
+    TYPE_SCHOOL = TYPE_OUTGOING
     TYPE_CHOICES = [
-        (TYPE_CLASS, "Transfert de classe"),
-        (TYPE_SCHOOL, "Transfert d'ecole"),
+        (TYPE_INTERNAL, "Transfert interne"),
+        (TYPE_OUTGOING, "Départ vers une autre école"),
+        (TYPE_INCOMING, "Arrivée depuis une autre école"),
     ]
 
     STATUS_DRAFT = "draft"
     STATUS_SUBMITTED = "submitted"
-    STATUS_VALIDATED = "validated"
+    STATUS_UNDER_REVIEW = "under_review"
+    STATUS_AWAITING_DOCUMENTS = "awaiting_documents"
+    STATUS_APPROVED = "approved"
+    STATUS_HANDOVER = "handover"
+    STATUS_COMPLETED = "completed"
+    STATUS_VALIDATED = STATUS_COMPLETED
     STATUS_REJECTED = "rejected"
+    STATUS_CANCELLED = "cancelled"
     STATUS_CHOICES = [
         (STATUS_DRAFT, "Brouillon"),
         (STATUS_SUBMITTED, "Soumis"),
-        (STATUS_VALIDATED, "Valide"),
-        (STATUS_REJECTED, "Rejete"),
+        (STATUS_UNDER_REVIEW, "En étude"),
+        (STATUS_AWAITING_DOCUMENTS, "Pièces à compléter"),
+        (STATUS_APPROVED, "Approuvé"),
+        (STATUS_HANDOVER, "Remise en cours"),
+        (STATUS_COMPLETED, "Terminé"),
+        (STATUS_REJECTED, "Rejeté"),
+        (STATUS_CANCELLED, "Annulé"),
     ]
 
+    reference = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     branch = models.ForeignKey(
         Branch,
         on_delete=models.PROTECT,
@@ -699,14 +718,18 @@ class TransferRequest(models.Model):
     )
     enrollment = models.ForeignKey(
         "academics.AcademicEnrollment",
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="transfer_requests",
+        null=True,
+        blank=True,
     )
     transfer_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default=TYPE_CLASS, db_index=True)
     source_class = models.ForeignKey(
         AcademicClass,
         on_delete=models.PROTECT,
         related_name="outgoing_transfer_requests",
+        null=True,
+        blank=True,
     )
     target_class = models.ForeignKey(
         AcademicClass,
@@ -733,6 +756,18 @@ class TransferRequest(models.Model):
         blank=True,
         related_name="reviewed_transfer_requests",
     )
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_transfer_requests",
+    )
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    decision_note = models.TextField(blank=True)
+    source_snapshot = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -746,7 +781,248 @@ class TransferRequest(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.get_transfer_type_display()} - {self.enrollment}"
+        subject = self.enrollment or getattr(self, "incoming_details", None) or self.reference
+        return f"{self.get_transfer_type_display()} - {subject}"
+
+
+class TransferSchool(models.Model):
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.PROTECT,
+        related_name="transfer_schools",
+        db_index=True,
+    )
+    name = models.CharField(max_length=180)
+    registration_number = models.CharField(max_length=80, blank=True)
+    address = models.CharField(max_length=255, blank=True)
+    city = models.CharField(max_length=120, blank=True)
+    country = models.CharField(max_length=100, default="Mali")
+    phone = models.CharField(max_length=30, blank=True)
+    email = models.EmailField(blank=True)
+    is_partner = models.BooleanField(default=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_transfer_schools",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name", "city"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["branch", "name", "city"],
+                name="portal_unique_transfer_school_branch_name_city",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.city})" if self.city else self.name
+
+
+class InternalTransfer(models.Model):
+    transfer_request = models.OneToOneField(
+        TransferRequest,
+        on_delete=models.CASCADE,
+        related_name="internal_details",
+    )
+    target_programme = models.ForeignKey(
+        "formations.Programme",
+        on_delete=models.PROTECT,
+        related_name="internal_transfer_destinations",
+    )
+    target_class = models.ForeignKey(
+        AcademicClass,
+        on_delete=models.PROTECT,
+        related_name="internal_transfer_placements",
+    )
+    source_level = models.CharField(max_length=20)
+    target_level = models.CharField(max_length=20)
+    academic_decision_reference = models.CharField(max_length=120, blank=True)
+    applied_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.transfer_request.reference} -> {self.target_class}"
+
+
+class OutgoingTransfer(models.Model):
+    transfer_request = models.OneToOneField(
+        TransferRequest,
+        on_delete=models.CASCADE,
+        related_name="outgoing_details",
+    )
+    destination_school = models.ForeignKey(
+        TransferSchool,
+        on_delete=models.PROTECT,
+        related_name="incoming_student_files",
+    )
+    destination_programme = models.CharField(max_length=180, blank=True)
+    destination_level = models.CharField(max_length=40, blank=True)
+    academic_check_completed = models.BooleanField(default=False)
+    administrative_check_completed = models.BooleanField(default=False)
+    financial_check_completed = models.BooleanField(default=False)
+    handover_at = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def checks_completed(self):
+        return all((
+            self.academic_check_completed,
+            self.administrative_check_completed,
+            self.financial_check_completed,
+        ))
+
+
+class IncomingTransfer(models.Model):
+    transfer_request = models.OneToOneField(
+        TransferRequest,
+        on_delete=models.CASCADE,
+        related_name="incoming_details",
+    )
+    origin_school = models.ForeignKey(
+        TransferSchool,
+        on_delete=models.PROTECT,
+        related_name="outgoing_student_files",
+    )
+    first_name = models.CharField(max_length=150)
+    last_name = models.CharField(max_length=150)
+    birth_date = models.DateField()
+    birth_place = models.CharField(max_length=150)
+    gender = models.CharField(max_length=10, choices=(("male", "Masculin"), ("female", "Féminin")))
+    phone = models.CharField(max_length=30)
+    email = models.EmailField()
+    address = models.CharField(max_length=255, blank=True)
+    city = models.CharField(max_length=100, blank=True)
+    country = models.CharField(max_length=100, default="Mali")
+    requested_programme = models.ForeignKey(
+        "formations.Programme",
+        on_delete=models.PROTECT,
+        related_name="incoming_transfer_requests",
+    )
+    requested_class = models.ForeignKey(
+        AcademicClass,
+        on_delete=models.PROTECT,
+        related_name="incoming_transfer_candidates",
+        null=True,
+        blank=True,
+    )
+    requested_level = models.CharField(max_length=20)
+    equivalence_notes = models.TextField(blank=True)
+    candidature = models.OneToOneField(
+        "admissions.Candidature",
+        on_delete=models.SET_NULL,
+        related_name="incoming_transfer",
+        null=True,
+        blank=True,
+    )
+
+    def __str__(self):
+        return f"{self.last_name} {self.first_name} - {self.origin_school}"
+
+
+def transfer_document_upload_path(instance, filename):
+    return f"portal/transfers/{instance.transfer_request.branch_id}/documents/{filename}"
+
+
+class TransferDocument(models.Model):
+    TYPE_REQUEST = "request"
+    TYPE_TRANSCRIPT = "transcript"
+    TYPE_CLEARANCE = "clearance"
+    TYPE_IDENTITY = "identity"
+    TYPE_EQUIVALENCE = "equivalence"
+    TYPE_OTHER = "other"
+    TYPE_CHOICES = [
+        (TYPE_REQUEST, "Demande de transfert"),
+        (TYPE_TRANSCRIPT, "Relevé de notes"),
+        (TYPE_CLEARANCE, "Quitus administratif ou financier"),
+        (TYPE_IDENTITY, "Pièce d'identité"),
+        (TYPE_EQUIVALENCE, "Décision d'équivalence"),
+        (TYPE_OTHER, "Autre document"),
+    ]
+    STATUS_PENDING = "pending"
+    STATUS_VERIFIED = "verified"
+    STATUS_REJECTED = "rejected"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "À vérifier"),
+        (STATUS_VERIFIED, "Vérifié"),
+        (STATUS_REJECTED, "Rejeté"),
+    ]
+
+    transfer_request = models.ForeignKey(
+        TransferRequest,
+        on_delete=models.CASCADE,
+        related_name="documents",
+    )
+    document_type = models.CharField(max_length=30, choices=TYPE_CHOICES, default=TYPE_REQUEST)
+    title = models.CharField(max_length=180)
+    file = models.FileField(upload_to=transfer_document_upload_path)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="uploaded_transfer_documents",
+    )
+    verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="verified_transfer_documents",
+    )
+    verified_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+
+class TransferDecision(models.Model):
+    OUTCOME_APPROVED = "approved"
+    OUTCOME_REJECTED = "rejected"
+    OUTCOME_CHOICES = [
+        (OUTCOME_APPROVED, "Approuvé"),
+        (OUTCOME_REJECTED, "Rejeté"),
+    ]
+    transfer_request = models.OneToOneField(
+        TransferRequest,
+        on_delete=models.CASCADE,
+        related_name="decision",
+    )
+    outcome = models.CharField(max_length=20, choices=OUTCOME_CHOICES)
+    note = models.TextField(blank=True)
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="transfer_decisions",
+    )
+    decided_at = models.DateTimeField(default=timezone.now)
+
+
+class TransferHistory(models.Model):
+    transfer_request = models.ForeignKey(
+        TransferRequest,
+        on_delete=models.CASCADE,
+        related_name="history",
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="transfer_history_entries",
+    )
+    action = models.CharField(max_length=80, db_index=True)
+    from_status = models.CharField(max_length=30, blank=True)
+    to_status = models.CharField(max_length=30, blank=True)
+    note = models.TextField(blank=True)
+    snapshot = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [models.Index(fields=["transfer_request", "created_at"])]
 
 
 class AdministrativeDocument(models.Model):

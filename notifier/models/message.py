@@ -1,3 +1,5 @@
+import uuid
+
 from django.conf import settings
 from django.db import models
 
@@ -54,6 +56,15 @@ class NotificationMessage(models.Model):
         on_delete=models.SET_NULL,
         related_name="messages",
     )
+    batch_id = models.UUIDField(null=True, blank=True, db_index=True)
+    thread_id = models.UUIDField(null=True, blank=True, db_index=True)
+    parent_message = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="replies",
+    )
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -90,6 +101,8 @@ class NotificationMessage(models.Model):
     sent_at = models.DateTimeField(null=True, blank=True)
     delivered_at = models.DateTimeField(null=True, blank=True)
     archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    pinned_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    deleted_at = models.DateTimeField(null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -108,3 +121,28 @@ class NotificationMessage(models.Model):
 
     def __str__(self):
         return f"{self.title} -> {self.recipient or 'external'}"
+
+
+def internal_message_attachment_upload_path(instance, filename):
+    owner_id = instance.uploaded_by_id or "unknown"
+    return f"notifier/internal-messages/{owner_id}/{instance.batch_id}/{filename}"
+
+
+class MessageAttachment(models.Model):
+    batch_id = models.UUIDField(default=uuid.uuid4, db_index=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="internal_message_attachments",
+    )
+    file = models.FileField(upload_to=internal_message_attachment_upload_path)
+    original_name = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=120, blank=True)
+    size = models.PositiveBigIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+
+    def __str__(self):
+        return self.original_name

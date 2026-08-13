@@ -1,0 +1,77 @@
+LECTURE ET AVIS SUR INSTRUCTIONS2.TXT
+
+J’ai lu les 528 lignes de instructions2.txt. C’est un cahier des charges de
+raffinement du dashboard « Directeur des études », pas une demande de réécriture
+générale.
+
+CE QUE J’EN RETIENS
+
+La priorité absolue est la cohérence métier :
+
+- Vérifier le backend avant de toucher à l’interface.
+- Rattacher la planification aux « Sessions d’évaluations » si les vues, modèles
+  et services le confirment.
+- Réserver « Résultats et notes » à la saisie, la validation, la publication et
+  aux bulletins.
+- N’inventer ni fonctionnalité, ni matière, ni donnée.
+
+Ensuite, il faut :
+
+- Raffiner les sous-fenêtres existantes en réutilisant les meilleurs patterns
+  UI Core.
+- Ne modifier ni la sidebar, ni la topbar, ni l’ensemble du dashboard.
+- Utiliser HTMX pour la navigation interne, les formulaires et la pagination.
+- Maintenir l’onglet actif, les filtres, l’URL et l’historique lorsque
+  l’architecture le permet.
+- Connecter chaque carte et bouton à une vraie vue, une vraie permission et un
+  vrai traitement backend.
+- Gérer le chargement, les erreurs, les succès, les états vides et les doubles
+  soumissions.
+- Corriger le responsive et empêcher tout débordement horizontal global.
+- Tester le parcours dans un véritable navigateur.
+- Produire dix captures dans _audit/director_subwindows_refinement/.
+- Exécuter les vérifications Django, les tests ciblés et la compilation CSS.
+- Rédiger docs/ui/DIRECTOR_SUBWINDOWS_REFINEMENT_REPORT.md avec le tableau
+  métier demandé et l’un des deux verdicts exacts.
+- Ne créer aucune migration, aucun commit et aucun push.
+
+MON POINT DE VUE
+
+Le cahier des charges est globalement très bon. Sa meilleure décision est
+d’imposer la vérification métier avant le travail visuel : cela évite de rendre
+élégante une interface construite autour de mauvaises responsabilités.
+
+Il existe néanmoins quelques points à surveiller :
+
+- La dernière phrase est réellement incomplète :
+  « Il doit d’abord transformer cette version… »
+  Ce n’est pas un problème d’encodage ; le fichier se termine ainsi.
+
+- Le périmètre est conséquent : audit métier, backend, HTMX, responsive, tests
+  navigateur, captures et rapport. Il faudra le traiter par étapes, avec des
+  contrôles intermédiaires.
+
+- « Utiliser les vraies données » devrait signifier respecter les modèles et le
+  domaine réel, pas dépendre de données de production. Les tests devront
+  probablement créer leurs propres données contrôlées, mais uniquement avec des
+  matières et filières cohérentes avec ESFE.
+
+- L’environnement nécessaire aux captures n’est pas précisé : compte Directeur
+  des études, données disponibles et serveur fonctionnel devront être vérifiés.
+
+- Surtout, le fichier ne répète pas la règle de filtrage par annexe. Or, selon
+  AGENTS.md, c’est la règle métier la plus critique. Toute vue, statistique,
+  recherche, pagination et action devra impérativement être limitée à l’annexe
+  de l’utilisateur.
+
+- Il faudra vérifier que les modules de tests expressément nommés existent et
+  que urls_test_local.py expose les routes nécessaires.
+
+CONCLUSION
+
+Les instructions sont suffisamment précises pour commencer un audit et une
+implémentation sérieuse. La phrase tronquée n’empêche pas de comprendre
+l’objectif : obtenir une version réellement fonctionnelle et validable avant
+toute généralisation aux autres sections.
+
+Au moment de cette lecture, aucun fichier applicatif n’avait été modifié.

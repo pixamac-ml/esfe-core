@@ -27,6 +27,7 @@ from accounts.models import PayrollEntry, Profile, UserPreference
 from notifier.models import NotificationMessage
 from notification_center.selectors import get_user_notifications, get_user_unread_count
 from notifier.services import NotificationBus
+from portal.services import build_role_dashboard_shell
 from .forms import (
     AppointmentForm,
     DocumentReceiptForm,
@@ -457,6 +458,42 @@ def secretary_dashboard(request):
     context["meetings_count"] = get_meetings_queryset(branch=branch).count()
     if _is_htmx(request) and request.headers.get("HX-Target") == "secretary-workspace":
         return render(request, "secretary/workspace_partial.html", context)
+
+    nav_groups = []
+    current_group = None
+    for nav_item in sidebar_items:
+        divider = nav_item.get("divider")
+        if divider:
+            current_group = {"label": divider, "items": []}
+            nav_groups.append(current_group)
+            continue
+        if current_group is None:
+            current_group = {"label": "Secretariat", "items": []}
+            nav_groups.append(current_group)
+        current_group["items"].append(
+            {
+                "key": nav_item.get("id"),
+                "label": nav_item.get("label"),
+                "icon": nav_item.get("icon"),
+                "url": nav_item.get("url"),
+                "badge": nav_item.get("badge"),
+            }
+        )
+    context.update(
+        build_role_dashboard_shell(
+            request,
+            role="secretary",
+            key="sg",
+            title="Secretariat",
+            subtitle="Secretariat d'annexe",
+            active_section=context["active_section"],
+            dashboard_url=reverse("secretary:secretary_dashboard"),
+            branch=branch,
+            context_label=f"Annexe - {branch_name}" if branch_name else "Annexe non definie",
+            groups=nav_groups,
+            modal_title="Operation du secretariat",
+        )
+    )
     return render(request, "secretary/dashboard.html", context)
 
 

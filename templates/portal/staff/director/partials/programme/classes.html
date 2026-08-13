@@ -1,0 +1,103 @@
+{% load component_tags %}
+<div class="space-y-5">
+  {% if director_fragment_response %}
+    <span id="director-programme-class-count" hx-swap-oob="innerHTML">{{ programme_metrics.classes }}</span>
+    <span id="director-programme-ue-count" hx-swap-oob="innerHTML">{{ programme_metrics.ues }}</span>
+  {% endif %}
+  {% if toast %}
+    {% if toast.level == "success" %}
+      {% component "ui_core.alert" title="Programmes et classes" message=toast.message tone="success" %}{% endcomponent %}
+    {% else %}
+      {% component "ui_core.alert" title="Action non effectuée" message=toast.message tone="danger" %}{% endcomponent %}
+    {% endif %}
+  {% endif %}
+
+  <form method="get"
+        hx-get="{% url 'accounts_portal:director_programme_subcontent' %}"
+        hx-target="#director-programme-subcontent"
+        hx-swap="innerHTML"
+        hx-trigger="submit, change from:select"
+        hx-indicator="#director-programme-loading"
+        hx-sync="#director-programme-subcontent:replace"
+        class="grid min-w-0 gap-3 border-y border-ui-border py-4 sm:grid-cols-2 xl:grid-cols-[minmax(13rem,1fr)_minmax(12rem,16rem)_11rem_9rem_auto]">
+    <input type="hidden" name="view" value="classes">
+    <label class="min-w-0">
+      <span class="sr-only">Rechercher une classe</span>
+      <input type="search" name="programme_q" value="{{ programme_q }}" placeholder="Classe, programme ou année" class="h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text focus:border-ui-focus focus:ring-ui-focus">
+    </label>
+    <label>
+      <span class="sr-only">Filtrer par programme</span>
+      <select name="programme_id" class="h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text focus:border-ui-focus focus:ring-ui-focus">
+        <option value="">Tous les programmes</option>
+        {% for programme in programme_filter_programmes %}<option value="{{ programme.id }}" {% if programme_filter_programme_id == programme.id|stringformat:"s" %}selected{% endif %}>{{ programme.title }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>
+      <span class="sr-only">Filtrer par année</span>
+      <select name="academic_year_id" class="h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text focus:border-ui-focus focus:ring-ui-focus">
+        <option value="">Toutes les années</option>
+        {% for academic_year in programme_filter_years %}<option value="{{ academic_year.id }}" {% if programme_filter_academic_year_id == academic_year.id|stringformat:"s" %}selected{% endif %}>{{ academic_year.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>
+      <span class="sr-only">Filtrer par niveau</span>
+      <select name="level" class="h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text focus:border-ui-focus focus:ring-ui-focus">
+        <option value="">Tous niveaux</option>
+        {% for choice in programme_filter_levels %}<option value="{{ choice }}" {% if programme_filter_level == choice %}selected{% endif %}>{{ choice }}</option>{% endfor %}
+      </select>
+    </label>
+    <button type="submit" class="ui-focus-ring inline-flex h-ui-control items-center justify-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-4 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">
+      <i data-lucide="search" class="h-4 w-4" aria-hidden="true"></i>Rechercher
+    </button>
+  </form>
+
+  <div id="director-programme-class-list-region" class="min-w-0">
+    {% if programme_classes_page.object_list %}
+      <div class="divide-y divide-ui-border border-y border-ui-border">
+        {% for academic_class in programme_classes_page.object_list %}
+        <article class="flex min-w-0 flex-col gap-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <div class="flex min-w-0 gap-3">
+            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button bg-ui-primary-soft text-ui-primary"><i data-lucide="school" class="h-5 w-5" aria-hidden="true"></i></span>
+            <div class="min-w-0">
+              <h3 class="break-words text-sm font-bold text-ui-text">{{ academic_class.display_name }}</h3>
+              <p class="mt-1 text-xs text-ui-text-muted">{{ academic_class.programme.cycle.name }} · {{ academic_class.academic_year.name }} · {{ academic_class.active_student_count }} étudiant(s)</p>
+              <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-ui-text-muted">
+                <span>{{ academic_class.programme_semester_count }} semestre(s)</span>
+                <span>{{ academic_class.programme_ue_count }} UE</span>
+                <span>{{ academic_class.programme_ec_count }} matière(s)</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
+            {% if academic_class.programme_semester_count < 2 or not academic_class.programme_ue_count or not academic_class.programme_ec_count %}
+              {% component "ui_core.status_badge" label="À compléter" tone="warning" %}{% endcomponent %}
+            {% else %}
+              {% component "ui_core.status_badge" label="Structurée" tone="success" %}{% endcomponent %}
+            {% endif %}
+            <button type="button"
+                    hx-get="{% url 'accounts_portal:director_programme_class_modal' %}?class_id={{ academic_class.id }}"
+                    hx-target="#director-modal-content"
+                    hx-swap="innerHTML"
+                    hx-disabled-elt="this"
+                    class="ui-focus-ring grid h-9 w-9 place-items-center rounded-ui-button border border-ui-border bg-ui-surface text-ui-text hover:bg-ui-surface-hover"
+                    aria-label="Modifier la classe" title="Modifier la classe">
+              <i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i>
+            </button>
+            <button type="button"
+                    hx-get="{% url 'accounts_portal:director_drawer' %}?panel=programme&class_id={{ academic_class.id }}"
+                    hx-target="#director-drawer-content"
+                    hx-swap="innerHTML"
+                    hx-disabled-elt="this"
+                    class="ui-focus-ring inline-flex h-9 items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover">
+              <i data-lucide="panel-right-open" class="h-4 w-4" aria-hidden="true"></i>Maquette
+            </button>
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+      {% include "portal/staff/director/partials/_pagination.html" with page_obj=programme_classes_page page_param="programme_page" query_suffix=programme_query_suffix target_id="#director-programme-class-list-region" hx_select="#director-programme-class-list-region" pagination_url_name="accounts_portal:director_programme_subcontent" indicator_id="#director-programme-loading" %}
+    {% else %}
+      {% component "ui_core.empty_state" title="Aucune classe trouvée" message="Ajustez les filtres ou créez une nouvelle classe académique." icon="school" %}{% endcomponent %}
+    {% endif %}
+  </div>
+</div>

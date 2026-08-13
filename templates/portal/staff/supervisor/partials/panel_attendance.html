@@ -1,77 +1,49 @@
 {% load component_tags %}
-<div id="sg-attendance" class="space-y-4">
-  {% if toast %}
-    {% if toast.level == 'success' %}
-      {% component "alert" tone="success" message=toast.message dismissible=True %}{% endcomponent %}
-    {% else %}
-      {% component "alert" tone="warning" message=toast.message dismissible=True %}{% endcomponent %}
-    {% endif %}
+{% if selected_class %}
+  <form class="flex flex-col gap-3 rounded-ui-card border border-ui-border bg-ui-surface p-4 md:flex-row md:items-end" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}" hx-target="#supervisor-section-content" hx-swap="innerHTML" hx-push-url="{{ supervisor_dashboard_base_url }}?section=attendance&view=call&class_id={{ selected_class.id }}">
+    <input type="hidden" name="section" value="attendance"><input type="hidden" name="view" value="call"><input type="hidden" name="fragment" value="subcontent"><input type="hidden" name="class_id" value="{{ selected_class.id }}">
+    <label class="text-xs font-bold text-ui-text-muted">Date de l'appel<input type="date" name="roll_date" value="{{ roll_date_iso }}" class="mt-2 h-ui-control rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus"></label>
+    <button class="ui-focus-ring h-ui-control rounded-ui-button border border-ui-border px-4 text-sm font-bold text-ui-text hover:bg-ui-surface-hover">Charger les séances</button>
+  </form>
+
+  {% if attendance_events %}
+    <div class="flex gap-2 overflow-x-auto pb-1" aria-label="Séances publiées">
+      {% for ev in attendance_events %}
+        <a href="{{ supervisor_dashboard_base_url }}?section=attendance&view=call&class_id={{ selected_class.id }}&roll_date={{ roll_date_iso }}&schedule_event_id={{ ev.id }}" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=attendance&view=call&fragment=subcontent&class_id={{ selected_class.id }}&roll_date={{ roll_date_iso }}&schedule_event_id={{ ev.id }}" hx-target="#supervisor-section-content" hx-push-url="{{ supervisor_dashboard_base_url }}?section=attendance&view=call&class_id={{ selected_class.id }}&roll_date={{ roll_date_iso }}&schedule_event_id={{ ev.id }}" class="ui-focus-ring min-w-52 rounded-ui-card border px-4 py-3 {% if selected_event.id == ev.id %}border-ui-primary bg-ui-primary-soft{% else %}border-ui-border bg-ui-surface hover:bg-ui-surface-hover{% endif %}">
+          <strong class="block text-sm text-ui-text">{{ ev.start_datetime|date:"H:i" }} · {{ ev.ec.title }}</strong><span class="mt-1 block truncate text-xs text-ui-text-muted">{{ ev.teacher.get_full_name|default:ev.teacher.username }} · {{ ev.location|default:"Salle non précisée" }}</span>
+        </a>
+      {% endfor %}
+    </div>
   {% endif %}
-
-  {% component "toolbar" class_str="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-3" %}
-    {% fill "left" %}
-      <form class="flex flex-wrap items-end gap-2" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}" hx-target="#supervisor-workspace" hx-push-url="true">
-        <input type="hidden" name="section" value="attendance">
-        <input type="hidden" name="class_id" value="{{ selected_class.id }}">
-        <div>
-          <label class="f-l mt-0" for="sg-roll-date">Date</label>
-          <input id="sg-roll-date" type="date" name="roll_date" value="{{ roll_date_iso }}" class="f-i">
-        </div>
-        <button type="submit" class="btn primary">Charger</button>
-      </form>
-    {% endfill %}
-  {% endcomponent %}
-
-  <div class="sess-strip" aria-label="Séances disponibles">
-    {% for ev in attendance_events %}
-      <button type="button" class="sess-chip {% if selected_event and ev.id == selected_event.id %}active{% endif %}"
-              hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=attendance&class_id={{ selected_class.id }}&roll_date={{ roll_date_iso }}&schedule_event_id={{ ev.id }}"
-              hx-target="#supervisor-workspace" hx-push-url="true">
-        <span class="t">{{ ev.start_datetime|date:"H:i" }} · {{ ev.ec.title }}</span>
-        <span class="s">{{ ev.teacher.get_full_name|default:ev.teacher.username }} · {{ ev.location|default:"—" }}</span>
-      </button>
-    {% empty %}
-      <span class="chip mute">Aucune séance ce jour</span>
-    {% endfor %}
-  </div>
 
   {% if not selected_event %}
-    {% component "empty_state" icon="calendar-x" title="Aucune séance" message="Aucun cours n'est planifié pour cette classe à la date choisie." %}{% endcomponent %}
+    {% component "ui_core.empty_state" icon="calendar-x" title="Aucune séance publiée" message="Aucun cours publié n'est prévu pour cette classe à la date choisie." %}{% endcomponent %}
   {% else %}
-    {% if roll_locked %}
-      {% component "alert" tone="success" message="Cette feuille est validée. Rouvrez-la pour la modifier." %}{% endcomponent %}
+    {% if attendance_workflow.state == "validated" %}
+      {% component "ui_core.alert" title="Appel validé" message="Les constats de cette séance sont verrouillés. Une correction relève désormais du Directeur des études." tone="success" %}{% endcomponent %}
+    {% elif attendance_workflow.state == "empty" %}
+      {% component "ui_core.alert" title="Appel non ouvert" message="Ouvrez l'appel de cette séance avant de renseigner les présences." tone="neutral" %}{% endcomponent %}
     {% else %}
-      {% component "alert" tone="warning" message="Complétez l'appel avant de valider la feuille." %}{% endcomponent %}
+      {% component "ui_core.alert" title="Appel en cours" message="Renseignez chaque étudiant puis validez définitivement l'appel de cette séance." tone="warning" %}{% endcomponent %}
     {% endif %}
 
-    {% component "dashboard_card" padding="none" %}
-      {% fill "default" %}
-        <div class="card-h">
-          <h3>{{ selected_event.ec.title }} — {{ selected_class.display_name }}</h3>
-          <form method="post" hx-post="{% url 'accounts_portal:supervisor_workflow_roll_action' %}" hx-target="#supervisor-workspace" hx-swap="innerHTML">
-            {% csrf_token %}
-            <input type="hidden" name="section" value="attendance">
-            <input type="hidden" name="class_id" value="{{ selected_class.id }}">
-            <input type="hidden" name="roll_date" value="{{ roll_date_iso }}">
-            {% if attendance_workflow and attendance_workflow.sheet_id %}
-              <input type="hidden" name="action" value="validate">
-              <input type="hidden" name="sheet_id" value="{{ attendance_workflow.sheet_id }}">
-              <button type="submit" class="btn primary">Valider l'appel</button>
-            {% else %}
-              <input type="hidden" name="action" value="start">
-              <input type="hidden" name="schedule_event_id" value="{{ selected_event.id }}">
-              <button type="submit" class="btn primary">Démarrer la feuille</button>
-            {% endif %}
-          </form>
-        </div>
-        <div class="card-b">
-          {% for row in attendance_rows %}
-            {% include "portal/staff/supervisor/partials/attendance_student_row.html" %}
-          {% empty %}
-            {% component "empty_state" icon="users" title="Aucun étudiant" message="Aucun étudiant trouvé pour cette séance." compact=True %}{% endcomponent %}
-          {% endfor %}
-        </div>
+    {% component "ui_core.panel" title=selected_event.ec.title subtitle=selected_class.display_name padding=False %}
+      {% fill "header" %}
+        {% if attendance_workflow.can_start %}
+          <form method="post" hx-post="{% url 'accounts_portal:supervisor_workflow_roll_action' %}" hx-target="#supervisor-section-content" hx-swap="innerHTML">{% csrf_token %}<input type="hidden" name="section" value="attendance"><input type="hidden" name="view" value="call"><input type="hidden" name="class_id" value="{{ selected_class.id }}"><input type="hidden" name="roll_date" value="{{ roll_date_iso }}"><input type="hidden" name="schedule_event_id" value="{{ selected_event.id }}"><button name="action" value="start" class="ui-focus-ring h-ui-control rounded-ui-button bg-ui-primary px-4 text-sm font-bold text-white">Ouvrir l'appel</button></form>
+        {% elif attendance_workflow.can_validate %}
+          <form method="post" hx-post="{% url 'accounts_portal:supervisor_workflow_roll_action' %}" hx-target="#supervisor-section-content" hx-swap="innerHTML">{% csrf_token %}<input type="hidden" name="section" value="attendance"><input type="hidden" name="view" value="call"><input type="hidden" name="class_id" value="{{ selected_class.id }}"><input type="hidden" name="roll_date" value="{{ roll_date_iso }}"><input type="hidden" name="schedule_event_id" value="{{ selected_event.id }}"><input type="hidden" name="sheet_id" value="{{ attendance_workflow.sheet_id }}"><button name="action" value="validate" class="ui-focus-ring h-ui-control rounded-ui-button bg-ui-success px-4 text-sm font-bold text-white">Valider l'appel</button></form>
+        {% endif %}
       {% endfill %}
+      <div class="divide-y divide-ui-border">
+        {% for row in attendance_rows %}
+          {% include "portal/staff/supervisor/partials/attendance_student_row.html" %}
+        {% empty %}
+          <div class="p-5">{% component "ui_core.empty_state" icon="users" title="Aucun étudiant" message="Aucun étudiant actif n'est rattaché à cette classe." compact=True %}{% endcomponent %}</div>
+        {% endfor %}
+      </div>
     {% endcomponent %}
   {% endif %}
-</div>
+{% else %}
+  {% component "ui_core.empty_state" icon="school" title="Sélectionnez une classe" message="Choisissez une classe dans la barre supérieure pour accéder à ses séances publiées." %}{% endcomponent %}
+{% endif %}

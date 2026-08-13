@@ -1,13 +1,20 @@
 {% load component_tags %}
 {% load humanize %}
 <div id="widget-scope-bar"
-     class="dashboard-scope-bar"
      hx-get="{% url 'accounts:widget_scope_bar' %}"
      hx-trigger="every 30s, dashboardStatsUpdated from:body, cashBalanceUpdated from:body, candidatureUpdated from:body, paymentUpdated from:body"
      hx-swap="outerHTML">
-  <span class="dashboard-scope-chip">{% component "icon" name="building-2" %}{% endcomponent %}{{ branch.name }}</span>
-  <span class="dashboard-scope-chip">{% component "icon" name="users" %}{% endcomponent %}{{ total_students|intcomma }} etudiants</span>
-  <span class="dashboard-scope-chip">{% component "icon" name="file-check" %}{% endcomponent %}{{ candidatures_pending|intcomma }} candidatures</span>
-  <span class="dashboard-scope-chip">{% component "icon" name="credit-card" %}{% endcomponent %}{{ pending_payments|intcomma }} paiements en attente</span>
-  <span class="dashboard-scope-chip">{% component "icon" name="vault" %}{% endcomponent %}{{ cash_balance|intcomma }} FCFA caisse</span>
+  {% component "ui_core.panel" title="Perimetre verrouille" subtitle="Toutes les donnees ci-dessous sont limitees a votre annexe" density="compact" padding=False %}
+    {% fill "header" %}
+      {% component "ui_core.status_badge" label=branch.name tone="primary" %}{% endcomponent %}
+    {% endfill %}
+    {% fill "default" %}
+      <div class="flex flex-wrap gap-2 px-4 py-3 text-xs font-semibold text-ui-text-muted" aria-label="Indicateurs du perimetre">
+        <span class="inline-flex items-center gap-1.5 rounded-ui-badge bg-ui-surface-muted px-3 py-1.5"><i data-lucide="users" class="h-3.5 w-3.5" aria-hidden="true"></i>{{ total_students|intcomma }} etudiants</span>
+        <span class="inline-flex items-center gap-1.5 rounded-ui-badge bg-ui-warning-soft px-3 py-1.5 text-ui-warning"><i data-lucide="file-check" class="h-3.5 w-3.5" aria-hidden="true"></i>{{ candidatures_pending|intcomma }} candidatures</span>
+        <span class="inline-flex items-center gap-1.5 rounded-ui-badge bg-ui-danger-soft px-3 py-1.5 text-ui-danger"><i data-lucide="credit-card" class="h-3.5 w-3.5" aria-hidden="true"></i>{{ pending_payments|intcomma }} paiements en attente</span>
+        <span class="inline-flex items-center gap-1.5 rounded-ui-badge bg-ui-info-soft px-3 py-1.5 text-ui-info"><i data-lucide="vault" class="h-3.5 w-3.5" aria-hidden="true"></i>{{ cash_balance|intcomma }} FCFA en caisse</span>
+      </div>
+    {% endfill %}
+  {% endcomponent %}
 </div>

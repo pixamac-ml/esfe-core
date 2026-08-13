@@ -6,6 +6,7 @@ from django.core.paginator import Paginator
 from django.db import OperationalError, ProgrammingError
 from django.db.models import Count, F, Q, Sum
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET
 
@@ -15,6 +16,8 @@ from accounts.models import BranchBankTransfer, BranchCashMovement, BranchExpens
 from accounts.services.manager_intelligence import build_manager_intelligence_context
 from accounts.services.manager_intelligence import get_branch_cash_balance
 from accounts.services.financial_reports import build_manager_financial_report_context, resolve_financial_report_period
+from accounts.services.manager_dashboard_presentation import build_manager_dashboard_presentation
+from accounts.services.manager_workspace_access import manager_workspace_required
 from coupons.services.querysets import active_coupons_for_branch
 from shop.forms import ShopCounterOrderForm, ShopProductForm, ShopStockInForm
 from shop.services.shop_cash_session import manager_shop_sessions_for_agent
@@ -25,6 +28,7 @@ from payments.models import CashPaymentSession, FinancialLog, Payment, PaymentAg
 from students.models import Student
 
 from accounts.dashboards.helpers import get_user_branch, is_manager
+from portal.services import build_role_dashboard_shell
 
 
 PAYABLE_INSCRIPTION_STATUSES = {
@@ -35,28 +39,9 @@ PAYABLE_INSCRIPTION_STATUSES = {
 
 
 def manager_required(view_func):
-    """Verifie l'acces gestionnaire et injecte l'annexe dans la requete."""
+    """Authorize a role context inside the single manager workspace."""
 
-    def wrapper(request, *args, **kwargs):
-        if settings.AUTH_POLICY_V2_ENABLED:
-            from accounts.access_context import get_request_access_context
-            from accounts.policy_v2 import decide
-
-            context = get_request_access_context(request)
-            decision = decide(context, allowed_positions={"annex_manager"})
-            if not decision.allowed:
-                return render(request, "core/errors/403.html", status=403)
-            request.branch = context.branch
-            return view_func(request, *args, **kwargs)
-        if not is_manager(request.user):
-            return redirect("accounts:dashboard_redirect")
-        branch = get_user_branch(request.user)
-        if not branch:
-            return render(request, "core/errors/403.html")
-        request.branch = branch
-        return view_func(request, *args, **kwargs)
-
-    return login_required(wrapper)
+    return login_required(manager_workspace_required("view_manager_workspace")(view_func))
 
 
 def _paginate(request, queryset, *, param_name, per_page=20):
@@ -244,7 +229,7 @@ def _manager_context(request, active_section="overview"):
     cand_search = request.GET.get("cand_q", "").strip()
     candidatures_qs = (
         base_candidatures
-        .select_related("programme", "programme__cycle")
+        .select_related("programme", "programme__cycle", "inscription")
         .order_by("-submitted_at")
     )
     if cand_status:
@@ -298,6 +283,7 @@ def _manager_context(request, active_section="overview"):
     }
 
     pay_status = request.GET.get("pay_status", "").strip()
+    pay_method = request.GET.get("pay_method", "").strip()
     pay_date = request.GET.get("pay_date", "").strip()
     pay_search = request.GET.get("pay_q", "").strip()
     payments_qs = (
@@ -312,6 +298,8 @@ def _manager_context(request, active_section="overview"):
     )
     if pay_status:
         payments_qs = payments_qs.filter(status=pay_status)
+    if pay_method:
+        payments_qs = payments_qs.filter(method=pay_method)
     if pay_date == "today":
         payments_qs = payments_qs.filter(paid_at__date=today)
     elif pay_date == "week":
@@ -766,6 +754,7 @@ def _manager_context(request, active_section="overview"):
         "annual_revenue_current_year_label": current_year,
         "annual_revenue_previous_year_label": current_year - 1,
         "pay_status": pay_status,
+        "pay_method": pay_method,
         "pay_date": pay_date,
         "pay_search": pay_search,
         "expenses": expenses_page,
@@ -821,21 +810,119 @@ def _manager_context(request, active_section="overview"):
     }
 
 
+def _manager_navigation_groups(context, access):
+    groups = [
+        {
+            "label": "Pilotage",
+            "items": [
+                {"key": "overview", "label": "Vue globale", "icon": "layout-dashboard"},
+                {"key": "candidatures", "label": "Candidatures", "icon": "file-check", "badge": context.get("candidatures_pending") or None},
+                {"key": "inscriptions", "label": "Inscriptions", "icon": "id-card"},
+                {"key": "paiements", "label": "Paiements", "icon": "credit-card", "badge": context.get("pending_payments") or None},
+            ],
+        },
+        {
+            "label": "Exploitation",
+            "items": [
+                {"key": "salaires", "label": "Salaires", "icon": "user-round-cog"},
+                {"key": "depenses", "label": "Depenses", "icon": "receipt"},
+                {"key": "boutique", "label": "Boutique", "icon": "store"},
+                {"key": "dons", "label": "Dons", "icon": "hand-heart"},
+            ],
+        },
+        {
+            "label": "Tresorerie",
+            "items": [
+                {"key": "caisse", "label": "Caisse", "icon": "vault"},
+                {"key": "rapport", "label": "Rapports", "icon": "chart-no-axes-combined"},
+                {"key": "cloture", "label": "Cloture mensuelle", "icon": "lock"},
+                {"key": "settings", "label": "Mon compte", "icon": "user-cog"},
+            ],
+        },
+    ]
+    filtered_groups = []
+    for group in groups:
+        items = [item for item in group["items"] if item["key"] in access.allowed_sections]
+        if items:
+            filtered_groups.append({"label": group["label"], "items": items})
+
+    if access.can("view_reenrollment_finance"):
+        filtered_groups.append(
+            {
+                "label": "Parcours",
+                "items": [
+                    {
+                        "key": "reenrollment",
+                        "label": "Passages et reinscriptions",
+                        "icon": "refresh-cw",
+                        "url": reverse("accounts_portal:reenrollment_workspace"),
+                    }
+                ],
+            }
+        )
+    return filtered_groups
+
+
 def _render_manager_dashboard(request, active_section):
+    access = request.manager_workspace_access
+    if active_section not in access.allowed_sections:
+        return render(request, "core/errors/403.html", status=403)
+    context = _manager_context(request, active_section=active_section)
+    branch = context["branch"]
+    context["manager_workspace_access"] = access
+    context["manager_capabilities"] = access.capabilities_context()
+    finance_context = access.position in {"finance_manager", "payment_agent"}
+    admissions_context = access.position == "admissions"
+    if finance_context:
+        dashboard_url = reverse("accounts_portal:portal_finance")
+    elif admissions_context:
+        dashboard_url = reverse("accounts_portal:portal_admissions")
+    else:
+        dashboard_url = reverse("accounts_portal:portal_annex_manager")
+    context["manager_ui"] = build_manager_dashboard_presentation(
+        active_section=active_section,
+        context=context,
+        capabilities=access.capabilities,
+        dashboard_url=dashboard_url,
+    )
+    context.update(
+        build_role_dashboard_shell(
+            request,
+            role=access.position,
+            key="manager",
+            title="Dashboard Gestionnaire",
+            subtitle=(
+                "Finance et encaissements"
+                if finance_context
+                else "Admissions et inscriptions"
+                if admissions_context
+                else "Gestion de l'annexe"
+            ),
+            active_section=active_section,
+            dashboard_url=dashboard_url,
+            branch=branch,
+            context_label=f"Annexe - {branch.name}",
+            groups=_manager_navigation_groups(context, access),
+            modal_title="Gestion d'annexe",
+        )
+    )
     return render(
         request,
         "accounts/dashboard/manager_dashboard.html",
-        _manager_context(request, active_section=active_section),
+        context,
     )
 
 
 @manager_required
 @require_GET
-def manager_dashboard(request):
-    section = request.GET.get("section", "overview").strip() or "overview"
-    allowed_sections = {"overview", "candidatures", "inscriptions", "paiements", "salaires", "depenses", "caisse", "rapport", "cloture", "boutique", "dons", "settings"}
-    if section not in allowed_sections:
-        section = "overview"
+def manager_dashboard(request, default_section=None):
+    access = request.manager_workspace_access
+    default_section = default_section or access.default_section
+    if default_section not in access.allowed_sections:
+        default_section = access.default_section
+    section = request.GET.get("section", default_section).strip() or default_section
+    if section not in access.allowed_sections:
+        section = default_section
     return _render_manager_dashboard(request, section)
 
 

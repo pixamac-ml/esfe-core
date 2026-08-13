@@ -1,0 +1,94 @@
+<div class="overflow-x-auto border-t border-ui-border" data-timetable-grid>
+  <div class="min-w-[1080px] bg-ui-surface">
+    <div class="grid grid-cols-[112px_repeat(6,minmax(150px,1fr))] border-b border-ui-border bg-ui-surface-muted/70">
+      <div class="sticky left-0 z-10 flex items-center border-r border-ui-border bg-ui-surface-muted px-3 py-3 text-xs font-bold text-ui-text-muted">Horaires</div>
+      {% for day in timetable_grid.weekdays %}
+        <div class="border-r border-ui-border px-3 py-3 last:border-r-0">
+          <div class="flex items-center justify-between gap-2">
+            <span class="min-w-0"><strong class="block text-xs text-ui-text">{{ day.label }}</strong><span class="mt-0.5 block text-[10px] text-ui-text-muted">{{ day.date|date:"d/m" }}</span></span>
+            {% if editable %}
+              <button type="button"
+                      title="Ajouter un cours le {{ day.label }}"
+                      aria-label="Ajouter un cours le {{ day.label }}"
+                      hx-get="{% url 'accounts_portal:director_timetable_slot_drawer' %}?class_id={{ timetable_selected_class.id }}&weekday={{ day.value }}&week_start={{ timetable_week_start|date:'Y-m-d' }}"
+                      hx-target="#director-drawer-content"
+                      hx-swap="innerHTML"
+                      class="ui-focus-ring grid h-8 w-8 shrink-0 place-items-center rounded-ui-button text-ui-primary hover:bg-ui-primary-soft">
+                <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
+              </button>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    {% for row in timetable_grid.rows %}
+      <div class="grid grid-cols-[112px_repeat(6,minmax(150px,1fr))] border-b border-ui-border last:border-b-0">
+        <div class="sticky left-0 z-10 border-r border-ui-border bg-ui-surface px-3 py-3">
+          <strong class="block text-xs text-ui-text">{{ row.start_time }}</strong>
+          <span class="mt-0.5 block text-[11px] text-ui-text-muted">{{ row.end_time }}</span>
+        </div>
+        {% for cell in row.cells %}
+          <div class="min-h-32 border-r border-ui-border p-2 last:border-r-0">
+            {% for slot in cell.slots %}
+              <article class="h-full min-h-28 rounded-ui-card border border-ui-primary/20 bg-ui-primary-soft p-3">
+                <div class="flex items-start gap-2">
+                  <div class="min-w-0 flex-1">
+                    <p class="line-clamp-2 text-xs font-bold text-ui-text">{{ slot.ec_title }}</p>
+                    <p class="mt-1 truncate text-[11px] font-semibold text-ui-primary">{{ slot.ec_code }}</p>
+                  </div>
+                  {% if editable %}
+                    <button type="button"
+                            title="Modifier ce cours"
+                            aria-label="Modifier {{ slot.ec_title }}"
+                            hx-get="{% url 'accounts_portal:director_timetable_slot_drawer' %}?class_id={{ timetable_selected_class.id }}&slot_id={{ slot.id }}&week_start={{ timetable_week_start|date:'Y-m-d' }}"
+                            hx-target="#director-drawer-content"
+                            hx-swap="innerHTML"
+                            class="ui-focus-ring grid h-7 w-7 shrink-0 place-items-center rounded-ui-button text-ui-primary hover:bg-ui-surface">
+                      <i data-lucide="pencil" class="h-3.5 w-3.5" aria-hidden="true"></i>
+                    </button>
+                  {% endif %}
+                </div>
+                <div class="mt-3 space-y-1 text-[11px] text-ui-text-muted">
+                  <p class="flex min-w-0 items-center gap-1.5"><i data-lucide="user-round" class="h-3.5 w-3.5 shrink-0" aria-hidden="true"></i><span class="truncate">{{ slot.teacher_name }}</span></p>
+                  <p class="flex min-w-0 items-center gap-1.5"><i data-lucide="map-pin" class="h-3.5 w-3.5 shrink-0" aria-hidden="true"></i><span class="truncate">{{ slot.room|default:"Salle à définir" }}</span></p>
+                </div>
+                {% if editable %}
+                  <form method="post"
+                        hx-post="{% url 'accounts_portal:director_timetable_action' %}"
+                        hx-target="#director-timetable-subcontent"
+                        hx-swap="innerHTML"
+                        hx-confirm="Retirer ce cours de la grille hebdomadaire ?"
+                        class="mt-2 flex justify-end">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="class_id" value="{{ timetable_selected_class.id }}">
+                    <input type="hidden" name="slot_id" value="{{ slot.id }}">
+                    <input type="hidden" name="week_start" value="{{ timetable_week_start|date:'Y-m-d' }}">
+                    <button type="submit" title="Retirer ce cours" aria-label="Retirer {{ slot.ec_title }}" class="ui-focus-ring grid h-7 w-7 place-items-center rounded-ui-button text-ui-danger hover:bg-ui-danger-soft">
+                      <i data-lucide="trash-2" class="h-3.5 w-3.5" aria-hidden="true"></i>
+                    </button>
+                  </form>
+                {% endif %}
+              </article>
+            {% empty %}
+              {% if editable %}
+                <button type="button"
+                        title="Ajouter un cours sur ce créneau"
+                        aria-label="Ajouter un cours le {{ cell.weekday_label }} de {{ row.start_time }} à {{ row.end_time }}"
+                        hx-get="{% url 'accounts_portal:director_timetable_slot_drawer' %}?class_id={{ timetable_selected_class.id }}&weekday={{ cell.weekday }}&start_time={{ row.start_time }}&end_time={{ row.end_time }}&week_start={{ timetable_week_start|date:'Y-m-d' }}"
+                        hx-target="#director-drawer-content"
+                        hx-swap="innerHTML"
+                        class="ui-focus-ring flex h-full min-h-28 w-full items-center justify-center rounded-ui-card border border-dashed border-ui-border text-ui-text-muted hover:border-ui-primary/50 hover:bg-ui-primary-soft hover:text-ui-primary">
+                  <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
+                </button>
+              {% else %}
+                <div class="flex h-full min-h-28 items-center justify-center text-[11px] text-ui-text-subtle">Libre</div>
+              {% endif %}
+            {% endfor %}
+          </div>
+        {% endfor %}
+      </div>
+    {% endfor %}
+  </div>
+</div>

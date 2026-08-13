@@ -17,8 +17,10 @@ class FilterBar(component.Component):
         indicator="",
         swap="outerHTML",
         sync="",
+        select="",
         density="comfortable",
         active_filters=None,
+        hidden_fields=None,
         **kwargs,
     ):
         density = density if density in {"comfortable", "compact"} else "comfortable"
@@ -33,7 +35,9 @@ class FilterBar(component.Component):
             "indicator": indicator,
             "swap": swap if swap in {"innerHTML", "outerHTML"} else "outerHTML",
             "sync": sync,
+            "select": select,
             "density": density,
             "active_filters": active_filters or [],
+            "hidden_fields": hidden_fields or [],
             **kwargs,
         }

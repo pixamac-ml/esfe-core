@@ -1,0 +1,8 @@
+{% load component_tags %}
+{% component "ui_core.panel" title="Alertes d'assiduité actives" subtitle="Signaux automatiques limités à votre annexe" padding=False %}
+  <div class="divide-y divide-ui-border">
+    {% for alert in attendance_alerts %}
+      <div class="flex items-start gap-4 px-5 py-4"><span class="grid h-9 w-9 shrink-0 place-items-center rounded-ui-button bg-ui-warning-soft text-ui-warning"><i data-lucide="triangle-alert" class="h-4 w-4"></i></span><span class="min-w-0 flex-1"><strong class="block text-sm text-ui-text">{{ alert.student.full_name }}</strong><span class="mt-1 block text-xs text-ui-text-muted">{{ alert.get_alert_type_display }} · {{ alert.count }} occurrence{{ alert.count|pluralize }} · {{ alert.triggered_at|date:"d/m/Y H:i" }}</span></span>{% component "ui_core.status_badge" label="À surveiller" tone="warning" %}{% endcomponent %}</div>
+    {% empty %}<div class="p-5">{% component "ui_core.empty_state" icon="circle-check-big" title="Aucune alerte active" message="Aucune anomalie d'assiduité automatique n'est active dans cette annexe." %}{% endcomponent %}</div>{% endfor %}
+  </div>
+{% endcomponent %}

@@ -11,6 +11,8 @@ class Tabs(component.Component):
         items=None,
         active="",
         density="comfortable",
+        subview_event="director-subview",
+        subview_attr="director-subview",
         **kwargs,
     ):
         density = density if density in {"comfortable", "compact"} else "comfortable"
@@ -20,5 +22,7 @@ class Tabs(component.Component):
             "items": items,
             "active": active or (items[0].get("id", "") if items else ""),
             "density": density,
+            "subview_event": subview_event,
+            "subview_attr": subview_attr,
             **kwargs,
         }

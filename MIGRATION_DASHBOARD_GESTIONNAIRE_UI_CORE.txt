@@ -1,0 +1,290 @@
+MIGRATION DU DASHBOARD GESTIONNAIRE VERS UI CORE
+================================================
+
+Date : 13 aout 2026
+Moule certifie : templates/portal/staff/director_dashboard.html
+Dashboard concerne : Gestionnaire d'annexe
+
+
+DECISION APPLIQUEE
+==================
+
+Le dashboard Gestionnaire utilise la coque certifiee du Directeur des etudes :
+
+- ui_core.app_shell ;
+- ui_core.app_sidebar ;
+- ui_core.app_topbar ;
+- ui_core.drawer ;
+- ui_core.modal ;
+- ui_core.confirm_dialog ;
+- loader et comportement communs du shell certifie.
+
+Le contenu Gestionnaire n'a plus le droit de rendre une deuxieme coque. Son
+role est uniquement de composer le workspace metier de l'annexe.
+
+Finance et Admissions seront des contextes restreints de ce meme dashboard.
+Ils reutiliseront les sections et les composants du Gestionnaire avec une
+navigation et des capabilities filtrees cote serveur.
+
+
+COMPOSANTS DISPONIBLES ET USAGE RETENU
+======================================
+
+Structure commune :
+
+- ui_core.page_header : titre et description de la section active ;
+- ui_core.page_section : regroupement semantique d'un sous-ensemble ;
+- ui_core.content_grid : disposition des zones principales ;
+- ui_core.panel : conteneur de formulaire, synthese ou liste secondaire.
+
+Indicateurs et donnees :
+
+- ui_core.stat_card : tous les KPI ;
+- ui_core.data_table : tableaux normalises quand les lignes auront un contrat
+  de presentation stable ;
+- ui_core.status_badge : statuts et compteurs courts ;
+- ui_core.progress_bar : avancement d'un processus ;
+- ui_core.timeline : historique et activite recente ;
+- ui_core.chart_panel : graphiques financiers ;
+- ui_core.empty_state : absence de donnees ou de resultat.
+
+Filtres et saisie :
+
+- ui_core.filter_bar : filtres GET et rafraichissement HTMX ;
+- ui_core.form_field : enveloppe commune des champs Django ;
+- composants forms input, select, date_picker, amount_input et upload_zone
+  seulement lorsque leur contrat correspond au formulaire existant.
+
+Feedback et operations :
+
+- ui_core.alert : priorites, anomalies et erreurs ;
+- ui_core.loading_overlay : requetes longues ;
+- ui_core.toast : confirmation non bloquante ;
+- ui_core.drawer : consultation d'un dossier ;
+- ui_core.modal : creation ou modification ;
+- ui_core.confirm_dialog : validation d'une operation sensible.
+
+
+MAPPING EXACT PAR SECTION
+=========================
+
+1. Vue globale
+
+   Composants : page_header, stat_card, page_section, panel, alert,
+   status_badge et empty_state.
+
+   Reutilisation :
+
+   - quatre stat_card pour etudiants, encaissements, alertes et caisse ;
+   - page_section pour les actions rapides ;
+   - panel pour priorites, situation, flux et risques ;
+   - alert pour chaque priorite ou risque ;
+   - empty_state lorsque rien n'est a traiter.
+
+   Etat : premiere tranche implementee. Les widgets HTMX continuent de mettre
+   a jour encaissements, caisse, coupons et perimetre sans recharger la page.
+
+2. Candidatures - module Admissions du Gestionnaire
+
+   Composants : page_header, stat_card, filter_bar, data_table, status_badge,
+   empty_state, drawer, modal et confirm_dialog.
+
+   Reutilisation :
+
+   - stat_card pour soumises, en etude, acceptees et rejetees ;
+   - filter_bar pour statut et recherche ;
+   - data_table pour la liste paginee ;
+   - drawer pour la lecture du dossier ;
+   - modal pour une action de modification ;
+   - confirm_dialog pour accepter, refuser ou supprimer.
+
+3. Inscriptions - module Admissions du Gestionnaire
+
+   Composants : page_header, stat_card, filter_bar, data_table, status_badge,
+   drawer, modal, alert et empty_state.
+
+   Reutilisation :
+
+   - stat_card pour actives, en attente, partielles et creees ;
+   - filter_bar pour statut et recherche ;
+   - data_table pour les inscriptions de l'annexe ;
+   - drawer pour le dossier administratif et financier ;
+   - modal pour le positionnement ou la finalisation.
+
+4. Paiements - module Finance du Gestionnaire
+
+   Composants : page_header, stat_card, panel, filter_bar, data_table,
+   status_badge, modal et confirm_dialog.
+
+   Reutilisation :
+
+   - stat_card pour valides, en attente, encaissement du jour et sessions cash ;
+   - panel pour la creation et le suivi des sessions espece ;
+   - filter_bar pour statut, date et recherche ;
+   - data_table pour les paiements scopes a l'annexe ;
+   - modal pour le detail et la correction ;
+   - confirm_dialog pour validation ou annulation.
+
+5. Salaires du personnel
+
+   Composants : page_header, stat_card, alert, filter_bar, data_table,
+   status_badge, modal et confirm_dialog.
+
+   Reutilisation :
+
+   - stat_card pour preparees, payees, partielles et reste a payer ;
+   - alert pour rappeler que les fiches sont auto-generees ;
+   - filter_bar pour mois, statut et employe ;
+   - data_table pour le workflow verifier -> corriger -> valider -> payer ;
+   - modal pour la fiche ;
+   - confirm_dialog et OTP pour le paiement.
+
+6. Depenses
+
+   Composants : page_header, stat_card, content_grid, panel, form_field,
+   filter_bar, data_table, status_badge et confirm_dialog.
+
+   Reutilisation :
+
+   - panel et form_field pour la nouvelle depense ;
+   - stat_card pour soumises, approuvees, payees et montant en attente ;
+   - filter_bar pour statut, categorie et recherche ;
+   - data_table pour la liste ;
+   - confirm_dialog pour approbation et paiement.
+
+7. Caisse
+
+   Composants : page_header, stat_card, content_grid, panel, form_field,
+   filter_bar, data_table, status_badge, alert et confirm_dialog.
+
+   Reutilisation :
+
+   - stat_card pour entrees, sorties, disponible et mouvements ;
+   - panel pour le mouvement manuel et la synthese mensuelle ;
+   - filter_bar pour type, source et recherche ;
+   - data_table pour le journal de caisse ;
+   - alert pour les incoherences ;
+   - confirm_dialog pour synchronisation et operation sensible.
+
+8. Rapport financier
+
+   Composants : page_header, filter_bar, stat_card, alert, data_table,
+   chart_panel et empty_state.
+
+   Reutilisation :
+
+   - filter_bar pour periode, dates, type et source ;
+   - stat_card pour recettes, charges, resultat et caisse ;
+   - alert pour caisse negative ou operations orphelines ;
+   - data_table pour sources et mouvements ;
+   - chart_panel pour les tendances annuelles ;
+   - boutons d'export conserves dans les actions de section.
+
+9. Honoraires et cloture mensuelle
+
+   Composants : page_header, stat_card, alert, content_grid, panel,
+   form_field, data_table, status_badge, modal et confirm_dialog.
+
+   Reutilisation :
+
+   - stat_card pour honoraires prepares, payes, partiels et reste ;
+   - alert pour separer explicitement honoraires enseignants et salaires staff ;
+   - data_table pour les fiches d'honoraires et les archives ;
+   - panel et form_field pour cloture et versement bancaire ;
+   - confirm_dialog pour validation et cloture definitive ;
+   - aucune suppression d'historique.
+
+10. Boutique
+
+    Composants : page_header, tabs, stat_card, filter_bar, data_table, panel,
+    drawer, modal, status_badge et empty_state.
+
+    Reutilisation :
+
+    - tabs pour catalogue, stock, commandes et caisse ;
+    - stat_card pour produits, stock faible, commandes et ventes ;
+    - data_table pour stock et commandes ;
+    - drawer pour le detail produit ou commande ;
+    - modal pour creation et entree de stock.
+
+11. Dons et donations
+
+    Composants : page_header, stat_card, content_grid, panel, form_field,
+    data_table, status_badge et empty_state.
+
+    Reutilisation :
+
+    - panel et form_field pour enregistrer un don ;
+    - stat_card pour nombre, total et montant du mois ;
+    - data_table pour l'historique ;
+    - status_badge pour nature et mode de paiement ;
+    - empty_state lorsque l'annexe n'a aucun don.
+
+12. Profil et securite
+
+    Composants : page_header, panel, account.profile_view,
+    account.profile_editor et account.security_settings.
+
+    Reutilisation :
+
+    - composants account communs au lieu d'une fiche Gestionnaire specifique ;
+    - aucun changement de scope ou de position depuis le template.
+
+
+ORDRE DE MIGRATION DES PROCHAINES TRANCHES
+==========================================
+
+1. Candidatures ;
+2. Inscriptions ;
+3. Paiements et sessions cash ;
+4. Caisse ;
+5. Depenses ;
+6. Salaires ;
+7. Honoraires et cloture ;
+8. Rapport ;
+9. Boutique ;
+10. Dons ;
+11. Profil et securite.
+
+Cet ordre termine d'abord le module Admissions, puis le module Finance du meme
+dashboard Gestionnaire. Chaque tranche doit conserver les URLs, les evenements
+HTMX, les permissions serveur et le filtrage obligatoire par annexe.
+
+
+MISE A JOUR DU 13 AOUT 2026 - PILOTE FINANCE TERMINE
+====================================================
+
+Le contexte Finance ne rend plus le dashboard parallele finance.html. Les
+routes Finance ouvrent maintenant le workspace Paiements du dashboard
+Gestionnaire, lui-meme rendu dans le shell certifie du Directeur des Etudes.
+
+Ce qui est effectivement raccorde :
+
+- resolution serveur du contexte annex_manager, finance_manager ou
+  payment_agent ;
+- navigation limitee par role et capability ;
+- acces Finance limite aux sections Paiements et Mon compte ;
+- filtrage de toutes les requetes Paiement par l'annexe du compte ;
+- KPI Finance prepares dans manager_dashboard_presentation.py ;
+- filtres normalises statut, moyen, periode et recherche ;
+- tableau Paiements normalise avec UI Core data_table ;
+- lignes HTMX reutilisant le meme contrat apres validation ou annulation ;
+- actions Voir, Valider, Annuler, Corriger et Recu derivees des capabilities ;
+- correction interdite au payment_agent, y compris directement sur l'URL ;
+- sessions especes rendues avec panel, status_badge, alert et empty_state ;
+- detail Paiement rendu dans la modal commune manager-modal ;
+- confirmations HTMX branchees au confirm_dialog commun manager-confirm ;
+- profil/compte adapte au role reel dans le meme shell ;
+- ancien modal parallele non rendu dans le contexte Finance.
+
+Verification realisee :
+
+- python manage.py check --settings=config.settings_test_local : OK ;
+- tests du contrat d'acces et du builder : OK ;
+- tests des dashboards certifies : OK ;
+- tests Finance positifs, negatifs et inter-annexes : OK ;
+- tests des workflows Paiement et Session cash : OK ;
+- build Tailwind de production : OK.
+
+Prochaine tranche autorisee par le plan : Admissions dans ce meme workspace
+Gestionnaire. Il ne faut pas recreer un dashboard Admissions parallele.

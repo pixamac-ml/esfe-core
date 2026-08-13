@@ -92,6 +92,12 @@ class UiCoreComponentTests(SimpleTestCase):
         self.assertIn("État non référencé", html)
         self.assertIn("bg-ui-surface-muted", html)
 
+    def test_status_badge_preserves_zero_value(self):
+        html = StatusBadge.render(kwargs={"label": 0, "tone": "warning"})
+
+        self.assertIn(">0<", html)
+        self.assertNotIn("Inconnu", html)
+
     def test_unknown_tones_have_safe_fallbacks(self):
         alert_html = Alert.render(
             kwargs={"message": "Alerte", "tone": "unsupported"}
@@ -167,6 +173,34 @@ class UiCoreComponentTests(SimpleTestCase):
 
         self.assertIn("max-w-lg", compact_html)
         self.assertIn("max-w-4xl", wide_html)
+
+    def test_tabs_support_htmx_links_without_breaking_button_items(self):
+        tabs = registry.all()["ui_core.tabs"]
+        html = tabs.render(
+            kwargs={
+                "id": "academic-tabs",
+                "active": "sessions",
+                "items": [
+                    {
+                        "id": "sessions",
+                        "label": "Sessions",
+                        "href": "/dashboard/?section=sessions",
+                        "hx_get": "/director/sessions/?view=sessions",
+                        "hx_target": "#session-content",
+                        "hx_push_url": "/dashboard/?section=sessions&view=sessions",
+                        "hx_indicator": "#session-loading",
+                    },
+                    {"id": "archive", "label": "Archive"},
+                ],
+            }
+        )
+
+        self.assertIn('href="/dashboard/?section=sessions"', html)
+        self.assertIn('hx-target="#session-content"', html)
+        self.assertIn('hx-indicator="#session-loading"', html)
+        self.assertIn('data-director-subview="sessions"', html)
+        self.assertIn('<button', html)
+        self.assertIn("Archive", html)
 
     def test_density_and_tone_fallbacks_are_safe(self):
         table = DataTable.render(kwargs={"density": "microscopic", "rows": []})

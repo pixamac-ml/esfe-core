@@ -11,6 +11,7 @@ from accounts.models import BranchCashMovement, SensitiveActionRequest
 from payments.models import FinancialLog, Payment
 
 from accounts.services.accounting_documents import create_cash_movement
+from accounts.services.manager_dashboard_presentation import build_payment_table_row
 from accounts.services.manager_intelligence import payment_cash_reference
 from accounts.services.sensitive_actions import (
     SensitiveActionError,
@@ -19,10 +20,21 @@ from accounts.services.sensitive_actions import (
 )
 from payments.services.corrections import correct_validated_payment_amount, financial_logs_for_payment
 
-from accounts.dashboards.htmx_utils import manager_required
+from accounts.dashboards.htmx_utils import manager_finance_required
 
 
-@manager_required
+def _payment_modal_context(request, payment, **extra):
+    context = {
+        "payment": payment,
+        "financial_logs": financial_logs_for_payment(payment)[:20],
+        "corrections": payment.corrections.select_related("corrected_by").all()[:10],
+        "manager_capabilities": request.manager_workspace_access.capabilities_context(),
+    }
+    context.update(extra)
+    return context
+
+
+@manager_finance_required("view_payments")
 @require_GET
 def payment_detail(request: HttpRequest, pk: int) -> HttpResponse:
     payment = get_object_or_404(
@@ -39,15 +51,11 @@ def payment_detail(request: HttpRequest, pk: int) -> HttpResponse:
     return render(
         request,
         "accounts/dashboard/partials/payment_modal.html",
-        {
-            "payment": payment,
-            "financial_logs": financial_logs_for_payment(payment)[:20],
-            "corrections": payment.corrections.select_related("corrected_by").all()[:10],
-        },
+        _payment_modal_context(request, payment),
     )
 
 
-@manager_required
+@manager_finance_required("correct_payment")
 @require_POST
 def payment_correct(request: HttpRequest, pk: int) -> HttpResponse:
     payment = get_object_or_404(
@@ -73,14 +81,13 @@ def payment_correct(request: HttpRequest, pk: int) -> HttpResponse:
         response = render(
             request,
             "accounts/dashboard/partials/payment_modal.html",
-            {
-                "payment": payment,
-                "financial_logs": financial_logs_for_payment(payment)[:20],
-                "corrections": payment.corrections.select_related("corrected_by").all()[:10],
-                "correction_error": "Tapez CORRIGER pour confirmer l'operation.",
-                "correction_new_amount": raw_amount,
-                "correction_reason": reason,
-            },
+            _payment_modal_context(
+                request,
+                payment,
+                correction_error="Tapez CORRIGER pour confirmer l'operation.",
+                correction_new_amount=raw_amount,
+                correction_reason=reason,
+            ),
         )
         response.status_code = 400
         return response
@@ -100,14 +107,13 @@ def payment_correct(request: HttpRequest, pk: int) -> HttpResponse:
         response = render(
             request,
             "accounts/dashboard/partials/payment_modal.html",
-            {
-                "payment": payment,
-                "financial_logs": financial_logs_for_payment(payment)[:20],
-                "corrections": payment.corrections.select_related("corrected_by").all()[:10],
-                "correction_error": str(exc),
-                "correction_new_amount": raw_amount,
-                "correction_reason": reason,
-            },
+            _payment_modal_context(
+                request,
+                payment,
+                correction_error=str(exc),
+                correction_new_amount=raw_amount,
+                correction_reason=reason,
+            ),
         )
         response.status_code = 400
         return response
@@ -115,15 +121,14 @@ def payment_correct(request: HttpRequest, pk: int) -> HttpResponse:
     response = render(
         request,
         "accounts/dashboard/partials/payment_modal.html",
-        {
-            "payment": payment,
-            "financial_logs": financial_logs_for_payment(payment)[:20],
-            "corrections": payment.corrections.select_related("corrected_by").all()[:10],
-            "otp_request_id": otp_request.pk,
-            "otp_new_amount": new_amount,
-            "otp_reason": reason,
-            "otp_validity_minutes": SensitiveActionRequest.OTP_VALIDITY_MINUTES,
-        },
+        _payment_modal_context(
+            request,
+            payment,
+            otp_request_id=otp_request.pk,
+            otp_new_amount=new_amount,
+            otp_reason=reason,
+            otp_validity_minutes=SensitiveActionRequest.OTP_VALIDITY_MINUTES,
+        ),
     )
     response["HX-Trigger"] = json.dumps({
         "showToast": {
@@ -134,7 +139,7 @@ def payment_correct(request: HttpRequest, pk: int) -> HttpResponse:
     return response
 
 
-@manager_required
+@manager_finance_required("correct_payment")
 @require_POST
 def payment_correct_confirm_otp(request: HttpRequest, pk: int) -> HttpResponse:
     payment = get_object_or_404(
@@ -174,13 +179,12 @@ def payment_correct_confirm_otp(request: HttpRequest, pk: int) -> HttpResponse:
         response = render(
             request,
             "accounts/dashboard/partials/payment_modal.html",
-            {
-                "payment": payment,
-                "financial_logs": financial_logs_for_payment(payment)[:20],
-                "corrections": payment.corrections.select_related("corrected_by").all()[:10],
-                "otp_request_id": otp_request_id,
-                "otp_error": message,
-            },
+            _payment_modal_context(
+                request,
+                payment,
+                otp_request_id=otp_request_id,
+                otp_error=message,
+            ),
         )
         response.status_code = 400
         return response
@@ -189,12 +193,11 @@ def payment_correct_confirm_otp(request: HttpRequest, pk: int) -> HttpResponse:
     response = render(
         request,
         "accounts/dashboard/partials/payment_modal.html",
-        {
-            "payment": payment,
-            "financial_logs": financial_logs_for_payment(payment)[:20],
-            "corrections": payment.corrections.select_related("corrected_by").all()[:10],
-            "correction_success": "Correction validee par le DG/DGA et caisse synchronisee.",
-        },
+        _payment_modal_context(
+            request,
+            payment,
+            correction_success="Correction validee par le DG/DGA et caisse synchronisee.",
+        ),
     )
     response["HX-Trigger"] = json.dumps({
         "paymentUpdated": True, "cashBalanceUpdated": True, "dashboardStatsUpdated": True,
@@ -203,7 +206,7 @@ def payment_correct_confirm_otp(request: HttpRequest, pk: int) -> HttpResponse:
     return response
 
 
-@manager_required
+@manager_finance_required("validate_payment")
 @require_POST
 def payment_validate(request: HttpRequest, pk: int) -> HttpResponse:
     with transaction.atomic():
@@ -248,7 +251,12 @@ def payment_validate(request: HttpRequest, pk: int) -> HttpResponse:
     response = render(
         request,
         "accounts/dashboard/partials/manager_payment_row.html",
-        {"payment": payment},
+        {
+            "payment_row": build_payment_table_row(
+                payment,
+                request.manager_workspace_access.capabilities,
+            )
+        },
     )
     response["HX-Trigger"] = json.dumps({
         "paymentUpdated": True, "cashBalanceUpdated": True, "dashboardStatsUpdated": True,
@@ -257,7 +265,7 @@ def payment_validate(request: HttpRequest, pk: int) -> HttpResponse:
     return response
 
 
-@manager_required
+@manager_finance_required("cancel_payment")
 @require_POST
 def payment_cancel(request: HttpRequest, pk: int) -> HttpResponse:
     payment = get_object_or_404(
@@ -283,7 +291,12 @@ def payment_cancel(request: HttpRequest, pk: int) -> HttpResponse:
     response = render(
         request,
         "accounts/dashboard/partials/manager_payment_row.html",
-        {"payment": payment},
+        {
+            "payment_row": build_payment_table_row(
+                payment,
+                request.manager_workspace_access.capabilities,
+            )
+        },
     )
     response["HX-Trigger"] = json.dumps({
         "paymentUpdated": True, "cashBalanceUpdated": True, "dashboardStatsUpdated": True,

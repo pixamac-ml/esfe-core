@@ -1,97 +1,37 @@
-{% load component_tags %}
-{% load humanize %}
-<div id="manager-cash-session-{{ session.id }}" class="rounded-2xl border border-violet-200 bg-violet-50 p-4">
-    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div class="space-y-3">
-            {% if show_created_notice %}
-            <div class="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-                {% component "icon" name="circle-check" %}{% endcomponent %}
-                Session espèce créée
-            </div>
-            {% elif show_existing_notice %}
-            <div class="inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-                {% component "icon" name="circle-alert" %}{% endcomponent %}
-                Session déjà active
-            </div>
-            {% elif show_regenerated_notice %}
-            <div class="inline-flex items-center gap-2 rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
-                {% component "icon" name="sync-alt" %}{% endcomponent %}
-                Code régénéré
-            </div>
-            {% endif %}
-
-            <div>
-                <p class="text-sm font-semibold text-slate-900">{{ session.inscription.candidature.full_name }}</p>
-                <p class="text-sm text-slate-600">{{ session.inscription.candidature.programme.title }}</p>
-            </div>
-
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div class="rounded-xl bg-white px-4 py-3 border border-violet-100">
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-600">Token public</p>
-                    <p class="mt-1 font-mono text-sm text-primary">{{ session.inscription.public_token }}</p>
-                </div>
-                <div class="rounded-xl bg-white px-4 py-3 border border-violet-100">
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-600">Code d'accès dossier</p>
-                    <p class="mt-1 font-mono text-sm text-slate-800">{{ session.inscription.access_code }}</p>
-                </div>
-                <div class="rounded-xl bg-white px-4 py-3 border border-violet-100">
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-600">Solde à payer</p>
-                    <p class="mt-1 text-sm font-semibold text-slate-900">{{ session.inscription.balance|intcomma }} FCFA</p>
-                </div>
-            </div>
+{% load component_tags humanize %}
+<div id="manager-cash-session-{{ session.id }}">
+  {% component "ui_core.panel" title=session.inscription.candidature.full_name subtitle=session.inscription.candidature.programme.title density="compact" tone="primary" %}
+    {% fill "header" %}
+      {% if show_created_notice %}{% component "ui_core.status_badge" label="Session créée" tone="success" %}{% endcomponent %}
+      {% elif show_existing_notice %}{% component "ui_core.status_badge" label="Déjà active" tone="warning" %}{% endcomponent %}
+      {% elif show_regenerated_notice %}{% component "ui_core.status_badge" label="Code régénéré" tone="info" %}{% endcomponent %}
+      {% else %}{% component "ui_core.status_badge" label="Active" tone="primary" %}{% endcomponent %}{% endif %}
+    {% endfill %}
+    {% fill "default" %}
+      <div class="grid gap-4 lg:grid-cols-[1fr_16rem]">
+        <dl class="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+          <div class="rounded-ui-card bg-ui-surface-muted p-3"><dt class="text-xs font-semibold text-ui-text-muted">Token public</dt><dd class="mt-1 break-all font-mono font-semibold text-ui-primary">{{ session.inscription.public_token }}</dd></div>
+          <div class="rounded-ui-card bg-ui-surface-muted p-3"><dt class="text-xs font-semibold text-ui-text-muted">Accès dossier</dt><dd class="mt-1 break-all font-mono font-semibold text-ui-text">{{ session.inscription.access_code }}</dd></div>
+          <div class="rounded-ui-card bg-ui-surface-muted p-3"><dt class="text-xs font-semibold text-ui-text-muted">Solde à payer</dt><dd class="mt-1 font-semibold tabular-nums text-ui-text">{{ session.inscription.balance|intcomma }} FCFA</dd></div>
+        </dl>
+        <div class="rounded-ui-card border border-ui-primary/30 bg-ui-primary-soft p-4 text-center">
+          <p class="text-xs font-semibold uppercase text-ui-text-muted">Code espèces</p>
+          <p class="mt-2 break-all font-mono text-3xl font-black tracking-widest text-ui-primary">{{ session.verification_code }}</p>
+          <p class="mt-2 text-xs text-ui-text-muted">Expire à {{ session.expires_at|date:"H:i" }}</p>
+          <p class="mt-1 break-words text-xs text-ui-text-muted">{{ manager_agent.user.get_full_name }} · {{ manager_agent.agent_code }}</p>
         </div>
+      </div>
 
-        <div class="lg:min-w-[260px] space-y-3">
-            <div class="rounded-2xl bg-white border border-violet-200 p-4 text-center">
-                <p class="text-sm font-semibold uppercase tracking-wide text-slate-600">Code de paiement espèce</p>
-                <p class="mt-2 text-3xl font-black tracking-[0.12em] text-violet-700 font-mono break-all">{{ session.verification_code }}</p>
-                <p class="mt-2 text-sm text-slate-600">Expire à {{ session.expires_at|date:"H:i" }}</p>
-                <p class="mt-1 text-sm text-slate-600 break-words">{{ manager_agent.user.get_full_name }} • {{ manager_agent.agent_code }}</p>
-            </div>
-
-            <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                <button
-                    hx-post="{% url 'accounts:htmx_manager_cash_session_regenerate' session.id %}"
-                    hx-target="#manager-cash-session-{{ session.id }}"
-                    hx-swap="outerHTML"
-                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition">
-                    {% component "icon" name="rotate" %}{% endcomponent %}
-                    Régénérer
-                </button>
-                <button
-                    hx-post="{% url 'accounts:htmx_manager_cash_session_cancel' session.id %}"
-                    hx-target="#manager-cash-session-{{ session.id }}"
-                    hx-swap="outerHTML"
-                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                    hx-confirm="Annuler cette session cash ?"
-                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 transition">
-                    {% component "icon" name="x" %}{% endcomponent %}
-                    Annuler
-                </button>
-            </div>
-
-            <form
-                hx-post="{% url 'accounts:htmx_manager_cash_session_complete' session.id %}"
-                hx-target="#manager-cash-session-{{ session.id }}"
-                hx-swap="outerHTML"
-                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                class="flex gap-2">
-                <input
-                    type="number"
-                    name="amount"
-                    min="1"
-                    max="{{ session.inscription.balance }}"
-                    value="{{ session.inscription.balance }}"
-                    class="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm focus:border-violet-500 focus:ring-2 focus:ring-violet-100"
-                    required>
-                <button
-                    type="submit"
-                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition">
-                    {% component "icon" name="badge-dollar-sign" %}{% endcomponent %}
-                    Encaisser
-                </button>
-            </form>
+      <div class="mt-4 flex flex-col gap-3 border-t border-ui-border pt-4 lg:flex-row lg:items-end lg:justify-between">
+        <div class="flex flex-wrap gap-2">
+          <button type="button" hx-post="{% url 'accounts:htmx_manager_cash_session_regenerate' session.id %}" hx-target="#manager-cash-session-{{ session.id }}" hx-swap="outerHTML" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' class="inline-flex h-9 items-center gap-2 rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover"><i data-lucide="rotate-cw" class="h-4 w-4"></i>Régénérer</button>
+          <button type="button" hx-post="{% url 'accounts:htmx_manager_cash_session_cancel' session.id %}" hx-target="#manager-cash-session-{{ session.id }}" hx-swap="outerHTML" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-confirm="Annuler cette session espèces ?" data-ui-confirm class="inline-flex h-9 items-center gap-2 rounded-ui-button border border-ui-danger px-3 text-xs font-semibold text-ui-danger hover:bg-ui-danger-soft"><i data-lucide="x" class="h-4 w-4"></i>Annuler</button>
         </div>
-    </div>
+        <form hx-post="{% url 'accounts:htmx_manager_cash_session_complete' session.id %}" hx-target="#manager-cash-session-{{ session.id }}" hx-swap="outerHTML" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' class="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <label class="text-xs font-semibold text-ui-text"><span class="mb-1 block">Montant à encaisser</span><input type="number" name="amount" min="1" max="{{ session.inscription.balance }}" value="{{ session.inscription.balance }}" class="h-9 w-full rounded-ui-input border-ui-border text-sm focus:border-ui-focus focus:ring-ui-focus" required></label>
+          <button type="submit" hx-confirm="Confirmer l'encaissement espèces ?" data-ui-confirm class="inline-flex h-9 items-center justify-center gap-2 rounded-ui-button bg-ui-success px-3 text-xs font-semibold text-white hover:opacity-90"><i data-lucide="badge-dollar-sign" class="h-4 w-4"></i>Encaisser</button>
+        </form>
+      </div>
+    {% endfill %}
+  {% endcomponent %}
 </div>

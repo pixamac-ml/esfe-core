@@ -1,0 +1,48 @@
+{% extends "secretary/base.html" %}
+{% load component_tags %}
+
+{% block title %}Reunions - Secretariat{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <div class="page-header">
+    <div>
+      <h1>Reunions</h1>
+      <p class="help-text">Planification, suivi et proces-verbaux des reunions de l'annexe.</p>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn btn-primary" hx-get="{% url 'secretary:meeting_create' %}" hx-target="#sg-drawer-content" hx-swap="innerHTML">
+        {% component "icon" name="plus" %}{% endcomponent %} Nouvelle reunion
+      </button>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th>Date</th><th>Reunion</th><th>Lieu</th><th>Statut</th></tr>
+      </thead>
+      <tbody>
+        {% for meeting in meetings %}
+          <tr>
+            <td>{{ meeting.scheduled_at|date:"d/m/Y H:i" }}</td>
+            <td><strong>{{ meeting.title }}</strong></td>
+            <td>{{ meeting.location|default:"-" }}</td>
+            <td>{{ meeting.get_status_display }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="4">Aucune reunion planifiee.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+    <div class="pagination">
+      {% if page_obj.has_previous %}<a class="btn" href="?page={{ page_obj.previous_page_number }}">Precedent</a>{% endif %}
+      <span>Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}<a class="btn" href="?page={{ page_obj.next_page_number }}">Suivant</a>{% endif %}
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

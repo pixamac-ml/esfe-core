@@ -11,13 +11,14 @@
   </div>
 
   {% if otp_error %}
-    <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{{ otp_error }}</div>
-  {% elif otp_request_id %}
+    <div class="rounded-ui-card border border-ui-danger/25 bg-ui-danger-soft px-4 py-3 text-sm font-semibold text-ui-danger">{{ otp_error }}</div>
+  {% endif %}
+  {% if otp_request_id %}
     <p class="text-sm font-semibold text-slate-500">
       Un code de validation a ete envoye au DG/DGA de l'annexe pour confirmer la publication
       definitive des resultats. Saisissez le code recu ci-dessous (validite : {{ otp_validity_minutes|default:5 }} minutes).
     </p>
-    <form class="grid gap-4" method="post" hx-post="{% url 'accounts_portal:director_results_confirm_otp' %}" hx-target="#director-workspace" hx-swap="innerHTML">
+    <form class="grid gap-4" method="post" hx-post="{% url 'accounts_portal:director_results_confirm_otp' %}" hx-target="#director-modal-content" hx-swap="innerHTML" hx-disabled-elt="button[type=submit]">
       {% csrf_token %}
       <input type="hidden" name="otp_request_id" value="{{ otp_request_id }}">
       <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">

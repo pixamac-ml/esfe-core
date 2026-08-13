@@ -5,6 +5,7 @@ from urllib.parse import urlencode
 from django.urls import reverse
 
 from notification_center.selectors import get_user_unread_count
+from portal.models import TransferRequest
 from ui.services.navigation import build_director_navigation
 
 
@@ -51,9 +52,18 @@ def build_director_dashboard_presentation(request, workspace):
     if academic_year is None and class_cards:
         academic_year = class_cards[0]["class"].academic_year
 
+    pending_transfers = (
+        TransferRequest.objects.filter(
+            branch=branch,
+            status=TransferRequest.STATUS_SUBMITTED,
+        ).count()
+        if branch else 0
+    )
     badges = {
         "evaluations": len(workspace.get("ready_to_publish") or []),
         "enseignants": workspace.get("teacher_unassigned_count") or None,
+        "transferts": pending_transfers or None,
+        "messagerie": get_user_unread_count(request.user) or None,
     }
     kpis = [
         {
@@ -121,6 +131,7 @@ def build_director_dashboard_presentation(request, workspace):
         {"key": "enseignants", "label": "Enseignants", "icon": "users"},
         {"key": "planification", "label": "Emploi du temps", "icon": "calendar-range"},
         {"key": "correspondances", "label": "Documents", "icon": "file-plus-2"},
+        {"key": "messagerie", "label": "Messagerie", "icon": "messages-square"},
     ]
     for action in quick_actions:
         action.update(
@@ -160,7 +171,7 @@ def build_director_dashboard_presentation(request, workspace):
         "notification_count": get_user_unread_count(request.user),
         "notifications_url": reverse("notification_center:notifications"),
         "preview_url": reverse("accounts_portal:director_notifications_preview"),
-        "center_url": _workspace_url("notifications"),
+        "center_url": _workspace_url("messagerie"),
         "director_teacher_filters": [
             {
                 "label": "Rechercher un enseignant",

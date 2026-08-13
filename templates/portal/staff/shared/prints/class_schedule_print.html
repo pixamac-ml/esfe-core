@@ -1,39 +1,123 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Emploi du temps classe - {{ academic_class.display_name }}</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 24px; color: #0f172a; }
-    .print-actions { margin-bottom: 16px; display: flex; gap: 12px; }
-    .print-btn { padding: 10px 14px; border: 1px solid #cbd5e1; background: #fff; text-decoration: none; color: #0f172a; font-weight: 700; border-radius: 10px; }
-    .header { margin-bottom: 20px; }
-    .meta { color: #475569; font-size: 13px; }
-    .week-block { margin-bottom: 28px; page-break-inside: avoid; }
-    .week-title { margin: 0 0 12px; font-size: 18px; }
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #eef2f7; color: #111827; font-family: Arial, Helvetica, sans-serif; }
+    .page { width: min(1400px, calc(100% - 32px)); margin: 16px auto; background: #fff; padding: 18px; box-shadow: 0 8px 30px rgba(15, 23, 42, .12); }
+    .print-actions { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 14px; }
+    .print-btn { cursor: pointer; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: #111827; padding: 9px 13px; font-size: 13px; font-weight: 700; text-decoration: none; }
+    .print-btn.primary { border-color: #0f766e; background: #0f766e; color: #fff; }
+    .header { display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: end; border-bottom: 3px solid #0f766e; padding-bottom: 12px; margin-bottom: 14px; }
+    .school { margin: 0 0 4px; color: #0f766e; font-size: 13px; font-weight: 800; text-transform: uppercase; }
+    h1 { margin: 0; font-size: 24px; line-height: 1.15; }
+    .meta { margin: 5px 0 0; color: #475569; font-size: 12px; }
+    .summary { text-align: right; }
+    .summary strong { display: block; font-size: 16px; }
+    .summary span { display: block; margin-top: 4px; color: #64748b; font-size: 11px; }
+    .week-block { margin-bottom: 24px; break-inside: avoid; }
+    .week-title { margin: 0 0 10px; font-size: 16px; }
+    .schedule-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .schedule-table th, .schedule-table td { border: 1px solid #94a3b8; }
+    .schedule-table th { background: #e2e8f0; padding: 8px 5px; font-size: 11px; text-align: center; }
+    .schedule-table th:first-child { width: 82px; }
+    .schedule-table td { height: 82px; padding: 5px; vertical-align: top; }
+    .time { background: #f8fafc; text-align: center; font-size: 11px; font-weight: 800; }
+    .time span { display: block; margin-top: 2px; color: #64748b; font-weight: 600; }
+    .course { height: 100%; border-left: 4px solid #0f766e; background: #f0fdfa; padding: 6px; }
+    .course + .course { margin-top: 4px; }
+    .course-title { margin: 0; font-size: 10.5px; font-weight: 800; line-height: 1.25; }
+    .course-code { margin: 3px 0 0; color: #0f766e; font-size: 9px; font-weight: 800; }
+    .course-meta { margin: 4px 0 0; color: #475569; font-size: 9px; line-height: 1.35; }
+    .free { color: #cbd5e1; text-align: center; font-size: 10px; }
+    .empty { border: 1px dashed #94a3b8; padding: 32px; color: #64748b; text-align: center; }
+    .footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 10px; color: #64748b; font-size: 9px; }
     @media print {
+      @page { size: A4 landscape; margin: 8mm; }
+      body { background: #fff; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
       .print-actions { display: none; }
-      body { margin: 0; }
+      .page { width: auto; margin: 0; padding: 0; box-shadow: none; }
       .week-block { break-inside: avoid; }
+    }
+    @media (max-width: 800px) {
+      .page { width: 100%; margin: 0; padding: 12px; overflow-x: auto; }
+      .print-sheet { min-width: 980px; }
     }
   </style>
 </head>
 <body>
-  <div class="print-actions">
-    <button class="print-btn" onclick="window.print()">Imprimer</button>
-  </div>
+  <main class="page">
+    <div class="print-actions">
+      <button type="button" class="print-btn" onclick="window.close()">Fermer</button>
+      <button type="button" class="print-btn primary" onclick="window.print()">Imprimer</button>
+    </div>
+    <div class="print-sheet">
+      <header class="header">
+        <div>
+          <p class="school">ESFE · {{ branch.name }}</p>
+          <h1>Emploi du temps · {{ academic_class.display_name }}</h1>
+          <p class="meta">{{ academic_class.programme.title }} · Année académique {{ academic_class.academic_year.name }}</p>
+        </div>
+        <div class="summary">
+          {% if source == "weekly" %}
+            <strong>{{ weekly_grid.total_hours }} h / semaine</strong>
+            <span>Du {{ weekly_grid.week_start|date:"d/m/Y" }} au {{ weekly_grid.week_end|date:"d/m/Y" }} · {{ weekly_grid.slots|length }} cours</span>
+          {% else %}
+            <strong>{% if period == "month" %}Mois pédagogique{% else %}Semaine{% endif %}</strong>
+          {% endif %}
+        </div>
+      </header>
 
-  <header class="header">
-    <h1>Emploi du temps officiel de classe</h1>
-    <p class="meta">{{ academic_class.display_name }} | {{ academic_class.programme.title }} | {{ branch.name }}</p>
-    <p class="meta">Periode: {% if period == "month" %}Mois pedagogique{% else %}Semaine{% endif %} | Genere le {{ generated_at|date:"d/m/Y H:i" }}</p>
-  </header>
+      {% if source == "weekly" %}
+        {% if weekly_grid.slots %}
+          <table class="schedule-table">
+            <thead>
+              <tr>
+                <th>Horaires</th>
+                {% for day in weekly_grid.weekdays %}<th>{{ day.label }}<br>{{ day.date|date:"d/m" }}</th>{% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in weekly_grid.rows %}
+                <tr>
+                  <td class="time">{{ row.start_time }}<span>{{ row.end_time }}</span></td>
+                  {% for cell in row.cells %}
+                    <td>
+                      {% for slot in cell.slots %}
+                        <div class="course">
+                          <p class="course-title">{{ slot.ec_title }}</p>
+                          <p class="course-code">{{ slot.ec_code }}</p>
+                          <p class="course-meta">{{ slot.teacher_name }}<br>{{ slot.room|default:"Salle à définir" }}</p>
+                        </div>
+                      {% empty %}<div class="free">Libre</div>{% endfor %}
+                    </td>
+                  {% endfor %}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <div class="empty">Aucun cours n'est encore placé dans la grille hebdomadaire de cette classe.</div>
+        {% endif %}
+      {% else %}
+        {% for schedule in week_blocks %}
+          <section class="week-block">
+            <h2 class="week-title">Semaine du {{ schedule.week_start|date:"d/m/Y" }}</h2>
+            {% include "portal/staff/supervisor/partials/schedule_week_grid.html" with schedule=schedule academic_class=academic_class %}
+          </section>
+        {% endfor %}
+      {% endif %}
 
-  {% for schedule in week_blocks %}
-  <section class="week-block">
-    <h2 class="week-title">Semaine du {{ schedule.week_start|date:"d/m/Y" }}</h2>
-    {% include "portal/staff/supervisor/partials/schedule_week_grid.html" with schedule=schedule academic_class=academic_class %}
-  </section>
-  {% endfor %}
+      <footer class="footer">
+        <span>Document de référence pour l'affichage interne.</span>
+        <span>Généré le {{ generated_at|date:"d/m/Y à H:i" }}</span>
+      </footer>
+    </div>
+  </main>
 </body>
 </html>

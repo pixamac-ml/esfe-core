@@ -463,6 +463,12 @@ class ManagerDashboardViewTests(TestCase):
     def test_overview_renders(self):
         response = self.client.get(reverse("accounts:manager_dashboard"), {"section": "overview"})
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-certified-dashboard-shell="true"')
+        self.assertContains(response, 'data-ui-core="app-sidebar"', count=1)
+        self.assertContains(response, 'data-ui-core="app-topbar"', count=1)
+        self.assertContains(response, 'data-ui-core="page-header"', count=1)
+        self.assertContains(response, 'data-ui-core="stat-card"', count=8)
+        self.assertNotContains(response, 'class="dashboard-shell"')
 
     def test_candidatures_section_renders(self):
         response = self.client.get(reverse("accounts:manager_dashboard"), {"section": "candidatures"})

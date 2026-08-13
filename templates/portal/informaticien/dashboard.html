@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "portal/staff/director_dashboard.html" %}
 
 {% block public_navbar %}{% endblock %}
 {% block public_footer %}{% endblock %}
@@ -124,16 +124,18 @@
 </style>
 {% endblock %}
 
-{% block content %}
+{% block dashboard_content %}
 <div
   x-data="itFlowDashboard()"
   x-init="init()"
   @keydown.escape.window="closeModal(); closeDrawer()"
+  @certified-dashboard:navigate.window="if ($event.detail.key === 'it-dashboard') openModule($event.detail.section)"
   x-cloak
   :class="{ 'dark': darkMode }"
 >
   <div id="it-topbar-loader"></div>
   <div class="flex min-h-screen">
+    {% if not dashboard_shell %}
     <aside class="it-sidebar fixed inset-y-0 left-0 z-40 flex flex-col transition-all duration-200" :class="collapsed ? 'w-[82px]' : 'w-[280px]'">
       <div class="flex h-20 items-center gap-3 px-4">
         <div class="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/15">
@@ -179,9 +181,11 @@
         </form>
       </div>
     </aside>
+    {% endif %}
 
-    <main class="min-h-screen flex-1 transition-all duration-200" :class="collapsed ? 'ml-[82px]' : 'ml-[280px]'">
+    <main class="min-h-screen flex-1 {% if not dashboard_shell %}transition-all duration-200{% endif %}" {% if not dashboard_shell %}:class="collapsed ? 'ml-[82px]' : 'ml-[280px]'"{% endif %}>
       <div class="mx-auto max-w-7xl px-5 py-6">
+        {% if not dashboard_shell %}
         <header class="mb-5 flex flex-col gap-3 border-b border-slate-200 pb-5 dark:border-slate-800 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p class="kicker" x-text="activeKicker()"></p>
@@ -272,6 +276,7 @@
             </div>
           </div>
         </header>
+        {% endif %}
 
         <div id="crumbBar" class="flex items-center gap-2 mb-4 text-sm font-bold" x-show="activeModule !== 'home'">
           <button

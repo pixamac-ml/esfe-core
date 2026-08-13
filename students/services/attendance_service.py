@@ -9,8 +9,40 @@ from django.utils import timezone
 from academics.models import AcademicClass, AcademicEnrollment, AcademicScheduleEvent
 from branches.models import Branch
 from students.models import AttendanceAlert, Student, StudentAttendance, TeacherAttendance
+from notifier.models import NotificationMessage
+from notifier.services import NotificationBus
 
 User = get_user_model()
+
+
+def _branch_directors(branch):
+    return User.objects.filter(
+        is_active=True,
+        profile__branch=branch,
+        profile__position="director_of_studies",
+    )
+
+
+def _notify_branch_directors(*, branch, actor, event_type, title, body, metadata):
+    for director in _branch_directors(branch):
+        NotificationBus.notify(
+            recipient=director,
+            actor=actor,
+            event_type=event_type,
+            title=title,
+            body=body,
+            source_app="students",
+            channels=(
+                NotificationMessage.CHANNEL_IN_APP,
+                NotificationMessage.CHANNEL_WEBSOCKET,
+            ),
+            priority=NotificationMessage.PRIORITY_HIGH,
+            metadata={
+                "branch_id": branch.id,
+                "url": "/portal/dashboard/?section=home",
+                **metadata,
+            },
+        )
 
 
 def _normalize_branch(branch: Branch | int | None) -> Branch:
@@ -76,12 +108,21 @@ def _maybe_create_alert(*, student: Student, branch: Branch, alert_type: str, co
     )
     if existing and existing.count == count:
         return existing
-    return AttendanceAlert.objects.create(
+    alert = AttendanceAlert.objects.create(
         student=student,
         branch=branch,
         alert_type=alert_type,
         count=count,
     )
+    _notify_branch_directors(
+        branch=branch,
+        actor=None,
+        event_type="attendance_alert_created",
+        title="Alerte d'assiduite",
+        body=f"{student.full_name} : {alert.get_alert_type_display()} ({count}).",
+        metadata={"alert_id": alert.id, "student_id": student.id},
+    )
+    return alert
 
 
 def _attendance_queryset_for_student(student: Student, branch: Branch):
@@ -211,6 +252,8 @@ def mark_student_attendance(
     branch: Branch | int,
     arrival_time=None,
     justification: str = "",
+    is_justified: bool = False,
+    observation: str = "",
 ):
     branch = _normalize_branch(branch)
     schedule_event = _normalize_schedule_event(schedule_event)
@@ -228,6 +271,8 @@ def mark_student_attendance(
             "status": status,
             "arrival_time": arrival_time,
             "justification": justification or "",
+            "is_justified": bool(is_justified),
+            "observation": observation or "",
             "recorded_by": recorded_by,
             "branch": branch,
         },
@@ -252,6 +297,8 @@ def mark_teacher_attendance(
     branch: Branch | int,
     arrival_time=None,
     justification: str = "",
+    course_delivered=None,
+    observation: str = "",
 ):
     branch = _normalize_branch(branch)
     schedule_event = _normalize_schedule_event(schedule_event)
@@ -260,7 +307,11 @@ def mark_teacher_attendance(
         raise ValidationError("L'evenement planifie ne correspond pas a l'enseignant fourni.")
 
     attendance_date = timezone.localtime(schedule_event.start_datetime).date()
-    attendance, _ = TeacherAttendance.objects.update_or_create(
+    previous = TeacherAttendance.objects.filter(
+        teacher=teacher,
+        schedule_event=schedule_event,
+    ).values("status", "course_delivered").first()
+    attendance, created = TeacherAttendance.objects.update_or_create(
         teacher=teacher,
         schedule_event=schedule_event,
         defaults={
@@ -268,6 +319,8 @@ def mark_teacher_attendance(
             "status": status,
             "arrival_time": arrival_time,
             "justification": justification or "",
+            "course_delivered": course_delivered,
+            "observation": observation or "",
             "recorded_by": recorded_by,
             "branch": branch,
         },
@@ -278,6 +331,33 @@ def mark_teacher_attendance(
             teacher=teacher,
             branch=branch,
             date_value=attendance_date,
+        )
+    notable_state = (
+        status in {TeacherAttendance.STATUS_ABSENT, TeacherAttendance.STATUS_LATE}
+        or course_delivered is False
+    )
+    changed_state = created or previous != {
+        "status": status,
+        "course_delivered": course_delivered,
+    }
+    if notable_state and changed_state:
+        labels = [attendance.get_status_display()]
+        if course_delivered is False:
+            labels.append("cours non assure")
+        _notify_branch_directors(
+            branch=branch,
+            actor=recorded_by,
+            event_type="teacher_attendance_anomaly",
+            title="Anomalie de presence enseignant",
+            body=(
+                f"{teacher.get_full_name() or teacher.username} — "
+                f"{schedule_event.academic_class.display_name} : {', '.join(labels)}."
+            ),
+            metadata={
+                "teacher_id": teacher.id,
+                "schedule_event_id": schedule_event.id,
+                "attendance_id": attendance.id,
+            },
         )
     return {
         "attendance": attendance,

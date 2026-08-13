@@ -35,18 +35,30 @@ def list_day_course_events(*, branch: Branch, academic_class_id: int, day: date)
             event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
             is_active=True,
         )
-        .exclude(status=AcademicScheduleEvent.STATUS_CANCELLED)
+        .exclude(
+            status__in={
+                AcademicScheduleEvent.STATUS_DRAFT,
+                AcademicScheduleEvent.STATUS_CANCELLED,
+            }
+        )
         .order_by("start_datetime", "id")
     )
 
 
-def get_roll_sheet(*, branch: Branch | int, academic_class_id: int, day: date) -> AttendanceRollSheet | None:
+def get_roll_sheet(
+    *,
+    branch: Branch | int,
+    academic_class_id: int,
+    day: date,
+    schedule_event_id: int | None = None,
+) -> AttendanceRollSheet | None:
     branch = _normalize_branch(branch)
-    return (
-        AttendanceRollSheet.objects.select_related("academic_class", "schedule_event", "validated_by")
-        .filter(branch=branch, academic_class_id=academic_class_id, date=day)
-        .first()
-    )
+    queryset = AttendanceRollSheet.objects.select_related(
+        "academic_class", "schedule_event", "validated_by"
+    ).filter(branch=branch, academic_class_id=academic_class_id, date=day)
+    if schedule_event_id is not None:
+        queryset = queryset.filter(schedule_event_id=schedule_event_id)
+    return queryset.first()
 
 
 def _workflow_state(sheet: AttendanceRollSheet | None) -> str:
@@ -63,6 +75,7 @@ def build_attendance_workflow_payload(
     user: User,
     academic_class_id: int | None,
     roll_date: date,
+    schedule_event_id: int | None = None,
 ) -> dict | None:
     if branch is None or not academic_class_id:
         return None
@@ -71,7 +84,12 @@ def build_attendance_workflow_payload(
     if academic_class is None:
         return None
 
-    sheet = get_roll_sheet(branch=branch, academic_class_id=academic_class_id, day=roll_date)
+    sheet = get_roll_sheet(
+        branch=branch,
+        academic_class_id=academic_class_id,
+        day=roll_date,
+        schedule_event_id=schedule_event_id,
+    )
     state = _workflow_state(sheet)
     day_events = list_day_course_events(branch=branch, academic_class_id=academic_class_id, day=roll_date)
 
@@ -115,7 +133,12 @@ def start_daily_roll(
 ) -> AttendanceRollSheet:
     branch = _normalize_branch(branch)
     academic_class = AcademicClass.objects.get(pk=academic_class_id, branch=branch, is_active=True)
-    sheet = get_roll_sheet(branch=branch, academic_class_id=academic_class_id, day=roll_date)
+    sheet = get_roll_sheet(
+        branch=branch,
+        academic_class_id=academic_class_id,
+        day=roll_date,
+        schedule_event_id=schedule_event_id,
+    )
     if sheet and sheet.status == AttendanceRollSheet.STATUS_VALIDATED:
         raise ValidationError("La feuille est deja validee. Rouvrez-la pour modifier.")
     if sheet:
@@ -170,8 +193,19 @@ def reopen_daily_roll(*, user: User, sheet: AttendanceRollSheet) -> AttendanceRo
     return sheet
 
 
-def assert_roll_allows_editing(*, branch: Branch | int, academic_class_id: int, roll_date: date) -> None:
-    sheet = get_roll_sheet(branch=branch, academic_class_id=academic_class_id, day=roll_date)
+def assert_roll_allows_editing(
+    *,
+    branch: Branch | int,
+    academic_class_id: int,
+    roll_date: date,
+    schedule_event_id: int | None = None,
+) -> None:
+    sheet = get_roll_sheet(
+        branch=branch,
+        academic_class_id=academic_class_id,
+        day=roll_date,
+        schedule_event_id=schedule_event_id,
+    )
     if sheet and sheet.status == AttendanceRollSheet.STATUS_VALIDATED:
         raise ValidationError("Cette feuille d'appel est validee. Rouvrez-la avant toute modification.")
 
@@ -189,23 +223,28 @@ def touch_roll_after_bulk_save(
     sheet, _created = AttendanceRollSheet.objects.get_or_create(
         branch=branch,
         academic_class=academic_class,
-        date=roll_date,
+        schedule_event=schedule_event,
         defaults={
-            "schedule_event": schedule_event,
+            "date": roll_date,
             "status": AttendanceRollSheet.STATUS_DRAFT,
             "updated_by": user,
         },
     )
     if sheet.status == AttendanceRollSheet.STATUS_VALIDATED:
         raise ValidationError("Cette feuille d'appel est validee. Rouvrez-la avant toute modification.")
-    sheet.schedule_event = schedule_event
+    sheet.date = roll_date
     sheet.status = AttendanceRollSheet.STATUS_DRAFT
     sheet.updated_by = user
-    sheet.save(update_fields=["schedule_event", "status", "updated_by", "updated_at"])
+    sheet.save(update_fields=["date", "status", "updated_by", "updated_at"])
     return sheet
 
 
 def is_roll_locked_for_event(*, branch: Branch | int, event: AcademicScheduleEvent) -> bool:
     roll_date = timezone.localtime(event.start_datetime).date()
-    sheet = get_roll_sheet(branch=branch, academic_class_id=event.academic_class_id, day=roll_date)
+    sheet = get_roll_sheet(
+        branch=branch,
+        academic_class_id=event.academic_class_id,
+        day=roll_date,
+        schedule_event_id=event.pk,
+    )
     return bool(sheet and sheet.status == AttendanceRollSheet.STATUS_VALIDATED)

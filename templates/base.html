@@ -365,6 +365,27 @@ main {
     });
   </script>
 
+  <!-- Alpine uiOverlay component (modals/drawers). Registered inline BEFORE Alpine boots:
+       this Alpine build starts via queueMicrotask, so a deferred script (ui_core/index.js)
+       would register it too late and x-data="uiOverlay(false)" would fail. -->
+  <script>
+    document.addEventListener('alpine:init',()=>{
+      Alpine.data('uiOverlay',(initiallyOpen)=>({
+        open:Boolean(initiallyOpen),
+        opener:null,
+        show(){this.opener=document.activeElement;this.open=true;document.documentElement.classList.add('overflow-hidden');this.$nextTick(()=>this.$refs.dialog&&this.$refs.dialog.focus())},
+        close(){this.open=false;document.documentElement.classList.remove('overflow-hidden');this.$nextTick(()=>this.opener&&this.opener.focus())},
+        trap(event){
+          const nodes=[...this.$refs.dialog.querySelectorAll("a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])")];
+          if(!nodes.length)return;
+          const first=nodes[0],last=nodes[nodes.length-1];
+          if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}
+          else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}
+        }
+      }));
+    });
+  </script>
+
   {% block extra_head %}{% endblock %}
 </head>
 
@@ -709,7 +730,9 @@ main {
   {% if request.user.is_authenticated %}
     {% if request.access_context.context_type == "SYSTEM" %}
       {% include "portal/partials/system_session_manager.html" %}
-      {% include "notification_center/partials/portal_component.html" %}
+      {% if not suppress_portal_notification_component %}
+        {% include "notification_center/partials/portal_component.html" %}
+      {% endif %}
     {% endif %}
   {% endif %}
   {% include "notification_center/partials/realtime.html" %}

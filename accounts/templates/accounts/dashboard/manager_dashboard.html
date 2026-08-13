@@ -1,4 +1,4 @@
-{% extends "base_app.html" %}
+{% extends "portal/staff/director_dashboard.html" %}
 {% load component_tags %}
 {% load humanize %}
 
@@ -22,7 +22,7 @@
     --dashboard-muted: #64748b;
   }
 
-  body { background: var(--dashboard-soft); color: var(--dashboard-text); overflow: hidden; }
+  [data-dashboard-workspace="manager"] { color: var(--dashboard-text); }
   [x-cloak] { display: none !important; }
 
   .dashboard-shell { display: flex; height: 100vh; min-height: 0; overflow: hidden; }
@@ -200,7 +200,8 @@
   .dashboard-scroll-area { background:var(--surface); }
   .dashboard-content-wrap { max-width:1680px; margin-inline:auto; padding:16px 24px 32px; }
   .dashboard-panel { border-color:var(--line); box-shadow:none; }
-  .manager-command-hero { position:relative; overflow:hidden; border:1px solid var(--line); border-radius:16px; padding:22px 24px; color:var(--text); background:linear-gradient(135deg,var(--card) 55%,var(--school-primary-soft)); box-shadow:none; }
+  .manager-command-hero { display:none; position:relative; overflow:hidden; border:1px solid var(--line); border-radius:16px; padding:22px 24px; color:var(--text); background:linear-gradient(135deg,var(--card) 55%,var(--school-primary-soft)); box-shadow:none; }
+  .dashboard-section-hero { display:none; }
   .manager-command-hero::after { content:""; position:absolute; width:220px; height:220px; right:-100px; top:-125px; border-radius:999px; background:color-mix(in srgb,var(--school-primary) 8%,transparent); }
   .manager-command-content { position: relative; z-index: 1; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
   .manager-command-kicker { display:inline-flex; align-items:center; gap:7px; color:var(--school-primary); font-size:.66rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
@@ -248,7 +249,6 @@
     .manager-command-content { align-items:flex-start; flex-direction:column; }
     .manager-command-actions { justify-content:flex-start; }
     .manager-overview-kpis, .manager-quick-actions { grid-template-columns: 1fr; }
-    body { overflow: auto; }
     .dashboard-row-2, .dashboard-row-3, .dashboard-row-4, .dashboard-action-grid, .dashboard-pill-grid, .dashboard-kpi-grid, .dashboard-form-grid { grid-template-columns: 1fr; }
     .dashboard-report-filters { grid-template-columns:1fr; }
     .dashboard-report-filter-wide { grid-column:auto; }
@@ -261,8 +261,9 @@
 </style>
 {% endblock %}
 
-{% block content %}
-<div class="dashboard-shell" x-data="{ sidebarCollapsed: localStorage.getItem('manager-sidebar-collapsed') === 'true' }">
+{% block dashboard_content %}
+<div class="space-y-6" x-data="{ sidebarCollapsed: localStorage.getItem('manager-sidebar-collapsed') === 'true' }">
+  {% if not dashboard_shell %}
   <aside class="dashboard-sidebar custom-scrollbar" id="managerSidebar" :class="sidebarCollapsed ? 'is-collapsed' : ''">
     <div class="dashboard-logo">
       <button type="button" class="dashboard-logo-mark" @click="sidebarCollapsed = !sidebarCollapsed; localStorage.setItem('manager-sidebar-collapsed', sidebarCollapsed)" title="Réduire la navigation">{% component "icon" name="panel-left-close" class_str="text-white" %}{% endcomponent %}</button>
@@ -334,8 +335,10 @@
       </form>
     </div>
   </aside>
+  {% endif %}
 
-  <main class="dashboard-main">
+  <div class="min-w-0">
+    {% if not dashboard_shell %}
     <header class="dashboard-topbar" hx-boost="true">
       <div class="dashboard-topbar-left">
         <button type="button" class="dashboard-btn-icon" @click="if (window.innerWidth >= 980) { sidebarCollapsed = !sidebarCollapsed; localStorage.setItem('manager-sidebar-collapsed', sidebarCollapsed) } else { managerToggleSidebar() }">{% component "icon" name="menu" %}{% endcomponent %}</button>
@@ -374,11 +377,27 @@
         </div>
       </div>
     </header>
+    {% endif %}
 
-    <div class="dashboard-scroll-area">
-      <div class="dashboard-content-wrap" id="dashboard-app-main" hx-boost="true">
-        {% include "accounts/dashboard/partials/widget_scope_bar.html" %}
+    <div>
+      <div class="space-y-6" id="dashboard-app-main" hx-boost="true">
+        {% include "accounts/dashboard/partials/widget_scope_bar.html" with cash_balance=cash_stats.available_balance %}
 
+        {% component "ui_core.page_header" eyebrow=manager_ui.page_header.eyebrow title=manager_ui.page_header.title subtitle=manager_ui.page_header.subtitle %}
+          {% fill "actions" %}
+            {% for action in manager_ui.header_actions %}
+              <a
+                href="{{ action.href }}"
+                class="inline-flex h-ui-control items-center gap-2 rounded-ui-button px-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus {% if action.primary %}bg-ui-primary text-ui-on-primary hover:bg-ui-primary-strong{% else %}border border-ui-border bg-ui-surface text-ui-text hover:bg-ui-surface-hover{% endif %}"
+              >
+                <i data-lucide="{{ action.icon }}" class="h-4 w-4" aria-hidden="true"></i>
+                {{ action.label }}
+              </a>
+            {% endfor %}
+          {% endfill %}
+        {% endcomponent %}
+
+        {% if not dashboard_shell %}
         <div class="dashboard-nav-tabs">
           <a href="?section=overview" class="dashboard-nav-tab {% if active_section == 'overview' %}active{% endif %}">Overview</a>
           <a href="?section=candidatures" class="dashboard-nav-tab {% if active_section == 'candidatures' %}active{% endif %}">Candidatures</a>
@@ -392,6 +411,7 @@
           <a href="?section=boutique" class="dashboard-nav-tab {% if active_section == 'boutique' %}active{% endif %}">Boutique</a>
           <a href="?section=dons" class="dashboard-nav-tab {% if active_section == 'dons' %}active{% endif %}">Dons</a>
         </div>
+        {% endif %}
 
         {% if manager_search %}
         <div class="dashboard-panel" style="margin-bottom:16px;">
@@ -452,6 +472,8 @@
         {% endif %}
 
         {% if active_section == "settings" %}
+        {% include "accounts/dashboard/partials/manager_account_workspace.html" %}
+        {% if manager_ui.render_legacy_settings %}
         <section class="dashboard-section-block">
           <div class="dashboard-section-hero">
             <div>
@@ -483,139 +505,105 @@
           </div>
         </section>
         {% endif %}
+        {% endif %}
 
         {% if active_section == "overview" %}
         <section class="dashboard-section-block">
-          <div class="manager-command-hero">
-            <div class="manager-command-content">
-              <div>
-                <span class="manager-command-kicker">{% component "icon" name="radio" size=14 %}{% endcomponent %} Centre de pilotage · {{ branch.name }}</span>
-                <h1 class="manager-command-title">Bonjour {{ user.first_name|default:"Gestionnaire" }}, votre annexe en un coup d'œil.</h1>
-                <p class="manager-command-subtitle">Suivez les admissions, les encaissements et les engagements financiers depuis un espace opérationnel unique.</p>
-              </div>
-              <div class="manager-command-actions">
-                <a href="?section=rapport" class="manager-command-action">{% component "icon" name="chart-column" size=16 %}{% endcomponent %} Rapport</a>
-                <a href="?section=caisse" class="manager-command-action primary">{% component "icon" name="vault" size=16 %}{% endcomponent %} Ouvrir la caisse</a>
-              </div>
-            </div>
-          </div>
-
-          <div class="manager-overview-kpis" id="live-kpi-grid">
-            {% component "metric_card" label="Étudiants" value=total_students|intcomma icon="users" hint="Inscrits actifs" %}{% endcomponent %}
-            {% include "accounts/dashboard/partials/widget_today_payments.html" %}
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" id="live-kpi-grid">
+            {% with card=manager_ui.stat_cards.0 %}{% component "ui_core.stat_card" label=card.label value=card.value unit=card.unit icon=card.icon tone=card.tone description=card.description %}{% endcomponent %}{% endwith %}
+            {% include "accounts/dashboard/partials/widget_today_payments.html" with stat_card=manager_ui.stat_cards.1 %}
             <div id="alerts-kpi-card">
-              {% component "metric_card" label="Alertes" value=manager_intelligence.alerts|length|default:0 icon="triangle-alert" hint="Éléments critiques à traiter" %}{% endcomponent %}
+              {% with card=manager_ui.stat_cards.2 %}{% component "ui_core.stat_card" label=card.label value=card.value unit=card.unit icon=card.icon tone=card.tone description=card.description %}{% endcomponent %}{% endwith %}
             </div>
-            {% include "accounts/dashboard/partials/widget_cash_balance.html" %}
+            {% include "accounts/dashboard/partials/widget_cash_balance.html" with stat_card=manager_ui.stat_cards.3 %}
           </div>
 
           {% include "accounts/dashboard/partials/widget_active_coupons.html" %}
 
-          <div class="manager-quick-actions" aria-label="Actions rapides">
-            <a href="?section=candidatures" class="manager-quick-action"><span class="manager-quick-icon">{% component "icon" name="user-round-check" size=18 %}{% endcomponent %}</span><span><span class="manager-quick-label">Traiter les candidatures</span><span class="manager-quick-hint">Examiner les dossiers en attente</span></span></a>
-            <a href="?section=paiements" class="manager-quick-action"><span class="manager-quick-icon">{% component "icon" name="badge-dollar-sign" size=18 %}{% endcomponent %}</span><span><span class="manager-quick-label">Valider un paiement</span><span class="manager-quick-hint">Contrôler les justificatifs reçus</span></span></a>
-            <a href="?section=depenses" class="manager-quick-action"><span class="manager-quick-icon">{% component "icon" name="receipt-text" size=18 %}{% endcomponent %}</span><span><span class="manager-quick-label">Suivre les dépenses</span><span class="manager-quick-hint">Voir les charges de la période</span></span></a>
-            <a href="?section=cloture" class="manager-quick-action"><span class="manager-quick-icon">{% component "icon" name="calendar-check-2" size=18 %}{% endcomponent %}</span><span><span class="manager-quick-label">Préparer la clôture</span><span class="manager-quick-hint">Contrôler la situation mensuelle</span></span></a>
-          </div>
+          {% component "ui_core.page_section" title="Actions rapides" description="Acces aux operations principales du jour" labelled_by="manager-quick-actions-title" %}
+            {% fill "default" %}
+              <nav class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-labelledby="manager-quick-actions-title">
+                <a href="?section=candidatures" class="flex min-h-20 items-center gap-3 rounded-ui-card border border-ui-border bg-ui-surface p-4 text-ui-text shadow-ui-card transition hover:border-ui-primary/40 hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus"><span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button bg-ui-primary-soft text-ui-primary"><i data-lucide="user-round-check" class="h-5 w-5" aria-hidden="true"></i></span><span><strong class="block text-sm">Traiter les candidatures</strong><small class="mt-1 block text-xs text-ui-text-muted">Examiner les dossiers en attente</small></span></a>
+                <a href="?section=paiements" class="flex min-h-20 items-center gap-3 rounded-ui-card border border-ui-border bg-ui-surface p-4 text-ui-text shadow-ui-card transition hover:border-ui-primary/40 hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus"><span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button bg-ui-success-soft text-ui-success"><i data-lucide="badge-dollar-sign" class="h-5 w-5" aria-hidden="true"></i></span><span><strong class="block text-sm">Valider un paiement</strong><small class="mt-1 block text-xs text-ui-text-muted">Controler les justificatifs recus</small></span></a>
+                <a href="?section=depenses" class="flex min-h-20 items-center gap-3 rounded-ui-card border border-ui-border bg-ui-surface p-4 text-ui-text shadow-ui-card transition hover:border-ui-primary/40 hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus"><span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button bg-ui-warning-soft text-ui-warning"><i data-lucide="receipt-text" class="h-5 w-5" aria-hidden="true"></i></span><span><strong class="block text-sm">Suivre les depenses</strong><small class="mt-1 block text-xs text-ui-text-muted">Voir les charges de la periode</small></span></a>
+                <a href="?section=cloture" class="flex min-h-20 items-center gap-3 rounded-ui-card border border-ui-border bg-ui-surface p-4 text-ui-text shadow-ui-card transition hover:border-ui-primary/40 hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus"><span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button bg-ui-info-soft text-ui-info"><i data-lucide="calendar-check-2" class="h-5 w-5" aria-hidden="true"></i></span><span><strong class="block text-sm">Preparer la cloture</strong><small class="mt-1 block text-xs text-ui-text-muted">Controler la situation mensuelle</small></span></a>
+              </nav>
+            {% endfill %}
+          {% endcomponent %}
         </section>
 
-        <section class="dashboard-section-block">
-          <div class="dashboard-row-2">
-            <div class="dashboard-panel">
-              <div class="dashboard-panel-title">Priorites</div>
-              {% for item in manager_intelligence.priorities %}
-              <div class="dashboard-action-card" style="margin-bottom:8px;">
-                <div>
-                  <div class="dashboard-action-label" style="{% if item.level == 'high' %}color:#ef4444;{% elif item.level == 'medium' %}color:#d97706;{% else %}color:#2563eb;{% endif %}">{{ item.title }}</div>
-                  <div class="dashboard-action-sub">{{ item.message }}</div>
-                </div>
-                <span class="dashboard-action-count {% if item.level == 'high' %}bg-rose-100 text-rose-700{% elif item.level == 'medium' %}bg-amber-100 text-amber-700{% else %}bg-blue-100 text-blue-700{% endif %}">{{ item.section }}</span>
-              </div>
-              {% empty %}
-              <div class="dashboard-empty">
-                <div class="dashboard-empty-icon">{% component "icon" name="circle-check" %}{% endcomponent %}</div>
-                <div class="dashboard-empty-text">Aucune priorite immediate</div>
-              </div>
-              {% endfor %}
-            </div>
-
-            <div class="dashboard-panel">
-              <div class="dashboard-panel-title">Situation periode</div>
-              <div class="dashboard-row-2">
-                <div class="dashboard-panel" style="box-shadow:none; border-radius:12px; background:#f8fafc;">
-                  <div class="dashboard-section-header-title">Recettes</div>
-                  <div class="dashboard-kpi-value" style="font-size:1.5rem; color:#16a34a;">{{ period_summary.total_revenue|intcomma }} FCFA</div>
-                  <div class="dashboard-section-header-sub">Etudiants: {{ period_summary.student_revenue|intcomma }} - Boutique: {{ period_summary.shop_revenue|intcomma }}</div>
-                </div>
-                <div class="dashboard-panel" style="box-shadow:none; border-radius:12px; background:#f8fafc;">
-                  <div class="dashboard-section-header-title">Charges payees</div>
-                  <div class="dashboard-kpi-value" style="font-size:1.5rem; color:#ef4444;">{{ period_summary.charges_paid|intcomma }} FCFA</div>
-                  <div class="dashboard-section-header-sub">Depenses: {{ period_summary.expenses_paid|intcomma }} - Salaires: {{ period_summary.salary_paid|intcomma }}</div>
-                </div>
-                <div class="dashboard-panel" style="box-shadow:none; border-radius:12px; background:#f8fafc;">
-                  <div class="dashboard-section-header-title">Solde estime</div>
-                  <div class="dashboard-kpi-value" style="font-size:1.5rem; {% if period_summary.net_result < 0 %}color:#ef4444;{% else %}color:#2563eb;{% endif %}">{{ period_summary.net_result|intcomma }} FCFA</div>
-                  <div class="dashboard-section-header-sub">Apres engagements: {{ period_summary.balance_after_commitments|intcomma }} FCFA</div>
-                </div>
-                <div class="dashboard-panel" style="box-shadow:none; border-radius:12px; background:#f8fafc;">
-                  <div class="dashboard-section-header-title">Taux de collecte</div>
-                  <div class="dashboard-kpi-value" style="font-size:1.5rem; color:#0f9d8a;">{{ period_summary.collection_rate }}%</div>
-                  <div class="dashboard-section-header-sub">Conversion candidatures: {{ period_summary.candidature_conversion_rate }}%</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="dashboard-section-block">
-          <div class="dashboard-row-2">
-            <div class="dashboard-panel">
-              <div class="dashboard-section-header">
-                <div>
-                  <div class="dashboard-section-header-title">Flux de travail</div>
-                  <div class="dashboard-section-header-sub">Parcours rapide des actions recurrentes.</div>
-                </div>
-              </div>
-              <div class="dashboard-action-grid">
-                {% for item in operational_flow %}
-                <a href="?section={{ item.section }}" class="dashboard-action-card">
-                  <div>
-                    <div class="dashboard-action-label" style="{% if item.tone == 'amber' %}color:#d97706;{% elif item.tone == 'blue' %}color:#2563eb;{% elif item.tone == 'emerald' %}color:#16a34a;{% elif item.tone == 'rose' %}color:#ef4444;{% else %}color:#64748b;{% endif %}">{{ item.label }}</div>
-                    <div class="dashboard-action-sub">Acces direct</div>
-                  </div>
-                  <span class="dashboard-action-count {% if item.tone == 'amber' %}bg-amber-100 text-amber-700{% elif item.tone == 'blue' %}bg-blue-100 text-blue-700{% elif item.tone == 'emerald' %}bg-emerald-100 text-emerald-700{% elif item.tone == 'rose' %}bg-rose-100 text-rose-700{% else %}bg-slate-100 text-slate-700{% endif %}">{{ item.value|intcomma }}</span>
-                </a>
+        <div class="grid grid-cols-1 gap-5 xl:grid-cols-2">
+          {% component "ui_core.panel" title="Priorites" subtitle="Actions a traiter dans l'ordre recommande" %}
+            {% fill "default" %}
+              <div class="space-y-3">
+                {% for item in manager_intelligence.priorities %}
+                  {% if item.level == "high" %}
+                    {% component "ui_core.alert" title=item.title message=item.message tone="danger" %}{% endcomponent %}
+                  {% elif item.level == "medium" %}
+                    {% component "ui_core.alert" title=item.title message=item.message tone="warning" %}{% endcomponent %}
+                  {% else %}
+                    {% component "ui_core.alert" title=item.title message=item.message tone="info" %}{% endcomponent %}
+                  {% endif %}
+                {% empty %}
+                  {% component "ui_core.empty_state" title="Aucune priorite immediate" message="Les flux principaux de l'annexe ne demandent aucune intervention urgente." icon="circle-check" %}{% endcomponent %}
                 {% endfor %}
               </div>
-            </div>
+            {% endfill %}
+          {% endcomponent %}
 
-            <div class="dashboard-panel">
-              <div class="dashboard-section-header">
-                <div>
-                  <div class="dashboard-section-header-title">Alertes & risques</div>
-                  <div class="dashboard-section-header-sub">{{ manager_intelligence.alerts|length|default:0 }} alerte{{ manager_intelligence.alerts|length|default:0|pluralize:"s" }} ouverte{{ manager_intelligence.alerts|length|default:0|pluralize:"s" }}</div>
-                </div>
+          {% component "ui_core.panel" title="Situation de la periode" subtitle=report_period.label %}
+            {% fill "default" %}
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {% component "ui_core.stat_card" label="Recettes" value=period_summary.total_revenue|intcomma unit="FCFA" icon="trending-up" tone="success" description="Paiements scolaires et boutique" compact=True %}{% endcomponent %}
+                {% component "ui_core.stat_card" label="Charges payees" value=period_summary.charges_paid|intcomma unit="FCFA" icon="trending-down" tone="danger" description="Depenses, salaires et honoraires" compact=True %}{% endcomponent %}
+                {% if period_summary.net_result < 0 %}
+                  {% component "ui_core.stat_card" label="Resultat net" value=period_summary.net_result|intcomma unit="FCFA" icon="scale" tone="danger" description="Avant engagements restants" compact=True %}{% endcomponent %}
+                {% else %}
+                  {% component "ui_core.stat_card" label="Resultat net" value=period_summary.net_result|intcomma unit="FCFA" icon="scale" tone="primary" description="Avant engagements restants" compact=True %}{% endcomponent %}
+                {% endif %}
+                {% component "ui_core.stat_card" label="Taux de collecte" value=period_summary.collection_rate unit="%" icon="gauge" tone="info" description="Part des montants attendus deja encaisses" compact=True %}{% endcomponent %}
               </div>
-              {% for alert in manager_intelligence.alerts %}
-              <div class="dashboard-action-card" style="margin-bottom:8px; border-color:{% if alert.level == 'danger' %}#fecaca{% else %}#fde68a{% endif %};">
-                <div>
-                  <div class="dashboard-action-label" style="{% if alert.level == 'danger' %}color:#ef4444;{% else %}color:#d97706;{% endif %}">{{ alert.message }}</div>
-                  <div class="dashboard-action-sub">{% if alert.level == 'danger' %}A traiter immediatement{% else %}Suivi recommande{% endif %}</div>
-                </div>
-                <span class="dashboard-action-count {% if alert.level == 'danger' %}bg-rose-100 text-rose-700{% else %}bg-amber-100 text-amber-700{% endif %}">{{ alert.level }}</span>
+            {% endfill %}
+          {% endcomponent %}
+
+          {% component "ui_core.panel" title="Flux de travail" subtitle="Acces direct aux operations recurrentes" %}
+            {% fill "default" %}
+              <nav class="grid grid-cols-1 gap-2 sm:grid-cols-2" aria-label="Flux de travail du gestionnaire">
+                {% for item in operational_flow %}
+                <a href="?section={{ item.section }}" class="flex min-h-14 items-center justify-between gap-3 rounded-ui-button border border-ui-border bg-ui-surface px-4 py-3 text-sm font-semibold text-ui-text transition hover:border-ui-primary/40 hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus">
+                  <span>{{ item.label }}</span>
+                  {% if item.tone == "amber" %}{% component "ui_core.status_badge" label=item.value tone="warning" %}{% endcomponent %}
+                  {% elif item.tone == "emerald" %}{% component "ui_core.status_badge" label=item.value tone="success" %}{% endcomponent %}
+                  {% elif item.tone == "rose" %}{% component "ui_core.status_badge" label=item.value tone="danger" %}{% endcomponent %}
+                  {% elif item.tone == "blue" %}{% component "ui_core.status_badge" label=item.value tone="primary" %}{% endcomponent %}
+                  {% else %}{% component "ui_core.status_badge" label=item.value tone="neutral" %}{% endcomponent %}{% endif %}
+                </a>
+                {% endfor %}
+              </nav>
+            {% endfill %}
+          {% endcomponent %}
+
+          {% component "ui_core.panel" title="Alertes et risques" subtitle="Controles automatiques sur le perimetre autorise" %}
+            {% fill "default" %}
+              <div class="space-y-3">
+                {% for alert in manager_intelligence.alerts %}
+                  {% if alert.level == "danger" %}
+                    {% component "ui_core.alert" title="A traiter immediatement" message=alert.message tone="danger" %}{% endcomponent %}
+                  {% else %}
+                    {% component "ui_core.alert" title="Suivi recommande" message=alert.message tone="warning" %}{% endcomponent %}
+                  {% endif %}
+                {% empty %}
+                  {% component "ui_core.empty_state" title="Aucune alerte active" message="Aucun risque operationnel ou financier n'est signale pour cette annexe." icon="shield-check" %}{% endcomponent %}
+                {% endfor %}
               </div>
-              {% empty %}
-              <div class="dashboard-empty">
-                <div class="dashboard-empty-icon">{% component "icon" name="shield-check" %}{% endcomponent %}</div>
-                <div class="dashboard-empty-text">Aucune alerte active</div>
-              </div>
-              {% endfor %}
-            </div>
-          </div>
-        </section>
+            {% endfill %}
+          {% endcomponent %}
+        </div>
         {% endif %}
 
         {% if active_section == "candidatures" %}
+        {% include "accounts/dashboard/partials/manager_candidatures_workspace.html" %}
+        {% if manager_ui.render_legacy_candidatures %}
         <section class="dashboard-panel">
           <div class="dashboard-section-hero">
             <div>
@@ -729,8 +717,11 @@
           </div>
         </section>
         {% endif %}
+        {% endif %}
 
         {% if active_section == "inscriptions" %}
+        {% include "accounts/dashboard/partials/manager_inscriptions_workspace.html" %}
+        {% if manager_ui.render_legacy_inscriptions %}
         <section class="dashboard-panel">
           <div class="dashboard-section-hero">
             <div>
@@ -805,8 +796,11 @@
           </div>
         </section>
         {% endif %}
+        {% endif %}
 
         {% if active_section == "paiements" %}
+        {% include "accounts/dashboard/partials/manager_payments_workspace.html" %}
+        {% if manager_ui.render_legacy_payments %}
         <section class="dashboard-panel">
           <div class="dashboard-section-hero">
             <div>
@@ -934,8 +928,11 @@
           </div>
         </section>
         {% endif %}
+        {% endif %}
 
         {% if active_section == "salaires" %}
+        {% include "accounts/dashboard/partials/manager_payroll_workspace.html" %}
+        {% if manager_ui.render_legacy_payroll %}
         <section class="dashboard-panel">
           <div class="dashboard-section-hero">
             <div>
@@ -1020,8 +1017,11 @@
           </div>
         </section>
         {% endif %}
+        {% endif %}
 
         {% if active_section == "depenses" %}
+        {% include "accounts/dashboard/partials/manager_expenses_workspace.html" %}
+        {% if manager_ui.render_legacy_expenses %}
         <section class="dashboard-panel">
           <div class="dashboard-section-hero">
             <div>
@@ -1119,8 +1119,11 @@
           </div>
         </section>
         {% endif %}
+        {% endif %}
 
         {% if active_section == "caisse" %}
+        {% include "accounts/dashboard/partials/manager_cash_workspace.html" %}
+        {% if manager_ui.render_legacy_cash %}
         <section class="dashboard-panel">
           <div class="dashboard-section-hero">
             <div>
@@ -1232,6 +1235,7 @@
           </div>
           </div>
         </section>
+        {% endif %}
         {% endif %}
 
         {% if active_section == "rapport" %}
@@ -1371,6 +1375,21 @@
                   </tbody>
                 </table>
               </div>
+            </div>
+          </div>
+
+          <div class="dashboard-panel" style="margin-top:16px; box-shadow:none; background:#f8fafc; border-radius:12px;">
+            <div class="dashboard-section-header">
+              <div>
+                <div class="dashboard-panel-title">Recettes annee</div>
+                <div class="dashboard-section-header-sub">Comparaison des encaissements valides par exercice.</div>
+              </div>
+              <span class="dashboard-scope-chip">Total : {{ annual_revenue_total|intcomma }} FCFA</span>
+            </div>
+            <div class="dashboard-row-3">
+              <div class="dashboard-stat-box" style="background:#eff6ff;"><div class="dashboard-stat-val" style="color:#2563eb;">{{ annual_revenue_current_year|intcomma }}</div><div class="dashboard-stat-lbl">{{ annual_revenue_current_year_label }}</div></div>
+              <div class="dashboard-stat-box" style="background:#f8fafc;"><div class="dashboard-stat-val" style="color:#475569;">{{ annual_revenue_previous_year|intcomma }}</div><div class="dashboard-stat-lbl">{{ annual_revenue_previous_year_label }}</div></div>
+              <div class="dashboard-stat-box" style="background:#f0fdf4;"><div class="dashboard-stat-val" style="color:#16a34a;">{{ annual_revenue_growth }}%</div><div class="dashboard-stat-lbl">Evolution</div></div>
             </div>
           </div>
 
@@ -1629,9 +1648,10 @@
         </div>
       </div>
     </div>
-  </main>
+  </div>
 </div>
 
+{% if manager_capabilities.can_manage_all_manager_modules %}
 <div id="modal-container" class="hidden" aria-hidden="true">
   <div class="fixed inset-0 z-[110] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Détail">
     <div class="absolute inset-0 bg-slate-950/55 backdrop-blur-sm" onclick="closeDashboardModal()"></div>
@@ -1640,6 +1660,7 @@
     </div>
   </div>
 </div>
+{% endif %}
 
 <div id="toast-container" style="position:fixed; top:1rem; right:1rem; z-index:9999; display:flex; flex-direction:column; gap:.5rem; pointer-events:none;"></div>
 {% endblock %}
@@ -1652,7 +1673,10 @@
 
   window.openDashboardModal = function openDashboardModal() {
     const modal = document.getElementById('modal-container');
-    if (!modal) return;
+    if (!modal) {
+      window.dispatchEvent(new CustomEvent('ui-overlay-open', { detail: { id: 'manager-modal' } }));
+      return;
+    }
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
@@ -1672,13 +1696,16 @@
       modal.classList.add('hidden');
       modal.setAttribute('aria-hidden', 'true');
     }
+    const certifiedContent = document.getElementById('manager-modal-content');
+    if (certifiedContent) certifiedContent.innerHTML = '';
+    window.dispatchEvent(new CustomEvent('ui-overlay-close', { detail: { id: 'manager-modal' } }));
     document.body.style.overflow = '';
   };
 
   window.managerOpenModal = function managerOpenModal(url) {
     const modal = document.getElementById('modal-container');
-    const content = document.getElementById('modal-content');
-    if (!modal || !content || !url) return;
+    const content = document.getElementById('modal-content') || document.getElementById('manager-modal-content');
+    if (!content || !url) return;
     window.openDashboardModal();
     content.innerHTML = '<div class="p-6 text-sm font-semibold text-slate-500">Chargement...</div>';
     document.body.style.overflow = 'hidden';

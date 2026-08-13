@@ -1,0 +1,45 @@
+{% load component_tags %}
+<tr id="{{ row.id }}" class="hover:bg-ui-surface-hover {% if row.selected %}bg-ui-selected{% endif %}">
+  {% if selectable %}<td class="px-4 {% if density == 'compact' %}py-2{% else %}py-3{% endif %}"><input type="checkbox" aria-label="Sélectionner {{ row.label|default:'la ligne' }}" class="rounded-ui-input border-ui-border text-ui-primary focus:ring-ui-focus"></td>{% endif %}
+  {% for cell in row.cells %}
+    <td class="max-w-sm px-4 {% if density == 'compact' %}py-2{% else %}py-3{% endif %} text-ui-text">
+      {% if cell.tone %}
+        {% component "ui_core.status_badge" label=cell.value tone=cell.tone %}{% endcomponent %}
+      {% elif cell.amount %}
+        <span class="font-semibold tabular-nums">{{ cell.value }}</span>
+      {% elif cell.href %}
+        <a href="{{ cell.href }}" {% if cell.external %}target="_blank" rel="noopener noreferrer" hx-boost="false"{% endif %} class="font-semibold text-ui-primary hover:underline">{{ cell.value|default:"—" }}</a>
+        {% if cell.secondary %}<span class="mt-0.5 block text-xs text-ui-text-muted">{{ cell.secondary }}</span>{% endif %}
+      {% else %}
+        <span class="break-words {% if cell.strong %}font-semibold{% endif %}">{{ cell.value|default:"—" }}</span>
+        {% if cell.secondary %}<span class="mt-0.5 block text-xs text-ui-text-muted">{{ cell.secondary }}</span>{% endif %}
+      {% endif %}
+    </td>
+  {% endfor %}
+  {% if row.actions %}
+    <td class="px-4 {% if density == 'compact' %}py-2{% else %}py-3{% endif %}">
+      <div class="flex items-center justify-end gap-1.5">
+        {% for action in row.actions %}
+          {% if action.href %}
+            <a href="{{ action.href }}" {% if action.external %}target="_blank" rel="noopener noreferrer" hx-boost="false"{% endif %} class="inline-flex h-9 items-center justify-center gap-1.5 rounded-ui-button px-2.5 text-xs font-semibold {% if action.tone == 'danger' %}text-ui-danger hover:bg-ui-danger-soft{% elif action.tone == 'success' %}text-ui-success hover:bg-ui-success-soft{% elif action.tone == 'warning' %}text-ui-warning hover:bg-ui-warning-soft{% else %}text-ui-primary hover:bg-ui-primary-soft{% endif %}" title="{{ action.title|default:action.label }}">
+              {% if action.icon %}{% component "icon" name=action.icon %}{% endcomponent %}{% endif %}<span class="sr-only lg:not-sr-only">{{ action.label }}</span>
+            </a>
+          {% else %}
+            <button type="button"
+                    {% if action.get_url %}hx-get="{{ action.get_url }}"{% endif %}
+                    {% if action.post_url %}hx-post="{{ action.post_url }}"{% endif %}
+                    {% if action.target %}hx-target="{{ action.target }}"{% endif %}
+                    {% if action.swap %}hx-swap="{{ action.swap }}"{% endif %}
+                    {% if action.csrf %}hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}'{% endif %}
+                    {% if action.confirm %}hx-confirm="{{ action.confirm }}" data-ui-confirm{% endif %}
+                    {% if action.open_overlay %}hx-on::after-request="if(event.detail.successful){window.dispatchEvent(new CustomEvent('ui-overlay-open',{detail:{id:'{{ action.open_overlay }}'}}))}"{% endif %}
+                    class="inline-flex h-9 items-center justify-center gap-1.5 rounded-ui-button px-2.5 text-xs font-semibold {% if action.tone == 'danger' %}text-ui-danger hover:bg-ui-danger-soft{% elif action.tone == 'success' %}text-ui-success hover:bg-ui-success-soft{% elif action.tone == 'warning' %}text-ui-warning hover:bg-ui-warning-soft{% else %}text-ui-primary hover:bg-ui-primary-soft{% endif %}"
+                    title="{{ action.title|default:action.label }}">
+              {% if action.icon %}{% component "icon" name=action.icon %}{% endcomponent %}{% endif %}<span class="sr-only lg:not-sr-only">{{ action.label }}</span>
+            </button>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </td>
+  {% endif %}
+</tr>

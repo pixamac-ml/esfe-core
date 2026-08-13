@@ -1,28 +1,38 @@
 {% load component_tags %}
-<div id="sg-students" class="space-y-4">
-  {% component "toolbar" %}
-    {% fill "left" %}
-      <form class="search" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}" hx-target="#supervisor-workspace" hx-push-url="true" hx-trigger="submit, keyup changed delay:250ms from:input[name='q']">
-        <i data-lucide="search" class="i" aria-hidden="true"></i><input type="hidden" name="section" value="students"><input type="hidden" name="class_id" value="{{ selected_class.id }}"><label class="sr-only" for="sg-student-search">Rechercher un étudiant</label><input id="sg-student-search" type="search" name="q" value="{{ student_query }}" placeholder="Rechercher dans la classe…">
-      </form>
-    {% endfill %}
-  {% endcomponent %}
+{% if selected_class %}
+  <form
+    class="flex flex-col gap-3 rounded-ui-card border border-ui-border bg-ui-surface p-4 sm:flex-row sm:items-end"
+    hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}"
+    hx-target="#supervisor-section-content"
+    hx-swap="innerHTML"
+    hx-push-url="{{ supervisor_dashboard_base_url }}?section=classes&view=students&class_id={{ selected_class.id }}"
+    hx-trigger="submit, keyup changed delay:300ms from:input[name='q']"
+  >
+    <input type="hidden" name="section" value="classes"><input type="hidden" name="view" value="students"><input type="hidden" name="fragment" value="subcontent"><input type="hidden" name="class_id" value="{{ selected_class.id }}">
+    <label class="min-w-0 flex-1 text-xs font-bold text-ui-text-muted">Rechercher dans {{ selected_class.display_name }}<input type="search" name="q" value="{{ student_query }}" placeholder="Nom ou matricule" class="mt-2 h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus"></label>
+    <button class="ui-focus-ring h-ui-control rounded-ui-button bg-ui-primary px-4 text-sm font-bold text-white">Rechercher</button>
+  </form>
 
-  <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-    {% component "widget_card" label="Effectif" value=students_total_count icon="users" tone="primary" %}{% endcomponent %}
-    {% component "widget_card" label="Présents aujourd'hui" value=students_present_today icon="user-check" tone="success" %}{% endcomponent %}
-    {% component "widget_card" label="Absents" value=students_absent_today icon="user-x" tone="danger" %}{% endcomponent %}
-    {% component "widget_card" label="Retards" value=students_late_today icon="clock-alert" tone="warning" %}{% endcomponent %}
+  <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    {% component "ui_core.stat_card" label="Effectif" value=students_total_count icon="users" tone="primary" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Présents aujourd'hui" value=students_present_today icon="user-check" tone="success" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Absents" value=students_absent_today icon="user-x" tone="danger" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Retards" value=students_late_today icon="clock-alert" tone="warning" compact=True %}{% endcomponent %}
   </div>
 
-  {% component "dashboard_card" padding="none" %}
-    {% fill "default" %}
-      <div class="card-h"><h3>{{ selected_class.display_name }}</h3><span class="hint">{{ students_list|length }} étudiant{{ students_list|length|pluralize }}</span></div>
-      <div class="card-b">
-        {% for student in students_list %}
-          <button type="button" class="row clickable w-full text-left" hx-get="{% url 'accounts_portal:supervisor_student_drawer' %}?student_id={{ student.id }}&class_id={{ selected_class.id }}" hx-target="#supervisor-drawer-content"><span class="pic">{{ student.full_name|slice:":2"|upper }}</span><span class="main"><b>{{ student.full_name }}</b><span>{{ student.matricule }}</span></span><span class="tail"><i data-lucide="chevron-right" class="i"></i></span></button>
-        {% empty %}{% component "empty_state" icon="users" title="Aucun étudiant" message="Aucun étudiant ne correspond à la recherche." %}{% endcomponent %}{% endfor %}
-      </div>
-    {% endfill %}
+  {% component "ui_core.panel" title=selected_class.display_name subtitle="Fiches étudiantes en lecture seule" padding=False %}
+    <div class="divide-y divide-ui-border">
+      {% for student in students_list %}
+        <button type="button" class="ui-focus-ring flex w-full items-center gap-4 px-5 py-4 text-left hover:bg-ui-surface-hover" hx-get="{% url 'accounts_portal:supervisor_student_drawer' %}?student_id={{ student.id }}&class_id={{ selected_class.id }}" hx-target="#supervisor-drawer-content" hx-swap="innerHTML">
+          <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ui-primary-soft text-sm font-black text-ui-primary">{{ student.full_name|slice:":2"|upper }}</span>
+          <span class="min-w-0 flex-1"><strong class="block truncate text-sm text-ui-text">{{ student.full_name }}</strong><span class="mt-1 block text-xs text-ui-text-muted">{{ student.matricule }}</span></span>
+          <i data-lucide="eye" class="h-4 w-4 text-ui-text-muted"></i>
+        </button>
+      {% empty %}
+        <div class="p-5">{% component "ui_core.empty_state" icon="users" title="Aucun étudiant" message="Aucun étudiant ne correspond à cette recherche dans la classe." %}{% endcomponent %}</div>
+      {% endfor %}
+    </div>
   {% endcomponent %}
-</div>
+{% else %}
+  {% component "ui_core.empty_state" icon="school" title="Sélectionnez une classe" message="Utilisez le sélecteur de classe dans la barre supérieure pour consulter son effectif." %}{% endcomponent %}
+{% endif %}

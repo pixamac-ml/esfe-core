@@ -1,37 +1,20 @@
 {% load component_tags %}
-<div class="space-y-4">
-  {% if toast %}
-    {% if toast.level == 'success' %}{% component "alert" tone="success" message=toast.message dismissible=True %}{% endcomponent %}
-    {% else %}{% component "alert" tone="warning" message=toast.message dismissible=True %}{% endcomponent %}{% endif %}
-  {% endif %}
-
-  <div class="grid gap-3 sm:grid-cols-3">
-    {% component "widget_card" label="Présents" value=teachers_present_count icon="user-check" tone="success" hint="sur le total du jour" %}{% endcomponent %}
-    {% component "widget_card" label="Appels à faire" value=teachers_pending_appel_count icon="clipboard-clock" tone="warning" hint="séances à contrôler" %}{% endcomponent %}
-    {% component "widget_card" label="Absents" value=teachers_absent_count icon="user-x" tone="danger" hint="enseignants signalés" %}{% endcomponent %}
-  </div>
-
-  {% component "dashboard_card" padding="none" %}
-    {% fill "default" %}
-      <div class="card-h"><h3>Enseignants — aujourd'hui</h3><span class="src-badge">Source académique</span></div>
-      <div class="card-b">
-        {% for t in teachers %}
-          <button type="button" class="row clickable w-full text-left" hx-get="{% url 'accounts_portal:supervisor_teacher_drawer' %}?teacher_id={{ t.id }}" hx-target="#supervisor-drawer-content">
-            <span class="pic">{{ t.name|slice:":2"|upper }}</span>
-            <span class="main"><b>{{ t.name }}</b><span>{{ t.subject }}</span></span>
-            <span class="tail">
-              {% if t.present and t.punctual %}{% component "status_badge" label="Présent" tone="success" %}{% endcomponent %}
-              {% elif t.present %}{% component "status_badge" label="En retard" tone="warning" %}{% endcomponent %}
-              {% else %}{% component "status_badge" label="Absent" tone="danger" %}{% endcomponent %}{% endif %}
-              {% if t.appel == "done" %}{% component "status_badge" label="Appel fait" tone="success" %}{% endcomponent %}
-              {% elif t.appel == "pending" %}{% component "status_badge" label="Appel à faire" tone="warning" %}{% endcomponent %}{% endif %}
-              <i data-lucide="chevron-right" class="i" aria-hidden="true"></i>
-            </span>
-          </button>
-        {% empty %}
-          {% component "empty_state" icon="users" title="Aucun cours aujourd'hui" message="Aucune séance programmée aujourd'hui pour suivre les enseignants." %}{% endcomponent %}
-        {% endfor %}
-      </div>
-    {% endfill %}
-  {% endcomponent %}
+<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+  {% component "ui_core.stat_card" label="Présents" value=teachers_present_count icon="user-check" tone="success" description="Séances du jour" compact=True %}{% endcomponent %}
+  {% component "ui_core.stat_card" label="Absents" value=teachers_absent_count icon="user-x" tone="danger" description="Séances du jour" compact=True %}{% endcomponent %}
+  {% component "ui_core.stat_card" label="En retard" value=teachers_late_count icon="clock-alert" tone="warning" description="Séances du jour" compact=True %}{% endcomponent %}
+  {% component "ui_core.stat_card" label="À renseigner" value=teachers_pending_count icon="clipboard-clock" tone="info" description="Séances du jour" compact=True %}{% endcomponent %}
 </div>
+
+{% component "ui_core.panel" title="Séances des enseignants" subtitle="Un constat distinct pour chaque cours publié aujourd'hui" padding=False %}
+  <div class="divide-y divide-ui-border">
+    {% for row in teacher_sessions %}
+      <button type="button" class="ui-focus-ring flex w-full items-center gap-4 px-5 py-4 text-left hover:bg-ui-surface-hover" hx-get="{% url 'accounts_portal:supervisor_teacher_drawer' %}?teacher_id={{ row.teacher_id }}&schedule_event_id={{ row.event_id }}" hx-target="#supervisor-drawer-content" hx-swap="innerHTML">
+        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-ui-primary-soft text-sm font-black text-ui-primary">{{ row.name|slice:":2"|upper }}</span>
+        <span class="min-w-0 flex-1"><strong class="block truncate text-sm text-ui-text">{{ row.name }}</strong><span class="mt-1 block truncate text-xs text-ui-text-muted">{{ row.time_range }} · {{ row.subject }} · {{ row.class_name }} · {{ row.room }}</span></span>
+        <span class="hidden flex-wrap justify-end gap-2 sm:flex">{% if row.status == "present" %}{% component "ui_core.status_badge" label="Présent" tone="success" %}{% endcomponent %}{% elif row.status == "late" %}{% component "ui_core.status_badge" label="En retard" tone="warning" %}{% endcomponent %}{% elif row.status == "absent" %}{% component "ui_core.status_badge" label="Absent" tone="danger" %}{% endcomponent %}{% else %}{% component "ui_core.status_badge" label="À renseigner" tone="neutral" %}{% endcomponent %}{% endif %}{% if row.course_delivered == True %}{% component "ui_core.status_badge" label="Cours assuré" tone="info" %}{% endcomponent %}{% elif row.course_delivered == False %}{% component "ui_core.status_badge" label="Cours non assuré" tone="danger" %}{% endcomponent %}{% endif %}</span>
+        <i data-lucide="chevron-right" class="h-4 w-4 text-ui-text-muted"></i>
+      </button>
+    {% empty %}<div class="p-5">{% component "ui_core.empty_state" icon="calendar-x" title="Aucune séance aujourd'hui" message="Aucun cours publié n'est prévu aujourd'hui dans votre annexe." %}{% endcomponent %}</div>{% endfor %}
+  </div>
+{% endcomponent %}

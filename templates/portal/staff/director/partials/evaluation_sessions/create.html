@@ -1,0 +1,57 @@
+{% load component_tags %}
+<div class="space-y-4">
+  {% if toast %}
+    {% component "ui_core.alert" title="Planification" message=toast.message tone=toast.level %}{% endcomponent %}
+  {% endif %}
+  {% if evaluation_form.non_field_errors %}
+    {% component "ui_core.alert" title="Le formulaire contient une erreur" message=evaluation_form.non_field_errors.0 tone="danger" %}{% endcomponent %}
+  {% endif %}
+
+  {% component "ui_core.panel" title="Planifier une évaluation" subtitle="Associez une classe, une matière et l'enseignant réellement responsable." padding=True %}
+    {% if not evaluation_form.has_teachers %}
+      <div class="mb-5">
+        {% component "ui_core.alert" title="Aucun enseignant disponible" message="Aucun enseignant actif n'est rattaché à cette annexe. Affectez d'abord un enseignant avant de planifier une évaluation." tone="warning" %}{% endcomponent %}
+      </div>
+    {% endif %}
+
+    <form method="post"
+          hx-post="{% url 'accounts_portal:director_evaluation_action' %}"
+          hx-target="#director-session-subcontent"
+          hx-swap="innerHTML"
+          hx-disabled-elt="button[type=submit]"
+          hx-indicator="#director-evaluation-form-loading"
+          hx-sync="#director-session-subcontent:replace"
+          class="space-y-5"
+          novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="action" value="create">
+
+      <div class="grid min-w-0 gap-4 md:grid-cols-2">
+        {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=evaluation_form.title %}
+        {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=evaluation_form.event_type %}
+        {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=evaluation_form.class_id %}
+        <div id="director-evaluation-ec-field" class="min-w-0">
+          {% include "portal/staff/director/partials/evaluation_sessions/_ec_field.html" %}
+        </div>
+        {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=evaluation_form.teacher %}
+        {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=evaluation_form.location %}
+        {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=evaluation_form.start_datetime %}
+        {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=evaluation_form.end_datetime %}
+        {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=evaluation_form.description span_two=True %}
+      </div>
+
+      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-ui-border pt-4">
+        <div id="director-evaluation-form-loading" class="htmx-indicator inline-flex items-center gap-2 text-xs font-semibold text-ui-text-muted" role="status">
+          <span class="h-4 w-4 animate-spin rounded-full border-2 border-ui-border border-t-ui-primary" aria-hidden="true"></span>
+          Vérification en cours
+        </div>
+        <button type="submit"
+                {% if not evaluation_form.has_teachers %}disabled{% endif %}
+                class="ui-focus-ring inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong disabled:cursor-not-allowed disabled:opacity-50">
+          <i data-lucide="calendar-plus" class="h-4 w-4" aria-hidden="true"></i>
+          Planifier l'évaluation
+        </button>
+      </div>
+    </form>
+  {% endcomponent %}
+</div>

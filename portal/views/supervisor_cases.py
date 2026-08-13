@@ -1,295 +1,279 @@
-"""Vues HTMX : gestion des cas de surveillance (superviseur général) — étudiants + enseignants."""
+"""Signalements factuels du Surveillant général, strictement limités à son annexe."""
 from __future__ import annotations
 
-from django.contrib.auth import get_user_model
+from datetime import datetime
+from functools import wraps
+
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponseBadRequest, HttpResponseForbidden
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from accounts.access import get_user_position
-from accounts.dashboards.helpers import get_user_branch
-from portal.services.supervisor_dashboard_service import get_supervisor_class_picker_bundle
-from students.models import Student, StudentCase, StudentCaseNote, TeacherCase, TeacherCaseNote
-from students.services.case_service import (
-    advance_student_case,
-    advance_teacher_case,
-    escalate_case_to_director,
-    list_open_cases,
-)
+from academics.models import AcademicClass, AcademicScheduleEvent
+from academics.permissions import require_director_branch_scope
+from students.models import Student, StudentCase, TeacherCase
+from students.services.case_service import escalate_case_to_director
 
 
-def _deny(request):
+TRANSMITTED_NOTE = "Cas transmis à la Direction des études."
+STUDENT_SIGNAL_TYPES = {
+    StudentCase.TYPE_ABSENCE_REPETEE,
+    StudentCase.TYPE_RETARD_FREQUENT,
+    StudentCase.TYPE_ABSENCE_LONGUE,
+    StudentCase.TYPE_SIGNALEMENT_COMPORTEMENTAL,
+}
+TEACHER_SIGNAL_TYPES = {
+    TeacherCase.TYPE_RETARD_REPETE,
+    TeacherCase.TYPE_ABSENCE_NON_JUSTIFIEE,
+    TeacherCase.TYPE_APPEL_NON_FAIT,
+    TeacherCase.TYPE_INCIDENT,
+    TeacherCase.TYPE_AUTRE,
+}
+
+
+def _deny(_request=None):
     return HttpResponseForbidden("Accès refusé.")
 
 
+def _removed_decision_capability():
+    return HttpResponseForbidden(
+        "Le Surveillant général transmet les faits au Directeur des études, "
+        "mais ne fait pas progresser les dossiers disciplinaires."
+    )
+
+
 def _require_supervisor(func):
-    """Décorateur : réserve la vue au surveillant général."""
+    @wraps(func)
+    @login_required
     def wrapper(request, *args, **kwargs):
         if get_user_position(request.user) != "academic_supervisor":
             return _deny(request)
         return func(request, *args, **kwargs)
-    wrapper.__name__ = func.__name__
-    return login_required(wrapper)
+
+    return wrapper
+
+
+def _resolve_supervisor_branch(request):
+    return require_director_branch_scope(
+        request.user,
+        additional_scoped_positions={"academic_supervisor"},
+    )
 
 
 def _case_model(kind):
-    if kind == "student":
-        return StudentCase
-    if kind == "teacher":
-        return TeacherCase
-    return None
+    return {"student": StudentCase, "teacher": TeacherCase}.get(kind)
 
 
-def _case_note_model(kind):
-    if kind == "student":
-        return StudentCaseNote
-    if kind == "teacher":
-        return TeacherCaseNote
-    return None
+def _parse_occurred_on(raw_value, event):
+    event_date = timezone.localtime(event.start_datetime).date()
+    if not raw_value:
+        return event_date
+    try:
+        occurred_on = datetime.strptime(raw_value, "%Y-%m-%d").date()
+    except ValueError as exc:
+        raise ValueError("Date du fait invalide.") from exc
+    if occurred_on != event_date:
+        raise ValueError("La date du fait doit correspondre à la séance sélectionnée.")
+    return occurred_on
 
 
-_FLOW_LABELS = {
-    StudentCase.STATUS_NOUVEAU: "Nouveau",
-    StudentCase.STATUS_EN_COURS: "En instruction",
-    StudentCase.STATUS_CONVOQUE: "Convoqué",
-    StudentCase.STATUS_RESOLU: "Résolu",
-}
+def _render_signals_workspace(request, *, toast=None):
+    """Return the canonical transmitted-signals subwindow after a mutation."""
+    from portal.views.supervisor import _render_supervisor_workflow_workspace
 
+    mutable_get = request.GET.copy()
+    mutable_get["section"] = "signals"
+    mutable_get["view"] = "transmitted"
+    mutable_get["fragment"] = "subcontent"
+    request.GET = mutable_get
+    return _render_supervisor_workflow_workspace(
+        request,
+        section="signals",
+        toast=toast,
+        force_subcontent=True,
+    )
 
-def _flow_steps(case):
-    flow = StudentCase.SIMPLE_FLOW_STATUSES
-    idx = flow.index(case.status) if case.status in flow else -1
-    steps = []
-    for i, key in enumerate(flow):
-        if idx == -1:
-            state = ""
-        elif i < idx:
-            state = "done"
-        elif i == idx:
-            state = "current"
-        else:
-            state = ""
-        steps.append({"key": key, "label": _FLOW_LABELS[key], "state": state})
-    return steps
-
-
-# ─── Workspace liste des cas (fusion étudiants + enseignants) ─────────────────
 
 @_require_supervisor
 def supervisor_cases_workspace(request):
-    """Liste fusionnée des cas étudiants + enseignants de l'annexe."""
-    branch = get_user_branch(request.user)
-    if not branch:
-        return HttpResponseBadRequest("Aucune annexe rattachée.")
-
-    status_filter = request.GET.get("status", "open")
-
-    if status_filter == "all":
-        student_cases = list(
-            StudentCase.objects.select_related("student__inscription__candidature", "opened_by").filter(branch=branch)
-        )
-        teacher_cases = list(TeacherCase.objects.select_related("teacher", "opened_by").filter(branch=branch))
-        priority_order = {
-            StudentCase.PRIORITY_CRITIQUE: 0,
-            StudentCase.PRIORITY_URGENTE: 1,
-            StudentCase.PRIORITY_NORMALE: 2,
-            StudentCase.PRIORITY_FAIBLE: 3,
-        }
-        combined = [("student", c) for c in student_cases] + [("teacher", c) for c in teacher_cases]
-        combined.sort(key=lambda pair: (priority_order.get(pair[1].priority, 9), -pair[1].pk))
-        combined = combined[:100]
-    else:
-        combined = list_open_cases(branch=branch, limit=100)
-
-    open_count = (
-        StudentCase.objects.filter(branch=branch).exclude(status=StudentCase.STATUS_RESOLU).count()
-        + TeacherCase.objects.filter(branch=branch).exclude(status=TeacherCase.STATUS_RESOLU).count()
-    )
-
-    students_qs = (
-        Student.objects.select_related("user", "inscription__candidature")
-        .filter(inscription__candidature__branch=branch, is_active=True)
-        .order_by("inscription__candidature__last_name", "inscription__candidature__first_name")[:200]
-    )
-
-    _, class_picker_items, _ = get_supervisor_class_picker_bundle(branch=branch)
-    context = {
-        "cases": combined,
-        "open_count": open_count,
-        "open_cases_count": open_count,
-        "status_filter": status_filter,
-        "case_type_choices": StudentCase.TYPE_CHOICES,
-        "students": students_qs,
-        "branch": branch,
-        "section": "cases",
-        "crumb": "Pilotage · Discipline",
-        "panel_title": "Cas à traiter",
-        "panel_lede": "Dossiers disciplinaires — étudiants et enseignants.",
-        "class_picker_items": class_picker_items,
-        "selected_class_id": None,
-    }
+    """Compatibility entrypoint for old links; the official screen is Signals."""
+    canonical = f"{reverse('accounts_portal:portal_dashboard')}?section=signals&view=transmitted"
     if not request.htmx:
-        from portal.views.supervisor import _render_supervisor_dashboard
+        return redirect(canonical)
+    return _render_signals_workspace(request)
 
-        return _render_supervisor_dashboard(request, section="cases")
-    return render(request, "portal/staff/supervisor/partials/cases_workspace.html", context)
-
-
-# ─── Détail d'un cas (étudiant ou enseignant) ─────────────────────────────────
 
 @_require_supervisor
 def supervisor_case_detail(request, kind: str, case_id: int):
-    """Drawer de détail d'un cas (kind = 'student' ou 'teacher')."""
-    branch = get_user_branch(request.user)
+    """Read-only drawer: the supervisor can review facts already transmitted."""
+    branch = _resolve_supervisor_branch(request)
     model = _case_model(kind)
-    if model is None:
-        return HttpResponseBadRequest("Type de cas invalide.")
+    if branch is None or model is None:
+        return HttpResponseBadRequest("Signalement invalide.")
     related = (
-        ["student__inscription__candidature", "opened_by"]
+        ["student__inscription__candidature", "opened_by", "academic_class", "schedule_event__ec"]
         if kind == "student"
-        else ["teacher", "opened_by"]
+        else ["teacher", "opened_by", "academic_class", "schedule_event__ec"]
     )
-    case = get_object_or_404(
+    signalment = get_object_or_404(
         model.objects.select_related(*related).prefetch_related("notes__author"),
         pk=case_id,
         branch=branch,
     )
-    is_escalated = (
-        case.status == StudentCase.STATUS_ESCALADE
+    transmitted = (
+        signalment.status == StudentCase.STATUS_ESCALADE
         if kind == "student"
-        else case.notes.filter(content="Cas transmis à la Direction des études.").exists()
+        else signalment.notes.filter(content=TRANSMITTED_NOTE).exists()
     )
-    context = {
-        "case": case,
-        "kind": kind,
-        "flow_steps": _flow_steps(case),
-        "can_advance": case.status in StudentCase.SIMPLE_FLOW_STATUSES and case.status != StudentCase.STATUS_RESOLU,
-        "is_escalated": is_escalated,
-    }
-    response = render(request, "portal/staff/supervisor/partials/case_detail.html", context)
+    response = render(
+        request,
+        "portal/staff/supervisor/partials/case_detail.html",
+        {"case": signalment, "kind": kind, "is_escalated": transmitted},
+    )
     response["HX-Trigger"] = "supervisor-drawer-open"
     return response
 
 
-# ─── Créer un cas étudiant ─────────────────────────────────────────────────────
-
 @_require_supervisor
 @require_POST
 def supervisor_case_create(request):
-    """Créer un nouveau cas étudiant."""
-    branch = get_user_branch(request.user)
-    if not branch:
+    """Record factual context and immediately transmit it to the branch DE."""
+    branch = _resolve_supervisor_branch(request)
+    if branch is None:
         return HttpResponseBadRequest("Aucune annexe rattachée.")
 
-    student_id = request.POST.get("student_id", "").strip()
-    case_type = request.POST.get("case_type", "").strip()
-    priority = request.POST.get("priority", StudentCase.PRIORITY_NORMALE).strip()
-    title = request.POST.get("title", "").strip()
-    description = request.POST.get("description", "").strip()
+    kind = (request.POST.get("kind") or "student").strip().lower()
+    case_type = (request.POST.get("case_type") or "").strip()
+    priority = (request.POST.get("priority") or StudentCase.PRIORITY_NORMALE).strip()
+    title = (request.POST.get("title") or "").strip()
+    description = (request.POST.get("description") or "").strip()
+    if kind not in {"student", "teacher"} or not title or not description:
+        return HttpResponseBadRequest("La personne, le titre et les faits constatés sont obligatoires.")
+    if priority not in {value for value, _label in StudentCase.PRIORITY_CHOICES}:
+        return HttpResponseBadRequest("Priorité invalide.")
 
-    if not student_id or not case_type or not title:
-        return HttpResponseBadRequest("Champs requis manquants.")
-
-    student = get_object_or_404(
-        Student,
-        pk=student_id,
-        inscription__candidature__branch=branch,
+    event = get_object_or_404(
+        AcademicScheduleEvent.objects.select_related("academic_class", "teacher", "ec"),
+        pk=request.POST.get("schedule_event_id"),
+        branch=branch,
+        event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
         is_active=True,
     )
-
-    valid_types = {k for k, _ in StudentCase.TYPE_CHOICES}
-    valid_priorities = {k for k, _ in StudentCase.PRIORITY_CHOICES}
-    if case_type not in valid_types or priority not in valid_priorities:
-        return HttpResponseBadRequest("Valeurs invalides.")
-
-    StudentCase.objects.create(
-        student=student,
+    if event.status in {
+        AcademicScheduleEvent.STATUS_DRAFT,
+        AcademicScheduleEvent.STATUS_CANCELLED,
+    }:
+        return HttpResponseBadRequest("Le signalement doit concerner une séance publiée.")
+    academic_class = get_object_or_404(
+        AcademicClass,
+        pk=request.POST.get("class_id") or event.academic_class_id,
         branch=branch,
-        case_type=case_type,
-        priority=priority,
-        title=title,
-        description=description,
-        opened_by=request.user,
+        is_active=True,
+    )
+    if academic_class.pk != event.academic_class_id:
+        return HttpResponseBadRequest("La classe ne correspond pas à la séance.")
+    try:
+        occurred_on = _parse_occurred_on(request.POST.get("occurred_on"), event)
+    except ValueError as exc:
+        return HttpResponseBadRequest(str(exc))
+
+    if kind == "student":
+        if case_type not in STUDENT_SIGNAL_TYPES:
+            return HttpResponseBadRequest("Type de fait étudiant invalide.")
+        student = get_object_or_404(
+            Student.objects.select_related("user", "inscription__candidature"),
+            pk=request.POST.get("student_id"),
+            inscription__candidature__branch=branch,
+            is_active=True,
+            user__academic_enrollments__academic_class=academic_class,
+            user__academic_enrollments__branch=branch,
+            user__academic_enrollments__is_active=True,
+        )
+        signalment = StudentCase.objects.create(
+            student=student,
+            branch=branch,
+            academic_class=academic_class,
+            schedule_event=event,
+            occurred_on=occurred_on,
+            case_type=case_type,
+            priority=priority,
+            title=title,
+            description=description,
+            opened_by=request.user,
+        )
+    else:
+        if case_type not in TEACHER_SIGNAL_TYPES:
+            return HttpResponseBadRequest("Type de fait enseignant invalide.")
+        if not event.teacher_id or str(event.teacher_id) != (request.POST.get("teacher_id") or "").strip():
+            return HttpResponseBadRequest("L'enseignant doit être celui de la séance sélectionnée.")
+        signalment = TeacherCase.objects.create(
+            teacher=event.teacher,
+            branch=branch,
+            academic_class=academic_class,
+            schedule_event=event,
+            occurred_on=occurred_on,
+            case_type=case_type,
+            priority=priority,
+            title=title,
+            description=description,
+            opened_by=request.user,
+        )
+
+    escalate_case_to_director(case=signalment, user=request.user)
+    return _render_signals_workspace(
+        request,
+        toast={
+            "level": "success",
+            "message": "Le signalement factuel a été enregistré et transmis au Directeur des études.",
+        },
     )
 
-    return supervisor_cases_workspace(request)
-
-
-# ─── Faire avancer un cas dans le flux à 4 étapes ──────────────────────────────
 
 @_require_supervisor
 @require_POST
 def supervisor_case_advance(request, kind: str, case_id: int):
-    """Avance un cas (étudiant ou enseignant) à l'étape suivante du flux simplifié."""
-    branch = get_user_branch(request.user)
-    model = _case_model(kind)
-    if model is None:
-        return HttpResponseBadRequest("Type de cas invalide.")
-    case = get_object_or_404(model, pk=case_id, branch=branch)
-
-    if kind == "student":
-        advance_student_case(case=case, user=request.user)
-    else:
-        advance_teacher_case(case=case, user=request.user)
-
-    return supervisor_case_detail(request, kind=kind, case_id=case_id)
+    return _removed_decision_capability()
 
 
 @_require_supervisor
 @require_POST
 def supervisor_case_escalate(request, kind: str, case_id: int):
-    """Transmet un cas de la même annexe à la Direction des études."""
-    branch = get_user_branch(request.user)
-    if not branch:
-        return HttpResponseBadRequest("Aucune annexe rattachée.")
+    """Compatibility action: transmission is allowed, decisions are not."""
+    branch = _resolve_supervisor_branch(request)
     model = _case_model(kind)
-    if model is None:
-        return HttpResponseBadRequest("Type de cas invalide.")
-    case = get_object_or_404(model, pk=case_id, branch=branch)
-    escalate_case_to_director(case=case, user=request.user)
+    if branch is None or model is None:
+        return HttpResponseBadRequest("Signalement invalide.")
+    signalment = get_object_or_404(model, pk=case_id, branch=branch)
+    already_transmitted = (
+        signalment.status == StudentCase.STATUS_ESCALADE
+        if kind == "student"
+        else signalment.notes.filter(content=TRANSMITTED_NOTE).exists()
+    )
+    if not already_transmitted:
+        escalate_case_to_director(case=signalment, user=request.user)
     return supervisor_case_detail(request, kind=kind, case_id=case_id)
 
-
-# ─── Ajouter une note ──────────────────────────────────────────────────────────
 
 @_require_supervisor
 @require_POST
 def supervisor_case_add_note(request, kind: str, case_id: int):
-    """Ajouter une note interne à un cas (étudiant ou enseignant)."""
-    branch = get_user_branch(request.user)
-    model = _case_model(kind)
-    note_model = _case_note_model(kind)
-    if model is None or note_model is None:
-        return HttpResponseBadRequest("Type de cas invalide.")
-    case = get_object_or_404(model, pk=case_id, branch=branch)
+    return _removed_decision_capability()
 
-    content = request.POST.get("content", "").strip()
-    if not content:
-        return HttpResponseBadRequest("Note vide.")
-
-    note_model.objects.create(case=case, author=request.user, content=content)
-
-    return supervisor_case_detail(request, kind=kind, case_id=case_id)
-
-
-# ─── Cas d'un étudiant (pour le drawer étudiant) ──────────────────────────────
 
 @_require_supervisor
 def supervisor_student_cases(request, student_id: int):
-    """Cas liés à un étudiant, chargés dans le drawer."""
-    branch = get_user_branch(request.user)
+    branch = _resolve_supervisor_branch(request)
     student = get_object_or_404(
         Student.objects.select_related("inscription__candidature"),
         pk=student_id,
         inscription__candidature__branch=branch,
     )
-    cases = StudentCase.objects.filter(student=student, branch=branch).order_by("-created_at")[:20]
-    context = {
-        "student": student,
-        "cases": cases,
-        "case_type_choices": StudentCase.TYPE_CHOICES,
-        "priority_choices": StudentCase.PRIORITY_CHOICES,
-        "status_choices": StudentCase.STATUS_CHOICES,
-    }
-    return render(request, "portal/staff/supervisor/partials/student_cases_panel.html", context)
+    signalments = StudentCase.objects.filter(student=student, branch=branch).order_by("-created_at")[:20]
+    return render(
+        request,
+        "portal/staff/supervisor/partials/student_cases_panel.html",
+        {"student": student, "cases": signalments, "read_only": True},
+    )

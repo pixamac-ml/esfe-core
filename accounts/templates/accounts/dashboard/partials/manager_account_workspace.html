@@ -1,0 +1,26 @@
+{% load component_tags %}
+<section data-dashboard-section="settings" class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+  {% component "ui_core.panel" title="Identité professionnelle" subtitle="Informations institutionnelles utilisées par le contrôle d'accès." %}
+    {% fill "default" %}
+      <dl class="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+        <div><dt class="text-ui-text-muted">Nom complet</dt><dd class="mt-1 font-semibold text-ui-text">{{ user.get_full_name|default:user.username }}</dd></div>
+        <div><dt class="text-ui-text-muted">Position officielle</dt><dd class="mt-1 font-semibold text-ui-text">{% if manager_workspace_access.position == "finance_manager" %}Responsable finance{% elif manager_workspace_access.position == "payment_agent" %}Agent de paiement{% elif manager_workspace_access.position == "admissions" %}Responsable des admissions{% else %}Gestionnaire d'annexe{% endif %}</dd></div>
+        <div><dt class="text-ui-text-muted">Annexe</dt><dd class="mt-1 font-semibold text-ui-text">{{ branch.name }}</dd></div>
+        <div><dt class="text-ui-text-muted">Code employé</dt><dd class="mt-1 font-semibold text-ui-text">{{ user.profile.employee_code|default:"Non renseigné" }}</dd></div>
+        <div><dt class="text-ui-text-muted">Téléphone</dt><dd class="mt-1 font-semibold text-ui-text">{{ user.profile.phone|default:"Non renseigné" }}</dd></div>
+        <div><dt class="text-ui-text-muted">Email</dt><dd class="mt-1 break-all font-semibold text-ui-text">{{ user.email|default:"Non renseigné" }}</dd></div>
+      </dl>
+    {% endfill %}
+  {% endcomponent %}
+
+  {% component "ui_core.panel" title="Sécurité et périmètre" subtitle="Les droits sont déterminés côté serveur par le rôle et l'annexe." %}
+    {% fill "default" %}
+      <dl class="space-y-4 text-sm">
+        <div class="flex items-center justify-between gap-4"><dt class="text-ui-text-muted">État du compte</dt><dd>{% component "ui_core.status_badge" label="Actif" tone="success" %}{% endcomponent %}</dd></div>
+        <div class="flex items-center justify-between gap-4"><dt class="text-ui-text-muted">Portée des données</dt><dd class="font-semibold text-ui-text">{{ branch.name }} uniquement</dd></div>
+        <div class="flex items-center justify-between gap-4"><dt class="text-ui-text-muted">Espace certifié</dt><dd class="font-semibold text-ui-text">{% if manager_workspace_access.position == "annex_manager" %}Gestion de l'annexe{% elif manager_workspace_access.position == "admissions" %}Admissions et inscriptions{% else %}Finance et encaissements{% endif %}</dd></div>
+      </dl>
+      <a href="{% url 'accounts:password_change' %}" hx-boost="false" class="mt-5 inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong"><i data-lucide="key-round" class="h-4 w-4"></i>Modifier mon mot de passe</a>
+    {% endfill %}
+  {% endcomponent %}
+</section>

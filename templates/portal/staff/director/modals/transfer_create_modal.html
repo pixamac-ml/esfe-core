@@ -1,62 +1,49 @@
-<div class="grid gap-5">
-  <div class="flex items-start justify-between gap-4">
-    <div>
-      <p class="portal-section-kicker">Transfert</p>
-      <h3 class="mt-1 text-2xl font-black text-slate-900">Nouvelle demande</h3>
-      <p class="mt-1 text-sm font-semibold text-slate-500">Creer un transfert de classe ou d'ecole sans quitter le dashboard.</p>
-    </div>
-    <button type="button" class="director-btn director-btn-secondary" onclick="window.deCloseModal && window.deCloseModal()">Fermer</button>
-  </div>
-
-  <form class="grid gap-5" method="post" enctype="multipart/form-data" hx-encoding="multipart/form-data" hx-post="{% url 'accounts_portal:director_transfer_create' %}" hx-target="#director-workspace" hx-swap="innerHTML">
+{% load component_tags %}
+<div class="space-y-5" x-data="{ transferType: '{{ transfer_form.transfer_type.value|default:'internal' }}' }">
+  <div><p class="text-xs font-semibold uppercase text-ui-text-muted">Mobilité étudiante</p><h2 class="mt-1 text-xl font-bold text-ui-text">Nouveau dossier de transfert</h2></div>
+  {% if transfer_form.non_field_errors %}{% component "ui_core.alert" title="Formulaire incomplet" message=transfer_form.non_field_errors|join:" " tone="danger" %}{% endcomponent %}{% endif %}
+  <form method="post" enctype="multipart/form-data" hx-encoding="multipart/form-data" hx-post="{% url 'accounts_portal:director_transfer_create' %}" hx-target="#director-transfer-subcontent" hx-swap="innerHTML" class="space-y-5">
     {% csrf_token %}
-    <div class="director-grid-3">
-      <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-        Etudiant
-        <select name="enrollment_id" class="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none">
-          {% for enrollment in transfer_enrollments %}
-            <option value="{{ enrollment.id }}">{{ enrollment.student.student_profile.full_name|default:enrollment.student.get_full_name|default:enrollment.student.username }} - {{ enrollment.academic_class.display_name }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-        Type
-        <select name="transfer_type" class="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none">
-          {% for value, label in transfer_type_choices %}
-            <option value="{{ value }}">{{ label }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-        Classe destination
-        <select name="target_class_id" class="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none">
-          <option value="">Selectionner</option>
-          {% for academic_class in transfer_target_classes %}
-            <option value="{{ academic_class.id }}">{{ academic_class.display_name }}</option>
-          {% endfor %}
-        </select>
-      </label>
-    </div>
+    <fieldset><legend class="mb-2 text-xs font-semibold text-ui-text">Parcours</legend><div class="grid gap-2 sm:grid-cols-3">
+      {% for radio in transfer_form.transfer_type %}<label class="ui-focus-ring flex cursor-pointer items-start gap-3 rounded-ui-card border border-ui-border p-3 hover:bg-ui-surface-hover" :class="transferType === '{{ radio.data.value }}' ? 'border-ui-primary bg-ui-primary-soft' : ''"><input type="radio" name="{{ transfer_form.transfer_type.html_name }}" value="{{ radio.data.value }}" x-model="transferType" class="mt-1"><span class="text-sm font-semibold text-ui-text">{{ radio.choice_label }}</span></label>{% endfor %}
+    </div>{% if transfer_form.transfer_type.errors %}<p class="mt-1 text-xs text-ui-danger">{{ transfer_form.transfer_type.errors|join:" " }}</p>{% endif %}</fieldset>
 
-    <div class="director-grid-2">
-      <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-        Ecole destination
-        <input type="text" name="target_school_name" class="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none" placeholder="Requis pour un transfert d'ecole">
-      </label>
-      <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-        Piece jointe
-        <input type="file" name="attachment" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none">
-      </label>
-    </div>
+    <div x-show="transferType !== 'incoming'" x-cloak>{% include "portal/staff/director/partials/_form_field.html" with field=transfer_form.enrollment_id %}</div>
+    <div x-show="transferType === 'internal' || transferType === 'incoming'" x-cloak>{% include "portal/staff/director/partials/_form_field.html" with field=transfer_form.target_class_id %}</div>
+    <div x-show="transferType === 'outgoing' || transferType === 'incoming'" x-cloak>{% include "portal/staff/director/partials/_form_field.html" with field=transfer_form.school_city %}</div>
 
-    <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-      Motif
-      <textarea name="reason" rows="4" class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none" placeholder="Motif, contexte, decision pedagogique"></textarea>
-    </label>
+    <section x-show="transferType === 'internal'" x-cloak class="grid gap-4 border-y border-ui-border py-4 sm:grid-cols-2">
+      <div class="sm:col-span-2">{% include "portal/staff/director/partials/_form_field.html" with field=transfer_form.academic_decision_reference %}</div>
+    </section>
 
-    <div class="flex flex-wrap items-center gap-3">
-      <button type="submit" class="director-btn director-btn-primary">Creer la demande</button>
-      <span class="text-xs font-semibold text-slate-500">Pour un transfert de classe, renseignez la classe cible. Pour un transfert d'ecole, renseignez l'ecole cible.</span>
-    </div>
+    <section x-show="transferType === 'outgoing'" x-cloak class="grid gap-4 border-y border-ui-border py-4 sm:grid-cols-2">
+      <div>{% include "portal/staff/director/partials/_form_field.html" with field=transfer_form.target_school_name %}</div>
+      <div>{% include "portal/staff/director/partials/_form_field.html" with field=transfer_form.destination_programme %}</div>
+      <div>{% include "portal/staff/director/partials/_form_field.html" with field=transfer_form.destination_level %}</div>
+      <div class="sm:col-span-2 grid gap-2 sm:grid-cols-3">
+        <label class="flex items-center gap-2 text-xs font-semibold text-ui-text">{{ transfer_form.academic_check_completed }} Académique</label>
+        <label class="flex items-center gap-2 text-xs font-semibold text-ui-text">{{ transfer_form.administrative_check_completed }} Administratif</label>
+        <label class="flex items-center gap-2 text-xs font-semibold text-ui-text">{{ transfer_form.financial_check_completed }} Financier</label>
+      </div>
+    </section>
+
+    <section x-show="transferType === 'incoming'" x-cloak class="grid gap-4 border-y border-ui-border py-4 sm:grid-cols-2">
+      <div>{% include "portal/staff/director/partials/_form_field.html" with field=transfer_form.origin_school_name %}</div>
+      <div>{% include "portal/staff/director/partials/_form_field.html" with field=transfer_form.first_name %}</div>
+      <div>{% include "portal/staff/director/partials/_form_field.html" with field=transfer_form.last_name %}</div>
+      <div>{% include "portal/staff/director/partials/_form_field.html" with field=transfer_form.birth_date %}</div>
+      <div>{% include "portal/staff/director/partials/_form_field.html" with field=transfer_form.birth_place %}</div>
+      <div>{% include "portal/staff/director/partials/_form_field.html" with field=transfer_form.gender %}</div>
+      <div>{% include "portal/staff/director/partials/_form_field.html" with field=transfer_form.phone %}</div>
+      <div class="sm:col-span-2">{% include "portal/staff/director/partials/_form_field.html" with field=transfer_form.email %}</div>
+      <div>{% include "portal/staff/director/partials/_form_field.html" with field=transfer_form.address %}</div>
+      <div>{% include "portal/staff/director/partials/_form_field.html" with field=transfer_form.city %}</div>
+      <div>{% include "portal/staff/director/partials/_form_field.html" with field=transfer_form.country %}</div>
+      <div class="sm:col-span-2">{% include "portal/staff/director/partials/_form_field.html" with field=transfer_form.equivalence_notes %}</div>
+    </section>
+
+    <div>{% include "portal/staff/director/partials/_form_field.html" with field=transfer_form.reason %}</div>
+    <div>{% include "portal/staff/director/partials/_form_field.html" with field=transfer_form.attachment %}</div>
+    <div class="flex justify-end gap-2 border-t border-ui-border pt-4"><button type="button" onclick="window.deCloseModal && window.deCloseModal()" class="ui-focus-ring h-ui-control rounded-ui-button border border-ui-border px-4 text-sm font-semibold text-ui-text">Annuler</button><button type="submit" class="ui-focus-ring inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary"><i data-lucide="save" class="h-4 w-4"></i>Enregistrer</button></div>
   </form>
 </div>

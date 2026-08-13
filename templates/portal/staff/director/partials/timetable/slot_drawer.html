@@ -1,0 +1,52 @@
+{% load component_tags %}
+<div class="space-y-5">
+  <header>
+    <p class="text-xs font-semibold text-ui-primary">Emploi du temps · {{ timetable_selected_class.display_name }}</p>
+    <h2 class="mt-1 text-lg font-bold text-ui-text">{% if timetable_editing_slot %}Modifier le cours{% else %}Ajouter un cours{% endif %}</h2>
+    <p class="mt-1 text-sm text-ui-text-muted">Renseignez le jour, les horaires et les informations visibles sur la grille imprimée.</p>
+  </header>
+
+  {% if timetable_slot_form.non_field_errors %}
+    {% component "ui_core.alert" title="Ce créneau ne peut pas être enregistré" message=timetable_slot_form.non_field_errors.0 tone="danger" %}{% endcomponent %}
+  {% endif %}
+  {% if not timetable_slot_form.has_subjects %}
+    {% component "ui_core.alert" title="Aucune matière disponible" message="La maquette de cette classe doit contenir au moins une matière active." tone="warning" %}{% endcomponent %}
+  {% endif %}
+  {% if not timetable_slot_form.has_teachers %}
+    {% component "ui_core.alert" title="Aucun enseignant disponible" message="Aucun enseignant actif n'est rattaché à votre annexe." tone="warning" %}{% endcomponent %}
+  {% endif %}
+
+  <form method="post"
+        hx-post="{% url 'accounts_portal:director_timetable_action' %}"
+        hx-target="#director-drawer-content"
+        hx-swap="innerHTML"
+        hx-disabled-elt="button[type=submit]"
+        hx-indicator="#director-timetable-slot-loading"
+        class="space-y-5"
+        novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="action" value="save">
+    <input type="hidden" name="class_id" value="{{ timetable_selected_class.id }}">
+    <input type="hidden" name="week_start" value="{{ timetable_week_start|date:'Y-m-d' }}">
+    {% if timetable_editing_slot %}<input type="hidden" name="slot_id" value="{{ timetable_editing_slot.id }}">{% endif %}
+
+    <div class="grid min-w-0 gap-4 sm:grid-cols-2">
+      {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=timetable_slot_form.weekday span_two=True %}
+      {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=timetable_slot_form.start_time %}
+      {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=timetable_slot_form.end_time %}
+      {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=timetable_slot_form.ec_id span_two=True help_text="Seules les matières actives de cette classe sont proposées." %}
+      {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=timetable_slot_form.teacher_id span_two=True help_text="Seuls les enseignants de votre annexe apparaissent." %}
+      {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=timetable_slot_form.room span_two=True help_text="Cette information sera imprimée sur l'emploi du temps." %}
+    </div>
+
+    <div class="flex flex-col-reverse gap-3 border-t border-ui-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+      <button type="button" onclick="window.deCloseDrawer && window.deCloseDrawer()" class="ui-focus-ring h-ui-control rounded-ui-button border border-ui-border bg-ui-surface px-4 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">Annuler</button>
+      <div class="flex items-center gap-3">
+        <span id="director-timetable-slot-loading" class="htmx-indicator text-xs font-semibold text-ui-text-muted">Vérification des conflits…</span>
+        <button type="submit" {% if not timetable_slot_form.has_subjects or not timetable_slot_form.has_teachers %}disabled{% endif %} class="ui-focus-ring inline-flex h-ui-control items-center justify-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong disabled:cursor-not-allowed disabled:opacity-50">
+          <i data-lucide="save" class="h-4 w-4" aria-hidden="true"></i>{% if timetable_editing_slot %}Enregistrer{% else %}Ajouter à la grille{% endif %}
+        </button>
+      </div>
+    </div>
+  </form>
+</div>

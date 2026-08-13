@@ -5,7 +5,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from academics.models import AcademicClass, AcademicScheduleEvent, EC, LessonLog
-from academics.services.schedule_service import get_class_week_schedule
+from academics.services.schedule_service import get_published_class_week_schedule
 from academics.services.session_service import get_supervisor_today_course_rows
 from academics.services.timetable_service import build_timetable_view_payload
 from students.models import Student, StudentAttendance, TeacherAttendance
@@ -36,7 +36,7 @@ def build_home_section_context(*, branch, selected_class=None):
         first = pending_appel_rows[0]
         alerts.append(
             {
-                "message": f"Appel non fait par {first['teacher_name']} — {first['subject_title']} ({first['time_range']})",
+                "message": f"Appel en attente — {first['subject_title']} ({first['time_range']})",
                 "level": "warn",
                 "section": "attendance",
             }
@@ -68,7 +68,7 @@ def build_home_section_context(*, branch, selected_class=None):
         },
         {"label": "Appels en attente", "value": len(pending_appel_rows), "icon": "clipboard-clock", "tone": "warning", "hint": "Aujourd'hui"},
         {"label": "Enseignants absents", "value": anomalies["absent_teacher_event_count"], "icon": "user-x", "tone": "danger", "hint": "Aujourd'hui"},
-        {"label": "Cas ouverts", "value": count_open_cases(branch=branch), "icon": "shield-alert", "tone": "info", "hint": "Étudiants et enseignants"},
+        {"label": "Signalements", "value": count_open_cases(branch=branch), "icon": "send", "tone": "info", "hint": "Transmis au DE"},
     ]
     return {
         "home_presence_rate": presence_rate,
@@ -82,7 +82,7 @@ def build_home_section_context(*, branch, selected_class=None):
 
 
 def build_teachers_section_context(*, branch):
-    """Vue du jour par enseignant : presence, ponctualite, appel fait/a faire (donnees reelles)."""
+    """Build one operational observation row per published session of the day."""
     today = timezone.localdate()
     events = list(
         AcademicScheduleEvent.objects.select_related("teacher", "ec", "academic_class")
@@ -92,7 +92,12 @@ def build_teachers_section_context(*, branch):
             event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
             is_active=True,
         )
-        .exclude(status=AcademicScheduleEvent.STATUS_CANCELLED)
+        .exclude(
+            status__in={
+                AcademicScheduleEvent.STATUS_DRAFT,
+                AcademicScheduleEvent.STATUS_CANCELLED,
+            }
+        )
         .order_by("start_datetime")
     )
     event_ids = [e.id for e in events]
@@ -100,76 +105,47 @@ def build_teachers_section_context(*, branch):
         row.schedule_event_id: row
         for row in TeacherAttendance.objects.filter(branch=branch, date=today, schedule_event_id__in=event_ids)
     }
-    lesson_map = {
-        row.schedule_event_id: row
-        for row in LessonLog.objects.filter(branch=branch, date=today, schedule_event_id__in=event_ids)
-    }
-
-    by_teacher = {}
+    sessions = []
     for event in events:
         teacher = event.teacher
-        entry = by_teacher.setdefault(
-            teacher.id,
-            {
-                "id": teacher.id,
-                "name": teacher.get_full_name() or teacher.username,
-                "subjects": [],
-                "present": True,
-                "punctual": True,
-                "appel_done": False,
-                "appel_pending": False,
-                "current_event_id": None,
-            },
-        )
-        if event.ec.title not in entry["subjects"]:
-            entry["subjects"].append(event.ec.title)
-        entry["current_event_id"] = event.id
-
         attendance = attendance_map.get(event.id)
-        if attendance:
-            if attendance.status == TeacherAttendance.STATUS_ABSENT:
-                entry["present"] = False
-            elif attendance.status == TeacherAttendance.STATUS_LATE:
-                entry["punctual"] = False
-
-        lesson = lesson_map.get(event.id)
-        if lesson and lesson.status not in (LessonLog.STATUS_PLANNED, LessonLog.STATUS_CANCELLED):
-            entry["appel_done"] = True
-        else:
-            entry["appel_pending"] = True
-
-    teachers = []
-    for entry in by_teacher.values():
-        if entry["appel_pending"]:
-            appel = "pending"
-        elif entry["appel_done"]:
-            appel = "done"
-        else:
-            appel = "na"
-        teachers.append(
+        local_start = timezone.localtime(event.start_datetime)
+        local_end = timezone.localtime(event.end_datetime)
+        sessions.append(
             {
-                "id": entry["id"],
-                "name": entry["name"],
-                "subject": ", ".join(entry["subjects"]),
-                "present": entry["present"],
-                "punctual": entry["punctual"],
-                "appel": appel,
-                "current_event_id": entry["current_event_id"],
+                "event": event,
+                "event_id": event.id,
+                "teacher": teacher,
+                "teacher_id": teacher.id,
+                "name": teacher.get_full_name() or teacher.username,
+                "subject": event.ec.title,
+                "class_name": event.academic_class.display_name,
+                "room": event.location or ("En ligne" if event.is_online else "Salle non precisee"),
+                "time_range": f"{local_start:%H:%M} - {local_end:%H:%M}",
+                "attendance": attendance,
+                "status": attendance.status if attendance else "pending",
+                "course_delivered": attendance.course_delivered if attendance else None,
             }
         )
-    teachers.sort(key=lambda t: t["name"])
 
     return {
-        "teachers": teachers,
-        "teachers_total_count": len(teachers),
-        "teachers_present_count": sum(1 for t in teachers if t["present"]),
-        "teachers_absent_count": sum(1 for t in teachers if not t["present"]),
-        "teachers_pending_appel_count": sum(1 for t in teachers if t["appel"] == "pending"),
+        "teacher_sessions": sessions,
+        "teachers_total_count": len({item["teacher_id"] for item in sessions}),
+        "teachers_present_count": sum(
+            1 for item in sessions if item["status"] == TeacherAttendance.STATUS_PRESENT
+        ),
+        "teachers_absent_count": sum(
+            1 for item in sessions if item["status"] == TeacherAttendance.STATUS_ABSENT
+        ),
+        "teachers_late_count": sum(
+            1 for item in sessions if item["status"] == TeacherAttendance.STATUS_LATE
+        ),
+        "teachers_pending_count": sum(1 for item in sessions if item["status"] == "pending"),
     }
 
 
 def build_schedule_section_context(*, branch, academic_class, week_start):
-    schedule = get_class_week_schedule(academic_class, week_start)
+    schedule = get_published_class_week_schedule(academic_class, week_start)
     summary = schedule.get("summary") or {}
     day_event_counts = schedule.get("day_event_counts") or []
     return {
@@ -180,11 +156,7 @@ def build_schedule_section_context(*, branch, academic_class, week_start):
         "schedule_week_planned": summary.get("planned", 0),
         "schedule_week_completed": summary.get("completed", 0),
         "schedule_empty_days_count": len([item for item in day_event_counts if not item.get("has_events")]),
-        "timetable_view": build_timetable_view_payload(
-            branch=branch,
-            academic_class=academic_class,
-            week_start=schedule["week_start"],
-        ),
+        "schedule_is_read_only": True,
     }
 
 
@@ -264,7 +236,7 @@ def build_attendance_monthly_report_context(*, branch, academic_class, month):
         if att.status == StudentAttendance.STATUS_PRESENT:
             entry["present"] += 1
         elif att.status == StudentAttendance.STATUS_ABSENT:
-            if att.justification:
+            if att.is_justified:
                 entry["justified"] += 1
             else:
                 entry["absent"] += 1
@@ -307,7 +279,12 @@ def build_teachers_weekly_report_context(*, branch, week_start):
             event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
             is_active=True,
         )
-        .exclude(status=AcademicScheduleEvent.STATUS_CANCELLED)
+        .exclude(
+            status__in={
+                AcademicScheduleEvent.STATUS_DRAFT,
+                AcademicScheduleEvent.STATUS_CANCELLED,
+            }
+        )
         .order_by("teacher__first_name", "teacher__last_name", "start_datetime")
     )
     event_ids = [e.id for e in events]
@@ -350,19 +327,25 @@ def build_teachers_weekly_report_context(*, branch, week_start):
         entry["planned"] += 1
         entry["subjects"].add(event.ec.title)
 
-        lesson = lesson_map.get(event.id)
         attendance = attendance_map.get(event.id)
+        lesson = lesson_map.get(event.id)
 
-        if lesson:
+        if attendance:
+            if attendance.course_delivered is True:
+                entry["held"] += 1
+            elif attendance.status == TeacherAttendance.STATUS_ABSENT:
+                entry["absent"] += 1
+            if attendance.status == TeacherAttendance.STATUS_LATE:
+                entry["late"] += 1
+        elif lesson:
+            # Compatibilite avec les donnees historiques anterieures au constat
+            # explicite "cours assure / non assure".
             if lesson.status == LessonLog.STATUS_DONE:
                 entry["held"] += 1
             elif lesson.status == LessonLog.STATUS_ABSENT_TEACHER:
                 entry["absent"] += 1
             elif lesson.status == LessonLog.STATUS_CANCELLED:
                 entry["cancelled"] += 1
-
-        if attendance and attendance.status == TeacherAttendance.STATUS_LATE:
-            entry["late"] += 1
 
     teachers = []
     for entry in by_teacher.values():
@@ -417,7 +400,12 @@ def build_attendance_section_context(*, request, branch, academic_class, roll_da
             event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
             is_active=True,
         )
-        .exclude(status=AcademicScheduleEvent.STATUS_CANCELLED)
+        .exclude(
+            status__in={
+                AcademicScheduleEvent.STATUS_DRAFT,
+                AcademicScheduleEvent.STATUS_CANCELLED,
+            }
+        )
         .order_by("start_datetime", "id")
     )
     selected_event = None
@@ -446,7 +434,10 @@ def build_attendance_section_context(*, request, branch, academic_class, roll_da
                     "student": student,
                     "status": status,
                     "next_status": next_status,
+                    "arrival_time": attendance.arrival_time if attendance else None,
                     "justification": attendance.justification if attendance else "",
+                    "is_justified": attendance.is_justified if attendance else False,
+                    "observation": attendance.observation if attendance else "",
                 }
             )
 
@@ -462,6 +453,7 @@ def build_attendance_section_context(*, request, branch, academic_class, roll_da
             user=request.user,
             academic_class_id=academic_class.id,
             roll_date=roll_date,
+            schedule_event_id=selected_event.pk if selected_event else None,
         ),
     }
 
@@ -514,7 +506,7 @@ def build_class_detail_context(request, *, branch, class_id: int, week_start):
         .get(pk=class_id)
     )
 
-    schedule = get_class_week_schedule(academic_class, week_start)
+    schedule = get_published_class_week_schedule(academic_class, week_start)
     prev_week_start = schedule["week_start"] - timedelta(days=7)
     next_week_start = schedule["week_start"] + timedelta(days=7)
 

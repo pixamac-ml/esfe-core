@@ -1,162 +1,21 @@
-<div class="grid gap-5">
-  {% if toast %}
-  <div class="rounded-2xl border px-4 py-3 text-sm font-semibold {% if toast.level == 'error' %}border-rose-200 bg-rose-50 text-rose-700{% else %}border-emerald-200 bg-emerald-50 text-emerald-700{% endif %}">
-    {{ toast.message }}
-  </div>
-  {% endif %}
-
-  <div class="flex items-start justify-between gap-4">
-    <div>
-      <p class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Affectation directe</p>
-      <h3 class="mt-1 text-2xl font-black text-slate-900">Affecter un enseignant</h3>
-      {% if assign_teacher %}
-      <p class="mt-1 text-sm font-semibold text-blue-600">{{ assign_teacher_name }} â€” {{ assign_teacher.profile.employee_code|default:"Code absent" }}</p>
-      {% endif %}
-      <p class="mt-1 text-sm font-semibold text-slate-500">Chaque affectation doit decrire clairement la classe, la matiere, la salle de reference et le volume horaire prevu.</p>
-    </div>
-    <button type="button" class="director-btn director-btn-secondary" onclick="window.deCloseModal && window.deCloseModal()">Fermer</button>
-  </div>
-
+{% load component_tags %}
+<div class="space-y-5" data-director-modal-size="wide">
+  <div class="border-b border-ui-border pb-4"><p class="text-xs font-semibold uppercase text-ui-primary">Affectation pédagogique</p><h2 class="mt-1 text-xl font-bold text-ui-text">{{ assign_teacher.get_full_name|default:assign_teacher.username|default:"Enseignant introuvable" }}</h2><p class="mt-1 text-sm text-ui-text-muted">Classe, matière, salle et charge de référence.</p></div>
+  {% if toast %}{% component "ui_core.alert" title="Affectation" message=toast.message tone="danger" %}{% endcomponent %}{% endif %}
   {% if assign_teacher %}
-  <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 grid grid-cols-3 gap-3 text-xs">
-    <div><p class="font-black uppercase text-slate-400 tracking-widest">Enseignant</p><p class="mt-1 font-bold text-slate-900">{{ assign_teacher_name }}</p></div>
-    <div><p class="font-black uppercase text-slate-400 tracking-widest">Code</p><p class="mt-1 font-bold text-slate-900">{{ assign_teacher.profile.employee_code|default:"â€”" }}</p></div>
-    <div><p class="font-black uppercase text-slate-400 tracking-widest">Annexe</p><p class="mt-1 font-bold text-slate-900">{{ assign_teacher.profile.branch.name|default:"â€”" }}</p></div>
-  </div>
-
-  <form method="post" hx-post="{% url 'accounts_portal:director_teacher_assign' %}" hx-target="#director-workspace" hx-swap="innerHTML">
-    {% csrf_token %}
-    <input type="hidden" name="teacher_id" value="{{ assign_teacher.id }}">
-
-    <div class="grid gap-4 md:grid-cols-2">
-      <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-        Classe <span class="text-red-500 normal-case tracking-normal">*</span>
-        <select id="assign-class-select" name="class_id" required class="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none focus:border-blue-500">
-          <option value="">-- Choisir une classe --</option>
-          {% for ac in assign_classes %}
-          <option value="{{ ac.id }}"{% if assign_selected_class_id == ac.id|stringformat:'s' %} selected{% endif %}>{{ ac.display_name }}</option>
-          {% endfor %}
-        </select>
-      </label>
-
-      <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-        Matiere (EC) <span class="text-slate-400 normal-case tracking-normal font-semibold">optionnel</span>
-        <select id="assign-ec-select" name="ec_id" class="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none focus:border-blue-500">
-          <option value="">-- Aucune EC specifique --</option>
-          {% for ec in assign_ecs %}
-          <option value="{{ ec.id }}" data-class-id="{{ ec.ue.semester.academic_class_id }}"{% if assign_selected_ec_id == ec.id|stringformat:'s' %} selected{% endif %}>{{ ec.title }}{% if ec.ue.semester.academic_class %} ({{ ec.ue.semester.academic_class.display_name }}){% endif %}</option>
-          {% endfor %}
-        </select>
-      </label>
-    </div>
-
-    <label class="mt-4 grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-      Salle de reference <span class="text-red-500 normal-case tracking-normal">*</span>
-      <input type="text" id="assign-room-input" name="room_label" value="{{ assign_selected_room_label }}" required class="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none focus:border-blue-500" placeholder="Salle B12, Laboratoire 2, Bloc C...">
-    </label>
-
-    <label class="mt-4 grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-      Volume horaire prevu <span class="text-red-500 normal-case tracking-normal">*</span>
-      <input type="number" step="0.5" min="0" name="planned_hours" value="{{ assign_selected_planned_hours }}" required class="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none focus:border-blue-500" placeholder="Ex: 18">
-    </label>
-
-    <div class="mt-4 flex flex-wrap items-center gap-3">
-      <button type="submit" class="director-btn director-btn-primary">Enregistrer l'affectation</button>
-      <button type="button" class="director-btn director-btn-secondary" onclick="window.deCloseModal && window.deCloseModal()">Annuler</button>
-      <span class="text-xs font-semibold text-slate-500">L'affectation est visible immediatement dans la liste enseignants.</span>
-    </div>
-  </form>
-
-  {% if assign_existing %}
-  <div class="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-    <div class="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-      <p class="text-sm font-bold text-slate-900">Affectations actuelles</p>
-      <span class="text-xs font-semibold text-slate-500">{{ assign_existing|length }} affectation(s)</span>
-    </div>
-    <table class="w-full text-sm">
-      <thead class="bg-slate-100 text-[11px] font-black uppercase text-slate-600">
-        <tr>
-          <th class="px-4 py-2 text-left">Classe</th>
-          <th class="px-4 py-2 text-left">Matiere (EC)</th>
-          <th class="px-4 py-2 text-left">Salle</th>
-          <th class="px-4 py-2 text-left">Volume</th>
-          <th class="px-4 py-2 text-right">Action</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-slate-100">
-        {% for asg in assign_existing %}
-        {% now "Y-m-d" as planner_week_start %}
-        <tr class="hover:bg-slate-50">
-          <td class="px-4 py-2 font-semibold text-slate-900">{{ asg.academic_class.display_name|default:"â€”" }}</td>
-          <td class="px-4 py-2 text-slate-600">{{ asg.ec.title|default:"(classe seule)" }}</td>
-          <td class="px-4 py-2 text-slate-600">{{ asg.room_label|default:"â€”" }}</td>
-          <td class="px-4 py-2 text-slate-600">{{ asg.planned_hours|default:"—" }}{% if asg.planned_hours %} h{% endif %}</td>
-          <td class="px-4 py-2 text-right">
-            <div class="flex justify-end gap-2">
-              {% if asg.academic_class %}
-              <button
-                type="button"
-                class="h-7 rounded-md border border-blue-200 bg-blue-50 px-2.5 text-xs font-bold text-blue-700 hover:bg-blue-100"
-                hx-get="{% url 'accounts_portal:director_planner_workspace' %}?class_id={{ asg.academic_class.id }}&week_start={{ planner_week_start }}&intent=program&teacher_id={{ assign_teacher.id }}{% if asg.ec_id %}&ec_id={{ asg.ec_id }}{% endif %}{% if asg.room_label %}&room_label={{ asg.room_label|urlencode }}{% endif %}{% if asg.planned_hours %}&planned_hours={{ asg.planned_hours }}{% endif %}"
-                hx-target="#director-workspace"
-                hx-swap="innerHTML"
-                onclick="window.deCloseModal && window.deCloseModal()"
-              >
-                Planifier
-              </button>
-              {% endif %}
-              <form method="post" hx-post="{% url 'accounts_portal:director_teacher_assign' %}" hx-target="#director-workspace" hx-swap="innerHTML" class="inline">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="remove">
-                <input type="hidden" name="assignment_id" value="{{ asg.id }}">
-                <input type="hidden" name="teacher_id" value="{{ assign_teacher.id }}">
-                <button type="submit" class="h-7 rounded-md border border-rose-200 bg-rose-50 px-2.5 text-xs font-bold text-rose-600 hover:bg-rose-100">
-                  Retirer
-                </button>
-              </form>
-            </div>
-          </td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="5" class="px-4 py-6 text-center text-slate-500">Aucune affectation enregistree.</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% endif %}
-
-  {% else %}
-  <div class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center">
-    <p class="text-lg font-bold text-slate-900">Enseignant introuvable</p>
-    <p class="mt-1 text-sm text-slate-500">Cet enseignant n'existe pas ou est hors perimetre.</p>
-  </div>
-  {% endif %}
+    <form method="post" novalidate hx-post="{% url 'accounts_portal:director_teacher_assign' %}" hx-target="#director-modal-content" hx-swap="innerHTML" hx-indicator="#director-teacher-assignment-loading" hx-disabled-elt="button[type='submit']" class="space-y-4">
+      {% csrf_token %}<input type="hidden" name="teacher_id" value="{{ assign_teacher.id }}">{% if assign_assignment %}<input type="hidden" name="assignment_id" value="{{ assign_assignment.id }}">{% endif %}
+      {% if assignment_form.non_field_errors %}<div class="rounded-ui-card border border-ui-danger bg-ui-danger-soft p-3 text-sm font-semibold text-ui-danger">{{ assignment_form.non_field_errors }}</div>{% endif %}
+      <div class="grid min-w-0 gap-4 md:grid-cols-2">
+        {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=assignment_form.class_id %}
+        <div id="director-teacher-assignment-ec-field">{% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=assignment_form.ec_id help_text="Facultatif pour une affectation couvrant toute la classe." %}</div>
+        {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=assignment_form.room_label %}
+        {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=assignment_form.planned_hours %}
+        {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=assignment_form.starts_on %}
+        {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=assignment_form.ends_on %}
+      </div>
+      <div class="flex justify-end gap-3 border-t border-ui-border pt-4"><span id="director-teacher-assignment-loading" class="htmx-indicator self-center text-xs font-semibold text-ui-text-muted">Enregistrement…</span><button type="submit" name="action" value="{% if assign_assignment %}update{% else %}add{% endif %}" class="ui-focus-ring inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary"><i data-lucide="save" class="h-4 w-4"></i>{% if assign_assignment %}Mettre à jour{% else %}Affecter{% endif %}</button></div>
+    </form>
+    {% if assign_existing %}<div class="border-t border-ui-border pt-4"><div class="mb-2 flex items-center justify-between"><h3 class="text-sm font-bold text-ui-text">Affectations actives</h3><span class="text-xs text-ui-text-muted">{{ assign_existing|length }} ligne(s)</span></div><div class="divide-y divide-ui-border">{% for assignment in assign_existing %}<div class="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"><div><p class="text-sm font-semibold text-ui-text">{{ assignment.academic_class.display_name }}</p><p class="mt-1 text-xs text-ui-text-muted">{{ assignment.ec.title|default:"Toute la classe" }} · {{ assignment.room_label }} · {{ assignment.planned_hours }} h</p></div><div class="flex gap-2"><button type="button" hx-get="{% url 'accounts_portal:director_teacher_assign' %}?teacher_id={{ assign_teacher.id }}&assignment_id={{ assignment.id }}" hx-target="#director-modal-content" hx-swap="innerHTML" class="ui-focus-ring grid h-9 w-9 place-items-center rounded-ui-button border border-ui-border text-ui-text" title="Modifier" aria-label="Modifier"><i data-lucide="pencil" class="h-4 w-4"></i></button><form method="post" hx-post="{% url 'accounts_portal:director_teacher_assign' %}" hx-target="#director-modal-content" hx-swap="innerHTML">{% csrf_token %}<input type="hidden" name="teacher_id" value="{{ assign_teacher.id }}"><input type="hidden" name="assignment_id" value="{{ assignment.id }}"><button name="action" value="remove" class="ui-focus-ring grid h-9 w-9 place-items-center rounded-ui-button border border-ui-danger text-ui-danger" title="Retirer" aria-label="Retirer"><i data-lucide="unlink" class="h-4 w-4"></i></button></form></div></div>{% endfor %}</div></div>{% endif %}
+  {% else %}{% component "ui_core.empty_state" title="Enseignant introuvable" message="Ce compte n'existe pas dans votre annexe." icon="user-x" %}{% endcomponent %}{% endif %}
 </div>
-
-<script>
-  (function () {
-    const classSelect = document.getElementById("assign-class-select");
-    const ecSelect = document.getElementById("assign-ec-select");
-    if (!classSelect || !ecSelect) {
-      return;
-    }
-
-    const syncEcOptions = () => {
-      const classId = classSelect.value;
-      Array.from(ecSelect.options).forEach((option, index) => {
-        if (index === 0) {
-          option.hidden = false;
-          return;
-        }
-        const matches = !classId || option.dataset.classId === classId;
-        option.hidden = !matches;
-        if (!matches && option.selected) {
-          ecSelect.value = "";
-        }
-      });
-    };
-
-    classSelect.addEventListener("change", syncEcOptions);
-    syncEcOptions();
-  }());
-</script>

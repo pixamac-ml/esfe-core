@@ -1,0 +1,27 @@
+{% load component_tags %}
+<div class="space-y-5">
+  {% include "portal/staff/director/partials/teachers/_feedback.html" %}
+  <div class="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    {% component "ui_core.stat_card" label="Enseignants actifs" value=teachers_total icon="users" tone="primary" description="Dans votre annexe" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Avec affectation" value=teacher_assigned_count icon="link-2" tone="success" description="Charge renseignée" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Sans affectation" value=teacher_unassigned_count icon="user-round-search" tone="warning" description="À organiser" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Pièces à vérifier" value=teacher_pending_documents icon="file-warning" tone="danger" description="Contrôle documentaire" compact=True %}{% endcomponent %}
+  </div>
+
+  {% component "ui_core.panel" title="Actions quotidiennes" subtitle="Accédez directement au travail à traiter." padding=False %}
+    <div class="grid divide-y divide-ui-border md:grid-cols-3 md:divide-x md:divide-y-0">
+      <a href="{% url 'accounts_portal:portal_dashboard' %}?section=enseignants&view=directory" hx-get="{% url 'accounts_portal:director_teachers_subcontent' %}?view=directory" hx-target="#director-teacher-subcontent" hx-swap="innerHTML" hx-push-url="{% url 'accounts_portal:portal_dashboard' %}?section=enseignants&view=directory" class="ui-focus-ring flex min-w-0 items-center gap-3 p-4 hover:bg-ui-surface-hover">
+        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button bg-ui-primary-soft text-ui-primary"><i data-lucide="users" class="h-5 w-5"></i></span><span class="min-w-0"><strong class="block text-sm text-ui-text">Répertoire</strong><span class="mt-0.5 block text-xs text-ui-text-muted">Coordonnées, profil et contrat.</span></span><i data-lucide="chevron-right" class="ml-auto h-4 w-4 shrink-0 text-ui-text-muted"></i>
+      </a>
+      <a href="{% url 'accounts_portal:portal_dashboard' %}?section=enseignants&view=assignments&teacher_scope=unassigned" hx-get="{% url 'accounts_portal:director_teachers_subcontent' %}?view=assignments&teacher_scope=unassigned" hx-target="#director-teacher-subcontent" hx-swap="innerHTML" hx-push-url="{% url 'accounts_portal:portal_dashboard' %}?section=enseignants&view=assignments&teacher_scope=unassigned" class="ui-focus-ring flex min-w-0 items-center gap-3 p-4 hover:bg-ui-surface-hover">
+        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button bg-ui-warning-soft text-ui-warning"><i data-lucide="link-2" class="h-5 w-5"></i></span><span class="min-w-0"><strong class="block text-sm text-ui-text">Affectations</strong><span class="mt-0.5 block text-xs text-ui-text-muted">{{ teacher_unassigned_count }} enseignant(s) à organiser.</span></span><i data-lucide="chevron-right" class="ml-auto h-4 w-4 shrink-0 text-ui-text-muted"></i>
+      </a>
+      <a href="{% url 'accounts_portal:portal_dashboard' %}?section=enseignants&view=files&teacher_scope=documents_pending" hx-get="{% url 'accounts_portal:director_teachers_subcontent' %}?view=files&teacher_scope=documents_pending" hx-target="#director-teacher-subcontent" hx-swap="innerHTML" hx-push-url="{% url 'accounts_portal:portal_dashboard' %}?section=enseignants&view=files&teacher_scope=documents_pending" class="ui-focus-ring flex min-w-0 items-center gap-3 p-4 hover:bg-ui-surface-hover">
+        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button bg-ui-danger-soft text-ui-danger"><i data-lucide="folder-check" class="h-5 w-5"></i></span><span class="min-w-0"><strong class="block text-sm text-ui-text">Dossiers</strong><span class="mt-0.5 block text-xs text-ui-text-muted">{{ teacher_pending_documents }} pièce(s) à vérifier.</span></span><i data-lucide="chevron-right" class="ml-auto h-4 w-4 shrink-0 text-ui-text-muted"></i>
+      </a>
+    </div>
+  {% endcomponent %}
+  {% if teacher_unassigned_count %}{% component "ui_core.alert" title="Affectations incomplètes" message="Des enseignants ne sont encore rattachés à aucune classe ou matière." tone="warning" %}{% endcomponent %}
+  {% elif teachers_total %}{% component "ui_core.alert" title="Équipe organisée" message="Tous les enseignants actifs disposent d'une affectation pédagogique." tone="success" %}{% endcomponent %}
+  {% else %}{% component "ui_core.empty_state" title="Aucun enseignant" message="Créez le premier compte enseignant de cette annexe." icon="users" %}{% endcomponent %}{% endif %}
+</div>

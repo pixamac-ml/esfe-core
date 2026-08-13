@@ -1,120 +1,24 @@
-<div class="grid gap-5">
-  <div class="flex items-start justify-between gap-4">
-    <div>
-      <p class="portal-section-kicker">Creation</p>
-      <h3 class="mt-1 text-2xl font-black text-slate-900">Nouvel enseignant</h3>
-      <p class="mt-1 text-sm font-semibold text-slate-500">Le directeur cree le compte, puis peut poser une affectation initiale lisible: une classe, une matiere, une salle et un volume horaire prevu.</p>
-    </div>
-    <button type="button" class="director-btn director-btn-secondary" onclick="window.deCloseModal && window.deCloseModal()">Fermer</button>
-  </div>
-
-  <form class="grid gap-5" method="post" hx-post="{% url 'accounts_portal:director_teacher_create' %}" hx-target="#director-workspace" hx-swap="innerHTML">
+{% load component_tags %}
+<div class="space-y-5" data-director-modal-size="wide">
+  <div class="border-b border-ui-border pb-4"><p class="text-xs font-semibold uppercase text-ui-primary">Équipe pédagogique</p><h2 class="mt-1 text-xl font-bold text-ui-text">Nouvel enseignant</h2><p class="mt-1 text-sm text-ui-text-muted">Créez le compte et, si nécessaire, sa première affectation.</p></div>
+  {% if toast %}{% component "ui_core.alert" title="Création non effectuée" message=toast.message tone="danger" %}{% endcomponent %}{% endif %}
+  <form method="post" novalidate hx-post="{% url 'accounts_portal:director_teacher_create' %}" hx-target="#director-modal-content" hx-swap="innerHTML" hx-indicator="#director-teacher-form-loading" hx-disabled-elt="button[type='submit']" class="space-y-5">
     {% csrf_token %}
-    <div class="director-grid-3">
-      <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-        Nom
-        <input type="text" name="last_name" class="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none" required>
-      </label>
-      <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-        Prenom
-        <input type="text" name="first_name" class="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none" required>
-      </label>
-      <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-        Email
-        <input type="email" name="email" class="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none" required>
-      </label>
-    </div>
-
-    <div class="director-grid-2">
-      <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-        Telephone
-        <input type="text" name="phone" class="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none" placeholder="+223 ...">
-      </label>
-      <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-        Tarif horaire
-        <input type="number" min="0" name="teacher_hourly_rate" class="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none" placeholder="Ex: 5000">
-      </label>
-      <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-        Specialite
-        <input type="text" name="specialty" class="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none" placeholder="Sciences infirmieres, anglais...">
-      </label>
-    </div>
-
-    <div class="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-      <p class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">Affectation initiale</p>
-      <h4 class="mt-1 text-lg font-black text-slate-900">Optionnelle mais non ambiguë</h4>
-      <p class="mt-1 text-sm font-semibold text-slate-500">Si vous rattachez l'enseignant des maintenant, renseignez la salle et la charge prevue. Pour d'autres affectations, utilisez ensuite la modale dediee.</p>
-
-      <div class="mt-5 director-grid-3">
-        <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-          Classe
-          <select name="class_id" id="teacher-create-class" class="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none">
-            <option value="">-- Aucun rattachement initial --</option>
-            {% for academic_class in teacher_form_classes %}
-              <option value="{{ academic_class.id }}">{{ academic_class.display_name }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-          Matiere (EC)
-          <select name="ec_id" id="teacher-create-ec" class="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none">
-            <option value="">-- Aucune EC specifique --</option>
-            {% for ec in teacher_form_ecs %}
-              <option value="{{ ec.id }}" data-class-id="{{ ec.ue.semester.academic_class_id }}">{{ ec.title }} - {{ ec.ue.semester.academic_class.display_name }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-          Salle
-          <input type="text" name="room_label" id="teacher-create-room" class="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none" placeholder="Salle B12, Bloc A...">
-        </label>
-        <label class="grid gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-          Volume horaire prevu
-          <input type="number" step="0.5" min="0" name="planned_hours" id="teacher-create-hours" class="h-12 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none" placeholder="Ex: 24">
-        </label>
-      </div>
-      <p class="mt-3 text-xs font-semibold text-slate-500">Volume attendu pour cette affectation sur la periode pedagogique en cours.</p>
-    </div>
-
-    <div class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-3 text-xs font-semibold text-slate-500">
-      Sans affectation initiale, seul le compte enseignant sera cree.
-    </div>
-
-    <div class="flex flex-wrap items-center gap-3">
-      <button type="submit" class="director-btn director-btn-primary">Creer l'enseignant</button>
-      <span class="text-xs font-semibold text-slate-500">Le compte, les acces et le contrat sont generes automatiquement.</span>
-    </div>
+    {% if teacher_form.non_field_errors %}<div class="rounded-ui-card border border-ui-danger bg-ui-danger-soft p-3 text-sm font-semibold text-ui-danger">{{ teacher_form.non_field_errors }}</div>{% endif %}
+    <div><h3 class="text-sm font-bold text-ui-text">Identité et rémunération</h3><div class="mt-3 grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=teacher_form.last_name %}
+      {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=teacher_form.first_name %}
+      {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=teacher_form.email %}
+      {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=teacher_form.phone %}
+      {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=teacher_form.specialty %}
+      {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=teacher_form.teacher_hourly_rate help_text="Utilisé pour préparer automatiquement les honoraires." %}
+    </div></div>
+    <div class="border-t border-ui-border pt-4"><h3 class="text-sm font-bold text-ui-text">Affectation initiale <span class="font-normal text-ui-text-muted">(facultative)</span></h3><p class="mt-1 text-xs text-ui-text-muted">Si une classe est choisie, la salle et le volume horaire deviennent obligatoires.</p><div class="mt-3 grid min-w-0 gap-4 md:grid-cols-2">
+      {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=teacher_form.class_id %}
+      <div id="director-teacher-create-ec-field">{% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=teacher_form.ec_id help_text="La liste dépend de la classe sélectionnée." %}</div>
+      {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=teacher_form.room_label %}
+      {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=teacher_form.planned_hours %}
+    </div></div>
+    <div class="flex flex-col-reverse gap-3 border-t border-ui-border pt-4 sm:flex-row sm:items-center sm:justify-between"><button type="button" onclick="window.deCloseModal && window.deCloseModal()" class="ui-focus-ring h-ui-control rounded-ui-button border border-ui-border bg-ui-surface px-4 text-sm font-semibold text-ui-text">Annuler</button><div class="flex items-center gap-3"><span id="director-teacher-form-loading" class="htmx-indicator text-xs font-semibold text-ui-text-muted">Création…</span><button type="submit" class="ui-focus-ring inline-flex h-ui-control items-center justify-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong"><i data-lucide="user-plus" class="h-4 w-4"></i>Créer l’enseignant</button></div></div>
   </form>
 </div>
-
-<script>
-  (function () {
-    const classSelect = document.getElementById("teacher-create-class");
-    const ecSelect = document.getElementById("teacher-create-ec");
-    const roomInput = document.getElementById("teacher-create-room");
-    const hoursInput = document.getElementById("teacher-create-hours");
-    if (!classSelect || !ecSelect || !roomInput || !hoursInput) {
-      return;
-    }
-
-    const syncAssignmentFields = () => {
-      const classId = classSelect.value;
-      Array.from(ecSelect.options).forEach((option, index) => {
-        if (index === 0) {
-          option.hidden = false;
-          return;
-        }
-        const matches = !classId || option.dataset.classId === classId;
-        option.hidden = !matches;
-        if (!matches && option.selected) {
-          ecSelect.value = "";
-        }
-      });
-      roomInput.required = Boolean(classId);
-      hoursInput.required = Boolean(classId);
-    };
-
-    classSelect.addEventListener("change", syncAssignmentFields);
-    syncAssignmentFields();
-  }());
-</script>

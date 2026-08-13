@@ -2,13 +2,17 @@ import json
 from datetime import datetime, timedelta
 
 from django.contrib import messages
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, update_session_auth_hash
+from django.contrib.auth.forms import PasswordChangeForm
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Q
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+
+from accounts.forms import SystemProfileForm, UserPreferenceForm
+from accounts.models import Profile, UserPreference
 
 from academics.models import AcademicClass, AcademicScheduleEvent, EC, LessonLog, WeeklyScheduleSlot
 from academics.services.lesson_log_service import create_lesson_log, update_lesson_log
@@ -46,7 +50,16 @@ from students.services.attendance_workflow import (
 )
 from students.services.case_service import advance_teacher_case, count_open_cases, create_teacher_case
 from students.services.convocation_service import create_convocation
+from portal.services.certified_dashboard_shell import build_certified_dashboard_shell
 from portal.services.supervisor_dashboard_service import get_supervisor_class_picker_bundle
+from portal.services.supervisor_dashboard_presentation import (
+    build_supervisor_dashboard_presentation,
+)
+from portal.services.supervisor_workspace_service import (
+    SECTION_META as SUPERVISOR_SECTION_META,
+    build_supervisor_workspace_context,
+    resolve_section_view,
+)
 from portal.services.supervisor_service import (
     build_attendance_monthly_report_context,
     build_attendance_section_context,
@@ -68,64 +81,88 @@ from portal.views.views import (
     _parse_optional_time,
     _parse_slot_time_hhmm,
     _position_required,
-    _resolve_academic_branch,
+    _resolve_director_branch,
     _user_initials,
 )
 
 
-def _redirect_supervisor_dashboard(anchor="overview"):
+def _resolve_supervisor_branch(request):
+    """Return the mandatory annexe for every supervisor workflow."""
+
+    return _resolve_director_branch(
+        request,
+        additional_scoped_positions={"academic_supervisor"},
+    )
+
+
+def _redirect_supervisor_dashboard(section="home"):
+    section = {
+        "overview": "home",
+        "absences": "attendance",
+    }.get(section, section)
     base_url = reverse("accounts_portal:portal_dashboard")
-    return redirect(f"{base_url}#{anchor}")
+    return redirect(f"{base_url}?section={section}")
 
 
-_SECTION_META = {
-    "home": ("Pilotage · Accueil", "Vue d'ensemble", "Pilotage des classes, du temps, des enseignants et de la discipline."),
-    "classes": ("Pilotage · Classes", "Suivi des classes", "État d'assiduité et alertes par classe."),
-    "cases": ("Pilotage · Discipline", "Cas à traiter", "Dossiers disciplinaires — étudiants et enseignants."),
-    "attendance": ("Classe active · Assiduité", "Faire l'appel", "Si l'enseignant n'a pas fait l'appel, le surveillant le complète."),
-    "schedule": ("Classe active · Emploi du temps", "Planifier la semaine", "Le surveillant construit l'emploi du temps hebdomadaire."),
-    "courses": ("Classe active · Cours", "Cours & séances", "Séances programmées pour la classe."),
-    "students": ("Classe active · Étudiants", "Étudiants de la classe", "Annuaire de la classe et historique individuel."),
-    "teachers": ("Pilotage · Enseignants", "Suivi des enseignants", "Présence, ponctualité, appels faits et incidents."),
-    "teachers_report": ("Suivi enseignants · Rapport", "Rapport hebdomadaire enseignants", "Régularité et présence de chaque enseignant sur la semaine sélectionnée."),
-    "attendance_report": ("Présences · Rapport mensuel", "Rapport mensuel des présences", "Taux de présence par étudiant sur le mois sélectionné."),
-}
+def _removed_supervisor_capability():
+    return HttpResponseForbidden(
+        "Cette action relève désormais du Directeur des études. "
+        "Le Surveillant général dispose d'un accès de consultation uniquement."
+    )
+
+
+_SECTION_META = SUPERVISOR_SECTION_META
+
+
+def _supervisor_account_context(request):
+    profile, _created = Profile.objects.get_or_create(user=request.user)
+    position_label = dict(Profile.POSITION_CHOICES).get(
+        profile.position,
+        profile.position or "Surveillant général",
+    )
+    status_label = dict(Profile.EMPLOYMENT_STATUS_CHOICES).get(
+        profile.employment_status,
+        profile.employment_status or "Actif",
+    )
+    panel_url = reverse("accounts_portal:supervisor_account_panel")
+    actions = [
+        {"label": "Modifier", "icon": "pencil", "hx_get": f"{panel_url}?view=edit", "hx_target": "#supervisor-drawer-content", "hx_swap": "innerHTML"},
+        {"label": "Sécurité", "icon": "shield", "hx_get": f"{panel_url}?view=security", "hx_target": "#supervisor-drawer-content", "hx_swap": "innerHTML"},
+        {"label": "Préférences", "icon": "settings", "hx_get": f"{panel_url}?view=preferences", "hx_target": "#supervisor-drawer-content", "hx_swap": "innerHTML"},
+    ]
+    return {
+        "profile": profile,
+        "account_display_name": request.user.get_full_name() or request.user.username,
+        "account_avatar_url": profile.avatar_url,
+        "account_role": position_label or "Surveillant général",
+        "email": request.user.email,
+        "branch_label": profile.branch.name if profile.branch else "Annexe non définie",
+        "status": profile.employment_status,
+        "status_label": status_label,
+        "phone": profile.phone,
+        "address": profile.address,
+        "created_at": timezone.localtime(profile.created_at).strftime("%d/%m/%Y") if profile.created_at else "",
+        "last_seen": timezone.localtime(profile.last_seen).strftime("%d/%m/%Y %H:%M") if profile.last_seen else "",
+        "bio": profile.bio,
+        "account_actions": actions,
+    }
 
 
 def _render_supervisor_dashboard(request, *, section=None):
-    branch = _resolve_academic_branch(request)
-    _, class_picker_items, classes_qs = get_supervisor_class_picker_bundle(branch=branch)
-    selected_class_id = None
-    selected_class_label = ""
-    selected_class_raw = (request.GET.get("class_id") or "").strip()
-    if selected_class_raw.isdigit():
-        selected_class_id = int(selected_class_raw)
-        for item in class_picker_items:
-            if item["id"] == selected_class_id:
-                selected_class_label = item["label"]
-                break
-
-    open_cases_count = count_open_cases(branch=branch) if branch else 0
-    resolved_section = section or _parse_supervisor_section(request)
-    crumb, panel_title, panel_lede = _SECTION_META.get(resolved_section, _SECTION_META["home"])
-
+    branch = _resolve_supervisor_branch(request)
+    workspace_context = build_supervisor_workspace_context(
+        request,
+        branch=branch,
+        section=section,
+    )
+    workspace_context["open_cases_count"] = count_open_cases(branch=branch)
     context = {
         **_build_portal_context(
             request,
             page_title="Dashboard Surveillant General",
             module_cards=["Suivi des classes", "Assiduite", "Emploi du temps"],
         ),
-        "branch": branch,
-        "section": resolved_section,
-        "crumb": crumb,
-        "panel_title": panel_title,
-        "panel_lede": panel_lede,
-        "today": timezone.localdate(),
-        "class_picker_items": class_picker_items,
-        "total_classes": classes_qs.count() if branch else 0,
-        "selected_class_id": selected_class_id,
-        "selected_class_label": selected_class_label,
-        "open_cases_count": open_cases_count,
+        **workspace_context,
     }
     display_name = (
         context.get("user_display_name")
@@ -135,13 +172,37 @@ def _render_supervisor_dashboard(request, *, section=None):
     )
     context["user_initials"] = _user_initials(display_name)
     context["active_alerts_count"] = len(context.get("alerts") or [])
-    return render(request, "portal/staff/supervisor_dashboard.html", context)
+    context.update(_supervisor_account_context(request))
+    presentation = build_supervisor_dashboard_presentation(request, context)
+    context.update(presentation)
+    context.update(
+        build_certified_dashboard_shell(
+            role="academic_supervisor",
+            key="supervisor",
+            page_title=context["page_title"],
+            title="Surveillance générale",
+            subtitle="Surveillance générale",
+            context_label=context.get("supervisor_context_label") or "",
+            user_name=context.get("user_display_name") or display_name,
+            navigation=context.get("supervisor_navigation") or [],
+            active_section=context.get("supervisor_active_section") or "home",
+            workspace_template="portal/staff/supervisor/partials/workflow_workspace.html",
+            topbar_template="portal/staff/supervisor/partials/topbar_actions.html",
+            script_path="src/js/portal/supervisor_dashboard.js",
+            stylesheet_path="portal/css/supervisor_dashboard.css",
+            notifications_url=context.get("notifications_url") or "",
+            show_notifications_button=False,
+            drawer_title="Détail",
+            modal_title="Supervision",
+            empty_modal_message="Le contenu de cette fenêtre sera chargé à la demande.",
+        )
+    )
+    return render(request, "portal/staff/director_dashboard.html", context)
 
 
 def _parse_supervisor_section(request, default="home"):
-    section = (request.GET.get("section") or request.POST.get("section") or default).strip().lower()
-    allowed = {"home", "classes", "attendance", "attendance_report", "schedule", "courses", "students", "teachers", "teachers_report"}
-    return section if section in allowed else default
+    section, _ = resolve_section_view(request, section=None)
+    return section or default
 
 
 def _parse_workflow_roll_date(request):
@@ -155,7 +216,7 @@ def _parse_workflow_roll_date(request):
 
 
 def _parse_supervisor_planner_request(request):
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_supervisor_branch(request)
     class_id_raw = (request.GET.get("class_id") or request.POST.get("class_id") or "").strip()
     week_start_raw = (request.GET.get("week_start") or request.POST.get("week_start") or "").strip()
     week_start = timezone.localdate()
@@ -189,10 +250,10 @@ _SECTION_BUILDERS = {
 }
 
 
-def _render_supervisor_workflow_workspace(request, *, section=None, toast=None):
+def _render_legacy_supervisor_workflow_workspace(request, *, section=None, toast=None):
     # This view always renders the HTMX panel only; the full-page shell is
     # rendered separately by _render_supervisor_dashboard (via portal_dashboard).
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_supervisor_branch(request)
     resolved_section = section or _parse_supervisor_section(request)
     _, class_picker_items, _ = get_supervisor_class_picker_bundle(branch=branch)
 
@@ -225,6 +286,7 @@ def _render_supervisor_workflow_workspace(request, *, section=None, toast=None):
         "selected_class": selected_class,
         "selected_class_id": selected_class.id if selected_class else None,
         "selected_class_label": selected_class.display_name if selected_class else "",
+        "supervisor_dashboard_base_url": reverse("accounts_portal:portal_dashboard"),
         "high_absence_classes": [],
         "schedule_conflicts": [],
         "unfollowed_classes": [],
@@ -290,13 +352,46 @@ def _render_supervisor_workflow_workspace(request, *, section=None, toast=None):
     return render(request, "portal/staff/supervisor/partials/workflow_workspace.html", context)
 
 
+def _render_supervisor_workflow_workspace(
+    request,
+    *,
+    section=None,
+    toast=None,
+    force_subcontent=False,
+):
+    """Render the common workspace shell or one of its HTMX subwindows."""
+
+    branch = _resolve_supervisor_branch(request)
+    context = build_supervisor_workspace_context(
+        request,
+        branch=branch,
+        section=section,
+        toast=toast,
+    )
+    context.update(build_supervisor_dashboard_presentation(request, context))
+    is_subcontent = force_subcontent or request.GET.get("fragment") == "subcontent"
+    template_name = (
+        "portal/staff/supervisor/partials/subcontent.html"
+        if is_subcontent
+        else "portal/staff/supervisor/partials/workflow_workspace.html"
+    )
+    return render(request, template_name, context)
+
+
 @_position_required({"academic_supervisor"})
 def supervisor_workflow_workspace(request):
     # Requete HTMX (navigation interne) -> panneau seul.
-    # Requete complete (refresh / retour navigateur / lien direct) -> shell + panneau.
+    # Une requete complete revient toujours vers l'entree Portal canonique.
     if request.htmx:
         return _render_supervisor_workflow_workspace(request)
-    return _render_supervisor_dashboard(request)
+    params = request.GET.copy()
+    section, active_view = resolve_section_view(request)
+    params["section"] = section
+    params["view"] = active_view
+    params.pop("fragment", None)
+    return redirect(
+        f"{reverse('accounts_portal:portal_dashboard')}?{params.urlencode()}"
+    )
 
 
 @_position_required({"academic_supervisor"})
@@ -304,7 +399,7 @@ def supervisor_attendance_toggle_student(request):
     if request.method != "POST":
         return _deny_portal_access(request)
 
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_supervisor_branch(request)
     if branch is None:
         return HttpResponseBadRequest("Aucune annexe rattachee.")
 
@@ -321,7 +416,12 @@ def supervisor_attendance_toggle_student(request):
                 event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
                 is_active=True,
             )
-            .exclude(status=AcademicScheduleEvent.STATUS_CANCELLED)
+            .exclude(
+                status__in={
+                    AcademicScheduleEvent.STATUS_DRAFT,
+                    AcademicScheduleEvent.STATUS_CANCELLED,
+                }
+            )
             .get()
         )
         student = (
@@ -341,6 +441,7 @@ def supervisor_attendance_toggle_student(request):
             branch=branch,
             academic_class_id=schedule_event.academic_class_id,
             roll_date=roll_date,
+            schedule_event_id=schedule_event.pk,
         )
         result = mark_student_attendance(
             student=student,
@@ -349,8 +450,17 @@ def supervisor_attendance_toggle_student(request):
             status=raw_status,
             recorded_by=request.user,
             branch=branch,
-            arrival_time=None,
+            arrival_time=(
+                _parse_optional_time(request.POST.get("arrival_time"))
+                if raw_status == StudentAttendance.STATUS_LATE
+                else None
+            ),
             justification=(request.POST.get("justification") or "").strip(),
+            is_justified=(
+                raw_status == StudentAttendance.STATUS_ABSENT
+                and (request.POST.get("is_justified") or "").lower() in {"1", "true", "on", "yes"}
+            ),
+            observation=(request.POST.get("observation") or "").strip(),
         )
         touch_roll_after_bulk_save(
             user=request.user,
@@ -374,7 +484,10 @@ def supervisor_attendance_toggle_student(request):
                 "student": student,
                 "status": attendance.status,
                 "next_status": next_status,
+                "arrival_time": attendance.arrival_time,
                 "justification": attendance.justification,
+                "is_justified": attendance.is_justified,
+                "observation": attendance.observation,
             },
             "selected_event": schedule_event,
             "roll_locked": is_roll_locked_for_event(branch=branch, event=schedule_event),
@@ -387,7 +500,7 @@ def supervisor_workflow_roll_action(request):
     if request.method != "POST":
         return _deny_portal_access(request)
 
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_supervisor_branch(request)
     toast = None
     if branch is None:
         toast = {"level": "error", "message": "Aucune annexe n'est rattachee a ce compte."}
@@ -398,13 +511,31 @@ def supervisor_workflow_roll_action(request):
                 class_id = int(request.POST.get("class_id") or 0)
                 roll_date = datetime.strptime((request.POST.get("roll_date") or "").strip(), "%Y-%m-%d").date()
                 raw_ev = (request.POST.get("schedule_event_id") or "").strip()
-                schedule_event_id = int(raw_ev) if raw_ev.isdigit() else None
+                if not raw_ev.isdigit():
+                    raise ValidationError("Une séance publiée est obligatoire pour ouvrir l'appel.")
+                schedule_event = AcademicScheduleEvent.objects.filter(
+                    pk=int(raw_ev),
+                    branch=branch,
+                    academic_class_id=class_id,
+                    event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+                    is_active=True,
+                ).exclude(
+                    status__in={
+                        AcademicScheduleEvent.STATUS_DRAFT,
+                        AcademicScheduleEvent.STATUS_CANCELLED,
+                    }
+                ).first()
+                if schedule_event is None:
+                    raise ValidationError("La séance publiée est introuvable dans votre annexe.")
+                event_date = timezone.localtime(schedule_event.start_datetime).date()
+                if roll_date != event_date:
+                    raise ValidationError("La date de l'appel doit correspondre à la séance.")
                 start_daily_roll(
                     user=request.user,
                     branch=branch,
                     academic_class_id=class_id,
                     roll_date=roll_date,
-                    schedule_event_id=schedule_event_id,
+                    schedule_event_id=schedule_event.pk,
                 )
                 toast = {"level": "success", "message": "Appel ouvert pour la seance."}
             elif action == "validate":
@@ -413,10 +544,7 @@ def supervisor_workflow_roll_action(request):
                 validate_daily_roll(user=request.user, sheet=sheet)
                 toast = {"level": "success", "message": "Appel enregistre et valide."}
             elif action == "reopen":
-                sheet_id = int(request.POST.get("sheet_id") or 0)
-                sheet = AttendanceRollSheet.objects.get(pk=sheet_id, branch=branch)
-                reopen_daily_roll(user=request.user, sheet=sheet)
-                toast = {"level": "success", "message": "Appel rouvert pour correction."}
+                return _removed_supervisor_capability()
             else:
                 raise ValidationError("Action inconnue.")
         except AttendanceRollSheet.DoesNotExist:
@@ -426,12 +554,19 @@ def supervisor_workflow_roll_action(request):
         except ValidationError as exc:
             toast = {"level": "error", "message": " ".join(exc.messages)}
 
-    return _render_supervisor_workflow_workspace(request, section="attendance", toast=toast)
+    return _render_supervisor_workflow_workspace(
+        request,
+        section="attendance",
+        toast=toast,
+        force_subcontent=True,
+    )
 
 
 @_position_required({"academic_supervisor"})
 def supervisor_quick_course_create(request):
-    branch = _resolve_academic_branch(request)
+    return _removed_supervisor_capability()
+
+    branch = _resolve_supervisor_branch(request)
     if request.method == "GET":
         class_id_raw = (request.GET.get("class_id") or "").strip()
         if branch is None or not class_id_raw.isdigit():
@@ -541,7 +676,7 @@ def supervisor_quick_course_create(request):
 
 @_position_required({"academic_supervisor"})
 def supervisor_student_drawer(request):
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_supervisor_branch(request)
     student_raw = (request.GET.get("student_id") or "").strip()
     enrollment_raw = (request.GET.get("enrollment_id") or "").strip()
     class_raw = (request.GET.get("class_id") or "").strip()
@@ -609,8 +744,96 @@ def supervisor_portal(request):
 
 
 @_position_required({"academic_supervisor"})
+def supervisor_account_panel(request):
+    """Shared account components inside the supervisor's common drawer."""
+    view_name = (request.GET.get("view") or request.POST.get("view") or "profile").strip().lower()
+    if view_name not in {"profile", "edit", "security", "preferences"}:
+        return HttpResponseBadRequest("Vue de compte inconnue.")
+
+    profile, _created = Profile.objects.get_or_create(user=request.user)
+    preference, _created = UserPreference.objects.get_or_create(user=request.user)
+    if request.method == "POST":
+        if view_name == "edit":
+            form = SystemProfileForm(request.POST, request.FILES, instance=profile, user=request.user)
+            if form.is_valid():
+                form.save()
+                response = render(
+                    request,
+                    "portal/staff/supervisor/partials/account/profile.html",
+                    _supervisor_account_context(request),
+                )
+                response["HX-Trigger"] = json.dumps({"ui:toast": {"message": "Profil mis à jour.", "tone": "success"}})
+                return response
+            return render(
+                request,
+                "portal/staff/supervisor/partials/account/edit.html",
+                {"form": form, "profile": profile},
+                status=400,
+            )
+        if view_name == "security":
+            password_form = PasswordChangeForm(request.user, request.POST)
+            if password_form.is_valid():
+                user = password_form.save()
+                update_session_auth_hash(request, user)
+                response = render(
+                    request,
+                    "portal/staff/supervisor/partials/account/security.html",
+                    {"password_form": PasswordChangeForm(request.user), "email": request.user.email},
+                )
+                response["HX-Trigger"] = json.dumps({"ui:toast": {"message": "Mot de passe mis à jour.", "tone": "success"}})
+                return response
+            return render(
+                request,
+                "portal/staff/supervisor/partials/account/security.html",
+                {"password_form": password_form, "email": request.user.email},
+                status=400,
+            )
+        if view_name == "preferences":
+            form = UserPreferenceForm(request.POST, instance=preference)
+            if form.is_valid():
+                form.save()
+                response = render(
+                    request,
+                    "portal/staff/supervisor/partials/account/preferences.html",
+                    {"form": UserPreferenceForm(instance=preference)},
+                )
+                response["HX-Trigger"] = json.dumps({"ui:toast": {"message": "Préférences mises à jour.", "tone": "success"}})
+                return response
+            return render(
+                request,
+                "portal/staff/supervisor/partials/account/preferences.html",
+                {"form": form},
+                status=400,
+            )
+
+    if view_name == "profile":
+        return render(
+            request,
+            "portal/staff/supervisor/partials/account/profile.html",
+            _supervisor_account_context(request),
+        )
+    if view_name == "edit":
+        return render(
+            request,
+            "portal/staff/supervisor/partials/account/edit.html",
+            {"form": SystemProfileForm(instance=profile, user=request.user), "profile": profile},
+        )
+    if view_name == "security":
+        return render(
+            request,
+            "portal/staff/supervisor/partials/account/security.html",
+            {"password_form": PasswordChangeForm(request.user), "email": request.user.email},
+        )
+    return render(
+        request,
+        "portal/staff/supervisor/partials/account/preferences.html",
+        {"form": UserPreferenceForm(instance=preference)},
+    )
+
+
+@_position_required({"academic_supervisor"})
 def supervisor_student_attendance_print(request, student_id: int):
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_supervisor_branch(request)
     if branch is None:
         return HttpResponseBadRequest("Aucune annexe rattachée.")
     class_id_raw = (request.GET.get("class_id") or "").strip()
@@ -646,7 +869,7 @@ def supervisor_student_attendance_print(request, student_id: int):
 
 @_position_required({"academic_supervisor"})
 def supervisor_teacher_regularity_print(request, teacher_id: int):
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_supervisor_branch(request)
     if branch is None:
         return HttpResponseBadRequest("Aucune annexe rattachée.")
     User = get_user_model()
@@ -681,10 +904,10 @@ def supervisor_mark_student_attendance(request):
     if request.method != "POST":
         return _deny_portal_access(request)
 
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_supervisor_branch(request)
     if branch is None:
         messages.error(request, "Aucune annexe n'est rattachee a ce compte.")
-        return _redirect_supervisor_dashboard("absences")
+        return _redirect_supervisor_dashboard("attendance")
 
     try:
         schedule_event = (
@@ -695,7 +918,12 @@ def supervisor_mark_student_attendance(request):
                 event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
                 is_active=True,
             )
-            .exclude(status=AcademicScheduleEvent.STATUS_CANCELLED)
+            .exclude(
+                status__in={
+                    AcademicScheduleEvent.STATUS_DRAFT,
+                    AcademicScheduleEvent.STATUS_CANCELLED,
+                }
+            )
             .get()
         )
         roll_date = timezone.localtime(schedule_event.start_datetime).date()
@@ -703,6 +931,7 @@ def supervisor_mark_student_attendance(request):
             branch=branch,
             academic_class_id=schedule_event.academic_class_id,
             roll_date=roll_date,
+            schedule_event_id=schedule_event.pk,
         )
         student = (
             Student.objects.select_related("user", "inscription__candidature")
@@ -716,15 +945,25 @@ def supervisor_mark_student_attendance(request):
             .distinct()
             .get()
         )
+        attendance_status = request.POST.get("status", "")
         result = mark_student_attendance(
             student=student,
             academic_class=schedule_event.academic_class,
             schedule_event=schedule_event,
-            status=request.POST.get("status", ""),
+            status=attendance_status,
             recorded_by=request.user,
             branch=branch,
-            arrival_time=_parse_optional_time(request.POST.get("arrival_time")),
+            arrival_time=(
+                _parse_optional_time(request.POST.get("arrival_time"))
+                if attendance_status == StudentAttendance.STATUS_LATE
+                else None
+            ),
             justification=request.POST.get("justification", ""),
+            is_justified=(
+                attendance_status == StudentAttendance.STATUS_ABSENT
+                and (request.POST.get("is_justified") or "").lower() in {"1", "true", "on", "yes"}
+            ),
+            observation=request.POST.get("observation", ""),
         )
         touch_roll_after_bulk_save(
             user=request.user,
@@ -735,17 +974,17 @@ def supervisor_mark_student_attendance(request):
         )
     except (AcademicScheduleEvent.DoesNotExist, Student.DoesNotExist):
         messages.error(request, "Selection invalide pour la saisie de presence etudiant.")
-        return _redirect_supervisor_dashboard("absences")
+        return _redirect_supervisor_dashboard("attendance")
     except ValidationError as exc:
         messages.error(request, " ".join(exc.messages))
-        return _redirect_supervisor_dashboard("absences")
+        return _redirect_supervisor_dashboard("attendance")
 
     attendance = result["attendance"]
     messages.success(
         request,
         f"Presence etudiant enregistree: {attendance.student.full_name} - {attendance.get_status_display()}.",
     )
-    return _redirect_supervisor_dashboard("absences")
+    return _redirect_supervisor_dashboard("attendance")
 
 
 @_position_required({"academic_supervisor"})
@@ -753,10 +992,10 @@ def supervisor_mark_teacher_attendance(request):
     if request.method != "POST":
         return _deny_portal_access(request)
 
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_supervisor_branch(request)
     if branch is None:
         messages.error(request, "Aucune annexe n'est rattachee a ce compte.")
-        return _redirect_supervisor_dashboard("absences")
+        return _redirect_supervisor_dashboard("attendance")
 
     try:
         schedule_event = (
@@ -767,39 +1006,84 @@ def supervisor_mark_teacher_attendance(request):
                 event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
                 is_active=True,
             )
-            .exclude(status=AcademicScheduleEvent.STATUS_CANCELLED)
+            .exclude(
+                status__in={
+                    AcademicScheduleEvent.STATUS_DRAFT,
+                    AcademicScheduleEvent.STATUS_CANCELLED,
+                }
+            )
             .get()
         )
+        attendance_status = request.POST.get("status", "")
         result = mark_teacher_attendance(
             teacher=schedule_event.teacher,
             schedule_event=schedule_event,
-            status=request.POST.get("status", ""),
+            status=attendance_status,
             recorded_by=request.user,
             branch=branch,
-            arrival_time=_parse_optional_time(request.POST.get("arrival_time")),
+            arrival_time=(
+                _parse_optional_time(request.POST.get("arrival_time"))
+                if attendance_status == TeacherAttendance.STATUS_LATE
+                else None
+            ),
             justification=request.POST.get("justification", ""),
+            course_delivered=(
+                False
+                if attendance_status == TeacherAttendance.STATUS_ABSENT
+                else True
+                if request.POST.get("course_delivered") == "yes"
+                else False
+                if request.POST.get("course_delivered") == "no"
+                else None
+            ),
+            observation=request.POST.get("observation", ""),
         )
     except AcademicScheduleEvent.DoesNotExist:
+        if request.htmx:
+            return HttpResponseBadRequest("Séance publiée introuvable dans votre annexe.")
         messages.error(request, "Cours introuvable pour la saisie de presence enseignant.")
-        return _redirect_supervisor_dashboard("absences")
+        return _redirect_supervisor_dashboard("attendance")
     except ValidationError as exc:
+        if request.htmx:
+            return HttpResponseBadRequest(" ".join(exc.messages))
         messages.error(request, " ".join(exc.messages))
-        return _redirect_supervisor_dashboard("absences")
+        return _redirect_supervisor_dashboard("attendance")
 
     attendance = result["attendance"]
+    if request.htmx:
+        response = render(
+            request,
+            "portal/staff/supervisor/partials/teacher_drawer.html",
+            _build_teacher_drawer_context(
+                branch=branch,
+                teacher=schedule_event.teacher,
+                event=schedule_event,
+            ),
+        )
+        response["HX-Trigger"] = json.dumps(
+            {
+                "toast": (
+                    f"Présence enregistrée : {attendance.get_status_display()}."
+                ),
+                "supervisor-attendance-updated": "",
+            }
+        )
+        return response
     messages.success(
         request,
         f"Presence enseignant enregistree: {attendance.teacher.get_full_name() or attendance.teacher.username} - {attendance.get_status_display()}.",
     )
-    return _redirect_supervisor_dashboard("absences")
+    return _redirect_supervisor_dashboard("attendance")
 
 
 @_position_required({"academic_supervisor"})
 def supervisor_save_lesson_log(request):
+    return _removed_supervisor_capability()
+
     if request.method != "POST":
         return _deny_portal_access(request)
 
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_supervisor_branch(request)
     if branch is None:
         messages.error(request, "Aucune annexe n'est rattachee a ce compte.")
         return _redirect_supervisor_dashboard("courses")
@@ -862,7 +1146,7 @@ def supervisor_save_lesson_log(request):
 
 @_position_required({"academic_supervisor"})
 def supervisor_quick_search(request):
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_supervisor_branch(request)
     if branch is None:
         return render(
             request,
@@ -934,7 +1218,7 @@ def supervisor_quick_search(request):
 
 @_position_required({"academic_supervisor"})
 def supervisor_student_options(request):
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_supervisor_branch(request)
     query = (request.GET.get("q") or "").strip()
     if branch is None or len(query) < 2:
         return render(
@@ -964,7 +1248,7 @@ def supervisor_student_options(request):
 
 @_position_required({"academic_supervisor"})
 def supervisor_class_detail(request, class_id: int):
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_supervisor_branch(request)
     if branch is None:
         return render(
             request,
@@ -995,6 +1279,8 @@ def supervisor_class_detail(request, class_id: int):
 
 @_position_required({"academic_supervisor"})
 def supervisor_planner_workspace(request):
+    return _removed_supervisor_capability()
+
     branch, class_id, week_start = _parse_supervisor_planner_request(request)
     if branch is None:
         return render(
@@ -1026,6 +1312,8 @@ def supervisor_planner_workspace(request):
 
 @_position_required({"academic_supervisor"})
 def supervisor_planner_hub(request):
+    return _removed_supervisor_capability()
+
     branch, class_id, week_start = _parse_supervisor_planner_request(request)
     drawer_mode = (request.GET.get("drawer") or "").strip() == "1"
 
@@ -1063,6 +1351,8 @@ def supervisor_planner_hub(request):
 
 @_position_required({"academic_supervisor"})
 def supervisor_planner_view_workspace(request):
+    return _removed_supervisor_capability()
+
     branch, class_id, week_start = _parse_supervisor_planner_request(request)
     if branch is None:
         return render(
@@ -1092,7 +1382,9 @@ def supervisor_planner_view_workspace(request):
 
 @_position_required({"academic_supervisor"})
 def supervisor_weekly_slots_workspace(request, class_id: int, drawer_form=False):
-    branch = _resolve_academic_branch(request)
+    return _removed_supervisor_capability()
+
+    branch = _resolve_supervisor_branch(request)
     if branch is None:
         return render(
             request,
@@ -1144,10 +1436,12 @@ def supervisor_weekly_slots_workspace(request, class_id: int, drawer_form=False)
 
 @_position_required({"academic_supervisor"})
 def supervisor_weekly_slot_save(request, class_id: int):
+    return _removed_supervisor_capability()
+
     if request.method != "POST":
         return _deny_portal_access(request)
 
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_supervisor_branch(request)
     if branch is None:
         return render(
             request,
@@ -1280,10 +1574,12 @@ def supervisor_weekly_slot_save(request, class_id: int):
 
 @_position_required({"academic_supervisor"})
 def supervisor_week_materialize(request, class_id: int):
+    return _removed_supervisor_capability()
+
     if request.method != "POST":
         return _deny_portal_access(request)
 
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_supervisor_branch(request)
     if branch is None:
         return render(
             request,
@@ -1332,10 +1628,12 @@ def supervisor_week_materialize(request, class_id: int):
 
 @_position_required({"academic_supervisor"})
 def supervisor_month_materialize(request, class_id: int):
+    return _removed_supervisor_capability()
+
     if request.method != "POST":
         return _deny_portal_access(request)
 
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_supervisor_branch(request)
     if branch is None:
         return render(
             request,
@@ -1384,10 +1682,12 @@ def supervisor_month_materialize(request, class_id: int):
 
 @_position_required({"academic_supervisor"})
 def supervisor_create_schedule_event(request, class_id: int):
+    return _removed_supervisor_capability()
+
     if request.method != "POST":
         return _deny_portal_access(request)
 
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_supervisor_branch(request)
     if branch is None:
         return _deny_portal_access(request)
 
@@ -1468,44 +1768,51 @@ def _hx_trigger_close_and_toast(response, *, message):
     return response
 
 
-def _build_teacher_drawer_context(*, branch, teacher):
-    teachers_context = build_teachers_section_context(branch=branch)
-    entry = next((t for t in teachers_context["teachers"] if t["id"] == teacher.id), None)
-    open_cases = list(
-        TeacherCase.objects.filter(teacher=teacher, branch=branch).exclude(status=TeacherCase.STATUS_RESOLU)
-    )
-    User = get_user_model()
-    other_teachers = list(
-        User.objects.filter(profile__branch=branch, profile__position="teacher", is_active=True)
-        .exclude(pk=teacher.id)
-        .order_by("first_name", "last_name", "username")[:50]
-    )
+def _build_teacher_drawer_context(*, branch, teacher, event):
+    attendance = TeacherAttendance.objects.filter(
+        branch=branch,
+        teacher=teacher,
+        schedule_event=event,
+    ).first()
     return {
         "teacher": teacher,
-        "entry": entry,
-        "open_cases": open_cases,
-        "other_teachers": other_teachers,
+        "selected_event": event,
+        "teacher_attendance": attendance,
     }
 
 
 @_position_required({"academic_supervisor"})
 def supervisor_teacher_drawer(request):
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_supervisor_branch(request)
     teacher_id_raw = (request.GET.get("teacher_id") or "").strip()
-    if branch is None or not teacher_id_raw.isdigit():
+    event_id_raw = (request.GET.get("schedule_event_id") or "").strip()
+    if branch is None or not teacher_id_raw.isdigit() or not event_id_raw.isdigit():
         return render(request, "portal/staff/supervisor/partials/teacher_drawer.html", {"teacher": None})
 
-    User = get_user_model()
-    teacher = User.objects.filter(
-        pk=int(teacher_id_raw), profile__branch=branch, profile__position="teacher"
-    ).first()
-    if teacher is None:
+    event = (
+        AcademicScheduleEvent.objects.select_related("teacher", "academic_class", "ec", "branch")
+        .filter(
+            pk=int(event_id_raw),
+            branch=branch,
+            teacher_id=int(teacher_id_raw),
+            event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+            is_active=True,
+        )
+        .exclude(
+            status__in={
+                AcademicScheduleEvent.STATUS_DRAFT,
+                AcademicScheduleEvent.STATUS_CANCELLED,
+            }
+        )
+        .first()
+    )
+    if event is None or event.teacher is None:
         return render(request, "portal/staff/supervisor/partials/teacher_drawer.html", {"teacher": None})
 
     response = render(
         request,
         "portal/staff/supervisor/partials/teacher_drawer.html",
-        _build_teacher_drawer_context(branch=branch, teacher=teacher),
+        _build_teacher_drawer_context(branch=branch, teacher=event.teacher, event=event),
     )
     response["HX-Trigger"] = "supervisor-drawer-open"
     return response
@@ -1513,67 +1820,16 @@ def supervisor_teacher_drawer(request):
 
 @_position_required({"academic_supervisor"})
 def supervisor_toggle_teacher_presence(request):
-    if request.method != "POST":
-        return _deny_portal_access(request)
-    branch = _resolve_academic_branch(request)
-    if branch is None:
-        return render(request, "portal/staff/supervisor/partials/teacher_drawer.html", {"teacher": None})
-
-    User = get_user_model()
-    try:
-        teacher = User.objects.get(
-            pk=request.POST.get("teacher_id"), profile__branch=branch, profile__position="teacher"
-        )
-        event_id_raw = (request.POST.get("schedule_event_id") or "").strip()
-        event = (
-            AcademicScheduleEvent.objects.filter(pk=event_id_raw, branch=branch, teacher=teacher).first()
-            if event_id_raw.isdigit()
-            else None
-        )
-        existing = (
-            TeacherAttendance.objects.filter(
-                branch=branch, teacher=teacher, date=timezone.localdate(), schedule_event=event
-            ).first()
-            if event
-            else None
-        )
-        new_status = (
-            TeacherAttendance.STATUS_PRESENT
-            if existing and existing.status == TeacherAttendance.STATUS_ABSENT
-            else TeacherAttendance.STATUS_ABSENT
-        )
-        if event:
-            mark_teacher_attendance(
-                teacher=teacher,
-                schedule_event=event,
-                status=new_status,
-                recorded_by=request.user,
-                branch=branch,
-                arrival_time=None,
-                justification="",
-            )
-        toast_message = (
-            f"{teacher.get_full_name() or teacher.username} marque "
-            f"{'present' if new_status == TeacherAttendance.STATUS_PRESENT else 'absent'}."
-        )
-        response = render(
-            request,
-            "portal/staff/supervisor/partials/teacher_drawer.html",
-            _build_teacher_drawer_context(branch=branch, teacher=teacher),
-        )
-    except User.DoesNotExist:
-        toast_message = "Enseignant introuvable pour cette annexe."
-        response = render(request, "portal/staff/supervisor/partials/teacher_drawer.html", {"teacher": None})
-
-    response["HX-Trigger"] = json.dumps({"toast": toast_message})
-    return response
+    return _removed_supervisor_capability()
 
 
 @_position_required({"academic_supervisor"})
 def supervisor_assign_replacement(request):
+    return _removed_supervisor_capability()
+
     if request.method != "POST":
         return _deny_portal_access(request)
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_supervisor_branch(request)
     User = get_user_model()
     try:
         event = AcademicScheduleEvent.objects.select_related("teacher", "branch").get(
@@ -1606,39 +1862,14 @@ def supervisor_assign_replacement(request):
 
 @_position_required({"academic_supervisor"})
 def supervisor_signal_teacher_incident(request):
-    if request.method != "POST":
-        return _deny_portal_access(request)
-    branch = _resolve_academic_branch(request)
-    User = get_user_model()
-    try:
-        teacher = User.objects.get(
-            pk=request.POST.get("teacher_id"), profile__branch=branch, profile__position="teacher"
-        )
-        create_teacher_case(
-            teacher=teacher,
-            branch=branch,
-            case_type=TeacherCase.TYPE_INCIDENT,
-            title="Incident signale",
-            description=(request.POST.get("note") or "Signalement cree depuis le suivi des enseignants.").strip(),
-            opened_by=request.user,
-        )
-        message = "Incident enregistre."
-    except User.DoesNotExist:
-        message = "Enseignant introuvable pour cette annexe."
-
-    return _hx_trigger_close_and_toast(
-        render(
-            request,
-            "portal/staff/supervisor/partials/panel_teachers.html",
-            build_teachers_section_context(branch=branch),
-        ),
-        message=message,
-    )
+    return _removed_supervisor_capability()
 
 
 @_position_required({"academic_supervisor"})
 def supervisor_convocation_drawer(request):
-    branch = _resolve_academic_branch(request)
+    return _removed_supervisor_capability()
+
+    branch = _resolve_supervisor_branch(request)
     target_type = (request.GET.get("target_type") or Convocation.TARGET_STUDENT).strip()
     target_id_raw = (request.GET.get("target_id") or "").strip()
     case_id = (request.GET.get("case_id") or "").strip()
@@ -1673,9 +1904,11 @@ def supervisor_convocation_drawer(request):
 
 @_position_required({"academic_supervisor"})
 def supervisor_convocation_create(request):
+    return _removed_supervisor_capability()
+
     if request.method != "POST":
         return _deny_portal_access(request)
-    branch = _resolve_academic_branch(request)
+    branch = _resolve_supervisor_branch(request)
     if branch is None:
         return _hx_trigger_close_and_toast(
             HttpResponse(""), message="Aucune annexe n'est rattachee a ce compte."

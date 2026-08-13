@@ -1,0 +1,747 @@
+PLAN DETAILLE - RAFFINEMENT DES SOUS-FENETRES DU DIRECTEUR DES ETUDES
+=====================================================================
+
+Date de l'analyse : 1er aout 2026
+Projet : ESFE Core
+Perimetre : dashboard reel du Directeur des Etudes
+Statut de ce document : analyse et plan de travail uniquement
+
+IMPORTANT
+---------
+
+Ce document explique la situation avant toute nouvelle modification du code.
+Il ne constitue pas encore le rapport final demande dans instructions2.txt.
+
+L'implementation ne doit commencer qu'apres lecture de ce document. La
+sidebar, la topbar et l'architecture generale du dashboard ne seront pas
+refaites.
+
+
+1. OBJECTIF DE LA MISSION
+-------------------------
+
+Le dashboard du Directeur des Etudes possede deja des sous-fenetres internes.
+Le principe est bon : la sidebar et la topbar restent visibles, l'en-tete de la
+section reste en place et seul le contenu interne change.
+
+Le probleme est que la version actuelle melange encore trois responsabilites :
+
+1. les periodes officielles de sessions d'examens ;
+2. la planification d'une evaluation precise pour une classe et une matiere ;
+3. le traitement des notes, la validation, la publication et les bulletins.
+
+La mission consiste a separer clairement ces responsabilites, raccorder les
+ecrans aux vrais services metier, rendre la navigation HTMX fiable et terminer
+la validation visuelle et technique.
+
+
+2. LES TROIS OBJETS METIER REELS
+--------------------------------
+
+A. AcademicCalendarEntry
+
+Role reel : definir une periode academique officielle.
+
+Types concernes :
+- session d'examens ;
+- session de rattrapage.
+
+Exemple fonctionnel : une session d'examens du semestre 1 qui commence le
+10 janvier et se termine le 20 janvier.
+
+Section correcte : Sessions d'evaluations.
+
+
+B. AcademicScheduleEvent
+
+Role reel : programmer un evenement precis dans le temps pour une classe, un
+EC, un enseignant, une salle et une annexe.
+
+Types concernes dans cette mission :
+- examen ;
+- travaux pratiques ou evaluation pratique.
+
+Exemple fonctionnel : une evaluation d'un EC pour une classe donnee, le
+12 janvier de 08 h 00 a 10 h 00.
+
+Section correcte : Sessions d'evaluations, car il s'agit encore de
+planification et non de resultats.
+
+
+C. Semester, ECGrade et bulletins
+
+Role reel : suivre la saisie des notes, detecter les notes manquantes, valider
+les resultats, demander la publication par OTP et generer les bulletins.
+
+Section correcte : Resultats et notes.
+
+
+3. CARTOGRAPHIE METIER RETENUE
+------------------------------
+
+Fonction                              Section correcte          Backend actuel                         Decision
+------------------------------------------------------------------------------------------------------------------------
+Creer une session d'examens           Sessions d'evaluations    director_exam_session_action           Conserver et fiabiliser
+Creer une session de rattrapage       Sessions d'evaluations    director_exam_session_action           Conserver et fiabiliser
+Publier/annuler une session           Sessions d'evaluations    director_exam_session_action           Conserver via services metier
+Planifier une evaluation classe/EC    Sessions d'evaluations    director_evaluation_action             Deplacer depuis Resultats et notes
+Lister les evaluations programmees    Sessions d'evaluations    director_evaluations_subcontent        Deplacer depuis Resultats et notes
+Annuler une evaluation planifiee      Sessions d'evaluations    director_evaluation_action             Conserver via service metier
+Voir l'avancement des notes           Resultats et notes         contexte des semestres/ECGrade         Conserver
+Valider ou rejeter les resultats       Resultats et notes         director_results_action                Conserver
+Publier les resultats par OTP          Resultats et notes         director_results_action                Conserver
+Generer/consulter les bulletins        Resultats et notes         director_bulletin_action               Conserver
+
+Conclusion metier : les sous-fenetres Planifier et Programmees sont mal
+placees sous Resultats et notes. Elles doivent rejoindre Sessions
+d'evaluations. La validation, la publication et les bulletins doivent rester
+sous Resultats et notes.
+
+
+4. CE QUI EXISTE DEJA ET QUI EST BON
+------------------------------------
+
+- Une section principale Sessions d'evaluations existe deja sous la cle
+  evaluations_calendar.
+- Une section Resultats et notes existe deja sous la cle evaluations.
+- Les donnees sont globalement filtrees par l'annexe du Directeur des Etudes.
+- Les sessions utilisent AcademicCalendarEntry.
+- Les evaluations individuelles utilisent AcademicScheduleEvent.
+- La validation utilise Semester et le workflow reel des notes.
+- La publication des resultats utilise une confirmation OTP.
+- Les bulletins utilisent une vraie action backend.
+- Les quatre fragments actuels sont separes dans des templates distincts.
+- Une cible HTMX stable, #director-section-subcontent, existe deja.
+- Les formulaires des actions importantes sont en POST et proteges par CSRF.
+- Les boutons sont temporairement desactives pendant certaines requetes HTMX.
+- Le dashboard possede deja des drawers larges adaptes aux informations du DE.
+
+Ces acquis doivent etre preserves. Il n'est pas necessaire de recommencer le
+dashboard.
+
+
+5. PROBLEMES CONSTATES DANS LA VERSION ACTUELLE
+-----------------------------------------------
+
+5.1 Melange des responsabilites
+
+La section Resultats et notes affiche actuellement :
+- Vue d'ensemble ;
+- Planifier ;
+- Programmees ;
+- Validation.
+
+Les deux onglets du milieu gerent AcademicScheduleEvent. Ils concernent la
+planification et doivent donc etre places dans Sessions d'evaluations.
+
+L'en-tete Resultats et notes additionne aussi les evaluations planifiees et les
+classes a valider. Il melange donc deux domaines dans le meme resume.
+
+
+5.2 Etat actif des sous-fenetres non fiable
+
+Les liens HTMX remplacent uniquement le contenu interne. La barre d'onglets,
+elle, n'est pas remplacee et aucun script ne met son etat actif a jour.
+
+Consequence : apres un clic, le contenu peut afficher Planifier tandis que
+l'onglet Vue d'ensemble reste visuellement actif.
+
+Il manque egalement aria-current ou un equivalent coherent pour annoncer
+l'onglet actif aux technologies d'assistance.
+
+
+5.3 Rechargement direct et historique navigateur incorrects
+
+Les onglets poussent dans l'URL la route director_workspace, qui est une route
+de fragment HTMX. Si l'utilisateur recharge cette URL directement, il risque
+d'obtenir uniquement le fragment au lieu du dashboard complet.
+
+De plus, le template principal inclut toujours overview.html. Le parametre
+view=validation ou view=create n'est donc pas restaure correctement lors d'un
+chargement complet.
+
+La cible correcte pour l'URL visible doit rester la route du dashboard complet,
+tandis que hx-get peut continuer a appeler une route de fragment.
+
+
+5.4 Pagination actuellement non fonctionnelle de bout en bout
+
+Dans Validation, #de-grid-evals contient seulement la grille des classes. Les
+controles Precedent/Suivant sont places en dehors de cette grille.
+
+La pagination demande ensuite director_workspace et utilise
+hx-select="#de-grid-evals". Or cette reponse principale inclut la vue d'ensemble
+et non le fragment Validation. Le select peut donc ne rien trouver.
+
+Meme si la grille etait trouvee, seuls les elements de la grille seraient
+remplaces : les controles de pagination et le numero de page resteraient ceux
+de l'ancienne page.
+
+Il faut une enveloppe unique contenant a la fois la liste et ses controles,
+par exemple #director-results-validation-list, puis faire repondre directement
+la vue de sous-contenu correspondante.
+
+
+5.5 Formulaire de planification insuffisant
+
+Le formulaire actuel est du HTML manuel ; aucun Django Form dedie n'existe.
+
+En cas d'erreur :
+- seul un toast global est renvoye ;
+- les erreurs ne sont pas rattachees aux champs ;
+- les valeurs saisies ne sont pas garanties d'etre conservees ;
+- le workspace complet est remplace ;
+- l'utilisateur revient sur la vue d'ensemble au lieu de rester dans le
+  formulaire.
+
+En cas de succes, le workspace complet est egalement remplace. Cela fonctionne
+partiellement, mais ce n'est pas l'experience interne fluide demandee.
+
+
+5.6 Contournement de services metier existants
+
+La creation actuelle appelle directement AcademicScheduleEvent.objects.create.
+Elle contourne create_schedule_event, qui assure :
+- full_clean ;
+- controle des conflits de salle, de classe et d'enseignant ;
+- transaction atomique ;
+- creation d'un AcademicScheduleChangeLog.
+
+L'annulation modifie aussi directement le statut. Elle contourne
+cancel_schedule_event, qui exige un motif et journalise le changement.
+
+Pour les sessions, la vue cree directement AcademicCalendarEntry alors que le
+projet possede create_calendar_entry et validate_entry_business_rules.
+
+
+5.7 Annee academique et enseignant choisis de maniere fragile
+
+La creation d'une evaluation prend la premiere annee academique active de la
+base, au lieu d'utiliser directement academic_class.academic_year.
+
+Si aucun enseignant n'est transmis, le Directeur des Etudes devient lui-meme
+l'enseignant de l'evaluation. Ce choix ne correspond pas forcement a la charge
+d'enseignement reelle.
+
+Le formulaire n'affiche d'ailleurs aucun champ enseignant, bien que la vue lise
+teacher_id.
+
+
+5.8 Types incoherents entre creation et liste
+
+Le formulaire autorise le type seminaire, mais la liste des evaluations ne
+charge que exam et practical. Un seminaire cree peut donc disparaitre de la
+liste immediatement apres sa creation.
+
+Les types proposes devront etre limites aux types reellement geres par ce
+workflow, ou le filtrage devra etre rendu coherent.
+
+
+5.9 Affectation des surveillants annoncee mais non implementee
+
+L'interface de Sessions d'evaluations annonce une affectation des surveillants.
+Le service renvoie pourtant toujours une liste vide et le code des actions
+contient seulement pass apres la selection des utilisateurs.
+
+Il n'existe actuellement aucune relation metier persistante identifiee entre
+une session et ses surveillants.
+
+Cette promesse visuelle doit etre retiree tant qu'un vrai backend n'existe pas.
+La mission interdit d'inventer un modele ou une migration pour la simuler.
+
+
+5.10 Exemples a corriger
+
+Le placeholder de creation de session contient actuellement L1 Informatique.
+Il est explicitement interdit par instructions2.txt.
+
+La base observee contient de vraies classes de sante, notamment Agent de Sante
+Communautaire dans plusieurs annexes. Les listes doivent rester entierement
+alimentees par la base et les placeholders doivent rester neutres, sans fausse
+matiere ou fausse filiere.
+
+
+5.11 Integration UI Core incomplete
+
+La page d'accueil du dashboard reutilise deja ui_core.page_header,
+ui_core.alert et les tokens UI Core. Les sous-fenetres utilisent encore de
+longues classes Tailwind ecrites directement dans chaque fragment.
+
+Le projet possede notamment :
+- ui_core.tabs ;
+- ui_core.page_header ;
+- ui_core.panel ;
+- ui_core.stat_card ;
+- ui_core.form_field ;
+- ui_core.filter_bar ;
+- ui_core.empty_state ;
+- ui_core.status_badge ;
+- ui_core.alert ;
+- ui_core.loading_overlay ;
+- ui_core.toast.
+
+Le composant ui_core.tabs actuel ne sait toutefois pas encore rendre des liens
+HTMX. Il faudra soit l'etendre de maniere retrocompatible, soit reutiliser son
+contrat visuel et accessible sans creer un second composant concurrent.
+
+
+5.12 Ancien rapport a ne pas prendre comme validation finale
+
+Le fichier docs/ui/DIRECTOR_SUBWINDOWS_REFINEMENT_REPORT.md existe deja et
+declare que les sous-fenetres sont pretes. Cette conclusion est prematuree :
+- les captures obligatoires n'ont pas ete produites ;
+- la pagination n'est pas validee dans un navigateur ;
+- les formulaires ne rendent pas les erreurs par champ ;
+- plusieurs actions contournent les services metier ;
+- la responsabilite de la planification reste dans Resultats et notes ;
+- l'affectation des surveillants est annoncee mais non implementee.
+
+Ce rapport devra etre remplace ou corrige uniquement apres la vraie execution
+et les tests de la mission.
+
+
+6. DONNEES REELLES OBSERVEES, SANS MODIFICATION
+-----------------------------------------------
+
+Une lecture seule de la base de developpement a montre :
+- des classes actives de sante, dont Agent de Sante Communautaire ;
+- plusieurs annexes, dont Djélibougou, Moribabougou, Bougouni, Kayes,
+  Koulikoro, Koutiala, Mopti, Segou et Sikasso ;
+- une evaluation exam/practical existante ;
+- trois sessions d'examens ou de rattrapage existantes.
+
+Ces nombres decrivent seulement l'etat observe le 1er aout 2026. Ils ne doivent
+pas etre codes en dur dans l'interface.
+
+Aucune donnee n'a ete creee ou modifiee pendant cette analyse.
+
+
+7. ARCHITECTURE FINALE PROPOSEE
+-------------------------------
+
+7.1 Section Sessions d'evaluations
+
+Cette section regroupera toute la preparation des evaluations :
+
+- Vue d'ensemble : nombres de sessions, evaluations a venir et alertes utiles ;
+- Sessions : creation, liste, publication et annulation des periodes officielles ;
+- Planifier : formulaire d'une evaluation precise pour une classe et un EC ;
+- Programmees : liste paginee et filtree des evaluations individuelles.
+
+Les quatre vues resteront sous le meme en-tete Sessions d'evaluations.
+
+
+7.2 Section Resultats et notes
+
+Cette section sera limitee au traitement des resultats :
+
+- Vue d'ensemble : notes completes, elements a valider, a publier et alertes ;
+- Validation et publication : classes/semestres, validation, rejet et OTP ;
+- Bulletins : acces aux actions de generation et de consultation deja
+  disponibles, sans creer de nouveau moteur documentaire.
+
+Si un onglet Bulletins autonome n'apporte pas assez de contenu avec le backend
+actuel, l'action restera dans le drawer du semestre. Aucun onglet vide ne sera
+cree uniquement pour remplir la navigation.
+
+
+7.3 Navigation et URL
+
+Chaque sous-fenetre aura :
+- un lien normal utilisable sans JavaScript ;
+- un hx-get vers un fragment dedie ;
+- une cible interne stable ;
+- un hx-push-url vers le dashboard complet ;
+- un etat actif serveur et client coherent ;
+- un focus visible au clavier ;
+- un indicateur de chargement discret ;
+- une restauration correcte apres actualisation et navigation precedent/suivant.
+
+
+8. PLAN D'IMPLEMENTATION TECHNIQUE
+----------------------------------
+
+Etape 1 - Verrouiller la cartographie
+- Separer les sous-vues de Sessions d'evaluations et de Resultats et notes.
+- Conserver les routes existantes utiles pour eviter les regressions.
+- Corriger les libelles sans toucher a la sidebar ou a la topbar.
+
+Etape 2 - Reorganiser les fragments
+- Deplacer logiquement Planifier et Programmees sous Sessions d'evaluations.
+- Garder les resultats, validations, publications et bulletins sous Resultats.
+- Faire rendre au chargement initial la sous-fenetre demandee par view=.
+
+Etape 3 - Stabiliser HTMX
+- Utiliser une cible interne par section.
+- Mettre a jour l'onglet actif apres chaque changement.
+- Utiliser hx-sync pour eviter les reponses concurrentes.
+- Gerer htmx:responseError et htmx:sendError avec un retour visible.
+- Reinitialiser les icones et le focus apres les swaps si necessaire.
+- Pousser l'URL du dashboard complet, jamais celle d'un fragment.
+
+Etape 4 - Corriger les formulaires
+- Introduire des Django Forms cibles si aucun formulaire reutilisable n'existe.
+- Rendre les erreurs par champ et les erreurs globales.
+- Conserver toutes les valeurs en cas d'echec.
+- Rester dans la sous-fenetre active apres une erreur.
+- Apres succes, afficher un message puis actualiser les statistiques et la liste
+  concernee.
+- Empecher les doubles soumissions.
+
+Etape 5 - Raccorder les services metier
+- Utiliser create_schedule_event pour la planification individuelle.
+- Utiliser cancel_schedule_event avec un vrai motif d'annulation.
+- Utiliser academic_class.academic_year.
+- Utiliser un enseignant reel autorise dans l'annexe, sans repli silencieux vers
+  le Directeur des Etudes.
+- Utiliser create_calendar_entry et validate_entry_business_rules pour les
+  sessions.
+- Conserver les filtres d'annexe sur chaque lecture et chaque action.
+
+Etape 6 - Corriger listes, filtres et pagination
+- Ajouter une enveloppe commune autour de chaque liste et de sa pagination.
+- Faire cibler cette enveloppe par Suivant et Precedent.
+- Conserver view, page, filtres, tri et recherche dans les parametres.
+- Tester premiere page, derniere page, page vide et filtre sans resultat.
+- Ne placer overflow-x-auto qu'autour d'un vrai tableau si necessaire.
+
+Etape 7 - Harmoniser l'interface
+- Reutiliser les tokens et composants UI Core compatibles.
+- Garder une navigation compacte, accessible et responsive.
+- Eviter les sections transformees en empilement de cartes decoratives.
+- Ajouter min-w-0 et max-w-full aux conteneurs qui peuvent deborder.
+- Verifier les boutons, badges et textes longs sur mobile.
+
+Etape 8 - Tests et validation navigateur
+- Ajouter des tests backend et de contrat HTML cibles.
+- Executer tous les tests imposes dans instructions2.txt.
+- Demarrer le dashboard avec les donnees locales autorisees.
+- Tester le parcours complet dans un vrai navigateur.
+- Produire les dix captures obligatoires.
+- Corriger le rapport final avec des resultats observes, pas supposes.
+
+
+9. FICHIERS PROBABLEMENT CONCERNES
+----------------------------------
+
+Fichiers principaux :
+- portal/views/views.py
+- portal/urls.py
+- portal/test_director_dashboard_phase2.py
+- templates/portal/staff/director/partials/workspace.html
+- templates/portal/staff/director/partials/_pagination.html
+- templates/portal/staff/director/partials/evaluations/overview.html
+- templates/portal/staff/director/partials/evaluations/create.html
+- templates/portal/staff/director/partials/evaluations/scheduled.html
+- templates/portal/staff/director/partials/evaluations/validation.html
+- templates/portal/staff/director/partials/drawers/evaluations_drawer.html
+- static/src/js/portal/director_dashboard.js
+- docs/ui/DIRECTOR_SUBWINDOWS_REFINEMENT_REPORT.md
+
+Fichiers possibles selon la solution retenue :
+- un formulaire cible dans portal/forms.py ou un module de formulaires directeur ;
+- des fragments dedies a Sessions d'evaluations ;
+- ui/components/ui_core/navigation/tabs.py ;
+- ui/templates/ui_core/navigation/tabs.html ;
+- ui/test_ui_core.py.
+
+Les modeles et migrations ne devraient pas etre modifies.
+
+
+10. TESTS A REALISER
+--------------------
+
+Tests metier et Django :
+- acces reserve au Directeur des Etudes et profils autorises ;
+- refus des donnees d'une autre annexe ;
+- creation valide d'une session ;
+- erreurs de dates et conservation des valeurs ;
+- creation d'une evaluation via le service metier ;
+- detection des conflits ;
+- enseignant obligatoire et limite a l'annexe ;
+- annulation journalisee avec motif ;
+- validation, rejet, publication OTP et bulletins ;
+- sous-fenetre active restauree par l'URL ;
+- absence de lien mort ;
+- pagination page 1, page 2, precedente et derniere page ;
+- conservation des filtres et du tri.
+
+Commandes minimales imposees :
+- python manage.py check
+- python manage.py makemigrations --check --dry-run
+- python manage.py test portal.test_director_dashboard_phase2 --settings=config.settings_test_local --keepdb
+- python manage.py test ui --settings=config.settings_test_local --keepdb
+- npm run build:css
+
+
+11. VALIDATION DANS LE NAVIGATEUR
+---------------------------------
+
+Le parcours devra verifier :
+- connexion Directeur des Etudes ;
+- ouverture des deux sections ;
+- changement de sous-fenetre sans rechargement complet ;
+- actualisation directe de chaque URL ;
+- precedent et suivant du navigateur ;
+- erreurs puis succes du formulaire ;
+- statistiques actualisees ;
+- pagination Suivant puis Precedent ;
+- filtres conserves ;
+- drawers de validation ;
+- permissions reelles ;
+- absence d'erreur console ;
+- absence de debordement global en desktop, tablette et mobile.
+
+Captures attendues dans _audit/director_subwindows_refinement/ :
+- 01-overview-refined.png
+- 02-create-refined.png
+- 03-scheduled-refined.png
+- 04-validation-refined.png
+- 05-pagination-page-1.png
+- 06-pagination-page-2.png
+- 07-form-errors.png
+- 08-form-success.png
+- 09-mobile.png
+- 10-tablet.png
+
+
+12. LIMITES A RESPECTER
+-----------------------
+
+- Ne pas modifier la sidebar.
+- Ne pas modifier la topbar.
+- Ne pas refaire le dashboard complet.
+- Ne pas appliquer cette architecture a toutes les autres sections.
+- Ne pas inventer de nouvelle fonction metier.
+- Ne pas inventer de matiere ou de filiere.
+- Ne pas creer de modele ni de migration pour les surveillants.
+- Ne pas contourner les services existants.
+- Ne pas laisser de bouton decoratif ou de lien mort.
+- Ne pas faire de commit.
+- Ne pas faire de push.
+- Ne pas effacer ni annuler les nombreuses modifications deja presentes dans
+  le worktree.
+
+
+13. CRITERES POUR CONSIDERER LA MISSION TERMINEE
+------------------------------------------------
+
+La mission sera terminee uniquement si :
+- la separation metier est visible et confirmee dans le code ;
+- Planifier et Programmees sont sous Sessions d'evaluations ;
+- Resultats et notes reste centre sur les notes et leurs decisions ;
+- tous les boutons visibles ont un vrai comportement ;
+- les services metier existants sont utilises ;
+- les erreurs de formulaire sont detaillees et les valeurs sont conservees ;
+- l'etat actif et l'historique navigateur fonctionnent ;
+- la pagination fonctionne reellement dans le navigateur ;
+- aucun contenu ne sort de la zone centrale ;
+- les dix captures existent ;
+- les tests imposes passent, ou toute anomalie externe est documentee avec
+  preuve ;
+- le rapport final correspond aux resultats reellement obtenus.
+
+
+14. VERDICT AVANT IMPLEMENTATION
+--------------------------------
+
+L'architecture generale est recuperable et ne doit pas etre recommencee.
+Cependant, la version actuelle n'est pas encore satisfaisante : la separation
+metier, les services backend, les formulaires, l'etat actif, l'historique et la
+pagination doivent etre corriges avant validation visuelle.
+
+Ce document est la derniere etape avant le debut de l'implementation.
+
+
+15. AUDIT VISUEL DU DASHBOARD REEL DANS LE NAVIGATEUR
+-----------------------------------------------------
+
+Date du passage navigateur : 1er aout 2026
+Compte utilise : directeur.etudes
+Annexe du compte : Bamako Djélibougou
+Navigateur : Chromium en session locale
+Tailles controlees : 1440 px, 768 px et 390 px de largeur
+
+Aucune creation, publication, validation, annulation ou autre action metier n'a
+ete soumise pendant ce passage. L'inspection a ete volontairement limitee aux
+lectures, ouvertures de sections, changements de sous-fenetre et controles
+responsive.
+
+
+15.1 Etat reel des donnees de l'annexe observee
+
+La verification conjointe du navigateur et de la base montre pour Djélibougou :
+- 114 classes actives ;
+- 0 evaluation exam/practical planifiee ;
+- 0 session d'examens ou de rattrapage.
+
+Les ecrans affichant zero dans Sessions d'evaluations ne sont donc pas vides a
+cause d'un probleme de chargement : ils refletent bien l'etat actuel de cette
+annexe.
+
+
+15.2 Vue generale : section de reference
+
+La vue generale est la partie visuellement la plus aboutie du dashboard.
+
+Points positifs observes :
+- titre, sous-titre et actions principales correctement hierarchises ;
+- contexte academique visible sous l'en-tete ;
+- grille de six indicateurs lisible et reguliere ;
+- raccourcis clairement separes des indicateurs ;
+- tableau des classes et activite recente organises sans surcharge ;
+- sidebar et topbar stables ;
+- aucune largeur globale excessive a 1440 px.
+
+Cette vue constitue la meilleure reference pour le raffinement : densite
+maitrisee, sections bien delimitees, alignements constants et actions faciles a
+identifier.
+
+Incoherence observee : la barre de contexte affiche Perimetre global alors que
+la topbar, les donnees et le compte indiquent Bamako Djélibougou. Les requetes
+inspectees restent filtrees sur Djélibougou, mais le libelle visuel est ambigu
+et doit etre corrige sans elargir les droits du compte.
+
+
+15.3 Sessions d'evaluations : rendu propre mais incomplet
+
+La section est visuellement propre sur desktop :
+- en-tete lisible ;
+- compteur de sessions bien place ;
+- formulaire repliable facile a reperer ;
+- etat vide clair ;
+- aucun debordement global observe.
+
+Cependant, elle donne encore l'impression d'une page courte plutot que d'un
+workspace complet :
+- beaucoup d'espace reste inutilise lorsque la liste est vide ;
+- aucune sous-navigation interne n'organise les sessions, la planification
+  individuelle et les elements programmes ;
+- le titre Calendrier des evaluations ne correspond pas exactement au libelle
+  de navigation Sessions d'evaluations ;
+- le texte promet une affectation des surveillants alors que cette fonction
+  n'est pas persistante dans le backend ;
+- le placeholder L1 Informatique est visible dans le vrai formulaire et doit
+  etre retire ;
+- l'absence d'evaluations individuelles dans cette section rend la separation
+  metier difficile a comprendre pour l'utilisateur.
+
+Le formulaire ouvert est correctement aligne sur desktop. Il contient le titre,
+le type, la classe, les dates de debut et de fin ainsi que les actions Brouillon
+et Annuler. Son apparence est satisfaisante ; le principal travail concerne le
+raccordement metier, les erreurs backend et l'integration des sous-fenetres.
+
+
+15.4 Resultats et notes : probleme visible de coherence
+
+Le melange metier est immediatement visible dans le navigateur :
+- l'en-tete Resultats et notes affiche le nombre d'evaluations planifiees ;
+- les onglets Planifier et Programmees sont places dans cette section ;
+- la vue d'ensemble propose des raccourcis de planification ;
+- le formulaire Planifier une nouvelle evaluation s'affiche sous le grand titre
+  Resultats et notes.
+
+Un utilisateur peut donc legitimement se demander s'il consulte les notes ou
+s'il organise le calendrier. Le deplacement prevu vers Sessions d'evaluations
+est confirme par l'experience visuelle, pas seulement par la lecture du code.
+
+
+15.5 Etat actif incorrect, confirme visuellement
+
+Apres avoir clique sur Planifier ou Validation :
+- le contenu interne change ;
+- Vue d'ensemble reste affiche comme l'onglet actif en bleu ;
+- l'onglet demande peut seulement conserver un fond de focus ou de survol ;
+- aucun aria-current n'identifie l'onglet reellement actif.
+
+Une capture a notamment montre le contenu Validation des notes par classe alors
+que Vue d'ensemble restait l'onglet actif. Cette incoherence est suffisamment
+visible pour induire l'utilisateur en erreur.
+
+
+15.6 URL et indicateur HTMX, confirmes dans le navigateur
+
+Apres un clic sur Planifier, l'URL visible est devenue :
+
+/portal/director/workspace/?section=evaluations&view=create
+
+Il s'agit de la route du fragment et non de la route complete du dashboard.
+Cette observation confirme la correction prevue pour hx-push-url.
+
+Apres certains remplacements internes, la console a affiche :
+
+The selector "#eval-subcontent-loading" on hx-indicator returned no matches!
+
+Le fragment charge ne contient plus l'indicateur declare par les boutons qu'il
+contient. L'indicateur doit rester hors de la zone remplacee ou etre inclus dans
+chaque fragment concerne.
+
+Les temps de calcul du contexte sont egalement perceptibles : des clics rapproches
+peuvent produire une impression de decalage entre l'URL et le contenu. hx-sync,
+un indicateur stable et des fragments plus legers sont necessaires.
+
+
+15.7 Vue Validation : trop de classes non actionnables
+
+La page affiche 114 classes, reparties sur 12 pages. Les dix premieres cartes
+observees indiquent toutes :
+- 0 etudiant ;
+- 0 a valider ;
+- 0 a publier ;
+- statut En cours.
+
+La grille est techniquement lisible, mais elle oblige le Directeur des Etudes a
+parcourir de nombreuses cartes sans action utile. La vue Validation devrait
+mettre en premier les classes ayant des notes a valider, publier ou corriger.
+Un filtre permettant d'afficher toutes les classes pourra rester disponible.
+
+Le bouton Suivant est visible sur la premiere page. Le passage automatise n'a
+pas permis d'observer de maniere fiable un etat page 2 avant expiration du
+controle, et l'analyse structurelle montre deja que la grille et les controles
+ne sont pas remplaces ensemble. La pagination reste donc non validee et doit
+etre corrigee avant toute declaration de succes.
+
+
+15.8 Responsive observe
+
+Points positifs :
+- aucun debordement horizontal global mesure a 1440, 768 ou 390 px ;
+- la sidebar devient un menu compact sur tablette et mobile ;
+- les cartes de classes passent de plusieurs colonnes a deux colonnes sur
+  tablette puis une colonne sur mobile ;
+- les noms longs des filieres et des classes reviennent correctement a la ligne ;
+- le bouton Suivant reste dans le cadre sur mobile.
+
+Points a raffiner :
+- sur mobile, la sous-navigation depasse localement et l'onglet Validation est
+  partiellement coupe hors de la zone visible ;
+- l'onglet actif n'est pas automatiquement ramene dans la zone visible ;
+- la liste de dix cartes cree une page mobile tres longue, meme quand aucune
+  classe n'a d'action disponible ;
+- certaines icones d'ouverture de drawer sont trop discretes et ressemblent a
+  un petit pictogramme incomplet apres le remplacement HTMX ;
+- le grand en-tete conserve des statistiques de planification alors que le
+  contenu visible concerne la validation.
+
+
+15.9 Conclusion de l'audit visuel
+
+Le dashboard global est solide et la vue generale prouve que le design systeme
+actuel peut produire un resultat professionnel. La mission ne necessite donc
+pas une reconstruction.
+
+En revanche, les deux sections etudiees ne sont pas encore pretes :
+- Sessions d'evaluations est propre mais trop courte et fonctionnellement
+  incomplete ;
+- Resultats et notes melange planification et traitement des notes ;
+- l'etat actif est visuellement faux ;
+- l'URL expose une route de fragment ;
+- l'indicateur HTMX disparait ;
+- la vue Validation montre trop de classes sans action ;
+- la pagination n'est pas validee ;
+- plusieurs promesses visibles ne correspondent pas au backend.
+
+L'analyse navigateur confirme donc l'architecture cible decrite dans les
+sections precedentes. Aucune implementation ne doit etre generalisee aux autres
+sections : il faut d'abord corriger ce pilote, le tester et le faire valider
+visuellement.

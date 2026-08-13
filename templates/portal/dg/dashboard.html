@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "portal/staff/director_dashboard.html" %}
 {% load static humanize component_tags %}
 
 {% block public_navbar %}{% endblock %}
@@ -498,8 +498,9 @@
 </style>
 {% endblock %}
 
-{% block content %}
-<div class="dg-shell" x-data="{ activeSection: window.location.hash ? window.location.hash.replace('#', '') : 'overview' }" @dg-set-section.window="activeSection = $event.detail.section">
+{% block dashboard_content %}
+<div class="dg-shell" x-data="{ activeSection: window.location.hash ? window.location.hash.replace('#', '') : '{{ dashboard_shell.active_section|default:'overview' }}' }" @dg-set-section.window="activeSection = $event.detail.section" @certified-dashboard:navigate.window="if ($event.detail.key === 'executive') dgShowSection($event.detail.section)">
+  {% if not dashboard_shell %}
   <aside id="dg-sidebar" class="dg-sidebar dg-scroll">
     <div class="dg-logo">
       <div class="flex items-center gap-3">
@@ -548,8 +549,10 @@
       </form>
     </div>
   </aside>
+  {% endif %}
 
   <main class="dg-main dg-scroll">
+    {% if not dashboard_shell %}
     <header class="dg-topbar">
       <div class="flex min-w-0 items-center gap-4">
         <button type="button" class="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-white text-slate-800 hover:bg-slate-50" onclick="dgToggleSidebar()">
@@ -604,6 +607,7 @@
         </div>
       </div>
     </header>
+    {% endif %}
 
 <div class="dg-content dg-scroll-area">
       <div class="dg-content-wrap">

@@ -1,30 +1,18 @@
 {% load notification_center_tags humanize %}
 {% notification_action_url notification as action_url %}
-<div class="space-y-5">
-  <div>
-    {% if notification.priority == 'critical' %}
-      <span class="inline-flex items-center rounded-full bg-ui-danger/10 px-2.5 py-0.5 text-[10px] font-bold text-ui-danger">Urgent</span>
-    {% elif notification.priority == 'high' %}
-      <span class="inline-flex items-center rounded-full bg-ui-warning/10 px-2.5 py-0.5 text-[10px] font-bold text-ui-warning">Important</span>
-    {% endif %}
-    <h3 class="mt-2 text-lg font-bold text-ui-text">{{ notification.title }}</h3>
-    <p class="mt-1 text-xs text-ui-text-muted">Reçu le {{ notification.created_at|date:"d/m/Y à H:i" }}</p>
-  </div>
-
-  <div class="rounded-ui-card border border-ui-border bg-ui-surface-muted/40 p-4 text-sm leading-6 text-ui-text">
-    {% if notification.body %}
-      {{ notification.body|linebreaksbr }}
-    {% else %}
-      <span class="text-ui-text-muted">Aucun contenu pour cette notification.</span>
-    {% endif %}
-  </div>
-
-  <div class="flex flex-wrap gap-2">
-    {% if action_url %}
-      <a href="{{ action_url }}" class="inline-flex items-center gap-2 rounded-ui-button border border-ui-border px-3 py-2 text-sm font-medium text-ui-text hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus">
-        <i data-lucide="external-link" class="h-4 w-4"></i>
-        Ouvrir la ressource
-      </a>
-    {% endif %}
-  </div>
-</div>
+<article class="space-y-5">
+  <header class="border-b border-ui-border pb-4">
+    <div class="flex flex-wrap items-center gap-2">{% if notification.priority == 'critical' %}<span class="inline-flex items-center rounded-full bg-ui-danger/10 px-2.5 py-0.5 text-[10px] font-bold text-ui-danger">Urgent</span>{% elif notification.priority == 'high' %}<span class="inline-flex items-center rounded-full bg-ui-warning/10 px-2.5 py-0.5 text-[10px] font-bold text-ui-warning">Important</span>{% endif %}<span class="text-xs text-ui-text-muted">{{ notification.created_at|date:"d/m/Y à H:i" }}</span></div>
+    <h2 class="mt-2 text-xl font-bold text-ui-text">{{ notification.title }}</h2>
+    <p class="mt-2 text-sm text-ui-text-muted">{% if notification.actor_id == request.user.id %}À <strong class="text-ui-text">{{ notification.recipient.get_full_name|default:notification.recipient.username }}</strong>{% elif notification.actor %}De <strong class="text-ui-text">{{ notification.actor.get_full_name|default:notification.actor.username }}</strong>{% else %}Message automatique du système{% endif %}</p>
+  </header>
+  <div class="min-h-40 whitespace-normal text-sm leading-7 text-ui-text">{% if notification.body %}{{ notification.body|linebreaksbr }}{% else %}<span class="text-ui-text-muted">Aucun contenu pour ce message.</span>{% endif %}</div>
+  {% if selected_attachments %}<div class="border-t border-ui-border pt-4"><p class="text-xs font-semibold text-ui-text-muted">Pièces jointes</p><div class="mt-2 flex flex-wrap gap-2">{% for attachment in selected_attachments %}<a href="{{ attachment.file.url }}" target="_blank" rel="noopener" class="ui-focus-ring inline-flex h-9 items-center gap-2 rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text"><i data-lucide="paperclip" class="h-4 w-4"></i>{{ attachment.original_name }}</a>{% endfor %}</div></div>{% endif %}
+  {% if selected_thread.count > 1 %}<section class="border-t border-ui-border pt-4"><h3 class="text-xs font-semibold text-ui-text-muted">Fil de discussion · {{ selected_thread.count }} messages</h3><div class="mt-2 divide-y divide-ui-border">{% for item in selected_thread %}<div class="py-2 text-xs"><div class="flex items-center justify-between gap-3"><strong class="text-ui-text">{{ item.actor.get_full_name|default:item.actor.username }}</strong><span class="text-ui-text-muted">{{ item.created_at|date:"d/m à H:i" }}</span></div><p class="mt-1 line-clamp-2 text-ui-text-muted">{{ item.body }}</p></div>{% endfor %}</div></section>{% endif %}
+  <footer class="flex flex-wrap gap-2 border-t border-ui-border pt-4">
+    {% if notification.event_type == "internal_message" and notification.actor and notification.actor_id != request.user.id %}<button type="button" hx-get="{% url 'accounts_portal:director_internal_message_compose' %}?reply_to={{ notification.id }}" hx-target="#director-modal-content" hx-swap="innerHTML" class="ui-focus-ring inline-flex h-9 items-center gap-2 rounded-ui-button bg-ui-primary px-3 text-xs font-semibold text-ui-on-primary"><i data-lucide="reply" class="h-4 w-4"></i>Répondre</button>{% endif %}
+    {% if notification.event_type == "internal_message" %}<button type="button" hx-get="{% url 'accounts_portal:director_internal_message_compose' %}?forward_from={{ notification.id }}" hx-target="#director-modal-content" hx-swap="innerHTML" class="ui-focus-ring inline-flex h-9 items-center gap-2 rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text"><i data-lucide="forward" class="h-4 w-4"></i>Transférer</button>{% endif %}
+    {% if notification.recipient_id == request.user.id %}<form hx-post="{% url 'accounts_portal:director_notification_action' notification.id %}?box={{ message_box|default:'inbox' }}" hx-target="#director-workspace" hx-swap="innerHTML" class="flex flex-wrap gap-2">{% csrf_token %}{% if notification.deleted_at %}<button name="action" value="restore" class="ui-focus-ring inline-flex h-9 items-center gap-2 rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text"><i data-lucide="rotate-ccw" class="h-4 w-4"></i>Restaurer</button>{% else %}{% if notification.pinned_at %}<button name="action" value="unpin" class="ui-focus-ring grid h-9 w-9 place-items-center rounded-ui-button border border-ui-primary text-ui-primary" title="Désépingler" aria-label="Désépingler"><i data-lucide="pin-off" class="h-4 w-4"></i></button>{% else %}<button name="action" value="pin" class="ui-focus-ring grid h-9 w-9 place-items-center rounded-ui-button border border-ui-border text-ui-text" title="Épingler" aria-label="Épingler"><i data-lucide="pin" class="h-4 w-4"></i></button>{% endif %}{% if notification.archived_at %}<button name="action" value="unarchive" class="ui-focus-ring inline-flex h-9 items-center gap-2 rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text"><i data-lucide="archive-restore" class="h-4 w-4"></i>Désarchiver</button>{% else %}<button name="action" value="archive" class="ui-focus-ring inline-flex h-9 items-center gap-2 rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text"><i data-lucide="archive" class="h-4 w-4"></i>Archiver</button>{% endif %}<button name="action" value="delete" class="ui-focus-ring grid h-9 w-9 place-items-center rounded-ui-button border border-ui-danger text-ui-danger" title="Placer dans la corbeille" aria-label="Placer dans la corbeille"><i data-lucide="trash-2" class="h-4 w-4"></i></button>{% endif %}</form>{% endif %}
+    {% if action_url %}<a href="{{ action_url }}" class="ui-focus-ring inline-flex h-9 items-center gap-2 rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text"><i data-lucide="external-link" class="h-4 w-4"></i>Ouvrir la ressource</a>{% endif %}
+  </footer>
+</article>

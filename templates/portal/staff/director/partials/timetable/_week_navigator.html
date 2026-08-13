@@ -1,0 +1,46 @@
+<nav class="flex flex-col gap-3 border-y border-ui-border bg-ui-surface-muted/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+     aria-label="Navigation entre les semaines"
+     data-timetable-week-start="{{ timetable_week_start|date:'Y-m-d' }}">
+  <button type="button"
+          aria-label="Afficher la semaine précédente"
+          title="Semaine précédente"
+          hx-get="{% url 'accounts_portal:director_timetable_subcontent' %}?view={{ timetable_subview }}&class_id={{ timetable_selected_class.id }}&week_start={{ timetable_previous_week|date:'Y-m-d' }}"
+          hx-target="#director-timetable-subcontent"
+          hx-swap="innerHTML"
+          hx-push-url="true"
+          hx-indicator="#director-timetable-loading"
+          class="ui-focus-ring inline-flex h-ui-control items-center justify-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover">
+    <i data-lucide="chevron-left" class="h-4 w-4" aria-hidden="true"></i>
+    <span>Semaine précédente</span>
+  </button>
+
+  <div class="text-center">
+    <p class="text-sm font-bold text-ui-text">Du {{ timetable_week_start|date:"d/m/Y" }} au {{ timetable_week_end|date:"d/m/Y" }}</p>
+    {% if timetable_is_current_week %}
+      <span class="mt-0.5 block text-[11px] font-semibold text-ui-success">Semaine actuelle</span>
+    {% else %}
+      <button type="button"
+              hx-get="{% url 'accounts_portal:director_timetable_subcontent' %}?view={{ timetable_subview }}&class_id={{ timetable_selected_class.id }}&week_start={{ timetable_current_week|date:'Y-m-d' }}"
+              hx-target="#director-timetable-subcontent"
+              hx-swap="innerHTML"
+              hx-push-url="true"
+              hx-indicator="#director-timetable-loading"
+              class="ui-focus-ring mt-0.5 text-[11px] font-semibold text-ui-primary hover:underline">
+        Revenir à cette semaine
+      </button>
+    {% endif %}
+  </div>
+
+  <button type="button"
+          aria-label="Afficher la semaine suivante"
+          title="Semaine suivante"
+          hx-get="{% url 'accounts_portal:director_timetable_subcontent' %}?view={{ timetable_subview }}&class_id={{ timetable_selected_class.id }}&week_start={{ timetable_next_week|date:'Y-m-d' }}"
+          hx-target="#director-timetable-subcontent"
+          hx-swap="innerHTML"
+          hx-push-url="true"
+          hx-indicator="#director-timetable-loading"
+          class="ui-focus-ring inline-flex h-ui-control items-center justify-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover">
+    <span>Semaine suivante</span>
+    <i data-lucide="chevron-right" class="h-4 w-4" aria-hidden="true"></i>
+  </button>
+</nav>

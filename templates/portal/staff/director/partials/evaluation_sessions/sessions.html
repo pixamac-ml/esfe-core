@@ -1,0 +1,156 @@
+{% load component_tags %}
+<div class="space-y-5">
+  {% if director_fragment_response %}<span id="director-session-count" hx-swap-oob="innerHTML">{{ exam_session_total }}</span>{% endif %}
+  {% if toast %}
+    {% if toast.level == "success" %}
+      {% component "ui_core.alert" title="Sessions d'évaluations" message=toast.message tone="success" %}{% endcomponent %}
+    {% else %}
+      {% component "ui_core.alert" title="Action non effectuée" message=toast.message tone="danger" %}{% endcomponent %}
+    {% endif %}
+  {% endif %}
+
+  {% component "ui_core.panel" title="Sessions officielles" subtitle="Définissez les périodes d'examens et de rattrapage de toute l'annexe." padding=False %}
+    <div x-data="{ open: {% if exam_session_form.errors %}true{% else %}false{% endif %} }">
+      <button type="button"
+              @click="open = !open"
+              :aria-expanded="open"
+              class="ui-focus-ring flex w-full items-center gap-3 border-b border-ui-border px-5 py-4 text-left hover:bg-ui-surface-hover">
+        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-ui-button bg-ui-primary text-ui-on-primary">
+          <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>
+        </span>
+        <span class="min-w-0">
+          <strong class="block text-sm text-ui-text">Nouvelle session</strong>
+          <span class="block text-xs text-ui-text-muted">Création dans le calendrier académique en brouillon</span>
+        </span>
+        <i data-lucide="chevron-down" :class="open ? 'rotate-180' : ''" class="ml-auto h-4 w-4 text-ui-text-muted transition-transform" aria-hidden="true"></i>
+      </button>
+
+      <div x-show="open" x-transition.opacity class="border-b border-ui-border bg-ui-surface-muted p-5">
+        {% if exam_session_form.non_field_errors %}
+          <div class="mb-4">
+            {% component "ui_core.alert" title="Le formulaire contient une erreur" message=exam_session_form.non_field_errors.0 tone="danger" %}{% endcomponent %}
+          </div>
+        {% endif %}
+        <form method="post"
+              hx-post="{% url 'accounts_portal:director_exam_session_action' %}"
+              hx-target="#director-session-subcontent"
+              hx-swap="innerHTML"
+              hx-disabled-elt="button[type=submit]"
+              hx-indicator="#director-session-form-loading"
+              hx-sync="#director-session-subcontent:replace"
+              class="space-y-4"
+              novalidate>
+          {% csrf_token %}
+          <input type="hidden" name="action" value="create">
+          <div class="grid min-w-0 gap-4 md:grid-cols-2">
+            {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=exam_session_form.title span_two=True %}
+            {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=exam_session_form.event_type %}
+            {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=exam_session_form.start_date %}
+            {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=exam_session_form.end_date %}
+            {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=exam_session_form.description %}
+          </div>
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div id="director-session-form-loading" class="htmx-indicator inline-flex items-center gap-2 text-xs font-semibold text-ui-text-muted">
+              <span class="h-4 w-4 animate-spin rounded-full border-2 border-ui-border border-t-ui-primary" aria-hidden="true"></span>
+              Validation en cours
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" @click="open = false" class="ui-focus-ring h-ui-control rounded-ui-button border border-ui-border bg-ui-surface px-4 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">Annuler</button>
+              <button type="submit" class="ui-focus-ring inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong disabled:opacity-50">
+                <i data-lucide="save" class="h-4 w-4" aria-hidden="true"></i>
+                Enregistrer en brouillon
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  {% endcomponent %}
+
+  <form method="get"
+        hx-get="{% url 'accounts_portal:director_exam_sessions_subcontent' %}"
+        hx-target="#director-session-subcontent"
+        hx-swap="innerHTML"
+        hx-trigger="submit, change from:select"
+        hx-indicator="#director-session-loading"
+        hx-sync="#director-session-subcontent:replace"
+        class="grid min-w-0 gap-3 border-y border-ui-border py-4 sm:grid-cols-2 lg:grid-cols-[minmax(12rem,1fr)_12rem_12rem_auto]">
+    <input type="hidden" name="view" value="sessions">
+    <label class="min-w-0">
+      <span class="sr-only">Rechercher une session</span>
+      <input type="search" name="session_q" value="{{ session_q }}" placeholder="Rechercher une session" class="h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text focus:border-ui-focus focus:ring-ui-focus">
+    </label>
+    <label>
+      <span class="sr-only">Filtrer par type</span>
+      <select name="session_type" class="h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text focus:border-ui-focus focus:ring-ui-focus">
+        <option value="">Tous les types</option>
+        {% for value, label in exam_session_type_choices %}<option value="{{ value }}" {% if session_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>
+      <span class="sr-only">Filtrer par statut</span>
+      <select name="session_status" class="h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text focus:border-ui-focus focus:ring-ui-focus">
+        <option value="">Tous les statuts</option>
+        <option value="brouillon" {% if session_status == "brouillon" %}selected{% endif %}>Brouillon</option>
+        <option value="publie" {% if session_status == "publie" %}selected{% endif %}>Publié</option>
+        <option value="en_cours" {% if session_status == "en_cours" %}selected{% endif %}>En cours</option>
+        <option value="termine" {% if session_status == "termine" %}selected{% endif %}>Terminé</option>
+        <option value="annule" {% if session_status == "annule" %}selected{% endif %}>Annulé</option>
+      </select>
+    </label>
+    <button type="submit" class="ui-focus-ring inline-flex h-ui-control items-center justify-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-4 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">
+      <i data-lucide="search" class="h-4 w-4" aria-hidden="true"></i>Rechercher
+    </button>
+  </form>
+
+  <div id="director-session-list-region" class="min-w-0">
+    {% if exam_session_rows_page.object_list %}
+      <div class="divide-y divide-ui-border border-y border-ui-border">
+        {% for row in exam_session_rows_page.object_list %}
+        <article class="flex min-w-0 flex-col gap-4 py-4 sm:flex-row sm:items-start sm:justify-between">
+          <div class="flex min-w-0 gap-3">
+            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button {% if row.state == 'en_cours' %}bg-ui-success-soft text-ui-success{% elif row.state == 'publie' %}bg-ui-primary-soft text-ui-primary{% elif row.state == 'brouillon' %}bg-ui-warning-soft text-ui-warning{% elif row.state == 'annule' %}bg-ui-danger-soft text-ui-danger{% else %}bg-ui-surface-muted text-ui-text-muted{% endif %}">
+              <i data-lucide="calendar-range" class="h-5 w-5" aria-hidden="true"></i>
+            </span>
+            <div class="min-w-0">
+              <h3 class="break-words text-sm font-bold text-ui-text">{{ row.entry.title }}</h3>
+              <p class="mt-1 text-xs text-ui-text-muted">{{ row.type_label }} · {{ row.entry.start_datetime|date:"d/m/Y" }} au {{ row.entry.end_datetime|date:"d/m/Y" }}</p>
+              {% if row.entry.description %}<p class="mt-2 max-w-3xl break-words text-sm text-ui-text-muted">{{ row.entry.description }}</p>{% endif %}
+            </div>
+          </div>
+          <div class="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+            {% component "ui_core.status_badge" label=row.state tone=row.tone %}{% endcomponent %}
+            <a href="{% url 'accounts_portal:portal_dashboard' %}?section=calendrier"
+               hx-get="{% url 'accounts_portal:director_workspace' %}?section=calendrier"
+               hx-target="#director-workspace"
+               hx-swap="innerHTML"
+               hx-push-url="{% url 'accounts_portal:portal_dashboard' %}?section=calendrier"
+               class="ui-focus-ring inline-flex h-9 items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover">
+              <i data-lucide="calendar-cog" class="h-4 w-4" aria-hidden="true"></i>Calendrier
+            </a>
+            {% if row.is_draft %}
+            <details class="relative">
+              <summary class="ui-focus-ring inline-flex h-9 cursor-pointer list-none items-center gap-2 rounded-ui-button border border-ui-danger/30 bg-ui-danger-soft px-3 text-xs font-semibold text-ui-danger">
+                <i data-lucide="x" class="h-4 w-4" aria-hidden="true"></i>Annuler
+              </summary>
+              <form method="post" hx-post="{% url 'accounts_portal:director_exam_session_action' %}" hx-target="#director-session-subcontent" hx-swap="innerHTML" hx-disabled-elt="button[type=submit]" class="absolute right-0 z-10 mt-2 w-72 max-w-[85vw] space-y-3 rounded-ui-card border border-ui-border bg-ui-surface p-3 shadow-ui-dropdown">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="cancel">
+                <input type="hidden" name="entry_id" value="{{ row.entry.id }}">
+                <label class="block text-xs font-semibold text-ui-text">Motif
+                  <textarea name="reason" rows="2" required class="mt-1 min-h-20 w-full rounded-ui-input border border-ui-border px-3 py-2 text-sm" placeholder="Motif de l'annulation"></textarea>
+                </label>
+                <button type="submit" class="ui-focus-ring h-9 w-full rounded-ui-button bg-ui-danger px-3 text-xs font-semibold text-white">Confirmer l'annulation</button>
+              </form>
+            </details>
+            {% endif %}
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+      {% include "portal/staff/director/partials/_pagination.html" with page_obj=exam_session_rows_page page_param="sessions_page" query_suffix=session_query_suffix target_id="#director-session-list-region" hx_select="#director-session-list-region" pagination_url_name="accounts_portal:director_exam_sessions_subcontent" indicator_id="#director-session-loading" %}
+    {% else %}
+      {% component "ui_core.empty_state" title="Aucune session trouvée" message="Créez une session ou ajustez les filtres affichés." icon="calendar-x" %}{% endcomponent %}
+    {% endif %}
+  </div>
+</div>

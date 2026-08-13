@@ -1,35 +1,14 @@
 {% load component_tags %}
-<div id="sg-schedule" class="space-y-4" x-data="{ alertsOpen: false }">
-  {% component "page_header" title="Emploi du temps" subtitle=selected_class.display_name %}
-    {% fill "actions" %}
-      {% if schedule and schedule.week_start %}
-        <button type="button" class="btn primary" hx-get="{% url 'accounts_portal:supervisor_planner_hub' %}?class_id={{ selected_class.id }}&week_start={{ schedule.week_start|date:'Y-m-d' }}&drawer=1" hx-target="#supervisor-drawer-content"><i data-lucide="calendar-plus" class="i"></i>Planifier</button>
-      {% endif %}
-    {% endfill %}
+{% if selected_class and schedule %}
+  <div class="flex flex-wrap items-center justify-between gap-3 rounded-ui-card border border-ui-border bg-ui-surface p-4">
+    <div class="flex items-center gap-2"><a class="ui-focus-ring grid h-ui-control w-ui-control place-items-center rounded-ui-button border border-ui-border text-ui-text" href="{{ supervisor_dashboard_base_url }}?section=schedule&view=week&class_id={{ selected_class.id }}&week_start={{ prev_week_start|date:'Y-m-d' }}" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=schedule&view=week&fragment=subcontent&class_id={{ selected_class.id }}&week_start={{ prev_week_start|date:'Y-m-d' }}" hx-target="#supervisor-section-content" hx-push-url="{{ supervisor_dashboard_base_url }}?section=schedule&view=week&class_id={{ selected_class.id }}&week_start={{ prev_week_start|date:'Y-m-d' }}"><i data-lucide="chevron-left" class="h-4 w-4"></i></a><strong class="px-2 text-sm text-ui-text">Semaine du {{ schedule.week_start|date:"d F Y" }}</strong><a class="ui-focus-ring grid h-ui-control w-ui-control place-items-center rounded-ui-button border border-ui-border text-ui-text" href="{{ supervisor_dashboard_base_url }}?section=schedule&view=week&class_id={{ selected_class.id }}&week_start={{ next_week_start|date:'Y-m-d' }}" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=schedule&view=week&fragment=subcontent&class_id={{ selected_class.id }}&week_start={{ next_week_start|date:'Y-m-d' }}" hx-target="#supervisor-section-content" hx-push-url="{{ supervisor_dashboard_base_url }}?section=schedule&view=week&class_id={{ selected_class.id }}&week_start={{ next_week_start|date:'Y-m-d' }}"><i data-lucide="chevron-right" class="h-4 w-4"></i></a></div>
+    {% component "ui_core.status_badge" label="Lecture seule" tone="neutral" icon="lock" %}{% endcomponent %}
+  </div>
+  <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{% component "ui_core.stat_card" label="Séances publiées" value=schedule_week_total icon="calendar-days" tone="primary" compact=True %}{% endcomponent %}{% component "ui_core.stat_card" label="Planifiées" value=schedule_week_planned icon="clock-3" tone="info" compact=True %}{% endcomponent %}{% component "ui_core.stat_card" label="Terminées" value=schedule_week_completed icon="circle-check-big" tone="success" compact=True %}{% endcomponent %}{% component "ui_core.stat_card" label="Jours sans cours" value=schedule_empty_days_count icon="calendar-x" tone="neutral" compact=True %}{% endcomponent %}</div>
+  {% component "ui_core.panel" title=selected_class.display_name subtitle="Planning publié par le Directeur des études" padding=False %}
+    {% if schedule.events %}<div class="grid gap-px bg-ui-border sm:grid-cols-2 xl:grid-cols-3">{% for event in schedule.events %}<article class="bg-ui-surface p-4"><div class="flex items-start justify-between gap-3"><div><span class="text-xs font-bold uppercase tracking-wide text-ui-primary">{{ event.start_datetime|date:"l d/m" }}</span><h3 class="mt-1 text-sm font-bold text-ui-text">{{ event.title }}</h3></div>{% component "ui_core.status_badge" label=event.status_label tone="info" %}{% endcomponent %}</div><dl class="mt-4 space-y-2 text-xs text-ui-text-muted"><div class="flex gap-2"><i data-lucide="clock-3" class="h-4 w-4"></i><span>{{ event.time_range }}</span></div><div class="flex gap-2"><i data-lucide="user-round" class="h-4 w-4"></i><span>{{ event.teacher_name }}</span></div><div class="flex gap-2"><i data-lucide="map-pin" class="h-4 w-4"></i><span>{{ event.location }}</span></div></dl></article>{% endfor %}</div>{% else %}<div class="p-5">{% component "ui_core.empty_state" icon="calendar-x" title="Semaine sans séance" message="Aucun cours publié pour cette classe pendant cette semaine." %}{% endcomponent %}</div>{% endif %}
   {% endcomponent %}
-
-  {% if schedule %}
-    {% component "toolbar" class_str="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-3" %}
-      {% fill "left" %}
-        {% component "status_badge" label=schedule_week_total tone="neutral" icon="calendar-days" %}{% endcomponent %}
-        {% component "status_badge" label=schedule_week_planned tone="info" icon="calendar-clock" %}{% endcomponent %}
-        {% component "status_badge" label=schedule_week_completed tone="success" icon="calendar-check" %}{% endcomponent %}
-        {% if schedule_empty_days_count %}{% component "status_badge" label=schedule_empty_days_count tone="warning" icon="calendar-x" %}{% endcomponent %}{% endif %}
-      {% endfill %}
-      {% fill "right" %}
-        <button type="button" class="btn" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=schedule&class_id={{ selected_class.id }}&week_start={{ prev_week_start|date:'Y-m-d' }}" hx-target="#supervisor-workspace" title="Semaine précédente"><i data-lucide="chevron-left" class="i"></i></button>
-        <span class="btn ghost cursor-default">Semaine du {{ schedule.week_start|date:"d/m/Y" }}</span>
-        <button type="button" class="btn" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=schedule&class_id={{ selected_class.id }}&week_start={{ next_week_start|date:'Y-m-d' }}" hx-target="#supervisor-workspace" title="Semaine suivante"><i data-lucide="chevron-right" class="i"></i></button>
-        {% if timetable_view.schedule_alerts %}<button type="button" class="btn" @click="alertsOpen = !alertsOpen"><i data-lucide="triangle-alert" class="i"></i>{{ timetable_view.schedule_alerts|length }} alerte{{ timetable_view.schedule_alerts|length|pluralize }}</button>{% endif %}
-      {% endfill %}
-    {% endcomponent %}
-
-    {% if timetable_view.schedule_alerts %}<div x-show="alertsOpen" x-cloak class="grid gap-2 md:grid-cols-2">{% for alert in timetable_view.schedule_alerts %}{% component "alert" tone="warning" message=alert.message %}{% endcomponent %}{% endfor %}</div>{% endif %}
-
-    {% component "dashboard_card" padding="none" %}
-      {% fill "default" %}<div class="overflow-auto p-3">{% include "portal/staff/supervisor/partials/sg_schedule_week_grid.html" %}</div>{% endfill %}
-    {% endcomponent %}
-  {% else %}
-    {% component "empty_state" icon="calendar-off" title="Emploi du temps indisponible" message="Aucune donnée de planning pour cette classe et cette semaine." %}{% endcomponent %}
-  {% endif %}
-</div>
+  {% component "ui_core.alert" title="Planning non modifiable" message="Toute création, suppression, affectation ou modification d'horaire relève exclusivement du Directeur des études." tone="neutral" %}{% endcomponent %}
+{% else %}
+  {% component "ui_core.empty_state" icon="school" title="Sélectionnez une classe" message="Choisissez une classe dans la barre supérieure pour consulter son planning publié." %}{% endcomponent %}
+{% endif %}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from io import BytesIO
+from urllib.parse import urlencode
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
@@ -16,8 +17,8 @@ from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
-from academics.models import AcademicClass, EC, Semester, UE
-from academics.services.semester import compute_semester_result
+from academics.imports.template_service import generate_notes_workbook
+from academics.models import AcademicClass, EC, ECGrade, Semester, UE
 from accounts.access import get_user_position
 from accounts.dashboards.helpers import get_user_branch
 from portal.selectors import (
@@ -66,7 +67,7 @@ from portal.services.informaticien_workflows import (
     take_branch_ticket,
     update_branch_settings,
 )
-from portal.selectors.informaticien import grade_entries_for_class, support_tickets_for_branch
+from portal.selectors.informaticien import support_tickets_for_branch
 from portal.models import SupportAuditLog, SupportTicket
 from students.models import Student
 from portal.views.admin_grades import _build_notes_grid_context
@@ -88,7 +89,7 @@ def _render_it_section(request, module_key, template_name, context):
     Si la requete vient de HTMX (navigation interne), seul le fragment est
     renvoye. Sinon (navigation directe, F5, retour/avance navigateur), la
     coquille complete du dashboard est reconstruite avec ce meme fragment
-    deja insere dans #it-workspace, pour eviter une page cassee.
+    deja insere dans #it-dashboard-workspace, pour eviter une page cassee.
     """
     if getattr(request, "htmx", False):
         return render(request, template_name, context)
@@ -99,6 +100,33 @@ def _render_it_section(request, module_key, template_name, context):
         initial_module=module_key,
         initial_workspace_html=fragment.content.decode(fragment.charset or "utf-8"),
     )
+
+
+def _it_subnavigation(*, url_name, active, definitions, query=None):
+    """Build the same HTMX-backed secondary navigation contract as DE."""
+
+    endpoint = reverse(url_name)
+    query = dict(query or {})
+    items = []
+    for item_id, label, icon, extra_query in definitions:
+        params = {**query, **extra_query}
+        encoded = urlencode(params)
+        url = f"{endpoint}?{encoded}" if encoded else endpoint
+        items.append(
+            {
+                "id": item_id,
+                "label": label,
+                "icon": icon,
+                "href": url,
+                "hx_get": url,
+                "hx_target": "#it-dashboard-workspace",
+                "hx_swap": "innerHTML",
+                "hx_push_url": url,
+                "hx_indicator": "#it-dashboard-loading",
+                "hx_sync": "#it-dashboard-workspace:replace",
+            }
+        )
+    return items
 
 
 def _same_branch_or_forbidden(*, request, target_user):
@@ -389,7 +417,7 @@ def it_notes_workflow_action(request):
             modal_context = _build_retake_modal_context(request)
             modal_context["form_error"] = " ".join(exc.messages)
             response = render(request, "portal/informaticien/workflows/retake_modal.html", modal_context)
-            response["HX-Retarget"] = "#it-modal-root"
+            response["HX-Retarget"] = "#it-dashboard-modal-content"
             return response
         toast = {"level": "error", "message": " ".join(exc.messages)}
 
@@ -473,11 +501,22 @@ def it_support_flow_workspace(request):
         return HttpResponseForbidden("Acces refuse.")
     branch = get_user_branch(request.user)
     status = (request.GET.get("status") or "").strip()
+    context = build_support_context(branch=branch, status=status, page=request.GET.get("page"))
+    context["support_subnavigation"] = _it_subnavigation(
+        url_name="accounts_portal:it_support_flow_workspace",
+        active=status or "all",
+        definitions=(
+            ("all", "Tous", "layout-list", {"status": ""}),
+            ("open", "Ouverts", "circle-dot", {"status": SupportTicket.STATUS_OPEN}),
+            ("in_progress", "En cours", "loader-circle", {"status": SupportTicket.STATUS_IN_PROGRESS}),
+            ("resolved", "Résolus", "circle-check", {"status": SupportTicket.STATUS_RESOLVED}),
+        ),
+    )
     return _render_it_section(
         request,
         "support",
         "portal/informaticien/workflows/support_workspace.html",
-        build_support_context(branch=branch, status=status, page=request.GET.get("page")),
+        context,
     )
 
 
@@ -522,7 +561,19 @@ def it_support_flow_action(request):
     return render(
         request,
         "portal/informaticien/workflows/support_workspace.html",
-        build_support_context(branch=branch, status=request.POST.get("status", ""), toast=toast),
+        {
+            **build_support_context(branch=branch, status=request.POST.get("status", ""), toast=toast),
+            "support_subnavigation": _it_subnavigation(
+                url_name="accounts_portal:it_support_flow_workspace",
+                active=request.POST.get("status", "") or "all",
+                definitions=(
+                    ("all", "Tous", "layout-list", {"status": ""}),
+                    ("open", "Ouverts", "circle-dot", {"status": SupportTicket.STATUS_OPEN}),
+                    ("in_progress", "En cours", "loader-circle", {"status": SupportTicket.STATUS_IN_PROGRESS}),
+                    ("resolved", "Résolus", "circle-check", {"status": SupportTicket.STATUS_RESOLVED}),
+                ),
+            ),
+        },
     )
 
 
@@ -659,6 +710,7 @@ def it_import_workspace(request):
             classes=classes,
             selected_class=selected_class,
             selected_semester=selected_semester,
+            session_type=request.GET.get("session_type", "normal"),
         ),
     )
 
@@ -684,6 +736,7 @@ def it_import_upload(request):
             academic_class=selected_class,
             semester=selected_semester,
             file=upload,
+            session_type=request.POST.get("session_type", "normal"),
         )
     except (ValidationError, ValueError) as exc:
         message = " ".join(exc.messages) if hasattr(exc, "messages") else str(exc)
@@ -706,6 +759,7 @@ def it_import_upload(request):
             classes=classes,
             selected_class=selected_class,
             selected_semester=selected_semester,
+            session_type=request.POST.get("session_type", "normal"),
             feedback=feedback,
         ),
     )
@@ -715,81 +769,48 @@ def it_import_upload(request):
 def it_export_notes_excel(request):
     if not _require_it_support(request):
         return HttpResponseForbidden("Acces refuse.")
-    try:
-        from openpyxl import Workbook
-    except ImportError:
-        return HttpResponse("openpyxl doit etre installe pour exporter en Excel.", status=500)
     selection = _resolve_workflow_selection(request)
     academic_class = selection["selected_class"]
     selected_semester = selection["selected_semester"]
     if academic_class is None:
         return HttpResponseForbidden("Classe obligatoire.")
+    if selected_semester is None:
+        return HttpResponseForbidden("Semestre obligatoire.")
 
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.title = "Notes classe"
-    sheet.append(["Classe", "Semestre", "Etudiant", "EC", "Coefficient", "Credits", "Session normale", "Rattrapage", "Note finale", "Valide"])
-    grades = grade_entries_for_class(academic_class=academic_class)
-    if selected_semester:
-        grades = grades.filter(ec__ue__semester=selected_semester)
-    for grade in grades.order_by("enrollment__student__username", "ec__ue__semester__number", "ec__title"):
-        sheet.append([
-            academic_class.display_name,
-            f"S{grade.ec.ue.semester.number}",
-            grade.enrollment.student.get_full_name() or grade.enrollment.student.username,
-            grade.ec.title,
-            grade.ec.coefficient,
-            grade.ec.credit_required,
-            grade.normal_score,
-            grade.retake_score,
-            grade.final_score,
-            "oui" if grade.is_validated else "non",
-        ])
-
-    anomalies = workbook.create_sheet("Anomalies")
-    anomalies.append(["Type", "Detail", "Action attendue"])
-    state = get_notes_state(academic_class=academic_class, semester=selected_semester) if selected_semester else None
-    if state:
-        for alert in state.technical_alerts:
-            anomalies.append(["Notes", alert, "Completer la grille puis verifier"])
-    if anomalies.max_row == 1:
-        anomalies.append(["Aucune", "Aucune anomalie bloquante detectee dans la selection.", "-"])
-
-    results = workbook.create_sheet("Resultats")
-    results.append(["Etudiant", "Semestre", "Moyenne", "Pourcentage", "Credits obtenus", "Credits requis", "Statut"])
-    if selected_semester:
-        enrollments = academic_class.enrollments.filter(is_active=True, academic_year=academic_class.academic_year).select_related("student")
-        for enrollment in enrollments:
-            summary = compute_semester_result(selected_semester, enrollment)
-            results.append([
-                enrollment.student.get_full_name() or enrollment.student.username,
-                f"S{selected_semester.number}",
-                summary["average"],
-                summary["percentage"],
-                summary["credit_obtained"],
-                summary["credit_required"],
-                state.label if state else "",
-            ])
-
-    for worksheet in workbook.worksheets:
-        for column in ("A", "B", "C", "D"):
-            worksheet.column_dimensions[column].width = 28
-    for column in ("A", "B", "C"):
-        sheet.column_dimensions[column].width = 28
-    buffer = BytesIO()
-    workbook.save(buffer)
-    buffer.seek(0)
+    session_type = (request.GET.get("session") or "normal").strip().lower()
+    if session_type not in {"normal", "retake"}:
+        return HttpResponse("Session de notes invalide.", status=400)
+    score_field = "retake_score" if session_type == "retake" else "normal_score"
+    scores_by_cell = {
+        (grade.enrollment_id, grade.ec_id): getattr(grade, score_field)
+        for grade in ECGrade.objects.filter(
+            enrollment__academic_class=academic_class,
+            enrollment__academic_year=academic_class.academic_year,
+            enrollment__is_active=True,
+            ec__ue__semester=selected_semester,
+        )
+        if getattr(grade, score_field) is not None
+    }
+    buffer = generate_notes_workbook(
+        academic_class=academic_class,
+        semester=selected_semester,
+        session_type=session_type,
+        scores_by_cell=scores_by_cell,
+    )
     response = HttpResponse(
         buffer.getvalue(),
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-    response["Content-Disposition"] = f'attachment; filename="notes-classe-{academic_class.id}.xlsx"'
+    response["Content-Disposition"] = (
+        f'attachment; filename="notes-{session_type}-{academic_class.id}-'
+        f'S{selected_semester.number}.xlsx"'
+    )
     log_support_action(
         actor=request.user,
         branch=get_user_branch(request.user),
         action_type=SupportAuditLog.ACTION_EXCEL_EXPORTED,
         target_label=f"Export notes {academic_class.display_name}",
-        details=f"Export Excel {'S' + str(selected_semester.number) if selected_semester else 'classe complete'}.",
+        details=f"Export Excel S{selected_semester.number} - session {session_type}.",
     )
     return response
 
@@ -801,18 +822,29 @@ def it_structure_workspace(request):
     selected_class_id = (request.GET.get("class_id") or request.GET.get("classe") or "").strip()
     student_query = (request.GET.get("student_q") or "").strip()
     section = (request.GET.get("section") or "classes").strip()
+    context = build_academic_structure_context(
+        branch=get_user_branch(request.user),
+        selected_class_id=selected_class_id,
+        student_query=student_query,
+        section=section,
+        class_page=request.GET.get("class_page") or 1,
+        student_page=request.GET.get("student_page") or 1,
+    )
+    context["structure_subnavigation"] = _it_subnavigation(
+        url_name="accounts_portal:it_structure_workspace",
+        active=section,
+        query={"class_id": selected_class_id} if selected_class_id else None,
+        definitions=(
+            ("classes", "Classes", "graduation-cap", {"section": "classes"}),
+            ("maquettes", "Maquettes", "blocks", {"section": "maquettes"}),
+            ("affectations", "Affectations", "users-round", {"section": "affectations"}),
+        ),
+    )
     return _render_it_section(
         request,
         "structure",
         "portal/informaticien/workflows/structure_workspace.html",
-        build_academic_structure_context(
-            branch=get_user_branch(request.user),
-            selected_class_id=selected_class_id,
-            student_query=student_query,
-            section=section,
-            class_page=request.GET.get("class_page") or 1,
-            student_page=request.GET.get("student_page") or 1,
-        ),
+        context,
     )
 
 
@@ -906,7 +938,7 @@ def _render_structure_modal_from_post(request, *, branch, message):
         }
     )
     response = render(request, "portal/informaticien/workflows/structure_modal.html", context)
-    response["HX-Retarget"] = "#it-modal-root"
+    response["HX-Retarget"] = "#it-dashboard-modal-content"
     return response
 
 
@@ -992,6 +1024,16 @@ def it_structure_action(request):
         selected_class_id=selected_class_id,
         student_query=(request.POST.get("student_q") or "").strip(),
         section=section,
+    )
+    context["structure_subnavigation"] = _it_subnavigation(
+        url_name="accounts_portal:it_structure_workspace",
+        active=section,
+        query={"class_id": selected_class_id} if selected_class_id else None,
+        definitions=(
+            ("classes", "Classes", "graduation-cap", {"section": "classes"}),
+            ("maquettes", "Maquettes", "blocks", {"section": "maquettes"}),
+            ("affectations", "Affectations", "users-round", {"section": "affectations"}),
+        ),
     )
     context["toast"] = toast
     response = render(request, "portal/informaticien/workflows/structure_workspace.html", context)

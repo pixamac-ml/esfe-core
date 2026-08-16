@@ -12,6 +12,7 @@ class EmptyState(component.Component):
         icon="inbox",
         action_label="",
         action_url="",
+        compact=False,
         **kwargs,
     ):
         return {
@@ -20,5 +21,6 @@ class EmptyState(component.Component):
             "icon": icon or "inbox",
             "action_label": action_label,
             "action_url": action_url,
+            "compact": bool(compact),
             **kwargs,
         }

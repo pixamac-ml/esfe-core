@@ -4,6 +4,7 @@ from datetime import time, timedelta
 from urllib.parse import urlencode
 
 from django.contrib.auth import get_user_model
+from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.utils import timezone
 
@@ -144,7 +145,7 @@ def build_weekly_timetable_grid(academic_class, *, week_start=None):
 
 
 def build_director_timetable_context(
-    *, branch, subview="overview", selected_class_id=None, week_start=None
+    *, branch, subview="overview", selected_class_id=None, week_start=None, page_number=1
 ):
     subview = subview if subview in TIMETABLE_SUBVIEWS else "overview"
     classes = list(_active_classes(branch))
@@ -173,6 +174,7 @@ def build_director_timetable_context(
         }
         for academic_class in classes
     ]
+    class_cards_page = Paginator(class_cards, 10).get_page(page_number)
 
     query_params = {"view": subview}
     if selected_class is not None:
@@ -182,7 +184,8 @@ def build_director_timetable_context(
     return {
         "timetable_subview": subview,
         "timetable_classes": classes,
-        "timetable_class_cards": class_cards,
+        "timetable_class_cards": class_cards_page.object_list,
+        "timetable_class_cards_page": class_cards_page,
         "timetable_selected_class": selected_class,
         "timetable_grid": grid,
         "timetable_metrics": {
@@ -192,6 +195,9 @@ def build_director_timetable_context(
             "slots": slot_count,
         },
         "timetable_query_suffix": urlencode(query_params),
+        "timetable_overview_query_suffix": urlencode(
+            {"view": "overview", "week_start": normalized_week.isoformat()}
+        ),
         "timetable_week_start": normalized_week,
         "timetable_week_end": normalized_week + timedelta(days=5),
         "timetable_previous_week": normalized_week - timedelta(days=7),

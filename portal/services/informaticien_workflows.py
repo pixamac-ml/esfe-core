@@ -166,7 +166,15 @@ def build_audit_context(*, branch, page=1):
     }
 
 
-def build_import_context(*, branch, classes, selected_class=None, selected_semester=None, feedback=None):
+def build_import_context(
+    *,
+    branch,
+    classes,
+    selected_class=None,
+    selected_semester=None,
+    session_type="normal",
+    feedback=None,
+):
     semesters = list(selected_class.semesters.order_by("number")) if selected_class else []
     ues = list(selected_semester.ues.prefetch_related("ecs").order_by("id")) if selected_semester else []
     student_count = (
@@ -179,6 +187,11 @@ def build_import_context(*, branch, classes, selected_class=None, selected_semes
     )
     ec_count = sum(ue.ecs.count() for ue in ues)
     permissions = get_semester_permissions(selected_semester) if selected_semester else None
+    active_session_type = (
+        "retake"
+        if permissions and permissions["can_enter_retake"]
+        else "normal"
+    )
     state = get_notes_state(academic_class=selected_class, semester=selected_semester) if selected_class and selected_semester else None
     return {
         "branch": branch,
@@ -190,6 +203,7 @@ def build_import_context(*, branch, classes, selected_class=None, selected_semes
         "student_count": student_count,
         "ec_count": ec_count,
         "workflow_permissions": permissions,
+        "active_session_type": active_session_type,
         "notes_state": state,
         "import_preview": _build_import_preview(
             selected_class=selected_class,
@@ -201,19 +215,20 @@ def build_import_context(*, branch, classes, selected_class=None, selected_semes
 
 
 @transaction.atomic
-def import_notes_file(*, actor, branch, academic_class, semester, file):
+def import_notes_file(*, actor, branch, academic_class, semester, file, session_type="normal"):
     if academic_class.branch_id != getattr(branch, "id", None):
         raise ValidationError("Classe hors annexe refusee.")
     if semester.academic_class_id != academic_class.id:
         raise ValidationError("Le semestre ne correspond pas a la classe.")
 
-    result = import_grades(file, academic_class, semester, session_type="normal")
+    session_type = (session_type or "normal").strip().lower()
+    result = import_grades(file, academic_class, semester, session_type=session_type)
     has_critical_errors = bool(result.skipped_invalid_scores or result.skipped_unknown_students)
     log_support_action(
         actor=actor,
         branch=branch,
         action_type=SupportAuditLog.ACTION_GRADES_IMPORTED,
-        target_label=f"Import notes {academic_class.display_name} S{semester.number}",
+        target_label=f"Import notes {academic_class.display_name} S{semester.number} {session_type}",
         details=f"{result.updated} note(s) importee(s), {len(result.student_issues)} ligne(s) invalide(s).",
     )
     if has_critical_errors:
@@ -221,10 +236,19 @@ def import_notes_file(*, actor, branch, academic_class, semester, file):
             f"Import refuse: {len(result.student_issues)} erreur(s) critique(s). "
             "Aucune note n'a ete inseree."
         )
+    elif result.skipped_empty:
+        message = (
+            f"Import partiel: {result.updated} note(s) importee(s), "
+            f"{result.skipped_empty} cellule(s) vide(s) a completer avant validation."
+        )
     else:
         message = f"{result.updated} note(s) importee(s). {len(result.student_issues)} ligne(s) invalide(s)."
     return ImportFeedback(
-        level="error" if has_critical_errors or not result.updated else "success",
+        level=(
+            "error" if has_critical_errors or not result.updated
+            else "warning" if result.skipped_empty
+            else "success"
+        ),
         message=message,
         invalid_lines=result.student_issues,
         updated=result.updated,

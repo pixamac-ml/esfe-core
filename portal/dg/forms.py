@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from accounts.models import Profile
+from accounts.position_registry import get_position_definition
 from branches.models import Branch
 from coupons.models import Coupon
 from formations.models import Programme
@@ -48,6 +49,9 @@ class DgRecruitmentForm(forms.Form):
     def clean(self):
         cleaned = super().clean()
         position = cleaned.get("position")
+        definition = get_position_definition(position)
+        if definition and definition.branch_required and not cleaned.get("branch"):
+            self.add_error("branch", "Une annexe est obligatoire pour ce poste.")
         if position == "other":
             required = [
                 "business_description",
@@ -68,14 +72,10 @@ class DgRecruitmentForm(forms.Form):
         return position
 
     def profile_role(self):
-        position = self.cleaned_data["position"]
-        if position == "finance_manager":
-            return "finance"
-        if position == "admissions":
-            return "admissions"
-        if position in {"branch_manager", "academic_supervisor", "it_support", "secretary"}:
-            return ""
-        return ""
+        # Compatibilite temporaire : la position est la source d'autorite.
+        from accounts.services.institutional_access import compatibility_role_for_position
+
+        return compatibility_role_for_position(self.profile_position())
 
 
 class DgCouponForm(forms.Form):

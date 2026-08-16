@@ -16,7 +16,12 @@ from portal.views.it_dashboard_v2 import it_portal_v2
 from portal.views.system_profile import system_profile, system_profile_edit, system_security
 from portal.views.system_session import system_session_activity, system_session_status
 from accounts.auth_views import PortalPasswordChangeView
-from portal.views.annex_manager import access_regularization, annex_manager_portal
+from portal.views.annex_manager import (
+    access_regularization,
+    annex_manager_portal,
+    annex_manager_subcontent,
+    annex_manager_workspace,
+)
 from portal.views.admin_grades import excel_grade_view
 from portal.views.it_grades_import import it_grades_import_view
 from portal.views.it_surveillance import (
@@ -222,6 +227,8 @@ urlpatterns = [
     path("account/password/", PortalPasswordChangeView.as_view(), name="system_change_password"),
     path("access/regularization/", access_regularization, name="access_regularization"),
     path("manager/", annex_manager_portal, name="portal_annex_manager"),
+    path("manager/workspace/", annex_manager_workspace, name="manager_workspace"),
+    path("manager/subcontent/", annex_manager_subcontent, name="manager_subcontent"),
     path("", portal_home, name="portal_home"),
     path("dashboard/", portal_dashboard, name="portal_dashboard"),
     path("schedule/print/class/<int:class_id>/", schedule_class_print, name="schedule_class_print"),

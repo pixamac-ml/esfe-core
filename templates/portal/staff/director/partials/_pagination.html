@@ -1,11 +1,11 @@
 {% if page_obj and page_obj.paginator.num_pages > 1 %}
-{% with pname=page_param|default:"classes_page" htmx_target=target_id|default:"#director-workspace" htmx_select=hx_select|default:"" %}
+{% with pname=page_param|default:"classes_page" htmx_target=target_id|default:"#director-workspace" htmx_select=hx_select|default:"" swap_mode=hx_swap|default:"outerHTML" %}
 <nav class="flex flex-wrap items-center justify-between gap-3 border-t border-ui-border py-3" aria-label="Pagination">
   <div class="flex items-center gap-2">
     {% if page_obj.has_previous %}
     <button type="button"
       hx-get="{% if pagination_url_name %}{% url pagination_url_name %}{% else %}{% url 'accounts_portal:director_workspace' %}{% endif %}?{{ query_suffix }}&{{ pname }}=1"
-      hx-target="{{ htmx_target }}" hx-swap="outerHTML"
+      hx-target="{{ htmx_target }}" hx-swap="{{ swap_mode }}"
       {% if htmx_select %}hx-select="{{ htmx_select }}"{% endif %}
       {% if indicator_id %}hx-indicator="{{ indicator_id }}"{% endif %}
       hx-sync="{{ htmx_target }}:replace"
@@ -16,7 +16,7 @@
     </button>
     <button type="button"
       hx-get="{% if pagination_url_name %}{% url pagination_url_name %}{% else %}{% url 'accounts_portal:director_workspace' %}{% endif %}?{{ query_suffix }}&{{ pname }}={{ page_obj.previous_page_number }}"
-      hx-target="{{ htmx_target }}" hx-swap="outerHTML"
+      hx-target="{{ htmx_target }}" hx-swap="{{ swap_mode }}"
       {% if htmx_select %}hx-select="{{ htmx_select }}"{% endif %}
       {% if indicator_id %}hx-indicator="{{ indicator_id }}"{% endif %}
       hx-sync="{{ htmx_target }}:replace"
@@ -31,7 +31,7 @@
     {% if page_obj.has_next %}
     <button type="button"
       hx-get="{% if pagination_url_name %}{% url pagination_url_name %}{% else %}{% url 'accounts_portal:director_workspace' %}{% endif %}?{{ query_suffix }}&{{ pname }}={{ page_obj.next_page_number }}"
-      hx-target="{{ htmx_target }}" hx-swap="outerHTML"
+      hx-target="{{ htmx_target }}" hx-swap="{{ swap_mode }}"
       {% if htmx_select %}hx-select="{{ htmx_select }}"{% endif %}
       {% if indicator_id %}hx-indicator="{{ indicator_id }}"{% endif %}
       hx-sync="{{ htmx_target }}:replace"
@@ -41,7 +41,7 @@
     </button>
     <button type="button"
       hx-get="{% if pagination_url_name %}{% url pagination_url_name %}{% else %}{% url 'accounts_portal:director_workspace' %}{% endif %}?{{ query_suffix }}&{{ pname }}={{ page_obj.paginator.num_pages }}"
-      hx-target="{{ htmx_target }}" hx-swap="outerHTML"
+      hx-target="{{ htmx_target }}" hx-swap="{{ swap_mode }}"
       {% if htmx_select %}hx-select="{{ htmx_select }}"{% endif %}
       {% if indicator_id %}hx-indicator="{{ indicator_id }}"{% endif %}
       hx-sync="{{ htmx_target }}:replace"

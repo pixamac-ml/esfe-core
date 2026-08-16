@@ -1,34 +1,18 @@
-{% load humanize component_tags %}
-        <!-- =========== SETTINGS =========== -->
-        <div id="teacher-panel-settings" class="sg-section-panel {% if active_section == 'settings' %}is-active{% endif %}" data-sg-panel="settings" {% if active_section != 'settings' %}hidden{% endif %}>
-          {% component "section_header" title="Paramètres" subtitle="Gérer les options liées à votre profil enseignant." icon="settings" %}{% endcomponent %}
-
-          <div class="grid gap-4 md:grid-cols-2">
-            {% component "dashboard_card" %}
-              {% fill "default" %}
-                <span class="block text-xs font-bold text-[color:var(--text)] mb-3">Profil enseignant</span>
-                <div class="space-y-2 text-sm">
-                  <div><span class="font-bold">Nom :</span> {{ teacher_user.get_full_name|default:teacher_user.username }}</div>
-                  <div><span class="font-bold">Email :</span> {{ teacher_user.email|default:"-" }}</div>
-                  <div><span class="font-bold">Téléphone :</span> {{ teacher_user.profile.phone|default:"-" }}</div>
-                  <div><span class="font-bold">Spécialité :</span> {{ teacher_user.profile.main_domain|default:"-" }}</div>
-                  <div><span class="font-bold">Tarif horaire :</span> {{ teacher_user.profile.teacher_hourly_rate|floatformat:0|default:"-" }} FCFA/h</div>
-                </div>
-                <div class="mt-3 pt-2 border-t border-[color:var(--line)]">
-                  <a href="{% url 'accounts:edit_profile' %}" class="inline-flex items-center gap-1.5 rounded-lg border border-[color:var(--line)] px-3 py-2 text-xs font-bold text-[color:var(--text)] transition hover:border-[color:var(--school-primary-soft)]">
-                    <i data-lucide="pen-square" style="width:14px;height:14px;"></i> Modifier mon profil
-                  </a>
-                </div>
-              {% endfill %}
-            {% endcomponent %}
-            {% component "dashboard_card" %}
-              {% fill "default" %}
-                <span class="block text-xs font-bold text-[color:var(--text)] mb-3">Mot de passe et sécurité</span>
-                <a href="{% url 'password_change' %}" class="flex w-full items-center gap-2 rounded-lg border border-[color:var(--line)] px-3 py-2.5 text-xs font-bold text-[color:var(--text)] transition hover:border-[color:var(--school-primary-soft)]">
-                  <i data-lucide="key" style="width:14px;height:14px;"></i> Changer mot de passe
-                </a>
-              {% endfill %}
-            {% endcomponent %}
-          </div>
-        </div>
-
+{% load component_tags %}
+<section id="teacher-panel-settings" data-teacher-section="settings" class="space-y-5">
+  {% component "ui_core.page_header" eyebrow="Compte enseignant" title="Paramètres" subtitle="Vos informations de profil et options de sécurité." %}{% endcomponent %}
+  <div class="grid gap-5 lg:grid-cols-2">
+    {% component "ui_core.panel" title="Profil enseignant" subtitle="Informations visibles par l'administration." %}
+      {% fill "default" %}
+      <dl class="grid gap-3 text-sm sm:grid-cols-2"><div><dt class="text-ui-text-muted">Nom</dt><dd class="font-semibold text-ui-text">{{ teacher_user.get_full_name|default:teacher_user.username }}</dd></div><div><dt class="text-ui-text-muted">Email</dt><dd class="font-semibold text-ui-text">{{ teacher_user.email|default:"—" }}</dd></div><div><dt class="text-ui-text-muted">Téléphone</dt><dd class="font-semibold text-ui-text">{{ teacher_user.profile.phone|default:"—" }}</dd></div><div><dt class="text-ui-text-muted">Spécialité</dt><dd class="font-semibold text-ui-text">{{ teacher_user.profile.main_domain|default:"—" }}</dd></div></dl>
+      {% endfill %}
+      {% fill "footer" %}<a href="{% url 'accounts:edit_profile' %}" class="text-sm font-semibold text-ui-primary hover:underline">Modifier mon profil</a>{% endfill %}
+    {% endcomponent %}
+    {% component "ui_core.panel" title="Sécurité" subtitle="Protégez l'accès à votre compte." %}
+      {% fill "default" %}
+      {% component "ui_core.alert" title="Mot de passe" message="Utilisez un mot de passe personnel et ne le partagez avec personne." tone="info" %}{% endcomponent %}
+      {% endfill %}
+      {% fill "footer" %}<a href="{% url 'password_change' %}" class="text-sm font-semibold text-ui-primary hover:underline">Changer mon mot de passe</a>{% endfill %}
+    {% endcomponent %}
+  </div>
+</section>

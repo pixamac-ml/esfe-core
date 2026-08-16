@@ -1,40 +1,9 @@
-<div class="workflow-list">
-  {% for alert in alerts %}
-    <article>
-      <div>
-        <strong>{{ alert.title }}</strong>
-        <span>{{ alert.detail }}</span>
-      </div>
-      {% if alert.action_url %}
-        <button
-          type="button"
-          class="workflow-btn workflow-btn-secondary"
-          hx-get="{{ alert.action_url }}"
-          hx-target="#it-workspace"
-          hx-swap="innerHTML"
-        >
-          {{ alert.action_label }}
-        </button>
-      {% else %}
-        <span>{{ alert.level }}</span>
-      {% endif %}
-    </article>
-  {% empty %}
-    <section class="workflow-empty">Aucune alerte actionnable detectee.</section>
-  {% endfor %}
-</div>
-{% if alerts_page and alerts_page.paginator.num_pages > 1 %}
-<div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
-  <p class="text-sm font-bold text-slate-500">
-    Page {{ alerts_page.number }} / {{ alerts_page.paginator.num_pages }} - {{ alerts_page.paginator.count }} alertes
-  </p>
-  <div class="flex flex-wrap gap-2">
-    {% if alerts_page.has_previous %}
-    <button type="button" class="workflow-btn workflow-btn-secondary" hx-get="{% url 'accounts_portal:it_supervision_workspace' %}?page={{ alerts_page.previous_page_number }}" hx-target="#it-workspace" hx-swap="innerHTML">Precedent</button>
-    {% endif %}
-    {% if alerts_page.has_next %}
-    <button type="button" class="workflow-btn workflow-btn-secondary" hx-get="{% url 'accounts_portal:it_supervision_workspace' %}?page={{ alerts_page.next_page_number }}" hx-target="#it-workspace" hx-swap="innerHTML">Suivant</button>
-    {% endif %}
-  </div>
-</div>
-{% endif %}
+{% load component_tags %}
+{% component "ui_core.panel" title="Alertes actionnables" subtitle="Anomalies détectées dans le périmètre de l'annexe." %}
+  {% fill "default" %}
+    <div class="divide-y divide-ui-border">
+      {% for alert in alerts %}<article class="flex min-w-0 items-center gap-3 py-4 first:pt-0 last:pb-0"><span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button {% if alert.level == 'danger' or alert.level == 'critical' %}bg-ui-danger-soft text-ui-danger{% elif alert.level == 'warning' %}bg-ui-warning-soft text-ui-warning{% else %}bg-ui-info-soft text-ui-info{% endif %}"><i data-lucide="alert-triangle" class="h-4 w-4" aria-hidden="true"></i></span><div class="min-w-0 flex-1"><p class="text-sm font-semibold text-ui-text">{{ alert.title }}</p><p class="mt-0.5 text-sm text-ui-text-muted">{{ alert.detail }}</p></div>{% if alert.action_url %}<button type="button" class="inline-flex h-9 shrink-0 items-center rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover" hx-get="{{ alert.action_url }}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">{{ alert.action_label }}</button>{% endif %}</article>{% empty %}<p class="py-7 text-center text-sm text-ui-text-muted">Aucune alerte actionnable détectée.</p>{% endfor %}
+    </div>
+    {% if alerts_page and alerts_page.paginator.num_pages > 1 %}<div class="mt-4 flex justify-end gap-2 border-t border-ui-border pt-4">{% if alerts_page.has_previous %}<button type="button" class="inline-flex h-9 items-center rounded-ui-button border border-ui-border px-3 text-xs font-semibold" hx-get="{% url 'accounts_portal:it_supervision_workspace' %}?page={{ alerts_page.previous_page_number }}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">Précédent</button>{% endif %}{% if alerts_page.has_next %}<button type="button" class="inline-flex h-9 items-center rounded-ui-button border border-ui-border px-3 text-xs font-semibold" hx-get="{% url 'accounts_portal:it_supervision_workspace' %}?page={{ alerts_page.next_page_number }}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">Suivant</button>{% endif %}</div>{% endif %}
+  {% endfill %}
+{% endcomponent %}

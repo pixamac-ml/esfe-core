@@ -1,9 +1,12 @@
 from django.test import SimpleTestCase
 from django.contrib.humanize.templatetags.humanize import intcomma
+from django.core.paginator import Paginator
 
 from accounts.services.manager_dashboard_presentation import (
+    MANAGER_SUBVIEW_DEFINITIONS,
     SECTION_PRESENTATION,
     build_manager_dashboard_presentation,
+    normalize_manager_subview,
 )
 
 
@@ -55,3 +58,36 @@ class ManagerDashboardPresentationTests(SimpleTestCase):
         )
 
         self.assertEqual(presentation["section"], "overview")
+
+    def test_manager_business_domains_expose_real_subviews(self):
+        self.assertIn("paiements", MANAGER_SUBVIEW_DEFINITIONS)
+        self.assertEqual(
+            normalize_manager_subview("paiements", "cash_sessions"),
+            "cash_sessions",
+        )
+        self.assertEqual(
+            normalize_manager_subview("paiements", "invented"),
+            "overview",
+        )
+
+        presentation = build_manager_dashboard_presentation(
+            active_section="paiements",
+            active_subview="cash_sessions",
+            context={"payments": Paginator([], 20).get_page(1)},
+            dashboard_url="/portal/manager/",
+            workspace_url="/portal/manager/workspace/",
+        )
+
+        self.assertEqual(presentation["subview"], "cash_sessions")
+        self.assertEqual(
+            [item["id"] for item in presentation["subnavigation"]],
+            ["overview", "payments", "cash_sessions", "to_validate"],
+        )
+        self.assertEqual(
+            presentation["subnavigation"][0]["hx_target"],
+            "#manager-paiements-subcontent",
+        )
+        self.assertIn(
+            "section=paiements&view=overview",
+            presentation["subnavigation"][0]["hx_get"],
+        )

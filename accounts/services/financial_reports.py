@@ -258,7 +258,7 @@ def build_manager_financial_report_context(*, branch, request, today=None):
     }
     receipt_rows = [
         {
-            "label": "Paiements etudiants",
+            "label": "Paiements étudiants",
             "amount": student_receipts,
             "count": source_row_lookup.get(BranchCashMovement.SOURCE_STUDENT_PAYMENT, {}).get("in_count", 0),
             "tone": "blue",

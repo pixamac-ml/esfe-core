@@ -8,6 +8,20 @@
   const UI = window.ESFEUI = window.ESFEUI || {};
   UI.instances = UI.instances || { charts: new Map() };
 
+  // The component is registered inline before Alpine boots, but focus
+  // restoration is shared here so every UI Core overlay has one contract.
+  UI.overlay = UI.overlay || {
+    lockPage() {
+      document.documentElement.classList.add("overflow-hidden");
+    },
+    unlockPage() {
+      document.documentElement.classList.remove("overflow-hidden");
+    },
+    restoreFocus() {
+      if (this.opener) this.opener.focus();
+    }
+  };
+
   UI.toast = function (detail) {
     const data = typeof detail === "string" ? { message: detail } : (detail || {});
     const region = document.getElementById("ui-toast-region");

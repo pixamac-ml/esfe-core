@@ -1,27 +1,38 @@
-<div class="toolbar-actions">
-  <div class="session-switch">
+<div class="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2">
+  <div class="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm">
     {% if embedded_in_dashboard %}
-      <a class="session-pill {% if active_session_type == 'normal' %}active{% endif %} {% if not workflow_permissions.can_enter_normal %}disabled{% endif %}" {% if workflow_permissions.can_enter_normal %}hx-get="{% url 'accounts_portal:it_notes_grid' %}?class_id={{ academic_class.id }}&semester_id={{ semester.id }}&session=normal" hx-target="#notes-workspace" hx-swap="innerHTML"{% endif %}>Normale</a>
-      <a class="session-pill {% if active_session_type == 'retake' %}active{% endif %} {% if not workflow_permissions.can_enter_retake %}disabled{% endif %}" {% if workflow_permissions.can_enter_retake %}hx-get="{% url 'accounts_portal:it_notes_grid' %}?class_id={{ academic_class.id }}&semester_id={{ semester.id }}&session=retake" hx-target="#notes-workspace" hx-swap="innerHTML"{% endif %}>Rattrapage</a>
+      <a class="rounded-md px-2.5 py-1.5 text-xs font-semibold {% if active_session_type == 'normal' %}bg-indigo-600 text-white shadow-sm{% elif workflow_permissions.can_enter_normal %}text-slate-600 hover:bg-slate-100{% else %}cursor-not-allowed text-slate-300{% endif %}" {% if workflow_permissions.can_enter_normal %}hx-get="{% url 'accounts_portal:it_notes_grid' %}?class_id={{ academic_class.id }}&semester_id={{ semester.id }}&session=normal" hx-target="#notes-workspace" hx-swap="innerHTML"{% endif %}>Normale</a>
+      <a class="rounded-md px-2.5 py-1.5 text-xs font-semibold {% if active_session_type == 'retake' %}bg-amber-500 text-white shadow-sm{% elif workflow_permissions.can_enter_retake %}text-slate-600 hover:bg-slate-100{% else %}cursor-not-allowed text-slate-300{% endif %}" {% if workflow_permissions.can_enter_retake %}hx-get="{% url 'accounts_portal:it_notes_grid' %}?class_id={{ academic_class.id }}&semester_id={{ semester.id }}&session=retake" hx-target="#notes-workspace" hx-swap="innerHTML"{% endif %}>Rattrapage</a>
     {% else %}
-      <a class="session-pill {% if active_session_type == 'normal' %}active{% endif %} {% if not workflow_permissions.can_enter_normal %}disabled{% endif %}" href="{% if workflow_permissions.can_enter_normal %}?session=normal{% else %}#{% endif %}">Normale</a>
-      <a class="session-pill {% if active_session_type == 'retake' %}active{% endif %} {% if not workflow_permissions.can_enter_retake %}disabled{% endif %}" href="{% if workflow_permissions.can_enter_retake %}?session=retake{% else %}#{% endif %}">Rattrapage</a>
+      <a class="rounded-md px-2.5 py-1.5 text-xs font-semibold {% if active_session_type == 'normal' %}bg-indigo-600 text-white shadow-sm{% elif workflow_permissions.can_enter_normal %}text-slate-600 hover:bg-slate-100{% else %}cursor-not-allowed text-slate-300{% endif %}" href="{% if workflow_permissions.can_enter_normal %}?session=normal{% else %}#{% endif %}">Normale</a>
+      <a class="rounded-md px-2.5 py-1.5 text-xs font-semibold {% if active_session_type == 'retake' %}bg-amber-500 text-white shadow-sm{% elif workflow_permissions.can_enter_retake %}text-slate-600 hover:bg-slate-100{% else %}cursor-not-allowed text-slate-300{% endif %}" href="{% if workflow_permissions.can_enter_retake %}?session=retake{% else %}#{% endif %}">Rattrapage</a>
     {% endif %}
   </div>
-  <a class="toolbar-btn dark" href="{% url 'accounts_portal:it_grade_sheet_pdf' academic_class.id semester.id %}?format=a4"><i data-lucide="file-text" class="h-4 w-4"></i> PDF A4</a>
-  <a class="toolbar-btn dark" href="{% url 'accounts_portal:it_grade_sheet_pdf' academic_class.id semester.id %}?format=a3"><i data-lucide="file-text" class="h-4 w-4"></i> PDF A3</a>
-  <a class="toolbar-btn primary" href="{% url 'accounts_portal:it_grade_sheet_print' academic_class.id semester.id %}?format=a4" target="_blank"><i data-lucide="printer" class="h-4 w-4"></i> Imprimer A4</a>
-  <a class="toolbar-btn primary" href="{% url 'accounts_portal:it_grade_sheet_print' academic_class.id semester.id %}?format=a3" target="_blank"><i data-lucide="printer" class="h-4 w-4"></i> Imprimer A3</a>
-  <a class="toolbar-btn soft" href="{% url 'academics:download_import_template' academic_class.id semester.id %}"><i data-lucide="download" class="h-4 w-4"></i> Telecharger le modele Excel</a>
-  <form class="import-inline js-notes-import-form" enctype="multipart/form-data">
-    {% csrf_token %}
-    <input type="hidden" name="class_id" value="{{ academic_class.id }}">
-    <input type="hidden" name="semester_id" value="{{ semester.id }}">
-    <input type="file" name="file" accept=".xlsx" required class="file-input">
-    <button type="submit" class="toolbar-btn primary"><i data-lucide="upload-cloud" class="h-4 w-4"></i> Importer Excel</button>
-  </form>
-  <a href="{% url 'academics:export_class_reports' semester.id %}" class="toolbar-btn dark {% if not workflow_permissions.can_generate_reports %}disabled{% endif %}"><i data-lucide="download" class="h-4 w-4"></i> Exporter tous</a>
-  <a href="{% url 'academics:class_reports_overview' semester.id %}" class="toolbar-btn soft {% if not workflow_permissions.can_generate_reports %}disabled{% endif %}" target="_blank"><i data-lucide="eye" class="h-4 w-4"></i> Voir releve global</a>
-  <a href="{% url 'academics:annual_class_report' academic_class.id %}" class="toolbar-btn {% if not workflow_permissions.can_generate_reports %}disabled{% endif %}" target="_blank"><i data-lucide="file-text" class="h-4 w-4"></i> Releve annuel</a>
-  <button type="submit" form="bulk-report-form" class="toolbar-btn primary {% if not workflow_permissions.can_generate_reports %}disabled{% endif %}" {% if not workflow_permissions.can_generate_reports %}disabled{% endif %}><i data-lucide="download" class="h-4 w-4"></i> Exporter selection</button>
+  <a class="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-500" href="{% url 'accounts_portal:it_grade_sheet_pdf' academic_class.id semester.id %}?format=a4&amp;session={{ active_session_type }}&amp;preview=1" target="_blank" rel="noopener"><i data-lucide="file-text" class="h-3.5 w-3.5"></i> Prévisualiser PDF</a>
+  <details class="relative ml-auto">
+    <summary class="cursor-pointer list-none rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100">Actions</summary>
+    <div class="absolute right-0 z-30 mt-1 flex w-64 flex-col gap-1 rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl">
+      <a class="rounded-md px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100" href="{% url 'accounts_portal:it_grade_sheet_pdf' academic_class.id semester.id %}?format=a4&amp;session={{ active_session_type }}">Télécharger PDF A4</a>
+      <a class="rounded-md px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100" href="{% url 'accounts_portal:it_grade_sheet_pdf' academic_class.id semester.id %}?format=a3&amp;session={{ active_session_type }}">Télécharger PDF A3</a>
+      <a class="rounded-md px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100" href="{% url 'accounts_portal:it_grade_sheet_pdf' academic_class.id semester.id %}?format=a3&amp;session={{ active_session_type }}&amp;preview=1" target="_blank" rel="noopener">Prévisualiser PDF A3</a>
+      <a class="rounded-md px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100" href="{% url 'accounts_portal:it_grade_sheet_print' academic_class.id semester.id %}?format=a4&amp;session={{ active_session_type }}" target="_blank" rel="noopener">Impression navigateur A4</a>
+      <a class="rounded-md px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100" href="{% url 'accounts_portal:it_grade_sheet_print' academic_class.id semester.id %}?format=a3&amp;session={{ active_session_type }}" target="_blank" rel="noopener">Impression navigateur A3</a>
+      <a class="rounded-md px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100" href="{% url 'academics:download_import_template' academic_class.id semester.id %}?session_type={{ active_session_type }}">Télécharger le modèle Excel</a>
+      <a class="rounded-md px-2.5 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100" href="{% url 'accounts_portal:it_export_notes_excel' %}?class_id={{ academic_class.id }}&amp;semester_id={{ semester.id }}&amp;session={{ active_session_type }}">Exporter le fichier Excel</a>
+      <form class="js-notes-import-form mt-1 border-t border-slate-100 px-2.5 pt-2" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="class_id" value="{{ academic_class.id }}">
+        <input type="hidden" name="semester_id" value="{{ semester.id }}">
+        <input type="hidden" name="session_type" value="{{ active_session_type }}">
+        <label class="block text-[11px] font-semibold text-slate-600" for="notes-import-file-{{ academic_class.id }}-{{ semester.id }}">Importer un fichier Excel</label>
+        <input id="notes-import-file-{{ academic_class.id }}-{{ semester.id }}" type="file" name="file" accept=".xlsx" required class="mt-1 block w-full text-xs text-slate-600 file:mr-2 file:rounded-md file:border-0 file:bg-slate-100 file:px-2 file:py-1.5 file:text-xs file:font-semibold file:text-slate-700 hover:file:bg-slate-200">
+        <button type="submit" class="mt-2 inline-flex items-center gap-1.5 rounded-md border border-indigo-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"><i data-lucide="upload-cloud" class="h-3.5 w-3.5"></i> Importer</button>
+        <span class="hidden text-xs font-medium" data-notes-import-status aria-live="polite"></span>
+      </form>
+      <a href="{% url 'academics:export_class_reports' semester.id %}" class="rounded-md px-2.5 py-2 text-xs font-medium {% if workflow_permissions.can_generate_reports %}text-slate-700 hover:bg-slate-100{% else %}pointer-events-none text-slate-300{% endif %}">Exporter tous les relevés</a>
+      <a href="{% url 'academics:class_reports_overview' semester.id %}" class="rounded-md px-2.5 py-2 text-xs font-medium {% if workflow_permissions.can_generate_reports %}text-slate-700 hover:bg-slate-100{% else %}pointer-events-none text-slate-300{% endif %}" target="_blank">Voir le relevé global</a>
+      <a href="{% url 'academics:annual_class_report' academic_class.id %}" class="rounded-md px-2.5 py-2 text-xs font-medium {% if workflow_permissions.can_generate_reports %}text-slate-700 hover:bg-slate-100{% else %}pointer-events-none text-slate-300{% endif %}" target="_blank">Relevé annuel</a>
+      <button type="submit" form="bulk-report-form" class="rounded-md px-2.5 py-2 text-left text-xs font-medium {% if workflow_permissions.can_generate_reports %}text-indigo-700 hover:bg-indigo-50{% else %}cursor-not-allowed text-slate-300{% endif %}" {% if not workflow_permissions.can_generate_reports %}disabled{% endif %}>Exporter la sélection</button>
+    </div>
+  </details>
 </div>

@@ -27,13 +27,6 @@
     return section ? section.dataset.directorSection : "";
   }
 
-  function setBusy(busy) {
-    const workspace = document.querySelector(WORKSPACE);
-    const indicator = document.querySelector("#director-loading");
-    if (workspace) workspace.setAttribute("aria-busy", busy ? "true" : "false");
-    if (indicator) indicator.classList.toggle("hidden", !busy);
-  }
-
   function refreshTopbar() {
     const button = document.getElementById("director-topbar-refresh");
     if (button) button.click();
@@ -151,21 +144,14 @@
     const target = event.detail.target;
     if (!target) return;
     clearSubwindowError(target);
-    if (target.matches(WORKSPACE)) setBusy(true);
     if (target.matches(DRAWER_CONTENT)) window.deOpenDrawer();
     if (target.matches(MODAL_CONTENT)) window.deOpenModal();
-  });
-
-  document.body.addEventListener("htmx:afterRequest", (event) => {
-    const target = event.detail.target;
-    if (target && target.matches(WORKSPACE)) setBusy(false);
   });
 
   document.body.addEventListener("htmx:afterSwap", (event) => {
     const target = event.detail.target;
     if (!target) return;
     if (target.matches(WORKSPACE)) {
-      setBusy(false);
       setActiveNavigation(workspaceSection(target));
       target.focus({ preventScroll: true });
     }

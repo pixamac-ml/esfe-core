@@ -258,6 +258,43 @@ Le contexte Finance ne rend plus le dashboard parallele finance.html. Les
 routes Finance ouvrent maintenant le workspace Paiements du dashboard
 Gestionnaire, lui-meme rendu dans le shell certifie du Directeur des Etudes.
 
+
+MISE A JOUR DU 14 AOUT 2026 - WORKSPACE COMPLET RACCORDE
+=========================================================
+
+Les sections restantes utilisent maintenant le meme contrat de presentation
+et les composants UI Core du shell certifie :
+
+- Salaires : stat_card, alert, filter_bar, data_table, status_badge, modal et
+  confirm_dialog. Le flux reste verifier -> corriger -> valider -> payer ; les
+  fiches sont auto-generees depuis le salaire officiel.
+- Rapport : filter_bar, stat_card, alert, data_table, chart_panel et
+  empty_state. Les exports Excel/PDF conservent la periode, les filtres et
+  l'annexe verrouillee.
+- Honoraires / cloture : workflow enseignant separe des salaires staff,
+  fiches filtrables, archives mensuelles, versements bancaires et actions
+  valider/cloturer dans data_table avec confirm_dialog.
+- Boutique : stat_card pour les indicateurs, data_table pour les commandes et
+  status_badge pour les etats ; les actions de paiement, preparation et remise
+  restent HTMX et reciblent le module de la meme annexe.
+- Dons : panel/formulaire UI Core, stat_card, data_table et recu PDF par don.
+
+La seconde modale historique du Gestionnaire a ete retiree. Les details des
+candidatures, inscriptions, paiements, salaires et honoraires ciblent tous la
+modale certifiee commune `manager-modal-content`.
+
+CONTROLES EFFECTUES
+===================
+
+- `python manage.py check --settings=config.settings_test_local` : OK.
+- Compilation des templates actifs des sections : OK.
+- `npm run build:css` : OK.
+
+Les tests Django de rendu ont ete ralentis par la base SQLite de test deja
+utilisee par plusieurs processus de developpement ; ils doivent etre relances
+dans un environnement de test libere avant integration finale. Aucun filtrage
+par annexe, permission serveur ou URL metier n'a ete retire.
+
 Ce qui est effectivement raccorde :
 
 - resolution serveur du contexte annex_manager, finance_manager ou
@@ -288,3 +325,3019 @@ Verification realisee :
 
 Prochaine tranche autorisee par le plan : Admissions dans ce meme workspace
 Gestionnaire. Il ne faut pas recreer un dashboard Admissions parallele.
+
+
+DIAGNOSTIC HONNETE ET PLAN DE CRISE - 14 AOUT 2026
+===================================================
+
+Ce projet est-il livrable la semaine prochaine ?
+-------------------------------------------------
+
+Oui, pour une version operationnelle ciblee et presentee au DG, a condition de
+geler immediatement le perimetre. Non, si l'objectif est de terminer toutes les
+fonctionnalites ideales, toutes les finitions UX, tous les dashboards de tous
+les roles et tous les modules secondaires en meme temps.
+
+Mon estimation sincere est la suivante :
+
+- 3 jours de travail concentre peuvent produire une release candidate du
+  parcours critique ;
+- 2 jours supplementaires sont necessaires pour les tests, la recette avec le
+  DG et les corrections bloquantes ;
+- 1 jour de marge est souhaitable pour la migration, les donnees de demo et la
+  mise en production.
+
+Cela represente environ 5 a 6 jours ouvrables a temps plein. Ce n'est pas une
+garantie : la variable la plus dangereuse n'est plus la quantite de code, mais
+la validation sur une base propre, les donnees reelles et les bugs decouverts
+pendant la recette.
+
+Faut-il recommencer le projet ?
+------------------------------
+
+Non. Recommencer maintenant serait une mauvaise decision strategique :
+
+- le modele de donnees, les migrations, les regles d'annexe, les permissions,
+  les workflows paiements, salaires, honoraires, cloture, boutique et dons
+  existent deja ;
+- les dashboards Finance et Admissions ont deja ete branches sur le workspace
+  Gestionnaire et le shell certifie DE ;
+- un nouveau projet recreerait les memes risques, mais sans les tests et les
+  corrections deja accumules ;
+- le vrai probleme est la stabilisation et la priorisation, pas l'absence de
+  fondation.
+
+Repartir de zero ne ferait gagner du temps que si le code etait inutilisable.
+Les controles Django, les templates actifs et le build CSS passent deja ; ce
+n'est donc pas le cas.
+
+Ce qui est deja suffisamment avance
+------------------------------------
+
+- shell unique certifie DE et contexte adapte au role ;
+- filtrage par annexe et restrictions Finance/Admissions cote serveur ;
+- candidatures, inscriptions, paiements et sessions de caisse ;
+- salaires staff avec generation automatique et workflow de paiement ;
+- honoraires enseignants separes des salaires ;
+- depenses, dons, boutique, rapport financier et cloture ;
+- exports Excel/PDF, OTP sur correction de paiements et traces financieres ;
+- composants UI Core et navigation du workspace Gestionnaire.
+
+Ce qui peut encore bloquer une livraison
+-----------------------------------------
+
+P0 - a traiter avant toute demonstration metier :
+
+1. lancer les migrations sur une base de test propre et verifier
+   `makemigrations --check --dry-run` ;
+2. executer les tests critiques sans processus SQLite concurrent ;
+3. tester manuellement les parcours : connexion, annexe, candidature,
+   inscription, paiement, caisse, salaire, honoraire, cloture et export ;
+4. verifier qu'un utilisateur d'une annexe ne voit jamais les donnees d'une
+   autre annexe ;
+5. verifier les comptes et donnees de demonstration utilises par le DG ;
+6. corriger uniquement les erreurs qui bloquent ces parcours.
+
+P1 - a faire si le temps le permet avant la mise en production :
+
+- message budgétaire explicite avant paiement d'une masse salariale ;
+- affichage caisse plus lisible avec solde courant et justificatifs ;
+- tests bout en bout OTP, salaire, honoraire et session cash ;
+- toasts et confirmations manquants sur quelques actions HTMX ;
+- recette de chaque role avec son contexte reel.
+
+P2 - a reporter sans culpabilite :
+
+- maquette complete de saisie/calcul des notes ;
+- refonte esthetique approfondie de la boutique ;
+- scheduler/cron avance et centre de taches quotidien ;
+- dashboard DG d'audit complet ;
+- tendances et rapports enrichis ;
+- perfectionnement de chaque composant non critique.
+
+Plan concret jusqu'a la semaine prochaine
+------------------------------------------
+
+Jour 1 - Gel et securisation
+
+- annoncer que le perimetre de livraison est le parcours administratif et
+  financier critique ;
+- arreter toute nouvelle fonctionnalite non P0 ;
+- verifier migrations, variables d'environnement, URLs et acces ;
+- creer une base de test propre et un jeu de donnees de demonstration.
+
+Jour 2 - Tests metier critiques
+
+- lancer les tests comptes, permissions, annexe, paiements, salaires,
+  honoraires, cloture, exports et boutique ;
+- ajouter seulement les tests qui couvrent un risque reel decouvert ;
+- corriger les erreurs de serveur avant toute retouche visuelle.
+
+Jour 3 - Recette manuelle des roles
+
+- tester Gestionnaire complet ;
+- tester Finance et Agent de paiement avec leurs limites ;
+- tester Admissions avec son contexte limite ;
+- verifier le shell et la navigation du Directeur des etudes ;
+- verifier qu'un acces interdit renvoie bien une reponse serveur refusee.
+
+Jour 4 - Stabilisation production
+
+- executer migrate sur une copie de la base cible ;
+- verifier sauvegarde, restauration, medias, emails et fichiers PDF/Excel ;
+- preparer les comptes de demo et les donnees minimales du DG ;
+- documenter les limites connues, au lieu de les cacher.
+
+Jour 5 - Demonstration DG et gel final
+
+- faire une demonstration guidee sur les parcours P0 ;
+- noter les anomalies bloquees, importantes et cosmetiques ;
+- corriger uniquement les bloquees ;
+- obtenir une validation explicite du perimetre livre.
+
+Jour 6 - Marge
+
+- deployer ou livrer la version candidate ;
+- surveiller les erreurs et appliquer uniquement des corrections urgentes.
+
+Regle de travail pendant cette periode
+----------------------------------------
+
+Une seule question doit guider chaque modification : « Est-ce que cela empeche
+le DG de faire le parcours critique de son annexe la semaine prochaine ? »
+
+- Si oui : priorite immediate.
+- Si non mais que cela concerne la securite, les donnees ou la facturation :
+  priorite suivante.
+- Si c'est uniquement esthetique ou une fonctionnalite future : on reporte.
+
+Il faut egalement eviter de travailler sur plusieurs dashboards en parallele.
+On termine et on teste un parcours, puis on passe au suivant. Le shell unique
+est deja la bonne direction : il reduit la duplication et rend les corrections
+plus rapides.
+
+Ce que tu peux dire au DG
+-------------------------
+
+« Le socle du systeme est en place et les espaces principaux sont deja unifies
+dans le dashboard certifie. Pour tenir la date, je gele les nouvelles
+fonctionnalites et je concentre la semaine sur la validation des parcours
+critiques, la securite par annexe, les migrations et la recette. Les fonctions
+secondaires seront planifiees apres la mise en service, sans mettre en risque
+les admissions, paiements, caisse, paie et rapports. »
+
+Conclusion
+----------
+
+Tu n'es pas bloque par un projet a abandonner ; tu es dans une phase de
+convergence ou il faut passer de « construire » a « stabiliser et livrer ».
+La bonne decision est donc : ne pas recommencer, geler le scope, proteger les
+parcours P0, tester sur une base propre et annoncer clairement ce qui sera
+livre maintenant et ce qui viendra ensuite.
+
+
+## Mission : stabiliser et uniformiser définitivement le dashboard Gestionnaire
+
+Nous devons maintenant **finaliser le dashboard Gestionnaire avant de poursuivre les autres dashboards**.
+
+Le dashboard du **Directeur des Études est la référence UI/UX officielle du projet**. Il ne faut pas créer une nouvelle architecture ni réinventer les composants.
+
+### 1. Réutiliser réellement UI Core
+
+Audit le dashboard Gestionnaire actuel et remplace progressivement les anciens fragments, composants locaux, implémentations historiques ou duplications par les composants réutilisables déjà disponibles dans `ui_core`.
+
+Utilise notamment, selon le besoin réel de chaque section :
+
+* `page_header`
+* `page_section`
+* `content_grid`
+* `panel`
+* `stat_card`
+* `data_table`
+* `status_badge`
+* `filter_bar`
+* `alert`
+* `empty_state`
+* `chart_panel`
+* `progress_bar`
+* `timeline`
+* `form_field`
+* `drawer`
+* `modal`
+* `confirm_dialog`
+* `toast`
+* `loading_overlay`
+* composants account communs
+
+Ne recrée pas localement un composant qui existe déjà dans UI Core.
+
+### 2. Prendre le Directeur des Études comme référence
+
+Analyse directement le dashboard DE et reproduis **le même contrat d'interface et de navigation**, tout en adaptant évidemment les contenus au métier du Gestionnaire.
+
+Je veux notamment retrouver :
+
+* même shell ;
+* même sidebar/topbar ;
+* même logique de navigation ;
+* même système de sections ;
+* même système de sous-sections / tabs ;
+* mêmes patterns de tableaux ;
+* mêmes filtres ;
+* mêmes états vides ;
+* mêmes loaders ;
+* mêmes feedbacks utilisateur ;
+* mêmes drawers ;
+* même modal commune ;
+* même `confirm_dialog` ;
+* même comportement HTMX ;
+* même logique responsive.
+
+**Aucun système parallèle spécifique au Gestionnaire ne doit subsister s'il existe déjà un équivalent certifié dans UI Core.**
+
+### 3. Sous-sections
+
+Lorsque certaines sections Gestionnaire contiennent plusieurs fonctions importantes, utilise le système de sous-sections déjà adopté dans le dashboard DE.
+
+Exemple de référence : la section Enseignants du DE avec :
+
+`Vue d'ensemble | Répertoire | Affectations | Dossiers`
+
+Applique cette logique lorsque cela améliore réellement les sections Gestionnaire, sans créer artificiellement des onglets inutiles.
+
+Les sous-sections doivent rester dans le workspace du dashboard et fonctionner proprement avec HTMX lorsque pertinent.
+
+### 4. Tableaux et pagination
+
+Inspecte toutes les listes longues du Gestionnaire.
+
+Utilise le composant `data_table` et ajoute une pagination cohérente avec le standard utilisé dans le dashboard DE lorsque le volume de données le justifie.
+
+Les filtres, recherches et pagination doivent fonctionner ensemble et conserver :
+
+* le scope de l'annexe ;
+* les permissions ;
+* les paramètres GET ;
+* le contexte de la section ;
+* les comportements HTMX existants.
+
+Ne charge pas inutilement des centaines de lignes dans une page.
+
+### 5. Modales, drawers et confirmations
+
+Il ne doit plus exister plusieurs systèmes concurrents.
+
+Réutilise exclusivement les composants communs certifiés :
+
+* `drawer` pour la consultation lorsqu'il est approprié ;
+* `modal` pour les formulaires/actions qui nécessitent une modale ;
+* `confirm_dialog` pour les opérations sensibles.
+
+Supprime uniquement les anciennes implémentations devenues réellement inutiles après vérification de leurs usages.
+
+### 6. Ne pas casser le métier
+
+Cette mission est principalement une **stabilisation UI/UX et architecturale**.
+
+Ne réécris pas inutilement :
+
+* les modèles ;
+* les workflows métier ;
+* les permissions ;
+* le filtrage par annexe ;
+* les URLs publiques existantes ;
+* les actions HTMX fonctionnelles ;
+* les règles Finance/Admissions ;
+* les mécanismes OTP ;
+* les exports PDF/Excel.
+
+Préserve les fonctionnalités déjà opérationnelles.
+
+### 7. Nettoyage
+
+Identifie les anciens partials/fragments/templates du Gestionnaire qui sont encore utilisés alors qu'UI Core fournit maintenant leur équivalent.
+
+Migre d'abord leurs usages.
+
+Ne supprime un ancien fichier qu'après avoir confirmé qu'il n'est plus référencé nulle part.
+
+Évite toute duplication.
+
+### 8. Validation obligatoire
+
+Après stabilisation :
+
+* `python manage.py check --settings=config.settings_test_local`
+* vérification des migrations sans en créer inutilement ;
+* compilation/rendu des templates concernés ;
+* tests Gestionnaire existants ;
+* tests Finance ;
+* tests Admissions ;
+* tests permissions et inter-annexes ;
+* tests des actions HTMX concernées ;
+* `npm run build:css`
+
+Puis effectue une vérification section par section du dashboard Gestionnaire.
+
+### Résultat attendu
+
+À la fin, je veux pouvoir considérer :
+
+**DASHBOARD GESTIONNAIRE = STABILISÉ ET GELÉ**
+
+Il doit donner l'impression d'appartenir exactement au même produit que le dashboard Directeur des Études.
+
+Même architecture.
+Même navigation.
+Même bibliothèque UI.
+Même comportement.
+Même niveau de finition.
+
+Seuls **le contenu métier, les données, les permissions et les actions propres au Gestionnaire** doivent différer.
+
+Commence par auditer l'existant et les composants UI Core disponibles avant de modifier le code. Procède section par section, évite les refontes massives inutiles et termine complètement cette stabilisation avant d'entamer un autre dashboard.
+
+================================================================
+APPLICATION DE LA MIGRATION — DASHBOARD GESTIONNAIRE
+================================================================
+
+Statut : stabilisation UI Core appliquée au dashboard Gestionnaire.
+
+Constat confirmé : le Gestionnaire utilise désormais le même shell certifié que
+le Directeur des Études. Le contexte, la navigation et les autorisations sont
+construits côté serveur par `build_role_dashboard_shell(...)`, avec la clé
+unique `manager`. Aucun menu ou sidebar parallèle Gestionnaire ne reste actif.
+
+Ce qui a été appliqué :
+
+- suppression de l'ancienne coque locale (sidebar, topbar, modales et CSS
+  historique) du template principal Gestionnaire ;
+- conservation de la coque DE certifiée : app shell, sidebar, topbar, drawer,
+  modal commune, confirmation et comportement HTMX ;
+- section Vue globale dédiée et sections métier rendues avec les composants
+  UI Core adaptés : `page_header`, `panel`, `stat_card`, `data_table`,
+  `filter_bar`, `status_badge`, `alert`, `empty_state` et pagination ;
+- création d'un composant commun `ui_core.django_form_field` pour afficher les
+  vrais champs Django de manière uniforme dans les formulaires du Gestionnaire ;
+- migration des formulaires encore historiques (clôture, dépenses, caisse,
+  paie, honoraires, positionnement académique) vers les tokens UI Core ;
+- migration des retours HTMX actifs (dons, détails d'inscription, sessions de
+  caisse, alertes et badges) pour qu'ils respectent aussi UI Core ;
+- navigation filtrée côté serveur par les sections autorisées : le
+  gestionnaire d'annexe, la finance, l'agent de paiement et les admissions ne
+  voient que leur contexte et leurs actions autorisées ;
+- les règles métier, URLs, OTP, exports et filtrage strict par annexe ont été
+  conservés : aucune réécriture de workflow n'a été faite.
+
+Vérifications effectuées avec succès :
+
+- `python manage.py check --settings=config.settings_test_local`
+- compilation des templates Gestionnaire/UI Core concernés
+- `python manage.py test --settings=config.settings_test_local accounts.test_manager_workspace_access`
+  (5 tests : rôles gestionnaire, finance, agent de paiement, admissions et
+  obligation d'annexe)
+- `npm run build:css`
+- `git diff --check`
+
+Limite de validation à résoudre avant le gel définitif : la suite métier plus
+large a trouvé une base SQLite de test existante et Django demande sa
+suppression interactive. La réutilisation sûre avec `--keepdb` n'a pas répondu
+avant le délai d'une minute. Cette base n'a pas été supprimée afin de ne pas
+écraser un travail local ou un processus en cours. Dès qu'elle est libérée ou
+qu'une base de test dédiée est disponible, relancer :
+
+`python manage.py test --settings=config.settings_test_local accounts.test_manager_workflows`
+
+Conclusion : l'architecture et l'interface actives du Gestionnaire sont
+alignées sur le moule certifié du DE. Il reste la validation complète des tests
+métier sur une base de test disponible avant de déclarer le dashboard
+formellement « gelé ».
+
+
+# PRIORITÉ — Le dashboard Gestionnaire n'est pas encore correctement uniformisé
+
+La précédente intervention n'a pas complètement atteint l'objectif.
+
+Le problème n'est PAS seulement l'utilisation visuelle de quelques composants UI Core.
+
+Je veux que le **dashboard Gestionnaire adopte réellement l'architecture d'interface, de navigation et de composition du dashboard Directeur des Études**, qui constitue désormais le standard officiel de tous les dashboards.
+
+## 1. Commence par comparer réellement les deux dashboards
+
+Avant toute modification, analyse directement :
+
+* le template et les composants utilisés par le dashboard Directeur des Études ;
+* son `app_shell` ;
+* sa sidebar ;
+* sa topbar ;
+* son workspace ;
+* son système de sections ;
+* son système de sous-sections ;
+* ses breadcrumbs/contextes ;
+* ses tableaux ;
+* ses filtres ;
+* ses modales/drawers ;
+* sa pagination ;
+* ses comportements HTMX.
+
+Compare ensuite cela avec le Gestionnaire.
+
+Je ne veux pas simplement une apparence similaire.
+
+Je veux **le même système d'interface réutilisable**.
+
+---
+
+# 2. Le Directeur des Études est le MOULE
+
+Exemple concret : **Enseignants**.
+
+Dans le DE, on ne met pas toutes les fonctionnalités Enseignants les unes sous les autres dans une énorme page.
+
+On entre dans le domaine :
+
+**Enseignants**
+
+puis on dispose d'une sous-navigation :
+
+**Vue d'ensemble | Répertoire | Affectations | Dossiers**
+
+Chaque sous-section possède son propre workspace et son propre objectif.
+
+### Vue d'ensemble
+
+KPI, alertes, synthèse, actions importantes.
+
+### Répertoire
+
+Recherche, filtres, liste des enseignants, pagination et actions.
+
+### Affectations
+
+Gestion des affectations.
+
+### Dossiers
+
+Gestion documentaire des enseignants.
+
+C'est exactement cette philosophie que je veux retrouver dans le Gestionnaire.
+
+---
+
+# 3. Repenser les sections Gestionnaire en domaines + sous-sections
+
+Certaines sections actuelles du Gestionnaire regroupent trop d'informations/actions dans un seul bloc ou une seule page.
+
+Il faut les restructurer.
+
+Une entrée principale de sidebar représente un **domaine métier**.
+
+À l'intérieur de ce domaine, lorsque plusieurs opérations distinctes existent, utilise une sous-navigation similaire au DE.
+
+Par exemple, étudie une organisation cohérente de ce type :
+
+### Candidatures
+
+`Vue d'ensemble | Candidatures | À traiter | Archives`
+
+### Inscriptions
+
+`Vue d'ensemble | Inscriptions | En attente | Dossiers`
+
+### Paiements
+
+`Vue d'ensemble | Paiements | Sessions espèces | À valider`
+
+### Salaires
+
+`Vue d'ensemble | Fiches | À valider | Paiements | Historique`
+
+### Dépenses
+
+`Vue d'ensemble | Dépenses | Nouvelle dépense | À approuver | Historique`
+
+### Boutique
+
+`Vue d'ensemble | Produits | Stock | Commandes | Ventes`
+
+### Dons
+
+`Vue d'ensemble | Enregistrer | Historique`
+
+### Caisse
+
+`Vue d'ensemble | Mouvements | Opérations | Rapprochement`
+
+### Rapports
+
+`Vue d'ensemble | Recettes | Charges | Résultats | Exports`
+
+### Clôture mensuelle
+
+`Vue d'ensemble | Honoraires | Versements | Clôtures | Archives`
+
+Ces intitulés sont une orientation fonctionnelle : **analyse les fonctionnalités réellement existantes avant de figer les sous-sections.**
+
+Ne crée surtout pas des sous-sections vides ou artificielles.
+
+---
+
+# 4. Une sous-section = un workspace dédié
+
+C'est un point essentiel.
+
+Je ne veux plus d'énormes pages verticales dans lesquelles plusieurs opérations indépendantes sont empilées.
+
+Lorsqu'une section possède plusieurs fonctions importantes, elles doivent être séparées en sous-sections.
+
+Exemple :
+
+`Paiements > Vue d'ensemble`
+
+peut afficher :
+
+* KPI ;
+* alertes ;
+* activité récente ;
+* raccourcis ;
+* situation de caisse.
+
+Puis :
+
+`Paiements > Paiements`
+
+affiche réellement :
+
+* recherche ;
+* filtres ;
+* tableau ;
+* pagination ;
+* actions.
+
+Puis :
+
+`Paiements > Sessions espèces`
+
+affiche uniquement le workflow des sessions espèces.
+
+Chaque espace devient ainsi plus lisible et opérationnel.
+
+---
+
+# 5. Uniformiser réellement le shell
+
+Les captures montrent encore des différences entre le Gestionnaire et le Directeur des Études au niveau du shell.
+
+Je veux vérifier et uniformiser :
+
+* largeur et comportement sidebar ;
+* header de sidebar ;
+* footer utilisateur ;
+* topbar ;
+* hauteur de topbar ;
+* zone utilisateur ;
+* notifications ;
+* boutons communs ;
+* collapse sidebar ;
+* comportement mobile/tablette ;
+* espacements du workspace ;
+* largeur maximale du contenu ;
+* scroll ;
+* loaders.
+
+Le Gestionnaire ne doit pas posséder une variante locale de ces éléments si le composant certifié du DE existe déjà.
+
+Il doit **instancier les mêmes composants UI Core** avec un contexte différent.
+
+Par exemple :
+
+DE :
+`ESFE Mali / Direction des Études`
+
+Gestionnaire :
+`ESFE Mali / Gestion de l'annexe`
+
+Le contenu change.
+
+**Le composant ne change pas.**
+
+---
+
+# 6. Même système de navigation
+
+Je veux un contrat de navigation uniforme pour tous les dashboards.
+
+Structure cible :
+
+`Shell`
+→ `Sidebar`
+→ `Section métier`
+→ `Sous-navigation`
+→ `Workspace`
+→ `Action / modal / drawer`
+
+Les changements de sous-sections doivent utiliser le même mécanisme que le DE, notamment HTMX lorsque celui-ci est déjà prévu pour cela.
+
+Préserver :
+
+* URL cohérente ;
+* historique navigateur lorsque pertinent ;
+* section active ;
+* sous-section active ;
+* filtres ;
+* recherche ;
+* pagination ;
+* permissions.
+
+---
+
+# 7. Breadcrumb / contexte
+
+Uniformise également la manière d'indiquer où se trouve l'utilisateur.
+
+Exemples conceptuels :
+
+`GESTIONNAIRE / PAIEMENTS`
+
+`GESTIONNAIRE / CAISSE`
+
+`GESTIONNAIRE / SALAIRES`
+
+puis le titre du workspace.
+
+Le pattern doit être identique à celui utilisé dans le dashboard DE.
+
+---
+
+# 8. Les longues listes doivent devenir de vrais workspaces
+
+Prends comme référence le **Répertoire des enseignants** du DE.
+
+On retrouve :
+
+* titre ;
+* nombre de résultats ;
+* recherche ;
+* filtre ;
+* liste/tableau ;
+* statuts ;
+* actions ;
+* pagination lorsque nécessaire.
+
+Applique le même contrat aux listes Gestionnaire :
+
+* candidatures ;
+* inscriptions ;
+* paiements ;
+* salaires ;
+* dépenses ;
+* mouvements de caisse ;
+* commandes ;
+* dons ;
+* honoraires ;
+* archives.
+
+Une liste potentiellement importante ne doit pas être affichée intégralement dans une page gigantesque.
+
+Utilise pagination serveur + HTMX lorsque l'architecture existante le permet.
+
+---
+
+# 9. Un seul système de composants interactifs
+
+Aucune modal spécifique au Gestionnaire si `ui_core.modal` répond au besoin.
+
+Aucun système parallèle de confirmation.
+
+Aucun drawer parallèle.
+
+Aucun loader parallèle.
+
+Aucun système local de toast.
+
+Utiliser :
+
+* `ui_core.modal`
+* `ui_core.drawer`
+* `ui_core.confirm_dialog`
+* `ui_core.loading_overlay`
+* `ui_core.toast`
+* `ui_core.empty_state`
+
+Le contenu métier change, **le moteur UI reste commun**.
+
+---
+
+# 10. Réutiliser les composants, pas les copier
+
+Attention :
+
+Je ne demande PAS de copier le HTML du Directeur des Études vers le Gestionnaire.
+
+Je demande de déterminer quels composants et contrats UI rendent le DE cohérent, puis de les **réutiliser réellement**.
+
+Si un composant commun existe mais qu'il n'est pas assez générique pour le Gestionnaire, améliore proprement son API dans UI Core au lieu d'en créer une copie locale.
+
+Objectif :
+
+**une correction apportée à un composant commun doit pouvoir bénéficier à plusieurs dashboards.**
+
+---
+
+# 11. Ne pas casser le backend existant
+
+Cette refonte concerne principalement :
+
+* architecture UI ;
+* composition ;
+* navigation ;
+* présentation ;
+* sous-sections ;
+* réutilisation des composants.
+
+Ne casse pas :
+
+* règles métier ;
+* permissions ;
+* scope annexe ;
+* workflows financiers ;
+* OTP ;
+* exports ;
+* modèles ;
+* relations existantes ;
+* endpoints HTMX fonctionnels.
+
+Adapte leur présentation à la nouvelle architecture.
+
+---
+
+# 12. Procédure demandée
+
+Ne modifie pas tout aveuglément.
+
+### Étape A — Audit
+
+Produis le mapping :
+
+`Composant/Pattern DE → équivalent Gestionnaire actuel → action nécessaire`
+
+Identifie également tous les composants/partials historiques encore utilisés.
+
+### Étape B — Shell
+
+Rends d'abord sidebar + topbar + workspace structurellement identiques au standard DE.
+
+### Étape C — Navigation
+
+Implémente le même contrat sections/sous-sections.
+
+### Étape D — Sections
+
+Migre ensuite les domaines Gestionnaire un par un.
+
+### Étape E — Listes
+
+Uniformise filtres, recherche, `data_table`, statuts, actions et pagination.
+
+### Étape F — Interactions
+
+Uniformise modal, drawer, confirm_dialog, toast et loading.
+
+### Étape G — Nettoyage
+
+Supprime les anciens fragments uniquement lorsqu'ils ne sont réellement plus référencés.
+
+### Étape H — Tests
+
+Teste les workflows existants après migration.
+
+---
+
+# CRITÈRE FINAL
+
+Je dois pouvoir ouvrir côte à côte :
+
+**Dashboard Directeur des Études**
+
+et
+
+**Dashboard Gestionnaire**
+
+et constater immédiatement qu'ils appartiennent au **même système applicatif**.
+
+Je dois retrouver :
+
+**même shell
+
+* même topbar
+* même sidebar
+* même grille
+* même navigation
+* même système de sous-sections
+* même breadcrumb/contexte
+* mêmes composants UI Core
+* mêmes tableaux
+* mêmes filtres
+* même pagination
+* mêmes modales/drawers
+* mêmes comportements HTMX
+* mêmes règles responsive**
+
+La différence doit venir uniquement du **métier**.
+
+Le Directeur des Études pilote l'académique.
+
+Le Gestionnaire pilote l'administratif et le financier.
+
+Mais ils utilisent **exactement le même langage d'interface**.
+
+## IMPORTANT
+
+Ne considère pas la tâche terminée simplement parce que le Gestionnaire "ressemble davantage" au DE.
+
+La tâche est terminée lorsque **l'architecture UI elle-même est mutualisée et que les anciennes implémentations parallèles ont disparu lorsqu'elles sont remplaçables par UI Core**.
+
+À la fin, fournis :
+
+1. les différences détectées entre DE et Gestionnaire ;
+2. les composants UI Core désormais réellement partagés ;
+3. les anciens composants/partials supprimés ou conservés avec justification ;
+4. la nouvelle cartographie sections → sous-sections ;
+5. les listes paginées ;
+6. les endpoints/partials HTMX concernés ;
+7. les tests exécutés et leurs résultats ;
+8. les éventuels écarts restant par rapport au standard DE.
+
+Ne passe à aucun autre dashboard avant validation de cette conformité.
+
+# 13. Nettoyer et simplifier la Vue globale du Gestionnaire
+
+Profite de cette stabilisation pour **nettoyer l'interface d'accueil du dashboard Gestionnaire**.
+
+Actuellement, la Vue globale contient notamment un gros bloc **« Périmètre verrouillé »** avec l'annexe et plusieurs badges récapitulatifs.
+
+Ce bloc prend beaucoup trop de place et fait doublon avec des informations déjà disponibles ailleurs dans l'interface.
+
+### À faire
+
+Supprime ce gros bloc de l'accueil.
+
+Le fait que les données soient limitées à l'annexe reste une **règle de sécurité backend obligatoire**, mais il n'est pas nécessaire d'occuper une grande zone de l'interface pour l'expliquer en permanence.
+
+L'annexe active peut être indiquée beaucoup plus discrètement, en reprenant le pattern compact du dashboard Directeur des Études, par exemple dans la barre contextuelle située sous le `page_header`.
+
+L'accueil Gestionnaire doit donc se rapprocher structurellement de l'accueil DE :
+
+`Page header + actions`
+→ `barre contextuelle compacte`
+→ `KPI`
+→ `alertes/priorités`
+→ `actions principales`
+→ `informations opérationnelles réellement utiles`
+
+Évite :
+
+* les gros blocs explicatifs permanents ;
+* les badges redondants ;
+* les informations répétées ;
+* les panneaux occupant beaucoup d'espace sans action métier ;
+* les espaces verticaux inutiles ;
+* les composants décoratifs qui n'aident pas le Gestionnaire à travailler.
+
+### Principe
+
+La **Vue globale est un cockpit**, pas une page documentaire.
+
+Elle doit permettre au Gestionnaire de comprendre rapidement :
+
+* ce qui se passe dans son annexe ;
+* ce qui nécessite son attention ;
+* les montants importants ;
+* les opérations en attente ;
+* les anomalies ;
+* les actions prioritaires.
+
+Prends directement la Vue générale du Directeur des Études comme référence de densité, de hiérarchie et de simplicité.
+
+Ne copie pas ses données académiques : **reproduis son organisation de l'information avec les données métier du Gestionnaire.**
+
+Le résultat recherché est une interface plus compacte, plus lisible et immédiatement exploitable, sans perdre les contrôles de sécurité liés au périmètre de l'annexe.
+
+
+Instruction Nouvelle
+
+# MISSION — STABILISATION GLOBALE DU SYSTÈME UI DES DASHBOARDS
+
+Le dashboard Directeur des Études sert de base architecturale au projet, mais il présente encore lui-même certains défauts de layout, d'overflow, de responsive et de feedback utilisateur.
+
+La mission ne doit donc PAS se limiter au dashboard Gestionnaire.
+
+Elle doit s'appliquer en priorité à :
+
+* Dashboard Directeur des Études ;
+* Dashboard Gestionnaire ;
+
+puis les corrections apportées aux composants communs doivent devenir le standard réutilisable pour tous les autres dashboards.
+
+---
+
+# 1. OBJECTIF PRINCIPAL
+
+Je veux stabiliser le système UI global afin d'obtenir :
+
+* aucun overflow horizontal global ;
+* contenu réellement responsive ;
+* composants correctement dimensionnés ;
+* listes longues paginées ;
+* filtres fonctionnels ;
+* boutons fonctionnels ;
+* recherche fonctionnelle ;
+* interactions HTMX propres ;
+* un seul système de loading ;
+* feedbacks cohérents ;
+* modales et drawers propres ;
+* comportement stable sur desktop, laptop, tablette et mobile.
+
+Il faut corriger le problème à la source dans UI Core lorsque cela est pertinent, au lieu de faire uniquement des corrections locales.
+
+---
+
+# 2. DIRECTEUR DES ÉTUDES ET GESTIONNAIRE DOIVENT ÊTRE AUDITÉS ENSEMBLE
+
+Ne considère pas que le Directeur des Études est déjà parfait.
+
+Inspecte les deux dashboards côte à côte.
+
+Cherche notamment :
+
+* zones qui dépassent le workspace ;
+* grilles trop larges ;
+* KPI surdimensionnés ;
+* actions qui ne reviennent pas correctement à la ligne ;
+* tableaux qui cassent le layout ;
+* tabs trop larges ;
+* filtres rigides ;
+* boutons hors écran ;
+* contenus avec `min-width` trop important ;
+* wrappers incorrects ;
+* anciens composants encore actifs.
+
+Lorsque le défaut vient d'un composant UI Core commun, corrige le composant commun.
+
+---
+
+# 3. RESPONSIVE RÉEL — PAS SEULEMENT DESKTOP
+
+Le contenu doit s'adapter correctement à la taille réelle de l'écran.
+
+Tester au minimum :
+
+* 1920×1080 ;
+* 1366×768 ;
+* 1280×720 ;
+* tablette ;
+* mobile.
+
+Le système doit fonctionner avec :
+
+* sidebar ouverte ;
+* sidebar réduite ;
+* workspace large ;
+* workspace compact.
+
+Il ne faut jamais calculer le contenu comme si toute la largeur de l'écran était disponible alors qu'une sidebar est affichée.
+
+---
+
+# 4. CORRIGER LES OVERFLOWS À LA SOURCE
+
+Audite notamment :
+
+* `w-screen`;
+* `w-full`;
+* `max-w-*`;
+* `min-w-*`;
+* `flex-shrink`;
+* `min-w-0`;
+* Grid ;
+* Flexbox ;
+* paddings ;
+* gaps ;
+* tableaux ;
+* tabs ;
+* formulaires ;
+* groupes d'actions.
+
+Le workspace doit toujours rester dans la largeur disponible.
+
+Aucune page ne doit provoquer de scrollbar horizontale globale.
+
+Si un tableau nécessite un scroll horizontal, celui-ci doit être **local au composant tableau**, jamais à toute l'application.
+
+---
+
+# 5. UI CORE DOIT DEVENIR LA SOURCE UNIQUE
+
+Inspecte les composants communs utilisés par les deux dashboards.
+
+En particulier :
+
+* `app_shell`
+* `app_sidebar`
+* `app_topbar`
+* `page_header`
+* `page_section`
+* `content_grid`
+* `stat_card`
+* `panel`
+* `filter_bar`
+* `data_table`
+* `status_badge`
+* `alert`
+* `empty_state`
+* `tabs`
+* `modal`
+* `drawer`
+* `confirm_dialog`
+* `loading_overlay`
+* `toast`
+
+Si un comportement responsive ou visuel est incorrect dans plusieurs dashboards, corrige le composant UI Core correspondant.
+
+Évite les patchs spécifiques à un rôle lorsque le problème est générique.
+
+---
+
+# 6. TAILLE DES COMPOSANTS
+
+Réduis la densité excessive.
+
+Certains KPI, panels ou actions occupent encore trop d'espace.
+
+Je veux une interface :
+
+* compacte ;
+* claire ;
+* professionnelle ;
+* lisible ;
+* sans énorme espace vide ;
+* sans cartes inutilement hautes.
+
+Le contenu doit rester compréhensible sans surcharger le workspace.
+
+---
+
+# 7. KPI RESPONSIVE
+
+Les KPI doivent être capables de passer automatiquement :
+
+* plusieurs colonnes sur grand écran ;
+* moins de colonnes sur laptop ;
+* 2 colonnes sur tablette si pertinent ;
+* 1 colonne sur mobile.
+
+Aucune valeur longue, devise ou label ne doit forcer la grille à dépasser.
+
+---
+
+# 8. LISTES LONGUES = PAGINATION
+
+Lorsqu'une section affiche beaucoup d'éléments, ne charge pas toute la liste d'un coup.
+
+Ajouter ou vérifier la pagination pour les listes importantes, notamment :
+
+* enseignants ;
+* candidatures ;
+* inscriptions ;
+* paiements ;
+* salaires ;
+* dépenses ;
+* mouvements de caisse ;
+* commandes ;
+* dons ;
+* honoraires ;
+* archives ;
+* autres grandes listes académiques.
+
+La pagination doit être compatible avec :
+
+* recherche ;
+* filtres ;
+* HTMX ;
+* section active ;
+* sous-section active.
+
+---
+
+# 9. RECHERCHE ET FILTRES DOIVENT RÉELLEMENT FONCTIONNER
+
+Il existe actuellement des filtres ou boutons qui semblent présents visuellement mais dont certaines actions ne fonctionnent pas correctement.
+
+Il faut auditer chaque filtre et chaque champ de recherche.
+
+Vérifie :
+
+* changement de statut ;
+* période ;
+* catégorie ;
+* recherche texte ;
+* reset ;
+* soumission ;
+* pagination ;
+* mise à jour HTMX.
+
+Le frontend ne doit pas afficher une fonctionnalité inactive.
+
+Si un bouton ou un filtre est visible, il doit avoir un comportement réel.
+
+---
+
+# 10. BOUTONS ET ACTIONS
+
+Tester les actions visibles dans chaque section.
+
+Exemples :
+
+* Voir ;
+* Modifier ;
+* Valider ;
+* Annuler ;
+* Corriger ;
+* Exporter ;
+* Ouvrir ;
+* Rechercher ;
+* Filtrer ;
+* Réinitialiser ;
+* Suivant/précédent ;
+* actions rapides.
+
+Aucun bouton décoratif ou mort ne doit rester dans une V1 production.
+
+---
+
+# 11. SUPPRIMER LES DOUBLES SPINNERS
+
+Problème important :
+
+Certaines actions affichent plusieurs systèmes de loading simultanément.
+
+Exemple actuel :
+
+* ancien spinner générique ;
+* spinner ou overlay historique ;
+* système de mise à jour UI Core.
+
+Je ne veux plus cela.
+
+Je veux **un seul système officiel de feedback de chargement**.
+
+---
+
+# 12. PRIVILÉGIER LE SYSTÈME « MISE À JOUR » UI CORE
+
+Je préfère le système de mise à jour déjà créé dans la bibliothèque UI Core.
+
+Il est :
+
+* plus propre ;
+* plus discret ;
+* plus naturel ;
+* plus compréhensible ;
+* mieux intégré au produit.
+
+Donc :
+
+**conserver le loading/update officiel UI Core**
+
+et supprimer les anciens spinners hérités lorsqu'ils ne sont plus nécessaires.
+
+---
+
+# 13. SUPPRIMER LE LOADER QUI BLANCHIT TOUT LE DASHBOARD
+
+Il existe un ancien comportement où une action provoque un loader global qui :
+
+* masque ou blanchit fortement le dashboard ;
+* affiche un spinner qui tourne ;
+* bloque visuellement tout l'écran.
+
+Je ne veux plus ce comportement pour les opérations normales.
+
+Les actions courantes doivent utiliser un feedback discret.
+
+Exemple cible :
+
+`clic`
+→ `mise à jour UI Core`
+→ `contenu actualisé`
+→ `toast ou message métier si nécessaire`
+
+Pas :
+
+`clic`
+→ `dashboard blanc`
+→ `spinner central`
+→ `spinner secondaire`
+→ `message supplémentaire`
+
+Un overlay global ne doit être utilisé que si une opération bloque réellement toute l'application.
+
+---
+
+# 14. UN SEUL FEEDBACK PAR ACTION
+
+Évite :
+
+* spinner + toast + alert + message inline + modal succès.
+
+Une action réussie doit généralement utiliser :
+
+* toast discret ;
+
+ou simplement :
+
+* mise à jour visible du contenu.
+
+Une erreur métier :
+
+* alert ou erreur formulaire.
+
+Une confirmation sensible :
+
+* `confirm_dialog`.
+
+---
+
+# 15. MODALES
+
+Uniformiser les modales des deux dashboards.
+
+Vérifier :
+
+* largeur ;
+* hauteur ;
+* scroll interne ;
+* responsive ;
+* boutons ;
+* fermeture ;
+* overlay ;
+* focus ;
+* footer.
+
+Pas de modale différente entre Directeur des Études et Gestionnaire si le même composant UI Core convient.
+
+---
+
+# 16. DRAWERS
+
+Même principe pour les drawers.
+
+Ils doivent rester utilisables :
+
+* desktop ;
+* tablette ;
+* mobile.
+
+Le contenu long doit scroller à l'intérieur du drawer.
+
+---
+
+# 17. TABS / SOUS-SECTIONS
+
+Les sous-sections sont désormais une partie importante du système.
+
+Vérifier :
+
+* overflow ;
+* scroll horizontal local sur mobile si nécessaire ;
+* état actif ;
+* navigation HTMX ;
+* historique ;
+* titre correspondant ;
+* contenu correspondant.
+
+Les tabs ne doivent jamais casser le workspace.
+
+---
+
+# 18. TABLEAUX
+
+Les tableaux sont un point critique.
+
+Vérifie :
+
+* contenu long ;
+* boutons actions ;
+* badges ;
+* colonnes ;
+* largeur ;
+* responsive ;
+* pagination ;
+* empty state.
+
+Sur un écran compact, il vaut mieux avoir un scroll local dans le tableau que casser tout le dashboard.
+
+---
+
+# 19. FORMULAIRES ET FILTER BAR
+
+Les formulaires et filtres doivent eux aussi être responsive.
+
+Sur grand écran :
+
+`Recherche | Filtre | Filtre | Action`
+
+Sur petit écran :
+
+les éléments doivent automatiquement revenir à la ligne.
+
+Aucun input ou select ne doit imposer une largeur fixe qui dépasse.
+
+---
+
+# 20. APPLIQUER LES CORRECTIONS AUX DEUX DASHBOARDS
+
+Toutes les corrections pertinentes doivent être vérifiées au minimum sur :
+
+## Directeur des Études
+
+* Vue générale ;
+* Enseignants ;
+* autres sections comportant listes, tabs, filtres ou tableaux.
+
+## Gestionnaire
+
+* Vue globale ;
+* Candidatures ;
+* Inscriptions ;
+* Paiements ;
+* Salaires ;
+* Dépenses ;
+* Boutique ;
+* Dons ;
+* Caisse ;
+* Rapports ;
+* Clôture.
+
+---
+
+# 21. NE PAS CASSER LE BACKEND
+
+Cette mission est principalement UI/UX.
+
+Ne modifie pas inutilement :
+
+* modèles ;
+* migrations ;
+* permissions ;
+* scope annexe ;
+* workflows métier ;
+* logique financière ;
+* OTP ;
+* règles académiques.
+
+Si une fonctionnalité visible ne fonctionne pas parce qu'un endpoint est incorrect, corrige uniquement ce qui est nécessaire.
+
+---
+
+# 22. ORDRE DE TRAVAIL
+
+## Phase A — Audit global
+
+Identifier les problèmes sur DE + Gestionnaire.
+
+## Phase B — UI Core
+
+Corriger les composants partagés.
+
+## Phase C — Layout
+
+Corriger container, width, grid, flex et overflow.
+
+## Phase D — Responsive
+
+Adapter les breakpoints.
+
+## Phase E — Interaction
+
+Recherche, filtres, boutons, pagination.
+
+## Phase F — Loading
+
+Supprimer les anciens spinners.
+
+## Phase G — Modales / Drawers
+
+Uniformiser.
+
+## Phase H — Tests
+
+Tester les deux dashboards.
+
+---
+
+# 23. CRITÈRE FINAL
+
+Je veux obtenir un système où :
+
+**le contenu s'adapte au dashboard**
+
+et non :
+
+**le dashboard essaie de s'adapter à un contenu trop large.**
+
+Aucun élément ne doit sortir du workspace.
+
+Aucune action normale ne doit blanchir tout l'écran.
+
+Aucune opération ne doit afficher deux ou trois spinners.
+
+Aucun filtre visible ne doit être inactif.
+
+Aucune longue liste ne doit charger inutilement des centaines de lignes.
+
+---
+
+# 24. TESTS OBLIGATOIRES
+
+Après modification :
+
+`python manage.py check --settings=config.settings_test_local`
+
+Puis tests ciblés :
+
+* shell certifié ;
+* dashboard DE ;
+* dashboard Gestionnaire ;
+* composants UI Core modifiés ;
+* HTMX ;
+* permissions ;
+* pagination ;
+* filtres ;
+* recherches.
+
+Puis :
+
+`npm run build:css`
+
+---
+
+# 25. RAPPORT FINAL
+
+À la fin, donne :
+
+1. problèmes d'overflow trouvés ;
+2. composants UI Core corrigés ;
+3. dashboards impactés ;
+4. anciens loaders supprimés ;
+5. comportement final du loading ;
+6. listes paginées ;
+7. filtres réparés ;
+8. recherches réparées ;
+9. boutons/actions réparés ;
+10. tailles d'écran testées ;
+11. éventuels problèmes restant ;
+12. tests exécutés et résultats.
+
+Ne considère pas la mission terminée tant que les deux dashboards ne sont pas réellement utilisables sans débordement et sans interactions mortes.
+
+
+ok Nouvelle instruction...
+
+# MISSION PRIORITAIRE — STANDARDISATION FINALE DES DASHBOARDS
+
+Nous devons maintenant arrêter les ajustements partiels et imposer une règle globale de conception à tous les dashboards concernés, en priorité :
+
+* Directeur des Études ;
+* Gestionnaire.
+
+Le problème actuel n'est plus seulement esthétique. Il concerne la **densité, la hauteur utile, la structuration du workspace, le responsive, la pagination et l'exploitation correcte de l'espace écran**.
+
+Le système est déjà bien avancé. Il ne faut pas refaire l'architecture, mais **nettoyer, compacter et standardiser profondément l'interface existante**.
+
+---
+
+# RÈGLE CATÉGORIQUE
+
+## Le contenu d'un écran ne doit plus dépasser inutilement la hauteur logique de travail.
+
+Une page métier standard doit être pensée pour tenir dans la zone visible de travail autant que possible.
+
+Il faut éviter :
+
+* les pages qui deviennent interminables ;
+* les blocs purement informatifs qui poussent le contenu vers le bas ;
+* les listes trop longues ;
+* les KPI trop hauts ;
+* les cartes trop grandes ;
+* les gros espaces vides ;
+* les répétitions d'informations ;
+* les sections empilées sans hiérarchie.
+
+Le scroll vertical reste évidemment autorisé lorsqu'il est réellement nécessaire, notamment pour :
+
+* longues listes ;
+* tableaux ;
+* formulaires complexes ;
+* historiques.
+
+Mais l'interface ne doit jamais être conçue de manière à **forcer inutilement un scroll massif**.
+
+---
+
+# 1. SUPPRIMER LES INFORMATIONS CONTEXTUELLES REDONDANTES DU CONTENU CENTRAL
+
+Actuellement plusieurs sections affichent encore dans le workspace :
+
+* annexe ;
+* année académique ;
+* date ;
+* parfois priorité / alerte ;
+* libellés de contexte.
+
+Ces informations consomment beaucoup d'espace et sont répétées d'une section à l'autre.
+
+Je veux désormais déplacer ce contexte dans la **topbar commune**.
+
+Exemple cible :
+
+`Direction des Études`
+`Bamako Moribabougou • 2026-2027 • vendredi 14 août 2026 • 12:15`
+
+Même principe pour le Gestionnaire :
+
+`Dashboard Gestionnaire`
+`Bamako Moribabougou • 2026-2027 • vendredi 14 août 2026 • 12:15`
+
+Ajouter l'heure avec une icône discrète si possible.
+
+Cette information doit être disponible sur tous les dashboards via le même composant de topbar.
+
+---
+
+# 2. RETIRER LES BARRES CONTEXTUELLES REDONDANTES DES SECTIONS
+
+Une fois l'information déplacée dans la topbar, supprimer des pages métier les barres du type :
+
+* `Annexe : Bamako Moribabougou`
+* `Année : 2026-2027`
+* `vendredi 14 août 2026`
+* compteurs contextuels non indispensables
+
+Ces éléments ne doivent plus occuper une ligne complète du workspace.
+
+Le titre de la section et les sous-sections suffisent déjà à indiquer où l'utilisateur travaille.
+
+---
+
+# 3. PAGE HEADER PLUS COMPACT
+
+Le `page_header` doit devenir plus compact.
+
+Il doit contenir uniquement :
+
+* petit contexte métier éventuellement ;
+* titre ;
+* description courte si réellement utile ;
+* actions principales.
+
+Réduire :
+
+* hauteur ;
+* margins ;
+* padding ;
+* taille excessive du titre ;
+* descriptions trop longues.
+
+Objectif : libérer rapidement de la hauteur utile.
+
+---
+
+# 4. COMPACTER LES KPI
+
+Les cartes KPI actuelles sont encore trop grandes.
+
+Je veux réduire leur hauteur de manière significative.
+
+Réduire :
+
+* padding interne ;
+* hauteur minimale ;
+* taille des icônes ;
+* taille des labels ;
+* taille de certaines descriptions ;
+* espaces entre valeur et description.
+
+Ne pas rendre le texte illisible.
+
+Le but est d'obtenir des KPI beaucoup plus compacts mais professionnels.
+
+Exemple cible :
+
+`LABEL`
+`17`
+`Contexte très court`
+`petite icône`
+
+Une carte ne doit pas occuper 130-150 px si 70-90 px suffisent.
+
+---
+
+# 5. ALIGNER TOUTES LES CARTES D'UNE MÊME LIGNE
+
+Dans certaines grilles, une carte descend plus bas à cause :
+
+* du texte ;
+* du label ;
+* d'une valeur ;
+* d'une description sur plusieurs lignes.
+
+Toutes les cartes d'une même grille doivent conserver une hauteur cohérente.
+
+Utiliser :
+
+* hauteur uniforme ;
+* line-clamp ;
+* texte tronqué si nécessaire ;
+* description courte ;
+* alignement flex interne.
+
+Pas de carte plus haute que les autres sans raison métier réelle.
+
+---
+
+# 6. ACCUEIL DU DIRECTEUR DES ÉTUDES — SIMPLIFIER
+
+La Vue générale du DE contient encore trop d'informations.
+
+Conserver :
+
+* header ;
+* contexte en topbar ;
+* KPI ;
+* éventuelle alerte importante ;
+* actions prioritaires / raccourcis.
+
+Retirer de la Vue générale les blocs secondaires qui peuvent vivre ailleurs.
+
+Notamment, ne pas surcharger l'accueil avec :
+
+* Classes actives détaillées ;
+* Activité récente ;
+* longues listes ;
+* informations déjà accessibles dans les sections spécialisées.
+
+La Vue générale doit rester un **cockpit synthétique**.
+
+---
+
+# 7. ACCUEIL DU GESTIONNAIRE — SIMPLIFIER FORTEMENT
+
+Même principe.
+
+Conserver :
+
+* header compact ;
+* KPI principaux ;
+* actions rapides ;
+* priorités critiques ;
+* résumé financier minimal si pertinent.
+
+Éviter d'afficher sur la même page :
+
+* coupons détaillés ;
+* longues priorités ;
+* multiples panneaux ;
+* situation financière complète ;
+* flux ;
+* risques ;
+* historique ;
+* autres informations déjà disponibles ailleurs.
+
+L'accueil doit servir à décider rapidement, pas à tout afficher.
+
+---
+
+# 8. LES DÉTAILS DOIVENT VIVRE DANS LES SOUS-SECTIONS
+
+Le système de sous-sections existe maintenant.
+
+Il faut l'utiliser réellement pour réduire la surcharge.
+
+Exemple :
+
+`Enseignants`
+
+* Vue d'ensemble
+* Répertoire
+* Affectations
+* Dossiers
+
+Même principe Gestionnaire.
+
+Les données détaillées doivent quitter les pages d'accueil et aller dans leur workspace spécialisé.
+
+---
+
+# 9. NE PLUS RÉPÉTER LE NOM DU CONTEXTE PARTOUT
+
+Éviter les répétitions du type :
+
+`GESTIONNAIRE / ADMISSIONS`
+puis
+`Candidatures`
+puis encore une ligne contextuelle complète.
+
+Une fois la navigation, le titre et la sous-navigation visibles, il faut éviter de répéter trop d'informations.
+
+Garder seulement ce qui apporte une valeur réelle à la compréhension.
+
+---
+
+# 10. LIMITER LE NOMBRE D'ÉLÉMENTS AFFICHÉS
+
+Les listes longues doivent impérativement avoir une limite.
+
+Exemple actuel :
+
+25 candidatures affichées dans une seule page.
+
+C'est trop.
+
+Définir des tailles de page cohérentes.
+
+Par exemple :
+
+* 5 ou 6 lignes pour certaines listes intégrées dans un dashboard ;
+* 10 lignes pour une page métier classique ;
+* 15 maximum si la densité le permet.
+
+Le choix doit dépendre de la hauteur disponible.
+
+---
+
+# 11. PAGINATION SERVEUR OBLIGATOIRE POUR LES LONGUES LISTES
+
+Toutes les grandes listes doivent avoir une vraie pagination.
+
+Exemples :
+
+* candidatures ;
+* inscriptions ;
+* enseignants ;
+* paiements ;
+* salaires ;
+* dépenses ;
+* mouvements de caisse ;
+* commandes ;
+* dons ;
+* honoraires ;
+* archives.
+
+Ne jamais charger toutes les lignes dans une seule page.
+
+---
+
+# 12. ADAPTER LA PAGINATION À LA HAUTEUR DE L'ÉCRAN
+
+Dans la mesure du raisonnable, choisir une `page_size` permettant de garder :
+
+* titre ;
+* filtres ;
+* tableau ;
+* pagination
+
+dans une zone de travail cohérente.
+
+L'objectif est que l'utilisateur puisse voir la pagination sans devoir descendre énormément.
+
+---
+
+# 13. TABLEAUX PLUS COMPACTS
+
+Réduire légèrement :
+
+* hauteur des lignes ;
+* padding vertical ;
+* taille de certains textes ;
+* largeur excessive des colonnes.
+
+Garder une bonne lisibilité.
+
+Éviter les tableaux avec 20 lignes énormes.
+
+---
+
+# 14. FORMULAIRES
+
+Les formulaires doivent rester dans le cadre logique.
+
+Utiliser :
+
+* grilles 2 colonnes sur desktop ;
+* 1 colonne sur petit écran ;
+* sections ;
+* tabs si nécessaire ;
+* accordéons seulement si réellement utile.
+
+Ne pas créer un formulaire vertical de plusieurs écrans lorsque des regroupements sont possibles.
+
+---
+
+# 15. FILTRES PLUS COMPACTS
+
+Les filter bars sont parfois trop hautes.
+
+Réduire :
+
+* padding ;
+* espacements ;
+* hauteur inputs/selects lorsque possible.
+
+Sur desktop, aligner proprement :
+
+`Recherche | Statut | Période | Appliquer | Effacer`
+
+Sur mobile, stack vertical.
+
+---
+
+# 16. TOPBAR — CENTRALISER LE CONTEXTE GLOBAL
+
+La topbar devient la zone officielle pour les informations globales.
+
+Elle doit pouvoir afficher discrètement :
+
+* rôle / espace ;
+* annexe ;
+* année académique ;
+* date ;
+* heure ;
+* utilisateur ;
+* notifications.
+
+Cela évite de répéter ces informations dans toutes les pages.
+
+---
+
+# 17. HEURE DYNAMIQUE
+
+Ajouter une petite horloge côté frontend dans la topbar.
+
+Exemple :
+
+`14 août 2026 • 12:15`
+
+Utiliser JavaScript léger.
+
+Ne pas provoquer de reload.
+
+L'heure peut être actualisée toutes les minutes.
+
+---
+
+# 18. RESPONSIVE GLOBAL
+
+Tester chaque composant commun sur :
+
+* 1920×1080 ;
+* 1366×768 ;
+* 1280×720 ;
+* tablette ;
+* mobile.
+
+Le système doit s'adapter.
+
+---
+
+# 19. AUCUN OVERFLOW HORIZONTAL GLOBAL
+
+Règle stricte :
+
+**aucune page ne doit créer de scrollbar horizontale globale.**
+
+Si un tableau est trop large :
+
+* scroll local au tableau ;
+* colonnes adaptatives ;
+* réduction d'information.
+
+---
+
+# 20. HAUTEUR DU WORKSPACE
+
+Le workspace doit exploiter correctement :
+
+`100vh - topbar`
+
+La sidebar doit elle aussi avoir son propre comportement de scroll.
+
+Éviter :
+
+* double scrollbar inutile ;
+* sidebar qui dépasse ;
+* footer sidebar mal positionné ;
+* contenu qui pousse la topbar.
+
+---
+
+# 21. SIDEBAR
+
+La sidebar doit :
+
+* conserver son header ;
+* garder son footer utilisateur ;
+* scroller uniquement dans la zone navigation si nécessaire ;
+* rester stable ;
+* ne pas imposer le scroll de toute la page.
+
+---
+
+# 22. SUPPRIMER LES BLOCS QUI N'APPORTENT PAS D'ACTION
+
+Toute carte affichée doit répondre à une question :
+
+**Est-ce que cette information aide l'utilisateur à prendre une décision ou effectuer une action immédiatement ?**
+
+Si non :
+
+* retirer de l'accueil ;
+* déplacer dans une sous-section ;
+* ou supprimer.
+
+---
+
+# 23. ACTIONS RAPIDES
+
+Les actions rapides doivent être compactes.
+
+Réduire leur hauteur.
+
+Limiter :
+
+* titre ;
+* éventuellement sous-titre très court ;
+* icône.
+
+Pas de cartes massives.
+
+---
+
+# 24. DENSITÉ VISUELLE
+
+Le système doit devenir visuellement plus léger.
+
+Réduire de manière cohérente :
+
+* tailles de certaines icônes ;
+* paddings ;
+* gaps ;
+* hauteur de cartes ;
+* titres secondaires ;
+* textes explicatifs.
+
+Attention :
+
+ne pas tout miniaturiser.
+
+Objectif :
+
+**plus compact, pas plus difficile à lire.**
+
+---
+
+# 25. COMPOSANTS UI CORE À CORRIGER EN PRIORITÉ
+
+Si les problèmes sont génériques, intervenir directement sur les composants partagés :
+
+* `app_shell`
+* `app_sidebar`
+* `app_topbar`
+* `page_header`
+* `page_section`
+* `content_grid`
+* `stat_card`
+* `panel`
+* `filter_bar`
+* `data_table`
+* `tabs`
+* `alert`
+* `empty_state`
+* `modal`
+* `drawer`
+
+Le correctif doit bénéficier aux deux dashboards.
+
+---
+
+# 26. NE PAS DUPLIQUER LES CORRECTIONS
+
+Si `stat_card` est trop grand :
+
+ne corrige pas la classe seulement dans le Gestionnaire.
+
+Corrige le composant commun.
+
+Même principe pour :
+
+* padding ;
+* taille icône ;
+* layout ;
+* responsive ;
+* table ;
+* filter bar.
+
+---
+
+# 27. LOADING / SPINNERS
+
+Continuer le nettoyage des anciens loaders.
+
+Je veux un seul comportement officiel :
+
+**mise à jour UI Core discrète**
+
+Éviter totalement les anciens loaders qui :
+
+* blanchissent le dashboard ;
+* bloquent tout l'écran ;
+* affichent un gros spinner central.
+
+---
+
+# 28. INTERACTIONS
+
+Profiter de cette passe pour vérifier :
+
+* boutons ;
+* filtres ;
+* recherche ;
+* tabs ;
+* pagination ;
+* actions HTMX ;
+* modales ;
+* drawers.
+
+Un élément visible doit fonctionner.
+
+---
+
+# 29. GESTION DES ÉTATS VIDES
+
+Les empty states doivent rester compacts.
+
+Un état vide ne doit pas occuper 300 px de hauteur simplement pour afficher :
+
+`Aucune donnée`.
+
+Utiliser un état vide propre et léger.
+
+---
+
+# 30. ALERTES
+
+Les alertes importantes peuvent rester.
+
+Mais éviter plusieurs alertes très hautes.
+
+Une alerte doit être :
+
+* concise ;
+* lisible ;
+* compacte.
+
+---
+
+# 31. VUE ENSEIGNANTS COMME BON EXEMPLE DE DENSITÉ
+
+La page Enseignants du Directeur des Études est actuellement beaucoup plus proche de la densité recherchée.
+
+Elle montre :
+
+* titre ;
+* tabs ;
+* KPI ;
+* actions ;
+* alerte ;
+
+sans surcharge excessive.
+
+Utiliser ce niveau de densité comme référence, mais corriger aussi ses éventuels défauts.
+
+---
+
+# 32. NE PAS FORCER ABSOLUMENT ZÉRO SCROLL
+
+Attention :
+
+La règle n'est pas de casser le contenu pour empêcher tout scroll.
+
+La règle est :
+
+**aucun scroll inutile.**
+
+Une liste de 100 éléments nécessitera forcément pagination ou scroll.
+
+Un formulaire important peut nécessiter du scroll.
+
+Mais une simple Vue générale ne doit pas faire 3 écrans de hauteur.
+
+---
+
+# 33. CRITÈRE DE CONCEPTION
+
+Chaque écran doit idéalement afficher :
+
+`Titre / actions`
+`navigation secondaire`
+`contenu principal`
+`action ou pagination`
+
+dans une hauteur visuellement maîtrisée.
+
+---
+
+# 34. CRITÈRE FINAL STRICT
+
+À la fin :
+
+* Vue générale DE beaucoup plus courte ;
+* Vue globale Gestionnaire beaucoup plus courte ;
+* KPI plus compacts ;
+* cards plus compactes ;
+* contexte global déplacé dans topbar ;
+* date + heure centralisées ;
+* plus de répétition annexe/année/date dans chaque section ;
+* listes limitées et paginées ;
+* tableaux plus compacts ;
+* formulaires contenus ;
+* aucune largeur hors workspace ;
+* pas de loader global agressif ;
+* sidebar propre ;
+* topbar propre ;
+* sections plus aérées ;
+* navigation plus naturelle.
+
+---
+
+# 35. ORDRE D'EXÉCUTION
+
+Commence par :
+
+1. identifier les composants UI Core responsables de la densité ;
+2. corriger topbar + contexte global ;
+3. supprimer les lignes contextuelles redondantes des pages ;
+4. compacter `page_header` ;
+5. compacter `stat_card` ;
+6. compacter panels/actions rapides ;
+7. simplifier Vue générale DE ;
+8. simplifier Vue globale Gestionnaire ;
+9. réduire les listes ;
+10. appliquer pagination ;
+11. vérifier filtres/recherche/actions ;
+12. responsive ;
+13. loaders ;
+14. tests.
+
+---
+
+# 36. TESTS
+
+Après modifications :
+
+`python manage.py check --settings=config.settings_test_local`
+
+Puis les tests ciblés existants :
+
+* shell ;
+* DE ;
+* Gestionnaire ;
+* pagination ;
+* filtres ;
+* HTMX ;
+* UI Core modifié.
+
+Puis :
+
+`npm run build:css`
+
+Ne crée pas de migrations si aucune modification de modèle n'est nécessaire.
+
+---
+
+# 37. RAPPORT FINAL
+
+À la fin, fournir :
+
+* composants UI Core modifiés ;
+* blocs retirés de la Vue générale DE ;
+* blocs retirés de la Vue globale Gestionnaire ;
+* éléments déplacés vers topbar ;
+* page sizes choisies ;
+* listes paginées ;
+* responsive corrigé ;
+* overflows corrigés ;
+* loaders supprimés ;
+* tests exécutés ;
+* éventuelles limites restantes.
+
+---
+
+# RÈGLE ABSOLUE À RETENIR
+
+**Ne plus dépasser inutilement la zone logique de travail.**
+
+Le logiciel doit donner une impression de maîtrise :
+
+* compact ;
+* propre ;
+* aéré ;
+* rapide ;
+* cohérent ;
+* professionnel.
+
+Nous ne voulons plus d'écrans qui donnent l'impression que les composants ont été simplement empilés verticalement les uns après les autres.
+
+
+Nouvelle instruction encore
+# Mission — Corriger définitivement le layout Sidebar / Main Content des dashboards ESFé Core
+
+Je veux que tu analyses et corriges un problème structurel de layout présent dans les dashboards du projet.
+
+## Constat visuel
+
+Le dashboard utilise une architecture commune avec :
+
+* une sidebar à gauche ;
+* une topbar/header ;
+* une zone principale de contenu à droite ;
+* plusieurs sections/pages dont la hauteur varie fortement.
+
+Le problème apparaît lorsque le contenu principal devient plus haut que la hauteur visible de l’écran.
+
+Sur certaines pages courtes, le dashboard semble correct.
+
+Mais dès qu’une section contient davantage de contenu — par exemple une longue table d’inscriptions, plusieurs cartes, formulaires, graphiques ou composants — la sidebar semble avoir une hauteur limitée/fixe et s’arrête avant la fin du contenu.
+
+Le contenu principal continue ensuite vers le bas tandis que la sidebar est déjà terminée.
+
+Résultat :
+
+* le dashboard paraît coupé verticalement ;
+* le fond de la sidebar ne couvre plus toute la hauteur utile ;
+* la sidebar et le contenu principal ne restent plus visuellement solidaires ;
+* certaines pages donnent l’impression que leur contenu déborde hors du shell principal ;
+* le comportement varie selon la quantité de contenu ;
+* le rendu n’est pas professionnel.
+
+## Objectif
+
+Je veux une correction **structurelle et globale du layout partagé**, pas un patch page par page.
+
+Le layout doit fonctionner aussi bien avec :
+
+* une page très courte ;
+* une page exactement à la hauteur du viewport ;
+* une page faisant 2, 3 ou 5 fois la hauteur de l’écran ;
+* une grande table paginée ;
+* des formulaires longs ;
+* des dashboards comportant plusieurs composants ;
+* desktop ;
+* tablette ;
+* mobile.
+
+La sidebar, la topbar et la zone de contenu doivent appartenir à un shell cohérent et stable.
+
+---
+
+# 1. Commencer par un audit — ne pas modifier immédiatement
+
+Avant toute modification, retrouve le ou les fichiers responsables de la structure globale des dashboards.
+
+Inspecte notamment :
+
+* le template/layout principal ;
+* le composant sidebar ;
+* le composant topbar/header ;
+* le wrapper général du dashboard ;
+* le `<main>`;
+* les wrappers internes ;
+* les composants Django/Tailwind utilisés pour construire ce shell ;
+* les éventuels layouts spécialisés par rôle.
+
+Recherche particulièrement les classes CSS/Tailwind ou styles équivalents à :
+
+* `h-screen`
+* `h-full`
+* `min-h-screen`
+* `max-h-*`
+* `height: 100vh`
+* `height: 100%`
+* `position: fixed`
+* `sticky`
+* `absolute`
+* `overflow-hidden`
+* `overflow-y-auto`
+* `overflow-auto`
+* `flex`
+* `flex-1`
+* `items-stretch`
+* `grid`
+* `fixed inset-*`
+
+Vérifie également les hauteurs héritées sur :
+
+* `html`
+* `body`
+* le root wrapper ;
+* le conteneur du dashboard ;
+* la sidebar ;
+* la zone de contenu.
+
+Je veux que tu détermines **la cause racine**, pas seulement le symptôme.
+
+---
+
+# 2. Vérifier l’architecture de scrolling
+
+Détermine quel élément est actuellement responsable du scroll vertical.
+
+Je veux éviter une situation où plusieurs conteneurs verticaux scrollent indépendamment sans raison.
+
+À vérifier :
+
+```text
+body
+└── dashboard shell
+    ├── sidebar
+    └── main shell
+        ├── topbar
+        └── page content
+```
+
+Analyse si actuellement :
+
+* le `body` scroll ;
+* le `main` scroll ;
+* un wrapper intermédiaire scroll ;
+* la sidebar possède son propre scroll ;
+* plusieurs niveaux utilisent simultanément `overflow-y-auto`.
+
+Il ne doit pas y avoir de double scroll vertical involontaire.
+
+---
+
+# 3. Comportement attendu sur desktop
+
+Sur desktop, je veux un comportement professionnel de type application SaaS/admin moderne.
+
+Conceptuellement :
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│ Sidebar        │ Topbar                                     │
+│                ├────────────────────────────────────────────┤
+│                │                                            │
+│                │ Main Content                               │
+│                │                                            │
+│                │                                            │
+│                │ contenu potentiellement très long          │
+│                │                                            │
+└────────────────┴────────────────────────────────────────────┘
+```
+
+Deux architectures sont acceptables si elles sont correctement implémentées :
+
+### Architecture A — Sidebar sticky
+
+La sidebar suit la structure de la page mais reste sticky pendant le scroll.
+
+Exemple conceptuel :
+
+```css
+.dashboard-shell {
+    min-height: 100vh;
+    display: flex;
+}
+
+.sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    flex-shrink: 0;
+}
+
+.main-shell {
+    flex: 1;
+    min-width: 0;
+}
+```
+
+### Architecture B — Sidebar fixed
+
+La sidebar occupe toujours le viewport et le contenu principal possède l’offset correspondant.
+
+Exemple conceptuel :
+
+```css
+.sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+}
+
+.main-shell {
+    margin-left: var(--sidebar-width);
+}
+```
+
+Mais ne choisis pas une architecture uniquement parce que cet exemple est fourni.
+
+Analyse d’abord l’architecture actuelle du projet et conserve la solution la plus cohérente avec le système existant.
+
+---
+
+# 4. Règle fondamentale sur la hauteur
+
+Je ne veux surtout pas quelque chose comme :
+
+```text
+dashboard = hauteur fixe 100vh
+contenu dépassant = cassure du layout
+```
+
+Le shell principal doit avoir au minimum la hauteur du viewport, mais il doit pouvoir grandir naturellement lorsque le contenu grandit.
+
+Autrement dit :
+
+```text
+min-height: 100vh
+```
+
+peut être pertinent.
+
+Mais une hauteur rigide comme :
+
+```text
+height: 100vh
+```
+
+sur un mauvais wrapper peut être la cause du problème.
+
+Analyse cela précisément.
+
+Ne remplace pas aveuglément tous les `h-screen` par `min-h-screen`.
+
+Comprends d’abord le rôle de chaque conteneur.
+
+---
+
+# 5. Sidebar
+
+La sidebar doit rester visuellement stable quelle que soit la longueur de la page.
+
+Je ne veux plus voir ceci :
+
+```text
+████████ sidebar
+████████ sidebar
+████████ sidebar
+████████ sidebar
+──────── fin sidebar
+
+         contenu
+         contenu
+         contenu
+         contenu
+```
+
+pendant qu’à droite le contenu continue.
+
+Si la sidebar elle-même contient plus d’éléments que la hauteur disponible, elle peut posséder **son propre scroll interne**, mais seulement pour sa navigation.
+
+Par exemple :
+
+```text
+Sidebar
+├── branding / logo
+├── navigation scrollable
+└── utilisateur / footer
+```
+
+Si nécessaire :
+
+```text
+display: flex
+flex-direction: column
+height: 100vh
+```
+
+avec :
+
+```text
+navigation:
+flex: 1
+overflow-y: auto
+```
+
+Le bloc utilisateur/footer peut rester correctement positionné sans écraser la navigation.
+
+---
+
+# 6. Main Content
+
+Le contenu principal doit :
+
+* prendre toute la largeur restante ;
+* ne pas pousser artificiellement la sidebar ;
+* ne pas provoquer de débordement horizontal ;
+* pouvoir s’allonger librement verticalement.
+
+Vérifie notamment la présence de :
+
+```text
+flex-1
+min-w-0
+w-full
+max-w-*
+overflow-x-auto
+```
+
+et leur cohérence.
+
+Attention : une table large ne doit pas agrandir le layout entier.
+
+Si nécessaire, son overflow horizontal doit rester **local au composant table**.
+
+Exemple :
+
+```html
+<div class="overflow-x-auto">
+    <table>...</table>
+</div>
+```
+
+et non sur tout le dashboard.
+
+---
+
+# 7. Topbar
+
+Vérifie également la topbar.
+
+Si elle est sticky, elle doit :
+
+* rester correctement alignée avec le contenu ;
+* ne pas créer une deuxième hauteur artificielle ;
+* ne pas casser le calcul du viewport ;
+* avoir le bon `z-index`.
+
+Vérifie notamment les combinaisons du type :
+
+```text
+h-screen
++
+topbar h-16
++
+main h-screen
+```
+
+qui peuvent produire en réalité :
+
+```text
+100vh + 64px
+```
+
+et provoquer des débordements.
+
+---
+
+# 8. Ne pas corriger seulement la page "Inscriptions"
+
+La capture actuelle montre le problème dans :
+
+```text
+Gestionnaire
+→ Inscriptions
+```
+
+mais je considère cela comme un **bug du shell partagé**.
+
+La correction doit donc être testée sur plusieurs rôles et plusieurs sections.
+
+Minimum à contrôler :
+
+### Gestionnaire
+
+* Vue globale
+* Candidatures
+* Inscriptions
+* Paiements
+* Salaires
+* Dépenses
+* Boutique
+* Caisse
+* Rapports
+* Clôture mensuelle
+
+### Directeur des études
+
+Tester également plusieurs pages courtes et longues.
+
+### Autres dashboards
+
+Vérifier les rôles utilisant le même shell partagé afin de confirmer que la correction ne provoque aucune régression.
+
+---
+
+# 9. Responsive
+
+La correction doit respecter les breakpoints existants.
+
+## Desktop
+
+Sidebar permanente ou sticky selon l’architecture actuelle.
+
+## Tablette
+
+Le layout doit rester stable.
+
+La sidebar peut être réduite/collapsée selon le comportement déjà prévu.
+
+## Mobile
+
+La sidebar ne doit surtout pas réserver une hauteur ou une largeur permanente lorsqu’elle devient drawer/off-canvas.
+
+Le contenu doit récupérer :
+
+```text
+width: 100%
+```
+
+sur mobile.
+
+Ne casse pas les mécanismes Alpine/HTMX/JavaScript existants de toggle/collapse de sidebar.
+
+---
+
+# 10. Interdictions
+
+Je ne veux pas :
+
+* de `height` arbitraires ajoutés page par page ;
+* de valeurs magiques comme `min-height: 1370px`;
+* de `calc()` bricolés uniquement pour la page actuelle ;
+* de duplication de layout ;
+* d’une correction uniquement dans `inscriptions.html`;
+* de `overflow-hidden` généralisé pour masquer le problème ;
+* de suppression du scroll afin de masquer le débordement ;
+* de JavaScript calculant dynamiquement la hauteur d’une page si CSS suffit ;
+* de patchs différents pour chaque rôle.
+
+Je veux corriger **le composant/layout racine**.
+
+---
+
+# 11. Faire attention aux composants existants
+
+Le projet possède maintenant une bibliothèque de composants UI partagés.
+
+Ne recrée pas une deuxième sidebar, une deuxième topbar ou un deuxième dashboard shell si ceux-ci existent déjà.
+
+Réutilise et corrige la source commune.
+
+Si plusieurs layouts similaires existent inutilement, signale-les.
+
+Ne lance toutefois pas de refactor massif sans nécessité.
+
+Priorité :
+
+```text
+diagnostic
+→ correction minimale structurelle
+→ tests
+→ seulement ensuite éventuel nettoyage
+```
+
+---
+
+# 12. Tests obligatoires
+
+Après la correction, teste au minimum ces scénarios.
+
+### Test A — contenu très court
+
+Page avec seulement quelques blocs.
+
+Attendu :
+
+```text
+hauteur dashboard >= hauteur viewport
+sidebar correcte
+aucune zone blanche incohérente
+```
+
+### Test B — contenu = environ 1 écran
+
+Attendu :
+
+```text
+layout normal
+aucune cassure
+```
+
+### Test C — contenu long
+
+Utilise une page avec une grande table comme Inscriptions.
+
+Faire défiler jusqu’au dernier élément.
+
+Attendu :
+
+* aucune découpe visuelle ;
+* aucune rupture du shell ;
+* sidebar stable ;
+* main stable ;
+* pagination accessible ;
+* footer ou bas de page normal.
+
+### Test D — contenu très long
+
+Simule suffisamment d’éléments pour produire environ 2 à 3 fois la hauteur du viewport.
+
+Attendu :
+
+```text
+layout toujours stable
+```
+
+### Test E — sidebar longue
+
+Si la navigation devient plus haute que le viewport :
+
+```text
+seule la partie navigation de la sidebar doit pouvoir scroller
+```
+
+sans faire disparaître anarchiquement les autres zones.
+
+### Test F — largeur
+
+Tester au moins :
+
+```text
+1920×1080
+1600×900
+1366×768
+1280×720
+tablette
+mobile
+```
+
+---
+
+# 13. Vérifier également le phénomène visible sur les captures
+
+Le comportement observé actuellement semble être approximativement :
+
+### État problématique
+
+Page longue :
+
+```text
+sidebar ███████
+sidebar ███████
+sidebar ███████
+sidebar ███████
+         contenu
+         contenu
+         contenu
+         contenu
+```
+
+### État attendu
+
+Selon l’architecture retenue :
+
+```text
+sidebar ███████ │ contenu
+sidebar ███████ │ contenu
+sidebar ███████ │ contenu
+sidebar ███████ │ contenu
+sidebar stable  │ contenu très long
+sidebar stable  │ contenu très long
+```
+
+ou sidebar fixe/sticky occupant continuellement le viewport pendant que la page défile.
+
+---
+
+# 14. Vérifier les parents avant les enfants
+
+Pour chaque problème de hauteur, remonte toute la chaîne DOM.
+
+Je veux que tu analyses quelque chose de ce type :
+
+```text
+html
+↓
+body
+↓
+root
+↓
+dashboard-shell
+↓
+dashboard-body
+↓
+main-wrapper
+↓
+main
+↓
+page-content
+```
+
+Une classe correcte sur un enfant peut ne pas fonctionner si son parent possède une hauteur incorrecte.
+
+Cherche donc la première contrainte de hauteur ou d’overflow responsable de la cassure.
+
+---
+
+# 15. Nettoyage des conflits CSS
+
+Recherche également :
+
+* classes Tailwind contradictoires ;
+* styles inline ;
+* CSS custom du dashboard ;
+* règles provenant d’anciens layouts ;
+* classes ajoutées par JavaScript ;
+* styles desktop qui restent actifs sur mobile ;
+* wrappers imbriqués ayant chacun `h-full` ou `h-screen`.
+
+S’il existe par exemple :
+
+```html
+<div class="h-screen overflow-hidden">
+    <div class="h-full">
+        <main class="h-screen">
+```
+
+analyse soigneusement cette structure.
+
+Ce type d’empilement peut être responsable du comportement actuel.
+
+---
+
+# 16. Conserver le design actuel
+
+La mission concerne la **structure du layout**.
+
+Ne redesign pas :
+
+* couleurs ;
+* typographie ;
+* tableaux ;
+* boutons ;
+* cartes ;
+* navigation ;
+* spacing général sauf nécessité technique.
+
+Je veux conserver visuellement le dashboard actuel.
+
+Corrige seulement ce qui est nécessaire pour obtenir un shell stable et professionnel.
+
+---
+
+# 17. Résultat attendu
+
+À la fin, je veux que tu me donnes un rapport synthétique avec :
+
+```text
+1. Cause racine trouvée
+2. Fichier(s) responsables
+3. Classes/styles problématiques
+4. Architecture choisie pour le scroll
+5. Fichiers modifiés
+6. Correction appliquée
+7. Pourquoi elle résout le problème globalement
+8. Tests effectués
+9. Résultats desktop/tablette/mobile
+10. Éventuelles limitations restantes
+```
+
+Puis indique clairement :
+
+```text
+SIDEBAR / MAIN LAYOUT : STABLE
+```
+
+uniquement si tous les tests sont concluants.
+
+---
+
+# Clarification des roles, positions et groupes — audit 2026-08-14
+
+## Constat certain
+
+Le Surveillant general possede bien une position officielle en base :
+`academic_supervisor`.
+
+Cette position est stockee dans `Profile.position` et recopied dans
+`InstitutionalProfile.position`. C'est elle qui permet aujourd'hui l'acces au
+dashboard et aux vues de supervision.
+
+En revanche, le champ historique `Profile.role` est incomplet. Il ne contient
+que : superadmin, executive, admissions, finance, teacher et student. Il ne
+propose ni `academic_supervisor`, ni secretary, ni annex_manager, ni plusieurs
+autres postes institutionnels.
+
+Le formulaire de creation RH du DG confirme ce comportement : pour
+`academic_supervisor`, il enregistre volontairement `role=""` et
+`position="academic_supervisor"`.
+
+Le probleme n'est donc pas une erreur lors de la creation d'un surveillant :
+le systeme actuel fonctionne ainsi, mais son architecture d'acces est
+incoherente.
+
+## Les trois couches actuelles
+
+1. `Profile.role` : ancien role applicatif general, incomplet et encore
+   present dans certaines interfaces d'administration.
+2. `Profile.position` / `InstitutionalProfile.position` : fonction metier
+   officielle (academic_supervisor, secretary, annex_manager,
+   director_of_studies, etc.). C'est la couche qui doit faire autorite.
+3. Groupes Django : crees par plusieurs scripts ou manuellement, sans
+   synchronisation automatique aux positions. Le registre prevoit un groupe
+   `academic_supervisor`, mais les ecrans d'administration ne le creent ni ne
+   l'attribuent automatiquement. Un ancien seed cree aussi un groupe nomme
+   `Surveillant Academique`, qui n'est pas le nom canonique du registre.
+
+Les permissions sont aujourd'hui reparties entre groupes, positions et
+controles directs dans les vues. Cette situation explique pourquoi certains
+comptes fonctionnent avec un role vide.
+
+## Architecture a retenir
+
+Ne pas creer une deuxieme copie de toutes les positions dans `Profile.role` :
+cela creerait deux sources de verite et de nouvelles divergences.
+
+```text
+position institutionnelle = identite metier officielle
+position -> groupe Django canonique synchronise automatiquement
+groupe -> permissions techniques
+vues/services -> controle obligatoire de l'annexe sur chaque lecture et ecriture
+```
+
+Exemple :
+
+```text
+academic_supervisor
+  -> groupe Django : academic_supervisor
+  -> permissions de supervision necessaires
+  -> annexe obligatoire
+  -> aucune visibilite inter-annexes
+```
+
+L'administrateur doit choisir une position, pas trois donnees independantes
+(`role`, `position`, `groupe`). Le systeme doit ensuite synchroniser le groupe
+canonique et les permissions associees.
+
+## Travail a prevoir avant la stabilisation finale de tous les dashboards
+
+1. Definir la matrice officielle position -> groupe -> permissions.
+2. Creer les groupes canoniques manquants, dont `academic_supervisor`.
+3. Synchroniser automatiquement le groupe lors de la creation ou modification
+   d'une position.
+4. Migrer et auditer les comptes existants : position valide, groupe coherent,
+   annexe presente lorsque le poste est rattache a une annexe.
+5. Retirer progressivement `Profile.role` des formulaires d'administration ;
+   le conserver uniquement en compatibilite tant que les anciens parcours le
+   necessitent.
+6. Centraliser les capacites metier par position/groupe, sans jamais remplacer
+   le filtrage serveur par annexe.
+
+## Conclusion
+
+Le Surveillant general est un vrai poste metier et son dashboard est reel,
+mais son role general et son groupe ne sont pas encore normalises dans le
+systeme d'administration. La priorite n'est pas de remplir artificiellement
+le champ `role` : il faut finaliser une architecture unique autour de la
+position institutionnelle et de groupes canoniques synchronises.
+
+---
+
+# Principe final
+
+Ne cherche pas à faire rentrer artificiellement tout le contenu dans un seul écran.
+
+Une page administrative peut naturellement être plus haute que le viewport.
+
+Le problème à résoudre est différent :
+
+**quelle que soit la hauteur du contenu, le shell du dashboard doit rester cohérent, la sidebar ne doit jamais sembler se terminer en plein milieu de la page et aucun wrapper ne doit casser visuellement lorsque le contenu grandit.**
+
+Analyse d’abord, trouve la cause racine, corrige le composant partagé, puis teste les dashboards concernés.
+
+ici
+
+

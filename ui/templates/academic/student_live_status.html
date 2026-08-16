@@ -1,0 +1,31 @@
+{% load component_tags %}
+{% if variant == "detail" %}
+  <section class="mx-auto max-w-5xl space-y-5" data-ui-core="academic-student-live-status">
+    {% component "ui_core.page_header" title=snapshot.full_name subtitle=snapshot.academic_class eyebrow=snapshot.matricule|default:"Dossier étudiant" %}
+      {% fill "actions" %}{% component "ui_core.status_badge" label=snapshot.presence_state.label|default:"Statut indisponible" tone=snapshot.presence_state.ui_tone|default:"neutral" icon="map-pin" %}{% endcomponent %}{% endfill %}
+    {% endcomponent %}
+    <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div class="space-y-5">
+        {% component "ui_core.panel" title="Situation maintenant" subtitle="Présence et séance attendue à cette heure" tone="primary" %}
+          {% if snapshot.current_event %}
+            <div class="flex flex-col justify-between gap-3 rounded-ui-button border border-ui-primary/25 bg-ui-primary-soft p-4 sm:flex-row sm:items-center"><div><p class="text-sm font-bold text-ui-text">{{ snapshot.current_event.title }}</p><p class="mt-1 text-xs text-ui-text-muted">{{ snapshot.current_event.time_range }} · {{ snapshot.current_event.teacher_name|default:"Enseignant non précisé" }} · {{ snapshot.current_event.location|default:"Salle non précisée" }}</p></div>{% component "ui_core.status_badge" label=snapshot.current_event.attendance_label|default:"Présence non pointée" tone=snapshot.presence_state.ui_tone|default:"warning" %}{% endcomponent %}</div>
+          {% else %}
+            {% component "ui_core.empty_state" icon="calendar-off" title="Pas de cours en ce moment" message="L'étudiant n'est pas attendu dans une séance active." compact=True %}{% endcomponent %}
+          {% endif %}
+        {% endcomponent %}
+        {% component "ui_core.panel" title="Prochaine séance" subtitle="Prochain cours planifié" %}
+          {% if snapshot.next_event %}<div class="rounded-ui-button border border-ui-border bg-ui-surface-muted p-4"><p class="text-sm font-bold text-ui-text">{{ snapshot.next_event.title }}</p><p class="mt-1 text-xs text-ui-text-muted">{{ snapshot.next_event.start_datetime|date:"D d/m · H:i" }} · {{ snapshot.next_event.location|default:"Salle non précisée" }}</p></div>{% else %}{% component "ui_core.empty_state" icon="clock-3" title="Aucune prochaine séance" message="Aucune séance ultérieure n'est planifiée dans la période consultée." compact=True %}{% endcomponent %}{% endif %}
+        {% endcomponent %}
+        {% component "ui_core.panel" title="Cours du jour" subtitle="Séances programmées aujourd'hui" %}
+          <div class="space-y-2">{% for event in snapshot.today_events %}<div class="flex flex-wrap items-center justify-between gap-3 rounded-ui-button border border-ui-border px-3 py-2.5"><div><p class="text-sm font-semibold text-ui-text">{{ event.title }}</p><p class="text-xs text-ui-text-muted">{{ event.time_range }} · {{ event.location|default:"Salle non précisée" }}</p></div>{% component "ui_core.status_badge" label=event.attendance_label|default:"À venir" tone="neutral" %}{% endcomponent %}</div>{% empty %}{% component "ui_core.empty_state" icon="calendar" title="Aucun cours aujourd'hui" message="Aucune séance n'est programmée pour cette classe." compact=True %}{% endcomponent %}{% endfor %}</div>
+        {% endcomponent %}
+      </div>
+      <aside class="space-y-5">
+        {% component "ui_core.panel" title="Fiche étudiant" %}<dl class="space-y-3 text-sm"><div><dt class="text-xs text-ui-text-muted">Classe</dt><dd class="font-semibold text-ui-text">{{ snapshot.academic_class|default:"Non définie" }}</dd></div><div><dt class="text-xs text-ui-text-muted">Formation</dt><dd class="font-semibold text-ui-text">{{ snapshot.programme|default:"Non définie" }}</dd></div><div><dt class="text-xs text-ui-text-muted">Annexe</dt><dd class="font-semibold text-ui-text">{{ snapshot.branch|default:"Non définie" }}</dd></div><div><dt class="text-xs text-ui-text-muted">Email</dt><dd class="break-all font-semibold text-ui-text">{{ snapshot.email|default:"Non renseigné" }}</dd></div></dl>{% endcomponent %}
+        {% if actions %}{% component "ui_core.panel" title="Actions" %}<div class="grid gap-2">{% for action in actions %}<button type="button" hx-get="{{ action.url }}" hx-target="{{ action.target|default:'#sg-drawer-content' }}" hx-swap="innerHTML" class="rounded-ui-button border border-ui-border px-3 py-2 text-left text-sm font-semibold text-ui-text hover:bg-ui-surface-hover"><i data-lucide="{{ action.icon|default:'arrow-right' }}" class="mr-2 inline h-4 w-4 text-ui-primary"></i>{{ action.label }}</button>{% endfor %}</div>{% endcomponent %}{% endif %}
+      </aside>
+    </div>
+  </section>
+{% else %}
+  <article class="flex flex-col gap-2 rounded-ui-button border border-ui-border bg-ui-surface p-3 sm:flex-row sm:items-center sm:justify-between" data-ui-core="academic-student-live-status"><div class="min-w-0"><strong class="block truncate text-sm text-ui-text">{{ snapshot.full_name }}</strong><span class="block truncate text-xs text-ui-text-muted">{{ snapshot.matricule|default:"—" }}{% if snapshot.current_event %} · {{ snapshot.current_event.title }} · {{ snapshot.current_event.time_range }}{% elif snapshot.next_event %} · Prochain : {{ snapshot.next_event.title }} à {{ snapshot.next_event.start_datetime|date:"H:i" }}{% else %} · Aucun cours en ce moment{% endif %}</span></div>{% component "ui_core.status_badge" label=snapshot.presence_state.label|default:"Actif" tone=snapshot.presence_state.ui_tone|default:"neutral" %}{% endcomponent %}</article>
+{% endif %}

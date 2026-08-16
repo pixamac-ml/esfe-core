@@ -1012,6 +1012,9 @@ class SecretaryDashboardSmokeTests(SecretaryTestMixin, TestCase):
         response = self.client.get(reverse("secretary:secretary_dashboard"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "secretary-workspace")
+        self.assertContains(response, 'data-certified-dashboard-shell="true"')
+        self.assertContains(response, 'id="sg-drawer-content"')
+        self.assertContains(response, 'data-ui-core="app-sidebar"')
 
     def test_dashboard_every_section_renders(self):
         self.client.force_login(self.secretary)
@@ -1023,6 +1026,38 @@ class SecretaryDashboardSmokeTests(SecretaryTestMixin, TestCase):
                     HTTP_HX_REQUEST="true",
                 )
                 self.assertEqual(response.status_code, 200)
+
+    def test_dashboard_modules_expose_tabbed_subsections(self):
+        self.client.force_login(self.secretary)
+        modules = {
+            "operations": ("registry", "visits", "appointments", "deposits"),
+            "follow_up": ("tasks", "classes", "students", "meetings"),
+            "management": ("reports", "salary", "notifications"),
+        }
+        for section, subviews in modules.items():
+            for subview in subviews:
+                with self.subTest(section=section, subview=subview):
+                    response = self.client.get(
+                        reverse("secretary:secretary_dashboard"),
+                        {"section": section, "view": subview},
+                        HTTP_HX_REQUEST="true",
+                        HTTP_HX_TARGET="secretary-workspace",
+                    )
+                    self.assertEqual(response.status_code, 200)
+                    self.assertContains(response, f"secretary-{section.replace('_', '-')}-tabs")
+                    self.assertContains(response, f"section={section}&amp;view={subview}")
+
+    def test_dashboard_legacy_subsection_url_maps_to_parent_module(self):
+        self.client.force_login(self.secretary)
+        response = self.client.get(
+            reverse("secretary:secretary_dashboard"),
+            {"section": "registry"},
+            HTTP_HX_REQUEST="true",
+            HTTP_HX_TARGET="secretary-workspace",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-dashboard-section="operations"')
+        self.assertContains(response, 'data-secretary-subview="registry"')
 
     def test_all_htmx_dashboard_endpoints_respond_200(self):
         self.client.force_login(self.secretary)

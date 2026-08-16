@@ -13,7 +13,7 @@ from .data_display import (
     Timeline,
 )
 from .feedback import Alert, ConfirmDialog, LoadingOverlay, Toast
-from .forms import FilterBar, FormField
+from .forms import DjangoFormField, FilterBar, FormField
 from .layout import AppShell, Breadcrumb, ContentGrid, PageHeader, PageSection, Panel
 from .navigation import AppSidebar, AppTopbar, DropdownMenu, NavGroup, NavItem, Tabs
 from .overlays import Drawer, Modal
@@ -28,6 +28,7 @@ __all__ = [
     "ConfirmDialog",
     "ContentGrid",
     "DataTable",
+    "DjangoFormField",
     "Drawer",
     "DropdownMenu",
     "EmptyState",

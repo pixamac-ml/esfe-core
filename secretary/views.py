@@ -116,6 +116,180 @@ def _is_htmx(request):
     return request.headers.get("HX-Request") == "true"
 
 
+def _secretary_status_tone(status):
+    """Translate secretary workflow states to the certified UI Core tones."""
+    return {
+        "completed": "success",
+        "paid": "success",
+        "done": "success",
+        "in_progress": "info",
+        "scheduled": "info",
+        "pending": "warning",
+        "partial": "warning",
+        "cancelled": "danger",
+        "archived": "neutral",
+    }.get(status, "neutral")
+
+
+def _secretary_ui_tables(context):
+    """Presentation-only table contract for the certified secretary workspace.
+
+    Querysets are prepared above with the authenticated user and their branch.
+    This helper deliberately only reshapes those already-scoped records for
+    ``ui_core.data_table``; it does not issue a second, unscoped query.
+    """
+
+    def status_cell(instance):
+        return {
+            "value": instance.get_status_display(),
+            "tone": _secretary_status_tone(instance.status),
+        }
+
+    def drawer_action(label, icon, url):
+        return {
+            "label": label,
+            "icon": icon,
+            "get_url": url,
+            "target": "#sg-drawer-content",
+            "swap": "innerHTML",
+            "open_overlay": "sg-drawer",
+        }
+
+    registry_rows = [
+        {
+            "id": f"secretary-registry-{entry.pk}",
+            "cells": [
+                {"value": entry.registry_number or f"#{entry.pk}", "strong": True, "secondary": entry.get_entry_type_display()},
+                {"value": entry.title, "secondary": entry.target_service or "Accueil"},
+                status_cell(entry),
+            ],
+            "actions": [drawer_action("Détail", "eye", reverse("secretary:registry_detail", args=[entry.pk]))],
+        }
+        for entry in context.get("recent_registry", [])
+    ]
+    visit_rows = [
+        {
+            "id": f"secretary-visit-{visit.pk}",
+            "cells": [
+                {"value": visit.full_name, "strong": True, "secondary": visit.related_student.full_name if visit.related_student else visit.phone},
+                {"value": visit.arrived_at.strftime("%d/%m %H:%M"), "secondary": visit.reason or "Motif non précisé"},
+                status_cell(visit),
+            ],
+            "actions": [drawer_action("Modifier", "pencil", reverse("secretary:visitor_update", args=[visit.pk]))],
+        }
+        for visit in context.get("today_visits_rows", [])
+    ]
+    appointment_rows = [
+        {
+            "id": f"secretary-appointment-{appointment.pk}",
+            "cells": [
+                {"value": appointment.title, "strong": True, "secondary": appointment.person_name},
+                {"value": appointment.scheduled_at.strftime("%d/%m %H:%M"), "secondary": appointment.assigned_to.get_full_name() if appointment.assigned_to else "Non attribué"},
+                status_cell(appointment),
+            ],
+            "actions": [drawer_action("Modifier", "pencil", reverse("secretary:appointment_update", args=[appointment.pk]))],
+        }
+        for appointment in context.get("today_appointments_rows", [])
+    ]
+    document_rows = [
+        {
+            "id": f"secretary-document-{document.pk}",
+            "cells": [
+                {"value": document.title, "strong": True, "secondary": document.submitted_by_name},
+                {"value": document.received_at.strftime("%d/%m %H:%M")},
+                status_cell(document),
+            ],
+            "actions": [drawer_action("Modifier", "pencil", reverse("secretary:document_receipt_update", args=[document.pk]))],
+        }
+        for document in context.get("pending_documents_rows", [])
+    ]
+    task_rows = [
+        {
+            "id": f"secretary-task-{task.pk}",
+            "cells": [
+                {"value": task.title, "strong": True, "secondary": task.get_priority_display()},
+                {"value": task.due_date.strftime("%d/%m/%Y") if task.due_date else "Sans échéance", "secondary": task.assigned_to.get_full_name() if task.assigned_to else "Non attribuée"},
+                status_cell(task),
+            ],
+            "actions": [drawer_action("Modifier", "pencil", reverse("secretary:task_update", args=[task.pk]))],
+        }
+        for task in context.get("pending_tasks_rows", [])
+    ]
+    meeting_rows = [
+        {
+            "id": f"secretary-meeting-{meeting.pk}",
+            "cells": [
+                {"value": meeting.title, "strong": True, "secondary": meeting.get_meeting_type_display()},
+                {"value": meeting.scheduled_at.strftime("%d/%m/%Y %H:%M"), "secondary": meeting.location or "Lieu non précisé"},
+                {"value": meeting.get_status_display(), "tone": _secretary_status_tone(meeting.status)},
+            ],
+            "actions": [drawer_action("Modifier", "pencil", reverse("secretary:meeting_update", args=[meeting.pk]))],
+        }
+        for meeting in context.get("meetings_rows", [])
+    ]
+    salary_rows = [
+        {
+            "id": f"secretary-salary-{entry.pk}",
+            "cells": [
+                {"value": entry.period_month.strftime("%m/%Y"), "strong": True},
+                {"value": f"{entry.net_salary:,.0f} FCFA", "amount": True},
+                status_cell(entry),
+            ],
+        }
+        for entry in context.get("salary_entries", [])
+    ]
+    notification_rows = [
+        {
+            "id": f"secretary-notification-{notification.pk}",
+            "cells": [
+                {"value": notification.title, "strong": True, "secondary": notification.body or "Notification centralisée"},
+                {"value": notification.created_at.strftime("%d/%m %H:%M")},
+                {"value": "Lue" if notification.read_at else "Nouvelle", "tone": "neutral" if notification.read_at else "primary"},
+            ],
+            "actions": [{"label": "Ouvrir", "icon": "eye", "href": f"?section=notifications&notification_id={notification.pk}"}],
+        }
+        for notification in context.get("notifications_rows", [])
+    ]
+    class_rows = [
+        {
+            "id": f"secretary-class-{academic_class.pk}",
+            "cells": [
+                {"value": str(academic_class), "strong": True},
+            ],
+            "actions": [{
+                "label": "Effectif",
+                "icon": "users",
+                "get_url": reverse("secretary:htmx_class_students", args=[academic_class.pk]),
+                "target": "#secretary-class-students",
+                "swap": "innerHTML",
+            }],
+        }
+        for academic_class in context.get("classes_rows", [])
+    ]
+    student_rows = [
+        {
+            "id": f"secretary-student-{student.pk}",
+            "cells": [
+                {"value": student.full_name, "strong": True, "secondary": getattr(student, "matricule", "")},
+            ],
+            "actions": [drawer_action("Dossier", "folder-open", reverse("secretary:student_snapshot", args=[student.pk]))],
+        }
+        for student in context.get("student_results", [])
+    ]
+    return {
+        "registry": registry_rows,
+        "visits": visit_rows,
+        "appointments": appointment_rows,
+        "documents": document_rows,
+        "tasks": task_rows,
+        "meetings": meeting_rows,
+        "salary": salary_rows,
+        "notifications": notification_rows,
+        "classes": class_rows,
+        "students": student_rows,
+    }
+
+
 def _secretary_profile_form(instance):
     form = ProfileForm(instance=instance)
     for field_name, field in form.fields.items():
@@ -140,16 +314,36 @@ def _secretary_preference_form(instance):
 
 SECRETARY_DASHBOARD_SECTIONS = {
     "overview",
-    "registry",
-    "visits",
-    "classes",
-    "students",
-    "appointments",
-    "deposits",
-    "reports",
-    "salary",
-    "notifications",
+    "operations",
+    "follow_up",
+    "management",
     "settings",
+}
+
+SECRETARY_SUBVIEW_DEFINITIONS = {
+    "operations": (
+        ("registry", "Registre", "book-open"),
+        ("visits", "Visiteurs", "user-clock"),
+        ("appointments", "Rendez-vous", "calendar-days"),
+        ("deposits", "Dépôts", "archive"),
+    ),
+    "follow_up": (
+        ("tasks", "Tâches", "list-checks"),
+        ("classes", "Classes", "school"),
+        ("students", "Étudiants", "graduation-cap"),
+        ("meetings", "Réunions", "calendar-range"),
+    ),
+    "management": (
+        ("reports", "Rapports", "file-chart-column"),
+        ("salary", "Salaire", "wallet"),
+        ("notifications", "Notifications", "bell"),
+    ),
+}
+
+SECRETARY_LEGACY_SECTION_TO_PARENT = {
+    subview: parent
+    for parent, subviews in SECRETARY_SUBVIEW_DEFINITIONS.items()
+    for subview, _label, _icon in subviews
 }
 
 SECRETARY_REFRESH_EVENTS = {
@@ -166,7 +360,38 @@ SECRETARY_REFRESH_EVENTS = {
 
 def _dashboard_section(request):
     section = request.GET.get("section", "overview").strip()
-    return section if section in SECRETARY_DASHBOARD_SECTIONS else "overview"
+    return SECRETARY_LEGACY_SECTION_TO_PARENT.get(
+        section,
+        section if section in SECRETARY_DASHBOARD_SECTIONS else "overview",
+    )
+
+
+def _secretary_subview(request, section):
+    definitions = SECRETARY_SUBVIEW_DEFINITIONS.get(section, ())
+    allowed = {item[0] for item in definitions}
+    legacy_section = request.GET.get("section", "").strip()
+    raw_view = (request.GET.get("view") or legacy_section or "").strip().lower()
+    return raw_view if raw_view in allowed else (definitions[0][0] if definitions else "overview")
+
+
+def _secretary_subnav_items(*, section, active, counts):
+    dashboard_url = reverse("secretary:secretary_dashboard")
+    return [
+        {
+            "id": subview,
+            "label": label,
+            "icon": icon,
+            "count": counts.get(subview),
+            "href": f"{dashboard_url}?section={section}&view={subview}",
+            "hx_get": f"{dashboard_url}?section={section}&view={subview}",
+            "hx_target": "#secretary-workspace",
+            "hx_swap": "outerHTML",
+            "hx_push_url": f"{dashboard_url}?section={section}&view={subview}",
+            "hx_indicator": "#secretary-subview-loading",
+            "hx_sync": "#secretary-workspace:replace",
+        }
+        for subview, label, icon in SECRETARY_SUBVIEW_DEFINITIONS.get(section, ())
+    ]
 
 
 SECRETARY_TOAST_TONES = {"success": "success", "error": "error", "warning": "notification", "info": "notification", "debug": "notification"}
@@ -243,9 +468,11 @@ def secretary_dashboard(request):
     context = get_secretary_dashboard_data(request.user)
     branch = context.get("branch")
     context["active_section"] = _dashboard_section(request)
+    context["secretary_subview"] = _secretary_subview(request, context["active_section"])
     context["student_query"] = request.GET.get("student_q", "").strip()
     if context["student_query"]:
-        context["active_section"] = "students"
+        context["active_section"] = "follow_up"
+        context["secretary_subview"] = "students"
 
     branch_name = branch.name if branch else ""
     user_display_name = request.user.get_full_name() or request.user.username
@@ -270,6 +497,19 @@ def secretary_dashboard(request):
         {"divider": "Compte"},
         {"id": "settings",      "label": "Paramètres",     "icon": "settings",         "url": "?section=settings",      "active": active_sec == "settings"},
     ]
+    # The sidebar deliberately exposes workflow modules, not every operation.
+    # Each module owns its tabbed subnavigation in the certified workspace.
+    sidebar_items = [
+        {"divider": "Général"},
+        {"id": "overview", "label": "Vue d'ensemble", "icon": "layout-dashboard", "url": "?section=overview", "active": active_sec == "overview"},
+        {"divider": "Secrétariat"},
+        {"id": "operations", "label": "Accueil & registre", "icon": "book-open", "url": "?section=operations", "active": active_sec == "operations", "badge": context.get("pending_registry_count", 0) or None},
+        {"id": "follow_up", "label": "Suivi", "icon": "list-checks", "url": "?section=follow_up", "active": active_sec == "follow_up", "badge": context.get("pending_tasks", 0) or None},
+        {"divider": "Pilotage"},
+        {"id": "management", "label": "Gestion", "icon": "chart-no-axes-combined", "url": "?section=management", "active": active_sec == "management", "badge": context.get("messages_count") or None},
+        {"divider": "Compte"},
+        {"id": "settings", "label": "Paramètres", "icon": "settings", "url": "?section=settings", "active": active_sec == "settings"},
+    ]
     context["nav_items"] = sidebar_items
     selected_notification = None
     notification_id = request.GET.get("notification_id")
@@ -281,7 +521,8 @@ def secretary_dashboard(request):
             channel=NotificationMessage.CHANNEL_IN_APP,
         )
         NotificationBus.mark_as_read(selected_notification)
-        context["active_section"] = "notifications"
+        context["active_section"] = "management"
+        context["secretary_subview"] = "notifications"
     if context["student_query"]:
         students_queryset = search_students(context["student_query"], user=request.user)
     else:
@@ -456,8 +697,42 @@ def secretary_dashboard(request):
     )
     context["meetings_rows"] = context["meetings_page"].object_list
     context["meetings_count"] = get_meetings_queryset(branch=branch).count()
+    context["secretary_ui_tables"] = _secretary_ui_tables(context)
+    context["secretary_tabs"] = _secretary_subnav_items(
+        section=context["active_section"],
+        active=context["secretary_subview"],
+        counts={
+            "registry": context["pending_registry_count"],
+            "visits": context["active_visits"],
+            "appointments": context["appointments_today"],
+            "deposits": context["pending_documents_count"],
+            "tasks": context["pending_tasks"],
+            "classes": context["classes_count"],
+            "students": context["students_count"],
+            "meetings": context["meetings_count"],
+            "notifications": context["notifications_count"],
+        },
+    )
+    context.update(
+        {
+            "registry_headers": ["Référence", "Objet", "État"],
+            "visits_headers": ["Visiteur", "Arrivée", "État"],
+            "appointments_headers": ["Rendez-vous", "Créneau", "État"],
+            "documents_headers": ["Document", "Réception", "État"],
+            "tasks_headers": ["Tâche", "Échéance", "État"],
+            "meetings_headers": ["Réunion", "Planification", "État"],
+            "salary_headers": ["Période", "Net", "État"],
+            "notifications_headers": ["Notification", "Reçue", "État"],
+            "classes_headers": ["Classe"],
+            "students_headers": ["Étudiant"],
+        }
+    )
     if _is_htmx(request) and request.headers.get("HX-Target") == "secretary-workspace":
         return render(request, "secretary/workspace_partial.html", context)
+
+    for nav_item in sidebar_items:
+        if nav_item.get("id"):
+            nav_item["active"] = nav_item["id"] == context["active_section"]
 
     nav_groups = []
     current_group = None
@@ -470,12 +745,17 @@ def secretary_dashboard(request):
         if current_group is None:
             current_group = {"label": "Secretariat", "items": []}
             nav_groups.append(current_group)
+        section_url = f"{reverse('secretary:secretary_dashboard')}{nav_item.get('url', '')}"
         current_group["items"].append(
             {
                 "key": nav_item.get("id"),
                 "label": nav_item.get("label"),
                 "icon": nav_item.get("icon"),
-                "url": nav_item.get("url"),
+                "url": section_url,
+                "hx_get": section_url,
+                "hx_target": "#secretary-workspace",
+                "hx_swap": "outerHTML",
+                "hx_push_url": section_url,
                 "badge": nav_item.get("badge"),
             }
         )
@@ -488,9 +768,13 @@ def secretary_dashboard(request):
             subtitle="Secretariat d'annexe",
             active_section=context["active_section"],
             dashboard_url=reverse("secretary:secretary_dashboard"),
+            workspace_template="secretary/workspace_partial.html",
+            workspace_target="#secretary-workspace",
             branch=branch,
             context_label=f"Annexe - {branch_name}" if branch_name else "Annexe non definie",
             groups=nav_groups,
+            script_path="src/js/portal/secretary_certified_dashboard.js",
+            drawer_title="Opération du secrétariat",
             modal_title="Operation du secretariat",
         )
     )
@@ -1195,18 +1479,14 @@ def task_start(request, pk):
 def student_snapshot_view(request, student_id):
     ensure_secretary_access(request.user)
     snapshot = get_student_snapshot(student_id, user=request.user)
-    # Get student object for schedule lookup
-    student = get_student_snapshot_queryset(student_id, user=request.user).first()
-    # Load weekly schedule (current week) so secretary can see if student is in class
-    student_schedule = None
-    if student:
-        from django.utils import timezone
-        from academics.services.schedule_service import get_student_week_schedule
-        student_schedule = get_student_week_schedule(student, timezone.localdate())
     if _is_htmx(request):
         return render(request, "secretary/htmx/student_drawer.html", {
             "snapshot": snapshot,
-            "student_schedule": student_schedule,
+            "student_actions": [
+                {"label": "Nouvelle entrée registre", "icon": "book-plus", "url": f"{reverse('secretary:registry_create')}?student={snapshot['student_id']}"},
+                {"label": "Planifier un rendez-vous", "icon": "calendar-plus", "url": f"{reverse('secretary:appointment_create')}?student={snapshot['student_id']}"},
+                {"label": "Enregistrer une visite", "icon": "user-plus", "url": f"{reverse('secretary:visitor_create')}?student={snapshot['student_id']}"},
+            ],
         })
     return JsonResponse(snapshot)
 

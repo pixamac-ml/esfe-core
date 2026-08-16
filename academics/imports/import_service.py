@@ -10,6 +10,10 @@ from unidecode import unidecode
 
 from academics.models import AcademicClass, AcademicEnrollment, EC, ECGrade, Semester
 from academics.services.grading import apply_ec_grade, compute_ec_status, resolve_ec_threshold
+from academics.imports.template_service import (
+    IMPORT_WORKBOOK_SCHEMA,
+    get_notes_workbook_signature,
+)
 
 
 @dataclass
@@ -66,25 +70,69 @@ def _resolve_ec_column(header: str, ecs: list[EC]) -> EC | None:
     return None
 
 
-def _to_decimal_score(value: Any) -> Decimal | None:
+def _is_empty_score_value(value: Any) -> bool:
     try:
         import pandas as pd
     except Exception:  # pragma: no cover
         pd = None
 
     if pd is not None and pd.isna(value):
-        return None
+        return True
     if value in (None, ""):
-        return None
+        return True
     raw = str(value).strip()
-    if not raw:
+    return not raw
+
+
+def _to_decimal_score(value: Any) -> Decimal | None:
+    if _is_empty_score_value(value):
         return None
-    raw = raw.replace(",", ".")
+    raw = str(value).strip().replace(",", ".")
     try:
         score = Decimal(raw)
     except (InvalidOperation, ValueError):
         return None
     return score
+
+
+def _validate_official_workbook(*, file, academic_class, semester, session_type):
+    """Reject a workbook that was not generated for this exact notes grid."""
+    filename = (getattr(file, "name", "") or "").lower()
+    if not filename.endswith(".xlsx"):
+        raise ValueError("Le fichier doit etre un modele Excel ESFE au format .xlsx.")
+
+    try:
+        from openpyxl import load_workbook
+        if hasattr(file, "seek"):
+            file.seek(0)
+        workbook = load_workbook(file, read_only=True, data_only=True)
+    except Exception as exc:
+        raise ValueError("Fichier Excel .xlsx invalide ou illisible.") from exc
+
+    try:
+        if "_ESFE_META" not in workbook.sheetnames:
+            raise ValueError("Modele Excel ESFE invalide. Telechargez un nouveau modele depuis la grille.")
+        metadata = dict(workbook["_ESFE_META"].iter_rows(min_col=1, max_col=2, values_only=True))
+        expected_metadata = {
+            "schema": IMPORT_WORKBOOK_SCHEMA,
+            "class_id": academic_class.id,
+            "semester_id": semester.id,
+            "session_type": session_type,
+            "signature": get_notes_workbook_signature(
+                academic_class_id=academic_class.id,
+                semester_id=semester.id,
+                session_type=session_type,
+            ),
+        }
+        for key, expected_value in expected_metadata.items():
+            if str(metadata.get(key, "")).strip() != str(expected_value):
+                raise ValueError(
+                    "Le fichier ne correspond pas a la classe, au semestre ou a la session selectionnee."
+                )
+    finally:
+        workbook.close()
+        if hasattr(file, "seek"):
+            file.seek(0)
 
 
 
@@ -125,6 +173,13 @@ def import_grades(
             f"(statut actuel: {semester.get_status_display()})."
         )
 
+    _validate_official_workbook(
+        file=file,
+        academic_class=academic_class,
+        semester=semester,
+        session_type=session_type,
+    )
+
     import pandas as pd
 
     if hasattr(file, "seek"):
@@ -154,16 +209,34 @@ def import_grades(
     matricule_column = normalized_columns.get("MATRICULE")
 
     semester_ecs = list(EC.objects.filter(ue__semester=semester).select_related("ue").order_by("ue__id", "id"))
-    ec_col_map: dict[str, EC] = {}
-    for header in headers:
-        if header in {nom_column, prenom_column, enrollment_id_column, matricule_column}:
-            continue
-        ec = _resolve_ec_column(header, semester_ecs)
-        if ec is None:
-            result.skipped_unknown_columns += 1
-            result.unknown_columns.append(header)
-            continue
-        ec_col_map[header] = ec
+    if not semester_ecs:
+        raise ValueError("Aucun EC n'est configure pour ce semestre.")
+
+    identity_headers = {"ENROLLMENT_ID", "MATRICULE", "NOM", "PRENOM"}
+    expected_ec_headers = {
+        _normalize_text(f"NOTE /20 - {_get_ec_human_label(ec)}"): ec
+        for ec in semester_ecs
+    }
+    actual_headers = {_normalize_text(header) for header in headers}
+    expected_headers = identity_headers | set(expected_ec_headers)
+    missing_headers = expected_headers - actual_headers
+    unexpected_headers = actual_headers - expected_headers
+    if missing_headers or unexpected_headers:
+        details = []
+        if missing_headers:
+            details.append(f"colonnes manquantes: {', '.join(sorted(missing_headers))}")
+        if unexpected_headers:
+            details.append(f"colonnes inconnues: {', '.join(sorted(unexpected_headers))}")
+        raise ValueError(
+            "Structure du modele Excel invalide (" + "; ".join(details) + "). "
+            "Telechargez un nouveau modele depuis la grille."
+        )
+
+    ec_col_map: dict[str, EC] = {
+        header: expected_ec_headers[_normalize_text(header)]
+        for header in headers
+        if _normalize_text(header) in expected_ec_headers
+    }
 
     enrollments_by_name: dict[tuple[str, str], list[AcademicEnrollment]] = {}
     enrollments_by_id: dict[str, AcademicEnrollment] = {}
@@ -190,17 +263,19 @@ def import_grades(
 
     def _row_has_data(row) -> bool:
         for column_name in ec_col_map.keys():
-            if _to_decimal_score(row.get(column_name)) is not None:
+            if not _is_empty_score_value(row.get(column_name)):
                 return True
         return False
 
     pending_updates: list[tuple[AcademicEnrollment, EC, Decimal]] = []
+    seen_enrollment_rows: dict[int, int] = {}
 
     for _idx, row in df.iterrows():
         excel_row_number = int(_idx) + 6
         nom = _normalize_text(row.get(nom_column))
         prenom = _normalize_text(row.get(prenom_column))
-        enrollment_id = str(row.get(enrollment_id_column) or "").strip() if enrollment_id_column else ""
+        enrollment_value = row.get(enrollment_id_column) if enrollment_id_column else None
+        enrollment_id = "" if _is_empty_score_value(enrollment_value) else str(enrollment_value).strip()
         if enrollment_id.endswith(".0"):
             enrollment_id = enrollment_id[:-2]
         matricule = _normalize_text(row.get(matricule_column)) if matricule_column else ""
@@ -273,11 +348,37 @@ def import_grades(
         if enrollment is None:
             enrollment = matching_enrollments[0]
 
+        if _row_has_data(row) and enrollment.id in seen_enrollment_rows:
+            result.skipped_unknown_students += 1
+            result.student_issues.append({
+                "row_number": excel_row_number,
+                "nom": display_nom,
+                "prenom": display_prenom,
+                "reason": "duplicate_enrollment",
+                "message": (
+                    "Etudiant duplique dans le fichier "
+                    f"(deja present a la ligne {seen_enrollment_rows[enrollment.id]})."
+                ),
+            })
+            continue
+        if _row_has_data(row):
+            seen_enrollment_rows[enrollment.id] = excel_row_number
+
         for column_name, ec in ec_col_map.items():
             value = row.get(column_name)
             score = _to_decimal_score(value)
             if score is None:
-                result.skipped_empty += 1
+                if _is_empty_score_value(value):
+                    result.skipped_empty += 1
+                    continue
+                result.skipped_invalid_scores += 1
+                result.student_issues.append({
+                    "row_number": excel_row_number,
+                    "nom": display_nom,
+                    "prenom": display_prenom,
+                    "reason": "invalid_score",
+                    "message": f"Note invalide pour {ec.title}: {value}. Saisissez un nombre entre 0 et 20.",
+                })
                 continue
             if score < Decimal("0") or score > Decimal("20"):
                 result.skipped_invalid_scores += 1
@@ -289,6 +390,22 @@ def import_grades(
                     "message": f"Note invalide pour {ec.title}: {value}. La note doit etre comprise entre 0 et 20.",
                 })
                 continue
+
+            normalized_score = score.quantize(Decimal("0.01"))
+            if score != normalized_score:
+                result.skipped_invalid_scores += 1
+                result.student_issues.append({
+                    "row_number": excel_row_number,
+                    "nom": display_nom,
+                    "prenom": display_prenom,
+                    "reason": "invalid_precision",
+                    "message": (
+                        f"Note invalide pour {ec.title}: {value}. "
+                        "Utilisez au maximum deux decimales (exemple : 12,50)."
+                    ),
+                })
+                continue
+            score = normalized_score
 
             if session_type == "retake":
                 existing_grade = ECGrade.objects.filter(enrollment=enrollment, ec=ec).first()

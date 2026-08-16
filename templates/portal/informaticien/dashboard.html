@@ -1,4 +1,5 @@
 {% extends "portal/staff/director_dashboard.html" %}
+{% load static %}
 
 {% block public_navbar %}{% endblock %}
 {% block public_footer %}{% endblock %}
@@ -7,6 +8,10 @@
 {% block title %}Dashboard Informaticien{% endblock %}
 
 {% block extra_head %}
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'vendor/tabulator/tabulator.min.css' %}">
+<script defer src="{% static 'vendor/tabulator/tabulator.min.js' %}"></script>
+<script defer src="{% static 'src/js/portal/notes_tabulator.js' %}?v=notes-live-calculation-4"></script>
 <style>
   [x-cloak] { display: none !important; }
   body { background: #f8fafc; color: #0f172a; }
@@ -116,6 +121,32 @@
   .workflow-toast { border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; padding: .8rem 1rem; }
   .dark .workflow-toast { border-color: #334155; background: #0f172a; }
   .workflow-split { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  /* Mode saisie : le drawer certifie devient un poste de travail plein ecran
+     uniquement lorsque la maquette de notes est chargee. */
+  [data-ui-core="drawer"].it-notes-entry-mode aside { width: 100vw; max-width: none; }
+  [data-ui-core="drawer"].it-notes-entry-mode aside > header { display: none; }
+  [data-ui-core="drawer"].it-notes-entry-mode #it-dashboard-drawer-content { padding: 0; overflow: hidden; }
+  [data-ui-core="drawer"].it-notes-entry-mode .it-notes-entry-grid,
+  [data-ui-core="drawer"].it-notes-entry-mode .it-notes-entry-grid > .workflow-table-shell,
+  [data-ui-core="drawer"].it-notes-entry-mode #notes-workspace,
+  [data-ui-core="drawer"].it-notes-entry-mode #notes-workspace > .maq-root,
+  [data-ui-core="drawer"].it-notes-entry-mode .maq-shell,
+  [data-ui-core="drawer"].it-notes-entry-mode .notes-tabulator-shell,
+  [data-ui-core="drawer"].it-notes-entry-mode .notes-tabulator-viewport { min-height: 0; height: 100%; }
+  [data-ui-core="drawer"].it-notes-entry-mode .it-notes-entry-grid,
+  [data-ui-core="drawer"].it-notes-entry-mode .it-notes-entry-grid > .workflow-table-shell,
+  [data-ui-core="drawer"].it-notes-entry-mode #notes-workspace,
+  [data-ui-core="drawer"].it-notes-entry-mode #notes-workspace > .maq-root,
+  [data-ui-core="drawer"].it-notes-entry-mode .maq-shell,
+  [data-ui-core="drawer"].it-notes-entry-mode .notes-tabulator-shell { display: flex; flex-direction: column; }
+  [data-ui-core="drawer"].it-notes-entry-mode .workflow-table-shell { border: 0; border-radius: 0; }
+  [data-ui-core="drawer"].it-notes-entry-mode .workflow-table-head { display: none; }
+  [data-ui-core="drawer"].it-notes-entry-mode .maq-toolbar > header,
+  [data-ui-core="drawer"].it-notes-entry-mode .notes-tabulator-toolbar > header { display: none; }
+  [data-ui-core="drawer"].it-notes-entry-mode .maq-toolbar,
+  [data-ui-core="drawer"].it-notes-entry-mode .notes-tabulator-toolbar { position: relative; z-index: 30; padding: 10px 16px; }
+  [data-ui-core="drawer"].it-notes-entry-mode .maq-scroll,
+  [data-ui-core="drawer"].it-notes-entry-mode .notes-tabulator-viewport { flex: 1 1 auto; max-height: none; }
   @media (max-width: 900px) {
     .wkc { grid-template-columns: 1fr; }
     .it-drawer { width: 100%; max-width: 100vw; }
@@ -125,6 +156,20 @@
 {% endblock %}
 
 {% block dashboard_content %}
+<section
+  data-dashboard-section="{{ initial_module|default:'home' }}"
+  class="min-w-0 max-w-full"
+  {% if not initial_workspace_html %}
+  hx-get="{% if selected_class and selected_semester %}{% url 'accounts_portal:it_notes_workspace' %}?class_id={{ selected_class.id }}&amp;semester_id={{ selected_semester.id }}{% else %}{% url 'accounts_portal:it_home_workspace' %}{% endif %}"
+  hx-trigger="load"
+  hx-target="#it-dashboard-workspace"
+  hx-swap="innerHTML"
+  {% endif %}
+>
+  {% if initial_workspace_html %}{{ initial_workspace_html }}{% else %}<div class="rounded-ui-card border border-ui-border bg-ui-surface p-4 text-sm text-ui-text-muted">{% if selected_class and selected_semester %}Workspace Notes{% else %}Chargement du workspace…{% endif %}</div>{% endif %}
+</section>
+
+{% if not dashboard_shell %}
 <div
   x-data="itFlowDashboard()"
   x-init="init()"
@@ -347,6 +392,7 @@
         { key: 'audit', label: 'Journal d\'audit', icon: 'history', kicker: 'Historique des actions de l\'annexe', url: "{% url 'accounts_portal:it_audit_workspace' %}" },
         { key: 'catalog', label: 'Catalogue', icon: 'library', kicker: 'Langues et professions de référence', url: "{% url 'accounts_portal:it_catalog_workspace' %}" },
         { key: 'notifications', label: 'Notifications', icon: 'bell', kicker: 'Alertes, messages et communications', url: "{% url 'accounts_portal:it_notifications_workspace' %}" },
+        { key: 'branch_settings', label: 'Paramètres d\'annexe', icon: 'sliders-horizontal', kicker: 'Réglages techniques de l\'annexe', url: "{% url 'accounts_portal:it_branch_settings_workspace' %}" },
         { key: 'settings', label: 'Compte', icon: 'settings', kicker: 'Profil, sécurité, préférences et annexe', url: "{% url 'accounts_portal:it_my_account_workspace' %}" },
       ],
       init() {
@@ -511,6 +557,9 @@
     };
   }
 
+</script>
+{% endif %}
+<script>
   // Calcul instantane (cosmetique) de la grille de notes informaticien.
   // Le serveur reste seul a valider/persister ; ce code ne fait que
   // reproduire l'affichage pour eviter tout aller-retour reseau visible
@@ -528,7 +577,101 @@
           this.structure = [];
         }
         this.ecsPerRow = this.structure.reduce((sum, ue) => sum + ue.ecs.length, 0);
+        this.syncHeaderOffsets();
+        this.headerResizeObserver = new ResizeObserver(() => this.syncHeaderOffsets());
+        const grid = this.$root.querySelector('.maq-grid');
+        if (grid) this.headerResizeObserver.observe(grid);
+        this.bindImport();
+        this.$root.addEventListener('htmx:beforeRequest', (event) => this.onSaveStarted(event));
         this.$root.addEventListener('htmx:afterRequest', (event) => this.onSaveSettled(event));
+      },
+      syncHeaderOffsets() {
+        [1, 2, 3, 4].forEach((number) => {
+          const cells = this.$root.querySelectorAll(`.maq-cell--h-row${number}`);
+          const height = Array.from(cells).reduce(
+            (largest, cell) => Math.max(largest, Math.ceil(cell.getBoundingClientRect().height)),
+            0,
+          );
+          this.$root.style.setProperty(`--maq-head-row${number}`, `${height}px`);
+        });
+      },
+      bindImport() {
+        const form = this.$root.querySelector('.js-notes-import-form');
+        if (!form || form.dataset.bound === '1') return;
+        form.dataset.bound = '1';
+        form.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const status = form.querySelector('[data-notes-import-status]');
+          const button = form.querySelector('button[type="submit"]');
+          const file = form.querySelector('input[type="file"]');
+          if (!file || !file.files || !file.files.length) return;
+          if (status) {
+            status.textContent = 'Import en cours…';
+            status.className = 'text-xs font-medium text-indigo-700';
+          }
+          if (button) button.disabled = true;
+          try {
+            const response = await fetch(this.$root.dataset.importUrl, {
+              method: 'POST',
+              body: new FormData(form),
+              headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            const payload = await response.json().catch(() => null);
+            if (!response.ok || !payload || payload.ok !== true) {
+              const detail = payload && (payload.error || payload.errors);
+              const issues = payload && payload.result && Array.isArray(payload.result.student_issues)
+                ? payload.result.student_issues.slice(0, 2).map((issue) => issue.message).filter(Boolean)
+                : [];
+              const message = Array.isArray(detail) ? detail.join(' ') : (detail || `Import refusé (${response.status}).`);
+              throw new Error(issues.length ? `${message} ${issues.join(' ')}` : message);
+            }
+            if (status) {
+              const imported = Number(payload.result && payload.result.updated || 0);
+              const empty = Number(payload.result && payload.result.skipped_empty || 0);
+              status.textContent = empty
+                ? `${imported} note(s) importée(s) · ${empty} cellule(s) vide(s) à compléter`
+                : `${imported} note(s) importée(s) · grille complète`;
+              status.className = empty
+                ? 'text-xs font-medium text-amber-700'
+                : 'text-xs font-medium text-emerald-700';
+            }
+            const gridUrl = this.$root.dataset.gridUrl;
+            if (window.htmx && gridUrl) {
+              const params = new URLSearchParams({
+                class_id: form.elements.class_id.value,
+                semester_id: form.elements.semester_id.value,
+                session: this.$root.dataset.session || 'normal',
+                imported: String(Number(payload.result && payload.result.updated || 0)),
+                empty: String(Number(payload.result && payload.result.skipped_empty || 0)),
+              });
+              window.setTimeout(() => window.htmx.ajax('GET', `${gridUrl}?${params.toString()}`, '#notes-workspace'), 350);
+            }
+          } catch (error) {
+            if (status) {
+              status.textContent = error && error.message ? error.message : 'Import non effectué.';
+              status.className = 'text-xs font-medium text-rose-700';
+            }
+          } finally {
+            if (button) button.disabled = false;
+          }
+        });
+      },
+      onSaveStarted(event) {
+        const elt = event.detail && event.detail.elt;
+        if (!elt || !elt.classList || !elt.classList.contains('score-input')) return;
+        const rowEl = elt.closest('.maq-row-student');
+        const rowIndex = rowEl ? rowEl.dataset.rowIndex : null;
+        const ecId = elt.dataset.ecId;
+        const statusEl = rowIndex !== null && rowIndex !== undefined && ecId
+          ? this.$root.querySelector(`#save-status-${rowIndex}-${ecId}`)
+          : null;
+        elt.classList.remove('is-saved', 'is-error', 'is-attention', 'is-editing');
+        elt.classList.add('is-saving');
+        if (!statusEl) return;
+        clearTimeout(statusEl._flashTimer);
+        statusEl.textContent = 'Enregistrement de la note.';
+        statusEl.title = 'La note est en cours d’enregistrement.';
+        statusEl.className = 'save-status sr-only htmx-indicator';
       },
       onSaveSettled(event) {
         const elt = event.detail && event.detail.elt;
@@ -536,18 +679,38 @@
         const rowEl = elt.closest('.maq-row-student');
         const rowIndex = rowEl ? rowEl.dataset.rowIndex : null;
         const ecId = elt.dataset.ecId;
-        if (!rowIndex || !ecId) return;
-        const statusEl = document.getElementById(`save-status-${rowIndex}-${ecId}`);
+        if (rowIndex === null || rowIndex === undefined || !ecId) return;
+        const statusEl = this.$root.querySelector(`#save-status-${rowIndex}-${ecId}`);
         if (!statusEl) return;
-        const ok = !!(event.detail.successful);
-        statusEl.textContent = ok ? 'Enregistre ✓' : 'Erreur';
-        statusEl.classList.add('is-flash');
-        statusEl.classList.toggle('is-error', !ok);
+        const xhr = event.detail.xhr;
+        const responseText = (xhr && xhr.responseText ? xhr.responseText : '').trim();
+        const requiresOtp = responseText.includes('grade_otp_modal') || responseText.includes('otp_request_id');
+        const ok = !!event.detail.successful && !requiresOtp;
+        const errorMessage = responseText && !requiresOtp
+          ? new DOMParser().parseFromString(responseText, 'text/html').body.textContent.trim()
+          : '';
+        elt.classList.remove('is-saving', 'is-editing');
+        elt.classList.toggle('is-saved', ok);
+        elt.classList.toggle('is-attention', requiresOtp);
+        elt.classList.toggle('is-error', !ok && !requiresOtp);
+        statusEl.textContent = ok
+          ? 'Note enregistrée.'
+          : requiresOtp
+            ? 'Validation OTP requise pour modifier cette note.'
+            : (errorMessage || 'Note non enregistrée. Vérifiez la valeur et le statut de session.');
+        statusEl.title = statusEl.textContent;
+        statusEl.className = ok
+          ? 'save-status sr-only htmx-indicator'
+          : requiresOtp
+            ? 'save-status is-attention htmx-indicator'
+            : 'save-status is-error htmx-indicator';
         clearTimeout(statusEl._flashTimer);
-        statusEl._flashTimer = setTimeout(() => {
-          statusEl.classList.remove('is-flash', 'is-error');
-          statusEl.textContent = '…';
-        }, 1400);
+        if (ok) {
+          statusEl._flashTimer = setTimeout(() => {
+            elt.classList.remove('is-saved');
+            statusEl.textContent = '…';
+          }, 520);
+        }
       },
       resolveEcThreshold(coefficient) {
         if (coefficient <= 1) return 8;
@@ -630,7 +793,7 @@
       recomputeRow(rowEl) {
         if (!this.structure || !this.structure.length) return;
         const rowIndex = rowEl.dataset.rowIndex;
-        if (!rowIndex) return;
+        if (rowIndex === null || rowIndex === undefined || rowIndex === '') return;
         let totalUeCoef = 0;
         let totalUeNoteCoef = 0;
         let totalCreditReq = 0;
@@ -680,7 +843,18 @@
       onInput(event) {
         const input = event.target;
         if (!input.classList || !input.classList.contains('score-input')) return;
+        input.classList.remove('is-saved', 'is-error', 'is-attention');
+        input.classList.add('is-editing');
         const rowEl = input.closest('.maq-row-student');
+        const rowIndex = rowEl ? rowEl.dataset.rowIndex : null;
+        const statusEl = rowIndex !== null && rowIndex !== undefined && input.dataset.ecId
+          ? this.$root.querySelector(`#save-status-${rowIndex}-${input.dataset.ecId}`)
+          : null;
+        if (statusEl) {
+          clearTimeout(statusEl._flashTimer);
+          statusEl.textContent = '…';
+          statusEl.className = 'save-status sr-only htmx-indicator';
+        }
         if (rowEl) this.recomputeRow(rowEl);
       },
       onKeydown(event) {
@@ -693,12 +867,15 @@
         }
         if (event.key !== 'Enter' && event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
         event.preventDefault();
-        const allInputs = Array.from(this.$root.querySelectorAll('.score-input'));
+        const allInputs = Array.from(this.$root.querySelectorAll('.score-input:not(:disabled)'));
         const idx = allInputs.indexOf(input);
         const offset = this.ecsPerRow || 1;
         const targetIdx = (event.key === 'ArrowUp') ? idx - offset : idx + offset;
         const target = allInputs[targetIdx];
-        if (target) target.focus();
+        if (target) {
+          target.focus({ preventScroll: true });
+          target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        }
       },
     };
   }

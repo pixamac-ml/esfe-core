@@ -8,7 +8,7 @@ from django.db.models import Q
 from portal.models import AdministrativeDocument
 
 
-def _page(queryset, page_number, *, per_page=12):
+def _page(queryset, page_number, *, per_page=10):
     paginator = Paginator(queryset, per_page)
     try:
         return paginator.page(page_number or 1)

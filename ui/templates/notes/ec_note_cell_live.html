@@ -19,18 +19,19 @@
       hx-swap="none"
       hx-indicator="#save-status-{{ row.index }}-{{ ec_row.ec.id }}"
       hx-vals='{"student_id": "{{ row.student_id }}", "live": "1"}'
+      aria-describedby="save-status-{{ row.index }}-{{ ec_row.ec.id }}"
       @input="onInput($event)"
       @keydown="onKeydown($event)"
       {% if row.active_session_type == "retake" and not ec_row.is_retake_editable %}disabled title="Matiere validee en session normale"{% endif %}
     >
-    <div class="score-meta">
-      <span class="score-token normal"><span class="score-token-label">N</span><span class="score-token-value" id="scoreN-{{ row.index }}-{{ ec_row.ec.id }}">{{ ec_row.normal_score_display|default:"0,00" }}</span></span>
-      {% if row.active_session_type == "retake" %}
+    {% if row.active_session_type == "retake" %}
+      <div class="score-meta">
+        <span class="score-token normal"><span class="score-token-label">N</span><span class="score-token-value" id="scoreN-{{ row.index }}-{{ ec_row.ec.id }}">{{ ec_row.normal_score_display|default:"0,00" }}</span></span>
         <span class="score-token retake"><span class="score-token-label">R</span><span class="score-token-value" id="scoreR-{{ row.index }}-{{ ec_row.ec.id }}">{{ ec_row.retake_score_display|default:"0,00" }}</span></span>
         <span class="score-token final"><span class="score-token-label">F</span><span class="score-token-value" id="scoreF-{{ row.index }}-{{ ec_row.ec.id }}">{{ ec_row.final_score_display|default:"0,00" }}</span></span>
-      {% endif %}
-    </div>
-    <span id="save-status-{{ row.index }}-{{ ec_row.ec.id }}" class="save-status htmx-indicator" aria-hidden="true">&hellip;</span>
+      </div>
+    {% endif %}
+    <span id="save-status-{{ row.index }}-{{ ec_row.ec.id }}" class="save-status sr-only htmx-indicator" aria-live="polite">&hellip;</span>
     {% if row.active_session_type == "retake" and ec_row.has_retake_score %}<span class="retake-badge">R</span>{% endif %}
     {% if row.active_session_type == "retake" and not ec_row.is_retake_editable %}<span class="retake-badge" title="Non modifiable">-</span>{% endif %}
   </div>

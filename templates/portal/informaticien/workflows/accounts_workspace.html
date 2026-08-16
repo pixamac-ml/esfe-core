@@ -1,81 +1,39 @@
-{% if toast %}
-<div class="panel mb-4" style="border-left:5px solid {% if toast.level == 'success' %}#059669{% elif toast.level == 'error' %}#be123c{% else %}#d97706{% endif %}">
-  <p class="text-sm font-black">{{ toast.message }}</p>
-</div>
-{% endif %}
+{% load component_tags %}
+<div class="min-w-0 space-y-5">
+  {% component "ui_core.page_header" eyebrow="Support et accès / Utilisateurs" title="Comptes de l'annexe" subtitle="Consulter et administrer uniquement les comptes rattachés à l'annexe courante." %}
+    {% fill "actions" %}<span class="rounded-ui-badge bg-ui-info-soft px-3 py-1.5 text-xs font-semibold text-ui-info">{{ branch.name|default:"Annexe" }}</span>{% endfill %}
+  {% endcomponent %}
 
-<div class="space-y-4">
-  <form
-    class="wkc"
-    hx-get="{% url 'accounts_portal:it_accounts_flow_workspace' %}"
-    hx-target="#it-workspace"
-    hx-swap="innerHTML"
-  >
-    <label>
-      <span>Recherche utilisateur</span>
-      <input name="q" value="{{ query }}" placeholder="Username ou email" hx-trigger="keyup changed delay:350ms" hx-get="{% url 'accounts_portal:it_accounts_flow_workspace' %}" hx-target="#it-workspace" hx-include="[name='q']">
-    </label>
-  </form>
+  {% if toast %}
+    {% if toast.level == "error" %}{% component "ui_core.alert" title="Action à vérifier" message=toast.message tone="danger" %}{% endcomponent %}{% else %}{% component "ui_core.alert" title="Comptes utilisateurs" message=toast.message tone=toast.level %}{% endcomponent %}{% endif %}
+  {% endif %}
 
-  <div class="band b-in_progress">
-    <div>
-      <p class="kicker">Gestion des comptes</p>
-      <h3>Utilisateur → État → Action</h3>
-      <p>La liste est limitée à l'annexe courante. Chaque ligne expose uniquement les actions possibles sur le compte.</p>
-    </div>
-    <span class="badge">{{ branch.name|default:"Global" }}</span>
-  </div>
+  {% component "ui_core.panel" title="Recherche" subtitle="Le filtrage ne quitte jamais le périmètre de votre annexe." %}
+    {% fill "default" %}
+      <form class="flex flex-col gap-3 sm:flex-row sm:items-end" method="get" hx-get="{% url 'accounts_portal:it_accounts_flow_workspace' %}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">
+        <label class="min-w-0 flex-1 text-sm font-semibold text-ui-text"><span class="mb-1.5 block">Utilisateur ou e-mail</span><input name="q" value="{{ query }}" placeholder="Nom, identifiant ou e-mail" class="h-ui-control w-full rounded-ui-input border-ui-border bg-ui-surface text-sm" hx-trigger="keyup changed delay:350ms" hx-get="{% url 'accounts_portal:it_accounts_flow_workspace' %}" hx-target="#it-dashboard-workspace" hx-include="[name='q']"></label>
+        <button type="submit" class="inline-flex h-ui-control items-center justify-center rounded-ui-button border border-ui-border px-4 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">Rechercher</button>
+      </form>
+    {% endfill %}
+  {% endcomponent %}
 
-  <div class="panel">
-    <div class="flex items-center justify-between mb-3">
-      <div>
-        <p class="kicker">Comptes utilisateurs</p>
-        <h3 class="text-lg font-black">File de traitement</h3>
+  {% component "ui_core.panel" title="File de traitement" subtitle="Chaque action est contrôlée côté serveur et filtrée par annexe." %}
+    {% fill "default" %}
+      <div class="divide-y divide-ui-border">
+        {% for row in rows %}
+          <article class="flex min-w-0 flex-col gap-4 py-4 first:pt-0 last:pb-0 xl:flex-row xl:items-center">
+            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button {% if row.account_state == 'actif' %}bg-ui-success-soft text-ui-success{% elif row.account_state == 'suspendu' or row.account_state == 'bloque' %}bg-ui-danger-soft text-ui-danger{% else %}bg-ui-surface-muted text-ui-text-muted{% endif %}"><i data-lucide="user-round" class="h-4 w-4" aria-hidden="true"></i></span>
+            <div class="min-w-0 flex-1"><p class="truncate text-sm font-semibold text-ui-text">{{ row.user.get_full_name|default:row.user.username }}</p><p class="mt-0.5 text-xs text-ui-text-muted">{{ row.user.username }} · {{ row.account_state|title }}</p></div>
+            <div class="flex shrink-0 flex-wrap gap-2">
+              <button type="button" class="inline-flex h-9 items-center gap-1.5 rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover" hx-get="{% url 'accounts_portal:it_user_modal' row.user.id %}" hx-target="#it-dashboard-modal-content" hx-swap="innerHTML"><i data-lucide="eye" class="h-3.5 w-3.5" aria-hidden="true"></i>Voir / modifier</button>
+              <form method="post" action="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-post="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">{% csrf_token %}<input type="hidden" name="target_user_id" value="{{ row.user.id }}"><input type="hidden" name="action" value="toggle_active"><button class="inline-flex h-9 items-center gap-1.5 rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover" type="submit">{% if row.user.is_active %}<i data-lucide="user-x" class="h-3.5 w-3.5" aria-hidden="true"></i>Désactiver{% else %}<i data-lucide="user-check" class="h-3.5 w-3.5" aria-hidden="true"></i>Activer{% endif %}</button></form>
+              <form method="post" action="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-post="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">{% csrf_token %}<input type="hidden" name="target_user_id" value="{{ row.user.id }}"><input type="hidden" name="action" value="reset_password"><button class="inline-flex h-9 items-center gap-1.5 rounded-ui-button bg-ui-primary px-3 text-xs font-semibold text-ui-on-primary hover:bg-ui-primary-strong" type="submit"><i data-lucide="key-round" class="h-3.5 w-3.5" aria-hidden="true"></i>Réinitialiser</button></form>
+            </div>
+          </article>
+        {% empty %}
+          <p class="py-8 text-center text-sm text-ui-text-muted">Aucun compte ne correspond à cette recherche dans l'annexe.</p>
+        {% endfor %}
       </div>
-    </div>
-    <div>
-      {% for row in rows %}
-      <div class="row">
-        <div class="avatar" style="background:#4338ca">
-          {{ row.user.get_full_name|default:row.user.username|first|upper }}
-        </div>
-        <div class="flex-1 min-w-0">
-          <b class="block">{{ row.user.get_full_name|default:row.user.username }}</b>
-          <span class="text-xs font-semibold text-slate-400">{{ row.user.username }} — {{ row.account_state|title }}</span>
-        </div>
-        <div class="flex flex-wrap gap-2">
-          <button
-            type="button"
-            class="btn btn-secondary"
-            hx-get="{% url 'accounts_portal:it_user_modal' row.user.id %}"
-            hx-target="#it-modal-root"
-            hx-swap="innerHTML"
-          >
-            <i data-lucide="eye" class="h-4 w-4"></i>
-            Voir / Modifier
-          </button>
-          <form method="post" action="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-post="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-target="#it-workspace" hx-swap="innerHTML">
-            {% csrf_token %}
-            <input type="hidden" name="target_user_id" value="{{ row.user.id }}">
-            <input type="hidden" name="action" value="toggle_active">
-            <button class="btn btn-secondary" type="submit">
-              {% if row.user.is_active %}<i data-lucide="user-x" class="h-4 w-4"></i> Désactiver{% else %}<i data-lucide="user-check" class="h-4 w-4"></i> Activer{% endif %}
-            </button>
-          </form>
-          <form method="post" action="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-post="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-target="#it-workspace" hx-swap="innerHTML">
-            {% csrf_token %}
-            <input type="hidden" name="target_user_id" value="{{ row.user.id }}">
-            <input type="hidden" name="action" value="reset_password">
-            <button class="btn btn-primary" type="submit">
-              <i data-lucide="key-round" class="h-4 w-4"></i>
-              Reset password
-            </button>
-          </form>
-        </div>
-      </div>
-      {% empty %}
-      <p class="py-6 text-center text-sm font-semibold text-slate-400">Aucun compte ne correspond à cette recherche.</p>
-      {% endfor %}
-    </div>
-  </div>
+    {% endfill %}
+  {% endcomponent %}
 </div>

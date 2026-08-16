@@ -1,0 +1,22 @@
+{% load component_tags %}
+<div class="min-w-0 max-w-full space-y-6" id="manager-dashboard-content" hx-boost="true">
+  {% component "ui_core.page_header" eyebrow=manager_ui.page_header.eyebrow title=manager_ui.page_header.title subtitle=manager_ui.page_header.subtitle %}
+    {% fill "actions" %}
+      {% for action in manager_ui.header_actions %}
+        <a href="{{ action.href }}" {% if action.external %}target="_blank" rel="noopener noreferrer" hx-boost="false"{% endif %} class="inline-flex h-ui-control items-center gap-2 rounded-ui-button px-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus {% if action.primary %}bg-ui-primary text-ui-on-primary hover:bg-ui-primary-strong{% else %}border border-ui-border bg-ui-surface text-ui-text hover:bg-ui-surface-hover{% endif %}"><i data-lucide="{{ action.icon }}" class="h-4 w-4" aria-hidden="true"></i>{{ action.label }}</a>
+      {% endfor %}
+    {% endfill %}
+  {% endcomponent %}
+
+  {% if manager_ui.subnavigation %}{% component "ui_core.tabs" id="manager-{{ manager_ui.section }}-tabs" items=manager_ui.subnavigation active=manager_ui.subview density="compact" subview_event="manager-subview" subview_attr="manager-subview" %}{% endcomponent %}{% endif %}
+
+  {% if active_section == "overview" %}
+    {% include "accounts/dashboard/partials/manager_overview_workspace.html" %}
+  {% elif active_section == "settings" %}
+    {% include "accounts/dashboard/partials/manager_account_workspace.html" %}
+  {% elif manager_ui.subnavigation %}
+    {% include "accounts/dashboard/partials/manager_section_shell.html" %}
+  {% elif active_section == "boutique" %}
+    {% include "shop/partials/manager_shop_panel.html" %}
+  {% endif %}
+</div>

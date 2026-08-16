@@ -1,8 +1,10 @@
 """Branch-scoped workspace contracts for the operational supervisor dashboard."""
 
 from datetime import datetime, timedelta
+from urllib.parse import urlencode
 
 from django.db.models import Count, Q
+from django.core.paginator import Paginator
 from django.utils import timezone
 
 from academics.models import AcademicClass, AcademicScheduleEvent
@@ -24,6 +26,7 @@ from students.models import (
     TeacherAttendance,
     TeacherCase,
 )
+from portal.services.supervisor_service import SUPERVISOR_LIST_PAGE_SIZE
 
 
 SECTION_META = {
@@ -176,7 +179,7 @@ def _signalment_rows(branch, *, transmitted_only=False):
         )
         .prefetch_related("notes")
         .filter(branch=branch)
-        .order_by("-created_at")[:100]
+        .order_by("-created_at")
     )
     teacher_cases = list(
         TeacherCase.objects.select_related(
@@ -187,7 +190,7 @@ def _signalment_rows(branch, *, transmitted_only=False):
         )
         .prefetch_related("notes")
         .filter(branch=branch)
-        .order_by("-created_at")[:100]
+        .order_by("-created_at")
     )
     rows = []
     for kind, case in [
@@ -225,7 +228,7 @@ def _signalment_rows(branch, *, transmitted_only=False):
             }
         )
     rows.sort(key=lambda row: row["case"].created_at, reverse=True)
-    return rows[:100]
+    return rows
 
 
 def _signal_form_context(branch):
@@ -310,6 +313,14 @@ def build_supervisor_workspace_context(request, *, branch, section=None, toast=N
         "supervisor_subcontent_template": SUBCONTENT_TEMPLATES[(resolved_section, active_view)],
         "supervisor_dashboard_base_url": "/portal/dashboard/",
     }
+    pagination_params = request.GET.copy() if request.GET else request.POST.copy()
+    pagination_params["section"] = resolved_section
+    pagination_params["view"] = active_view
+    pagination_params["fragment"] = "subcontent"
+    canonical_params = pagination_params.copy()
+    canonical_params.pop("fragment", None)
+    context["supervisor_pagination_query"] = urlencode(list(pagination_params.lists()), doseq=True)
+    context["supervisor_canonical_query"] = urlencode(list(canonical_params.lists()), doseq=True)
     if toast:
         context["toast"] = toast
 
@@ -320,6 +331,15 @@ def build_supervisor_workspace_context(request, *, branch, section=None, toast=N
         context.update(build_home_section_context(branch=branch, selected_class=selected_class))
 
     elif resolved_section == "classes":
+        class_page = Paginator(class_picker_items, SUPERVISOR_LIST_PAGE_SIZE).get_page(
+            request.GET.get("classes_page") or request.POST.get("classes_page") or 1
+        )
+        context.update(
+            {
+                "class_picker_page": class_page,
+                "classes_query_suffix": "section=classes&view=overview",
+            }
+        )
         if active_view == "students" and selected_class:
             context.update(
                 build_students_section_context(
@@ -357,6 +377,7 @@ def build_supervisor_workspace_context(request, *, branch, section=None, toast=N
                     branch=branch,
                     academic_class=selected_class,
                     month=report_month,
+                    page_number=request.GET.get("students_report_page") or request.POST.get("students_report_page") or 1,
                 )
             )
         elif active_view == "alerts":
@@ -365,16 +386,27 @@ def build_supervisor_workspace_context(request, *, branch, section=None, toast=N
                     "student__inscription__candidature"
                 )
                 .filter(branch=branch, is_resolved=False)
-                .order_by("-triggered_at")[:100]
+                .order_by("-triggered_at")
             )
+            alerts_page = Paginator(context["attendance_alerts"], SUPERVISOR_LIST_PAGE_SIZE).get_page(
+                request.GET.get("alerts_page") or request.POST.get("alerts_page") or 1
+            )
+            context["attendance_alerts"] = alerts_page.object_list
+            context["attendance_alerts_page"] = alerts_page
 
     elif resolved_section == "teachers":
-        context.update(build_teachers_section_context(branch=branch))
+        context.update(
+            build_teachers_section_context(
+                branch=branch,
+                page_number=request.GET.get("teachers_page") or request.POST.get("teachers_page") or 1,
+            )
+        )
         if active_view == "history":
             context.update(
                 build_teachers_weekly_report_context(
                     branch=branch,
                     week_start=week_start,
+                    page_number=request.GET.get("teachers_report_page") or request.POST.get("teachers_report_page") or 1,
                 )
             )
 
@@ -384,17 +416,22 @@ def build_supervisor_workspace_context(request, *, branch, section=None, toast=N
         if active_view == "week" and selected_class:
             context.update(
                 build_schedule_section_context(
-                    branch=branch,
-                    academic_class=selected_class,
-                    week_start=week_start,
+                branch=branch,
+                academic_class=selected_class,
+                week_start=week_start,
+                page_number=request.GET.get("schedule_page") or request.POST.get("schedule_page") or 1,
                 )
             )
 
     elif resolved_section == "signals":
         rows = _signalment_rows(branch, transmitted_only=active_view == "transmitted")
+        rows_page = Paginator(rows, SUPERVISOR_LIST_PAGE_SIZE).get_page(
+            request.GET.get("signals_page") or request.POST.get("signals_page") or 1
+        )
         context.update(
             {
-                "signalment_rows": rows,
+                "signalment_rows": rows_page.object_list,
+                "signalment_rows_page": rows_page,
                 "signalment_total": len(rows),
                 "signalment_transmitted": sum(1 for row in rows if row["transmitted"]),
             }
@@ -404,11 +441,15 @@ def build_supervisor_workspace_context(request, *, branch, section=None, toast=N
 
     elif resolved_section == "reports":
         transmitted_rows = _signalment_rows(branch, transmitted_only=True)
+        transmitted_page = Paginator(transmitted_rows, SUPERVISOR_LIST_PAGE_SIZE).get_page(
+            request.GET.get("signals_page") or request.POST.get("signals_page") or 1
+        )
         context.update(
             {
                 "report_student_records": StudentAttendance.objects.filter(branch=branch).count(),
                 "report_teacher_records": TeacherAttendance.objects.filter(branch=branch).count(),
-                "signalment_rows": transmitted_rows,
+                "signalment_rows": transmitted_page.object_list,
+                "signalment_rows_page": transmitted_page,
                 "report_transmitted_count": len(transmitted_rows),
             }
         )
@@ -418,6 +459,7 @@ def build_supervisor_workspace_context(request, *, branch, section=None, toast=N
                     branch=branch,
                     academic_class=selected_class,
                     month=report_month,
+                    page_number=request.GET.get("students_report_page") or request.POST.get("students_report_page") or 1,
                 )
             )
         elif active_view == "teachers":
@@ -425,6 +467,7 @@ def build_supervisor_workspace_context(request, *, branch, section=None, toast=N
                 build_teachers_weekly_report_context(
                     branch=branch,
                     week_start=week_start,
+                    page_number=request.GET.get("teachers_report_page") or request.POST.get("teachers_report_page") or 1,
                 )
             )
 

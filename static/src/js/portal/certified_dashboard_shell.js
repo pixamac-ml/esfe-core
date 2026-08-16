@@ -8,6 +8,7 @@
   const workspaceSelector = `#${key}-workspace`;
   const loadingSelector = `#${key}-loading`;
   const modalContentSelector = `#${key}-modal-content`;
+  const drawerContentSelector = `#${key}-drawer-content`;
   let pendingConfirmation = null;
 
   function dispatchOverlay(action, id) {
@@ -18,6 +19,42 @@
 
   function workspace() {
     return document.querySelector(workspaceSelector);
+  }
+
+  function requestTargets(event, selector) {
+    const detail = event.detail || {};
+    const target = detail.target;
+    if (target && typeof target.matches === "function" && target.matches(selector)) {
+      return true;
+    }
+    const elt = detail.elt;
+    return !!(
+      elt &&
+      typeof elt.getAttribute === "function" &&
+      elt.getAttribute("hx-target") === selector
+    );
+  }
+
+  function openRequestedOverlay(event) {
+    if (requestTargets(event, modalContentSelector)) {
+      dispatchOverlay("open", `${key}-modal`);
+    }
+    if (requestTargets(event, drawerContentSelector)) {
+      dispatchOverlay("open", `${key}-drawer`);
+    }
+  }
+
+  function syncItNotesDrawerMode(target) {
+    if (key !== "it-dashboard" || !target || !target.matches(drawerContentSelector)) {
+      return;
+    }
+    const drawer = target.closest('[data-ui-core="drawer"]');
+    if (drawer) {
+      drawer.classList.toggle(
+        "it-notes-entry-mode",
+        Boolean(target.querySelector("[data-it-notes-entry]")),
+      );
+    }
   }
 
   function sectionFrom(target) {
@@ -93,26 +130,37 @@
   }
 
   document.body.addEventListener("htmx:beforeRequest", (event) => {
-    if (event.detail.target && event.detail.target.matches(workspaceSelector)) {
+    if (requestTargets(event, workspaceSelector)) {
       setBusy(true);
     }
-    if (
-      key === "manager" &&
-      event.detail.target &&
-      event.detail.target.matches(modalContentSelector)
-    ) {
-      dispatchOverlay("open", `${key}-modal`);
-    }
+    openRequestedOverlay(event);
   });
 
+  // IT workflow actions already publish this event after a successful save.
+  // Keeping the bridge in the certified shell lets their content use the
+  // shared UI Core modal without owning a second overlay implementation.
+  if (key === "it-dashboard") {
+    document.body.addEventListener("it-modal-close", () => {
+      dispatchOverlay("close", `${key}-modal`);
+    });
+    window.addEventListener("ui-overlay-close", (event) => {
+      if (event.detail && event.detail.id === `${key}-drawer`) {
+        const drawer = document.querySelector('[data-ui-core="drawer"].it-notes-entry-mode');
+        if (drawer) drawer.classList.remove("it-notes-entry-mode");
+      }
+    });
+  }
+
   document.body.addEventListener("htmx:afterRequest", (event) => {
-    if (event.detail.target && event.detail.target.matches(workspaceSelector)) {
+    if (requestTargets(event, workspaceSelector)) {
       setBusy(false);
     }
   });
 
   document.body.addEventListener("htmx:afterSwap", (event) => {
     const target = event.detail.target;
+    openRequestedOverlay(event);
+    syncItNotesDrawerMode(target);
     if (!target || !target.matches(workspaceSelector)) return;
     setBusy(false);
     setActiveNavigation(sectionFrom(target));

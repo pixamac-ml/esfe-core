@@ -1,0 +1,5876 @@
+INVENTAIRE TECHNIQUE — DASHBOARD INFORMATICIEN (it_support)
+=============================================================
+
+Date : 15/08/2026
+Racine projet : C:\Users\HP\PycharmProjects\esfe-core
+
+But de ce fichier
+------------------
+Ce document recense les fichiers, URLs, vues, modèles, services, sélecteurs,
+fragments, composants et tests qui participent au périmètre du dashboard
+Informaticien. Il distingue le dashboard certifié actuellement utilisé des
+anciens endpoints encore présents pour compatibilité.
+
+1. POINT D'ENTRÉE ET ACCÈS
+--------------------------
+
+Position autorisée : `it_support`
+
+- `accounts/position_registry.py`
+  - PositionDefinition `it_support`.
+  - URL de destination enregistrée : `accounts_portal:portal_it_v2`.
+  - Important : cette URL V2 redirige maintenant vers le dashboard certifié.
+
+- `portal/views/views.py`
+  - `portal_dashboard(request)` : route générale des dashboards.
+  - Si la position est `it_support`, appelle `_render_it_dashboard(request)`.
+  - `_render_it_dashboard(...)` : construit la navigation IT, le contexte et
+    rend `portal/informaticien/dashboard.html` dans le shell certifié.
+  - `_build_it_dashboard_context(request)` : délègue à
+    `portal.services.it_dashboard_service.build_it_dashboard_context`.
+  - Anciennes vues de support/comptes : `it_portal`, `it_toggle_account`,
+    `it_reset_password`, `it_suspend_account`, `it_reactivate_account`,
+    `it_unblock_account`, `it_update_account_email`, `it_diagnostics_panel`,
+    `it_accounts_panel`, `it_support_panel`, `it_create_ticket`,
+    `it_assign_ticket`, `it_update_ticket_status`, `it_comment_ticket`.
+
+- `portal/views/it_dashboard_v2.py`
+  - `it_portal_v2(request)` : compatibilité historique ; redirige vers
+    `accounts_portal:portal_dashboard`.
+
+- `accounts/access.py`
+  - `get_user_position()` / `get_user_scope()` : décision d'accès globale.
+
+- `accounts/dashboards/helpers.py`
+  - `get_user_branch(user)` : annexe du compte connecté.
+
+Règle impérative : toutes les lectures et écritures IT doivent rester filtrées
+par l'annexe (`branch` / `annexe`) de l'informaticien connecté.
+
+2. PRÉFIXE URL ET ROUTES
+------------------------
+
+Le projet inclut `portal.urls` sous le préfixe `/portal/` :
+
+- Montage : `config/urls.py` -> `path("portal/", include(...portal.urls...))`
+- Fichier de routes : `portal/urls.py`
+- Namespace Django : `accounts_portal`
+
+2.1 Entrées principales
+
+| URL complète | Name Django | Vue | Rôle |
+|---|---|---|---|
+| `/portal/dashboard/` | `portal_dashboard` | `portal.views.views.portal_dashboard` | Entrée officielle selon la position |
+| `/portal/it/` | `portal_it` | `portal.views.views.it_portal` | Ancienne entrée IT |
+| `/portal/it/v2/` | `portal_it_v2` | `portal.views.it_dashboard_v2.it_portal_v2` | Alias historique -> redirection dashboard officiel |
+
+2.2 Workspaces certifiés (navigation principale)
+
+| URL complète | Name Django | Vue | Template/fragment principal |
+|---|---|---|---|
+| `/portal/it/workflows/home/` | `it_home_workspace` | `it_home_workspace` | `workflows/home_workspace.html` |
+| `/portal/it/workflows/notes/` | `it_notes_flow_workspace` | `it_notes_flow_workspace` | `workflows/notes_workspace.html` ou drawer notes |
+| `/portal/it/workflows/structure/` | `it_structure_workspace` | `it_structure_workspace` | `workflows/structure_workspace.html` |
+| `/portal/it/workflows/import/` | `it_import_workspace` | `it_import_workspace` | `workflows/import_workspace.html` |
+| `/portal/it/workflows/archives/` | `it_archives_workspace` | `it_archives_workspace` | `workflows/archive_workspace.html` |
+| `/portal/it/workflows/cards/` | `it_cards_workspace` | `it_cards_workspace` | `workflows/cards_workspace.html` |
+| `/portal/it/workflows/accounts/` | `it_accounts_flow_workspace` | `it_accounts_flow_workspace` | `workflows/accounts_workspace.html` |
+| `/portal/it/workflows/support/` | `it_support_flow_workspace` | `it_support_flow_workspace` | `workflows/support_workspace.html` + `support_panel` |
+| `/portal/it/workflows/supervision/` | `it_supervision_workspace` | `it_supervision_workspace` | `workflows/supervision_workspace.html` + `supervision_panel` |
+| `/portal/it/workflows/audit/` | `it_audit_workspace` | `it_audit_workspace` | `workflows/audit_workspace.html` + `audit_log_table` |
+| `/portal/it/workflows/catalog/` | `it_catalog_workspace` | `it_catalog_workspace` | `workflows/catalog_workspace.html` |
+| `/portal/it/workflows/notifications/` | `it_notifications_workspace` | `it_notifications_workspace` | `workflows/notifications_workspace.html` |
+| `/portal/it/workflows/settings/` | `it_branch_settings_workspace` | `it_branch_settings_workspace` | `workflows/branch_settings_workspace.html` |
+| `/portal/it/workflows/me/` | `it_my_account_workspace` | `it_my_account_workspace` | `workflows/my_account_workspace.html` |
+
+2.3 Notes et résultats
+
+| URL complète | Name Django | Vue | Action |
+|---|---|---|---|
+| `/portal/it/workflows/notes/kpi/` | `it_notes_kpi` | `it_notes_kpi` | Indicateurs des notes |
+| `/portal/it/workflows/notes/section/` | `it_workflow_section` | `it_workflow_section` | Fragment de workflow notes |
+| `/portal/it/workflows/notes/decisions/` | `it_notes_decisions` | `it_notes_decisions` | Décisions annuelles officielles |
+| `/portal/it/workflows/notes/action/` | `it_notes_workflow_action` | `it_notes_workflow_action` | Publier, calculer, envoyer, rattrapage |
+| `/portal/it/workflows/notes/retake-modal/` | `it_notes_retake_modal` | `it_notes_retake_modal` | Modal de rattrapage |
+| `/portal/it/workflows/notes/load/` | `load_notes_workspace` | `load_notes_workspace` | Chargement espace notes |
+| `/portal/it/grades/grid/` | `it_notes_grid` | `it_notes_grid_view` | Grille de notes HTMX |
+| `/portal/it/grades/workspace/` | `it_notes_workspace` | `it_notes_workspace_view` | Workspace grille/maquette |
+| `/portal/admin/grades/save/` | `save_grade` | `save_grade` | Sauvegarde d'une note |
+| `/portal/admin/grades/save/confirm-otp/` | `save_grade_confirm_otp` | `save_grade_confirm_otp` | Confirmation OTP |
+| `/portal/admin/grades/<enrollment_id>/<semester_id>/` | `load_grades_table` | `load_grades_table` | Tableau d'un étudiant |
+| `/portal/admin/grades/<enrollment_id>/` | `load_student_results` | `load_student_results` | Résultats d'un étudiant |
+| `/portal/admin/grades/<enrollment_id>/<semester_id>/publish/` | `publish_semester` | `publish_semester_view` | Publication historique par étudiant |
+| `/portal/admin/grades/excel/<enrollment_id>/<semester_id>/` | `excel_grade_view` | `excel_grade_view` | Export Excel historique |
+| `/portal/it/grades/pdf/<class_id>/<semester_id>/` | `it_grade_sheet_pdf` | `class_grade_sheet_pdf_view` | PDF de notes classe |
+| `/portal/it/grades/print/<class_id>/<semester_id>/` | `it_grade_sheet_print` | `class_grade_sheet_print_view` | Impression notes classe |
+| `/portal/it/grades/import/` | `it_grades_import` | `it_grades_import_view` | Import via endpoints academics |
+
+2.4 Structure académique, import, archives et cartes
+
+| URL complète | Name Django | Vue | Action |
+|---|---|---|---|
+| `/portal/it/workflows/structure/drawer/` | `it_structure_drawer` | `it_structure_drawer` | Détail classe / UE / EC |
+| `/portal/it/workflows/structure/modal/` | `it_structure_modal` | `it_structure_modal` | Formulaire classe, UE, EC, affectation |
+| `/portal/it/workflows/structure/action/` | `it_structure_action` | `it_structure_action` | Création/modification/archivage/affectation |
+| `/portal/it/workflows/import/upload/` | `it_import_upload` | `it_import_upload` | Téléversement Excel notes |
+| `/portal/it/workflows/import/export-notes/` | `it_export_notes_excel` | `it_export_notes_excel` | Export Excel notes |
+| `/portal/it/workflows/archives/action/` | `it_archives_action` | `it_archives_action` | Archiver/restaurer |
+| `/portal/it/workflows/archives/<batch_id>/` | `it_archive_detail` | `it_archive_detail` | Détail lot archive |
+| `/portal/it/workflows/cards/class/pdf/` | `it_class_cards_pdf` | `it_class_cards_pdf` | PDF cartes d'une classe |
+| `/portal/it/workflows/cards/<student_id>/pdf/` | `it_student_card_pdf` | `it_student_card_pdf` | PDF carte individuelle |
+
+2.5 Support, comptes, référentiels, notifications et paramètres
+
+| URL complète | Name Django | Vue | Action |
+|---|---|---|---|
+| `/portal/it/workflows/accounts/action/` | `it_accounts_flow_action` | `it_accounts_flow_action` | Activer/désactiver/reset mot de passe |
+| `/portal/it/workflows/accounts/users/<user_id>/` | `it_user_modal` | `it_user_modal` | Lire/modifier utilisateur |
+| `/portal/it/workflows/accounts/users/<user_id>/save/` | `it_user_modal_save` | `it_user_modal_save` | Sauvegarder utilisateur |
+| `/portal/it/workflows/support/action/` | `it_support_flow_action` | `it_support_flow_action` | Créer/prendre/résoudre ticket |
+| `/portal/it/workflows/catalog/action/` | `it_catalog_action` | `it_catalog_action` | Créer langue/profession |
+| `/portal/it/workflows/notifications/action/` | `it_notifications_action` | `it_notifications_action` | Actions notifications |
+| `/portal/it/workflows/settings/save/` | `it_branch_settings_save` | `it_branch_settings_save` | Enregistrer paramètres annexe |
+| `/portal/it/workflows/me/save/` | `it_my_account_save` | `it_my_account_save` | Enregistrer mon compte |
+
+2.6 Surveillance et anciennes routes compatibles
+
+| URL complète | Name Django | Vue |
+|---|---|---|
+| `/portal/it/surveillance/workspace/` | `it_surveillance_workspace` | `it_surveillance_workspace_view` |
+| `/portal/it/surveillance/student-followup/<student_id>/` | `it_surveillance_student_followup` | `it_surveillance_student_followup_view` |
+| `/portal/surveillance/general/` | `surveillance_general_api` | `surveillance_general_api_view` (JSON) |
+| `/portal/it/panels/diagnostics/` | `it_diagnostics_panel` | ancienne vue diagnostics |
+| `/portal/it/panels/accounts/` | `it_accounts_panel` | ancienne vue comptes |
+| `/portal/it/panels/support/` | `it_support_panel` | ancienne vue support |
+| `/portal/it/actions/toggle-account/` | `it_toggle_account` | ancienne action compte |
+| `/portal/it/actions/reset-password/` | `it_reset_password` | ancienne action compte |
+| `/portal/it/actions/suspend-account/` | `it_suspend_account` | ancienne action compte |
+| `/portal/it/actions/reactivate-account/` | `it_reactivate_account` | ancienne action compte |
+| `/portal/it/actions/unblock-account/` | `it_unblock_account` | ancienne action compte |
+| `/portal/it/actions/update-email/` | `it_update_account_email` | ancienne action compte |
+| `/portal/it/actions/tickets/create/` | `it_create_ticket` | ancienne action ticket |
+| `/portal/it/actions/tickets/<ticket_id>/assign/` | `it_assign_ticket` | ancienne action ticket |
+| `/portal/it/actions/tickets/<ticket_id>/status/` | `it_update_ticket_status` | ancienne action ticket |
+| `/portal/it/actions/tickets/<ticket_id>/comment/` | `it_comment_ticket` | ancienne action ticket |
+
+3. VUES ET RESPONSABILITÉS
+--------------------------
+
+Fichier principal : `portal/views/it_workflows.py`
+
+- Contrôle : `_require_it_support(request)` exige position `it_support` et
+  annexe non nulle.
+- Rendu : `_render_it_section(...)` renvoie seulement le fragment en HTMX ;
+  en accès direct, reconstruit le dashboard complet via `_render_it_dashboard`.
+- Navigation : `_it_subnavigation(...)` construit les onglets secondaires.
+- Sélection notes/classes : `_resolve_workflow_selection(...)`.
+
+Fonctions vues dans ce fichier :
+
+- Notes : `it_notes_kpi`, `it_workflow_section`, `it_notes_decisions`,
+  `it_notes_flow_workspace`, `it_notes_workflow_action`,
+  `_build_retake_modal_context`, `load_notes_workspace`, `it_notes_retake_modal`.
+- Accueil/cartes : `it_home_workspace`, `it_cards_workspace`,
+  `it_student_card_pdf`, `it_class_cards_pdf`.
+- Support/audit : `it_support_flow_workspace`, `it_support_flow_action`,
+  `it_audit_workspace`.
+- Import/structure : `it_import_workspace`, `it_import_upload`,
+  `it_export_notes_excel`, `it_structure_workspace`, `it_structure_drawer`,
+  `it_structure_modal`, `it_structure_action`.
+- Archives/supervision/catalogue : `it_archives_workspace`,
+  `it_archives_action`, `it_archive_detail`, `it_supervision_workspace`,
+  `it_catalog_workspace`, `it_catalog_action`.
+- Comptes/réglages : `it_accounts_flow_workspace`, `it_accounts_flow_action`,
+  `it_user_modal`, `it_user_modal_save`, `it_branch_settings_workspace`,
+  `it_branch_settings_save`, `it_my_account_workspace`, `it_my_account_save`.
+- Notifications : `it_notifications_workspace`, `it_notifications_action`.
+
+Vues de grille de notes : `portal/views/admin_grades.py`
+
+- `admin_grade_dashboard`, `it_notes_grid_view`, `it_notes_workspace_view`.
+- `_build_notes_grid_context` : construction des colonnes/UE/EC.
+- `save_grade`, `save_grade_confirm_otp` : persistance et OTP.
+- `class_grade_sheet_pdf_view`, `class_grade_sheet_print_view`.
+- Ne pas déplacer ni réécrire le calcul de notes sans tests métier dédiés.
+
+Vues complémentaires :
+
+- `portal/views/it_grades_import.py` : import alternatif grades.
+- `portal/views/it_surveillance.py` : surveillance et suivi étudiant.
+- `portal/views/views.py` : entrée globale, shell et anciennes actions.
+
+4. MODÈLES CONCERNÉS
+--------------------
+
+Modèles directs (`portal/models.py`) :
+
+- `SupportAuditLog` : trace toutes les opérations IT ; possède `branch`,
+  `actor`, `target_user`, `action_type`, `target_label`, `details`, date.
+- `SupportTicket` : ticket d'annexe ; états `open`, `in_progress`, `resolved`,
+  `rejected`; priorités et catégories ; liens annexe, demandeur, étudiant,
+  inscription, assigné, créateur.
+- `SupportTicketComment` : commentaire d'un ticket.
+- `ArchiveBatch` : archive consultable/restaurable d'une classe ou année.
+- `AccountSupportState` : suspension, blocage, mot de passe à changer et
+  compteur d'échecs d'un compte.
+- `BranchITSettings` : seuil de validation, année active, configuration locale
+  de l'annexe.
+
+Modèles académiques consommés :
+
+- `academics.models.AcademicClass` : classe académique.
+- `academics.models.Semester` : semestre et état du workflow.
+- `academics.models.UE` / `EC` : unités et éléments constitutifs.
+- `academics.models.AcademicEnrollment` : inscription académique d'un étudiant.
+- `academics.models.ECGrade` : note normale/rattrapage/finale.
+- `students.models.Student` : fiche étudiant, carte, inscription.
+- Modèle utilisateur Django + `accounts.models.Profile` : rôle/position et
+  annexe du personnel.
+- `notifier.models.NotificationMessage` : notifications IT.
+
+5. SERVICES ET SÉLECTEURS
+-------------------------
+
+`portal/services/it_dashboard_service.py`
+- `build_it_dashboard_context` : KPIs, alertes, diagnostics, compteurs et
+  données d'accueil, déjà filtrés par annexe lorsqu'elle existe.
+
+`portal/services/informaticien_workflows.py`
+- Contextes : `build_home_context`, `build_support_context`,
+  `build_audit_context`, `build_import_context`, `build_supervision_context`,
+  `build_catalog_context`, `build_structure_context`.
+- Support : `create_branch_ticket`, `take_branch_ticket`,
+  `resolve_branch_ticket`.
+- Import : `import_notes_file`.
+- Référentiels : `create_catalog_item`.
+- Réglages : `get_branch_settings`, `update_branch_settings`.
+
+`portal/services/academic_structure_service.py`
+- `build_academic_structure_context`.
+- `save_academic_class`, `archive_academic_class`, `save_semester`, `save_ue`,
+  `save_ec`, `delete_ec`, `assign_student_to_class`.
+
+`portal/services/notes_workflow.py`
+- `NotesWorkflowState`, `RetakeCandidate`.
+- `get_retake_candidates`, `can_edit_retake_grade`, `get_notes_state`,
+  `get_available_actions`, `apply_notes_workflow_action`.
+
+`portal/services/it_support_service.py`
+- Filtrage : `get_scoped_staff_queryset`, `get_scoped_student_queryset`.
+- Recherche/diagnostic : `search_support_entities`, `build_diagnostic_payload`.
+- Sécurité : `create_temp_password`.
+- Journal : `log_support_action`, `get_recent_support_logs`.
+- Tickets : `get_support_ticket_queryset`, `get_support_ticket_metrics`,
+  `create_support_ticket`, `assign_support_ticket`,
+  `update_support_ticket_status`.
+
+`portal/services/archive_service.py`
+- `archive_batches_for_branch`, `archive_candidates_for_branch`,
+  `preview_archive`, `archive_class`, `archive_year`,
+  `restore_archive_batch`, `archive_detail`.
+
+`portal/services/it_surveillance_service.py`
+- `build_it_surveillance_payload`, `build_student_followup_payload`.
+
+`portal/selectors/informaticien.py`
+- `support_tickets_for_branch`, `audit_logs_for_branch`,
+  `academic_classes_for_branch`, `classes_without_notes_for_branch`,
+  `ecs_without_schedule_teacher_for_branch`,
+  `enrollments_without_grades_for_branch`, `grade_entries_for_class`.
+
+`portal/selectors/__init__.py` (fonctions importées par les vues IT)
+- `get_it_academic_classes`, `get_it_semesters_for_class`,
+  `get_it_students_for_class`.
+
+6. TEMPLATES IT DIRECTS
+-----------------------
+
+Shell et dashboard :
+
+- `templates/portal/informaticien/dashboard.html`
+  - Template IT principal.
+  - Étend `templates/portal/staff/director_dashboard.html`.
+  - Contient le workspace interne `#it-workspace`, le JavaScript `notesGrid()`
+    et des éléments hérités historiques à surveiller.
+- `templates/portal/staff/director_dashboard.html`
+  - Shell certifié commun : sidebar, topbar, workspace officiel, drawer,
+    modal et dialogue de confirmation UX Core.
+- `portal/services/certified_dashboard_shell.py`
+  - Contrat Python du shell certifié.
+
+Fragments de workflow (`templates/portal/informaticien/workflows/`) :
+
+- `home_workspace.html` : accueil IT.
+- `notes_workspace.html` : sélection classe/semestre, workflow notes.
+- `retake_modal.html` : modal de rattrapage.
+- `structure_workspace.html` : classes, maquettes, affectations.
+- `structure_modal.html` : formulaire classe/UE/EC/affectation.
+- `accounts_workspace.html` : recherche et actions sur comptes.
+- `user_modal.html` : modification d'un utilisateur.
+- `support_workspace.html` : en-tête et sous-navigation tickets.
+- `supervision_workspace.html` : supervision d'anomalies.
+- `audit_workspace.html` : journal d'audit.
+- `import_workspace.html` : import/export des notes.
+- `archive_workspace.html` : création/restauration d'archives.
+- `archive_detail.html` : détail d'un lot archive.
+- `cards_workspace.html` : génération de cartes étudiants.
+- `catalog_workspace.html` : langues/professions.
+- `notifications_workspace.html` : centre de notifications.
+- `branch_settings_workspace.html` : réglages locaux d'annexe.
+- `my_account_workspace.html` : compte de l'informaticien.
+
+Drawers (`templates/portal/informaticien/drawers/`) :
+
+- `notes_drawer.html` : détail d'un workflow notes.
+- `structure_drawer.html` : détail classe, semestres, UE et EC.
+
+Partials anciens / compatibilité (`templates/portal/informaticien/partials/`) :
+
+- `accounts_panel.html`
+- `diagnostics_panel.html`
+- `support_panel.html`
+- `notes_kpi.html`
+- `notes_decisions.html`
+- `notifications_dropdown_it.html`
+
+7. TEMPLATES DE LA GRILLE DE NOTES (PÉRIMÈTRE SENSIBLE)
+--------------------------------------------------------
+
+Chemin principal : `portal/templates/portal/admin/grades/`
+
+- `dashboard.html`
+- `excel_sheet.html`, `excel_table.html`
+- `partials/notes_maquette.html` : pont vers le composant partagé.
+- `partials/notes_grid.html`
+- `partials/student_row.html`, `student_result.html`
+- `partials/semester_selector.html`, `class_selector.html`
+- `partials/excel_row.html`, `grades_table.html`, `row_oob.html`
+- `partials/grade_otp_modal.html`
+
+Composant de grille partagé :
+
+- `ui/components/grades/maquette/maquette.py`
+  - Enregistre le composant `grades_maquette`.
+- `ui/templates/grades/maquette/maquette.html`
+  - HTML de la maquette de notes.
+- `ui/components/notes/ec_note_cell.py`
+- `ui/templates/notes/ec_note_cell.html`
+- `ui/components/notes/ec_note_cell_live.py`
+- `ui/templates/notes/ec_note_cell_live.html`
+
+IMPORTANT : la grille et ses calculs ne doivent pas être modifiés par une
+migration visuelle. Les calculs et règles restent dans `admin_grades.py`,
+`notes_workflow.py` et les services académiques appelés par ces vues.
+
+8. COMPOSANTS UX / UI CORE UTILISÉS OU DISPONIBLES
+--------------------------------------------------
+
+Composants IT déjà utilisés :
+
+- `ui/templates/informaticien/support_panel.html`
+- `ui/templates/informaticien/supervision_panel.html`
+- `ui/templates/informaticien/audit_log_table.html`
+- `ui/templates/informaticien/import_panel.html`
+- `ui/templates/informaticien/settings_panel.html`
+
+Composants UI Core concernés :
+
+- `ui_core.app_shell`, `ui_core.app_sidebar`, `ui_core.app_topbar`.
+- `ui_core.page_header`, `ui_core.panel`, `ui_core.stat_card`,
+  `ui_core.tabs`, `ui_core.alert`.
+- `ui_core.drawer`, `ui_core.modal`, `ui_core.confirm_dialog`.
+- Les implémentations sont sous `ui/components/ui_core/` et les templates sous
+  `ui/templates/ui_core/`.
+
+Composants académiques disponibles :
+
+- Dossier : `ui/components/academic/` et `ui/templates/academic/`.
+- Exemples : `academic_tabs`, `academic_drawer`, `academic_modal`,
+  `academic_table`, `academic_stat_card`, `academic_filter_bar`,
+  `academic_student_live_status`.
+
+Enregistrement des composants : `core/apps.py` (méthode `CoreConfig.ready()`).
+
+9. JAVASCRIPT ET CSS
+--------------------
+
+- `static/src/js/portal/certified_dashboard_shell.js`
+  - Gère navigation certifiée, état occupé, ouverture drawer/modal UX Core,
+    confirmation et événement de fermeture modal IT.
+- `static/src/js/ui_core/index.js`
+  - Initialisation UI Core.
+- `templates/portal/informaticien/dashboard.html`
+  - Contient encore des styles locaux et le script `notesGrid()`.
+- `static/src/css/input.css` -> `static/public/css/main.css`
+  - Pipeline Tailwind du projet.
+
+10. NAVIGATION ET OVERLAYS ACTUELS
+----------------------------------
+
+Navigation principale : construite dans `_render_it_dashboard` de
+`portal/views/views.py`, puis normalisée par
+`build_role_dashboard_shell` / `build_certified_navigation`.
+
+Groupes actuels :
+
+- Administration IT : Accueil, Supervision, Journal d'audit, Notifications.
+- Scolarité : Notes et résultats, Paramétrage académique, Import/export,
+  Archives, Cartes étudiants.
+- Support et accès : Utilisateurs, Support.
+- Référentiels et compte : Catalogue, Paramètres d'annexe, Mon compte.
+
+Sous-navigation actuellement déclarée :
+
+- Structure : Classes / Maquettes / Affectations.
+- Support : Tous / Ouverts / En cours / Résolus.
+
+IDs du shell officiel IT :
+
+- Workspace certifié : `#it-dashboard-workspace`.
+- Indicateur : `#it-dashboard-loading`.
+- Drawer officiel : `#it-dashboard-drawer` ; contenu
+  `#it-dashboard-drawer-content`.
+- Modal officielle : `#it-dashboard-modal` ; contenu
+  `#it-dashboard-modal-content`.
+
+Attention : le template `templates/portal/informaticien/dashboard.html` garde
+encore les anciens éléments internes `#it-workspace`, `#it-modal-root` et
+`#it-drawer-content` pour certains fragments historiques, notamment le bloc
+notes. Avant de les supprimer, il faut migrer les appels du workflow notes et
+valider toutes les actions de calcul/saisie/rattrapage.
+
+11. TESTS À CONNAÎTRE
+---------------------
+
+Fichier principal : `accounts/tests.py`, classe `PortalPhaseOneTests`.
+
+Tests IT notables :
+
+- `test_portal_dashboard_renders_it_dashboard_from_single_entry`
+- `test_it_v2_route_redirects_to_the_certified_dashboard`
+- `test_it_dashboard_keeps_notes_module_inside_dashboard`
+- `test_it_notes_workspace_returns_filters_only_before_selection`
+- `test_it_notes_grid_htmx_returns_shared_maquette`
+- `test_it_notes_decisions_uses_official_annual_decision`
+- `test_it_notes_workflow_publishes_normal_session_then_unlocks_retake_modal`
+- `test_it_notes_retake_edit_is_blocked_for_validated_subject`
+- `test_it_structure_workspace_renders_academic_configuration_module`
+- `test_it_structure_action_can_create_academic_class`
+- `test_it_structure_action_keeps_modal_open_on_validation_error`
+- `test_it_support_workspace_uses_certified_subnavigation`
+- Tests import, archives, comptes et filtrage d'annexe dans la même classe.
+
+Commandes recommandées :
+
+    python manage.py check --settings=config.settings_test_local
+    python manage.py test accounts.tests.PortalPhaseOneTests --settings=config.settings_test_local
+
+12. ORDRE DE LECTURE RECOMMANDÉ
+--------------------------------
+
+1. `portal/urls.py` : routes exactes.
+2. `portal/views/views.py` -> `_render_it_dashboard` : shell et navigation.
+3. `portal/views/it_workflows.py` : workspaces et actions métier.
+4. `templates/portal/informaticien/dashboard.html` : adaptation IT actuelle.
+5. `templates/portal/staff/director_dashboard.html` +
+   `portal/services/certified_dashboard_shell.py` : contrat officiel.
+6. `portal/views/admin_grades.py` + composants `grades_maquette` : grille.
+7. Services/sélecteurs/modèles listés ci-dessus.
+
+
+
+# MISSION — STABILISER ET UNIFORMISER DÉFINITIVEMENT LE DASHBOARD INFORMATICIEN
+
+Tu disposes maintenant de l’inventaire complet du dashboard **Informaticien / `it_support`**.
+
+Je ne veux plus une analyse supplémentaire du périmètre.
+
+Je veux maintenant que tu **travailles réellement sur le dashboard Informaticien et que tu le migres proprement vers le même standard que les dashboards déjà stabilisés du système.**
+
+Les dashboards suivants constituent la référence fonctionnelle et visuelle :
+
+* Directeur des Études ;
+* Surveillant ;
+* Gestionnaire ;
+* Enseignant ;
+* Secrétaire.
+
+Le **Directeur des Études reste la référence principale du shell et de l’architecture de navigation**, mais les contenus du dashboard Informaticien doivent naturellement être adaptés à son propre métier.
+
+---
+
+# 1. OBJECTIF GLOBAL
+
+Le dashboard Informaticien existe déjà.
+
+Ses :
+
+* vues ;
+* URLs ;
+* services ;
+* sélecteurs ;
+* modèles ;
+* workflows ;
+* composants ;
+* fragments HTMX ;
+* traitements métier ;
+* imports ;
+* exports ;
+* notes ;
+* support ;
+* comptes ;
+* audit ;
+* archives ;
+* paramètres ;
+
+existent déjà.
+
+La mission n’est donc PAS de reconstruire son backend.
+
+La mission est :
+
+```text
+BACKEND EXISTANT
+        ↓
+WORKFLOWS EXISTANTS
+        ↓
+FRAGMENTS EXISTANTS
+        ↓
+COMPOSANTS UI CORE / DJANGO COMPONENTS EXISTANTS
+        ↓
+DASHBOARD INFORMATICIEN UNIFORMISÉ
+```
+
+Je veux que le dashboard Informaticien ressemble à un véritable membre de la même famille d’interfaces que les autres dashboards stabilisés.
+
+---
+
+# 2. PRINCIPE ABSOLU
+
+Ne fais plus :
+
+```text
+ancien HTML
++
+quelques classes Tailwind
++
+quelques fragments
+=
+nouveau dashboard
+```
+
+Ce n’est PAS l’objectif.
+
+Je veux :
+
+```text
+données métier existantes
++
+vues existantes
++
+HTMX existant
++
+composants Django existants
++
+UI Core
++
+shell certifié
+=
+dashboard Informaticien final
+```
+
+Les templates métier doivent devenir des **consommateurs de composants**, pas une nouvelle bibliothèque UI parallèle.
+
+---
+
+# 3. RÉFÉRENCE PRINCIPALE
+
+Commence obligatoirement par analyser l’implémentation stabilisée du :
+
+```text
+templates/portal/staff/director_dashboard.html
+```
+
+et son intégration avec :
+
+```text
+portal/services/certified_dashboard_shell.py
+```
+
+ainsi que :
+
+```text
+ui_core.app_shell
+ui_core.app_sidebar
+ui_core.app_topbar
+```
+
+Je veux que tu comprennes comment le Directeur des Études utilise :
+
+* le shell ;
+* la sidebar ;
+* la topbar ;
+* le workspace ;
+* les fragments HTMX ;
+* les drawers ;
+* les modals ;
+* les confirmations ;
+* les headers ;
+* les panels ;
+* les cartes ;
+* les tabs ;
+* les filtres ;
+* les tableaux.
+
+Ensuite, applique **la même philosophie d’architecture** au dashboard Informaticien.
+
+Ne copie pas son contenu métier.
+
+Copie son **système d’interface et d’orchestration**.
+
+---
+
+# 4. SHELL INFORMATICIEN
+
+Le dashboard Informaticien possède déjà :
+
+```text
+templates/portal/informaticien/dashboard.html
+```
+
+qui étend :
+
+```text
+templates/portal/staff/director_dashboard.html
+```
+
+Très bien.
+
+Il ne faut donc surtout pas recréer un autre shell.
+
+Je veux que tu transformes ce template en une adaptation propre et minimale du shell certifié.
+
+Il doit essentiellement fournir :
+
+* les informations spécifiques à l’Informaticien ;
+* son workspace ;
+* ses éventuels hooks nécessaires ;
+* les comportements spécifiques qui ne peuvent pas être mutualisés.
+
+Il ne doit plus contenir inutilement :
+
+* une deuxième architecture de layout ;
+* une deuxième modal ;
+* un deuxième drawer ;
+* un deuxième système de workspace ;
+* des styles locaux redondants ;
+* des comportements déjà fournis par UI Core.
+
+---
+
+# 5. PROBLÈME ACTUEL DES ANCIENS ÉLÉMENTS
+
+L’inventaire indique que le dashboard conserve encore :
+
+```text
+#it-workspace
+#it-modal-root
+#it-drawer-content
+```
+
+alors que le shell officiel utilise maintenant :
+
+```text
+#it-dashboard-workspace
+#it-dashboard-loading
+
+#it-dashboard-drawer
+#it-dashboard-drawer-content
+
+#it-dashboard-modal
+#it-dashboard-modal-content
+```
+
+Cela signifie qu’il existe encore une architecture hybride.
+
+Je veux que tu traites ce problème.
+
+## Règle
+
+Ne supprime PAS brutalement les anciens éléments.
+
+Procède workflow par workflow.
+
+Pour chaque ancien élément :
+
+1. identifier qui l’utilise ;
+2. identifier pourquoi ;
+3. migrer son appel vers le shell officiel ;
+4. tester ;
+5. seulement ensuite supprimer l’élément historique s’il n’est plus utilisé.
+
+Priorité particulière au workflow Notes.
+
+---
+
+# 6. WORKSPACES À MIGRER / STABILISER
+
+Traite chaque workspace existant.
+
+## Administration IT
+
+### Accueil
+
+```text
+home_workspace.html
+```
+
+Utiliser selon le besoin :
+
+```text
+ui_core.page_header
+ui_core.stat_card
+ui_core.panel
+ui_core.alert
+```
+
+Je veux un vrai dashboard d’accueil Informaticien.
+
+Pas une accumulation de `<div>`.
+
+---
+
+### Supervision
+
+```text
+supervision_workspace.html
+```
+
+Le composant existant :
+
+```text
+ui/templates/informaticien/supervision_panel.html
+```
+
+doit être correctement exploité.
+
+Ne duplique pas son contenu dans le workspace.
+
+Le workspace orchestre.
+
+Le composant affiche.
+
+---
+
+### Journal d’audit
+
+```text
+audit_workspace.html
+```
+
+Utilise le composant existant :
+
+```text
+ui/templates/informaticien/audit_log_table.html
+```
+
+avec les composants UI Core appropriés autour.
+
+---
+
+### Notifications
+
+```text
+notifications_workspace.html
+```
+
+Doit être intégré au standard du centre de notifications du dashboard.
+
+Ne crée pas une interface totalement différente des autres rôles si un pattern existe déjà.
+
+---
+
+# 7. NOTES ET RÉSULTATS — ZONE TRÈS SENSIBLE
+
+Le module Notes existe déjà et fonctionne.
+
+Il contient notamment :
+
+```text
+portal/views/admin_grades.py
+portal/services/notes_workflow.py
+ui/components/grades/maquette/maquette.py
+ui/templates/grades/maquette/maquette.html
+```
+
+ainsi que :
+
+```text
+ec_note_cell
+ec_note_cell_live
+```
+
+## INTERDICTION
+
+Tu ne dois PAS réécrire :
+
+* les calculs de notes ;
+* les règles LMD ;
+* le workflow normal/rattrapage ;
+* l’OTP ;
+* la validation ;
+* la publication ;
+* la persistance.
+
+La grille de notes est un composant partagé.
+
+Donc si son apparence doit être améliorée :
+
+```text
+NE PAS recréer une grille Informaticien.
+```
+
+Corrige ou adapte **le composant partagé lui-même** lorsque cela est réellement nécessaire.
+
+Mais préserve absolument :
+
+* ses interfaces ;
+* ses contextes ;
+* ses attributs HTMX ;
+* ses noms de champs ;
+* ses endpoints ;
+* sa logique métier.
+
+---
+
+# 8. REDESIGN DE LA GRILLE DE NOTES
+
+Je veux néanmoins que tu examines attentivement la grille.
+
+Elle doit être visuellement cohérente avec les nouveaux dashboards.
+
+Donc :
+
+* meilleur conteneur ;
+* header propre ;
+* barre de filtres claire ;
+* alignement correct ;
+* zones scrollables correctement ;
+* responsive ;
+* densité professionnelle ;
+* états des notes visibles ;
+* actions bien placées ;
+* pas de débordement horizontal global du dashboard.
+
+Si la grille est large :
+
+```text
+overflow-x-auto
+```
+
+doit être localisé dans son conteneur.
+
+Le dashboard entier ne doit jamais devenir horizontalement scrollable à cause de la grille.
+
+---
+
+# 9. PARAMÉTRAGE ACADÉMIQUE
+
+Workspace :
+
+```text
+structure_workspace.html
+```
+
+Sous-navigation :
+
+```text
+Classes
+Maquettes
+Affectations
+```
+
+Utilise au maximum les composants académiques déjà disponibles :
+
+```text
+academic_tabs
+academic_drawer
+academic_modal
+academic_table
+academic_stat_card
+academic_filter_bar
+academic_student_live_status
+```
+
+Avant de créer une nouvelle structure HTML, cherche si un composant existant répond déjà au besoin.
+
+---
+
+# 10. DRAWER STRUCTURE
+
+Existe :
+
+```text
+structure_drawer.html
+```
+
+Je veux qu’il utilise le drawer officiel :
+
+```text
+ui_core.drawer
+```
+
+et la racine :
+
+```text
+#it-dashboard-drawer-content
+```
+
+Pas une deuxième infrastructure parallèle.
+
+---
+
+# 11. MODALS STRUCTURE / UTILISATEUR / RATTRAPAGE
+
+Templates concernés :
+
+```text
+structure_modal.html
+user_modal.html
+retake_modal.html
+```
+
+Ils doivent être affichés dans la modal officielle :
+
+```text
+ui_core.modal
+```
+
+avec :
+
+```text
+#it-dashboard-modal
+#it-dashboard-modal-content
+```
+
+Les erreurs de validation serveur doivent continuer à fonctionner.
+
+HTMX doit pouvoir remplacer le contenu de la modal sans fermer la modal lorsqu’une erreur existe.
+
+---
+
+# 12. IMPORT / EXPORT
+
+Workspace :
+
+```text
+import_workspace.html
+```
+
+Composant existant :
+
+```text
+ui/templates/informaticien/import_panel.html
+```
+
+Utilise le composant existant.
+
+Le workspace doit surtout assurer :
+
+* page header ;
+* contexte ;
+* sections ;
+* actions secondaires ;
+* intégration UX.
+
+Ne réimplémente pas le formulaire d’import ailleurs.
+
+---
+
+# 13. ARCHIVES
+
+Templates :
+
+```text
+archive_workspace.html
+archive_detail.html
+```
+
+Les actions métier existent déjà :
+
+```text
+archive
+restore
+preview
+detail
+```
+
+Conserve intégralement leur logique.
+
+Adapte seulement la présentation.
+
+Utilise :
+
+```text
+ui_core.panel
+ui_core.alert
+ui_core.drawer
+ui_core.modal
+ui_core.confirm_dialog
+```
+
+lorsque pertinent.
+
+Toute action destructive ou sensible doit passer par le système officiel de confirmation.
+
+---
+
+# 14. CARTES ÉTUDIANTS
+
+Workspace :
+
+```text
+cards_workspace.html
+```
+
+Conserve :
+
+* génération individuelle ;
+* génération par classe ;
+* PDF.
+
+Mais donne au workspace une vraie hiérarchie visuelle.
+
+Par exemple :
+
+```text
+page_header
+↓
+filtres / sélection
+↓
+panel principal
+↓
+résultats / étudiants
+↓
+actions PDF
+```
+
+Réutilise les composants existants.
+
+---
+
+# 15. UTILISATEURS / COMPTES
+
+Workspace :
+
+```text
+accounts_workspace.html
+```
+
+Modal :
+
+```text
+user_modal.html
+```
+
+Actions :
+
+* activer ;
+* désactiver ;
+* reset mot de passe ;
+* modification utilisateur.
+
+Je veux une interface professionnelle de gestion de comptes.
+
+Mais surtout :
+
+```text
+NE PAS modifier la portée d’accès.
+```
+
+Toutes les données doivent rester filtrées sur l’annexe de l’informaticien.
+
+Ne touche pas à cette règle métier.
+
+---
+
+# 16. SUPPORT
+
+Workspace :
+
+```text
+support_workspace.html
+```
+
+Composant :
+
+```text
+ui/templates/informaticien/support_panel.html
+```
+
+Sous-navigation :
+
+```text
+Tous
+Ouverts
+En cours
+Résolus
+```
+
+Utilise le système officiel :
+
+```text
+ui_core.tabs
+```
+
+ou le composant utilisé par les dashboards stabilisés pour la sous-navigation.
+
+Pas de tabs faits manuellement si un composant existe.
+
+---
+
+# 17. CATALOGUE / RÉFÉRENTIELS
+
+Workspace :
+
+```text
+catalog_workspace.html
+```
+
+Les créations de :
+
+* langues ;
+* professions ;
+
+existent déjà.
+
+Adapte leur interface au design system.
+
+Formulaires et listes doivent utiliser les composants existants autant que possible.
+
+---
+
+# 18. PARAMÈTRES D’ANNEXE
+
+Workspace :
+
+```text
+branch_settings_workspace.html
+```
+
+Composant existant :
+
+```text
+ui/templates/informaticien/settings_panel.html
+```
+
+Réutilise-le.
+
+Ne recrée pas un nouveau formulaire parallèle.
+
+---
+
+# 19. MON COMPTE
+
+Workspace :
+
+```text
+my_account_workspace.html
+```
+
+Je veux qu’il adopte exactement le même principe que les sections compte/profil déjà stabilisées dans les autres dashboards.
+
+Si des composants communs existent pour :
+
+* avatar ;
+* informations personnelles ;
+* modification profil ;
+* mot de passe ;
+* sécurité ;
+
+réutilise-les.
+
+---
+
+# 20. NAVIGATION PRINCIPALE
+
+La navigation Informaticien officielle est :
+
+## Administration IT
+
+* Accueil
+* Supervision
+* Journal d’audit
+* Notifications
+
+## Scolarité
+
+* Notes et résultats
+* Paramétrage académique
+* Import / export
+* Archives
+* Cartes étudiants
+
+## Support et accès
+
+* Utilisateurs
+* Support
+
+## Référentiels et compte
+
+* Catalogue
+* Paramètres d’annexe
+* Mon compte
+
+Je veux cette navigation dans le **même composant sidebar utilisé par le shell certifié**.
+
+N’invente pas une sidebar spécifique Informaticien.
+
+---
+
+# 21. RÔLE DES WORKSPACES
+
+Chaque fichier :
+
+```text
+*_workspace.html
+```
+
+doit devenir une **composition de composants**.
+
+Le workspace ne doit pas contenir 300 lignes de HTML répétitif si des composants existent.
+
+Architecture souhaitée :
+
+```text
+workspace
+├── page_header component
+├── éventuellement stat_cards
+├── tabs/filter components
+├── métier component
+├── drawer trigger
+└── modal trigger
+```
+
+Pas :
+
+```text
+workspace
+├── énorme HTML custom
+├── styles inline
+├── boutons recréés
+├── tables recréées
+├── modal custom
+└── JS custom
+```
+
+---
+
+# 22. DJANGO COMPONENTS / UI CORE
+
+Avant de coder quelque chose, vérifie systématiquement :
+
+```text
+ui/components/ui_core/
+ui/templates/ui_core/
+
+ui/components/academic/
+ui/templates/academic/
+
+ui/components/grades/
+ui/templates/grades/
+
+ui/components/notes/
+ui/templates/notes/
+
+ui/templates/informaticien/
+```
+
+Je veux réellement utiliser la bibliothèque qui a été créée.
+
+Elle ne doit pas exister uniquement dans le projet sans être consommée par les dashboards.
+
+---
+
+# 23. COMPOSANTS UI CORE PRIORITAIRES
+
+Réutilise lorsque pertinent :
+
+```text
+ui_core.app_shell
+ui_core.app_sidebar
+ui_core.app_topbar
+
+ui_core.page_header
+ui_core.panel
+ui_core.stat_card
+ui_core.tabs
+ui_core.alert
+
+ui_core.drawer
+ui_core.modal
+ui_core.confirm_dialog
+```
+
+Si le dashboard Directeur des Études possède déjà un pattern précis avec ces composants, suis ce pattern.
+
+---
+
+# 24. NE PAS TOUCHER AU BACKEND SANS RAISON
+
+Cette mission est principalement :
+
+```text
+UI
++
+UX
++
+templates
++
+composition de composants
++
+HTMX
++
+shell
+```
+
+Ne pars pas dans une refonte :
+
+* des modèles ;
+* des services ;
+* des sélecteurs ;
+* des calculs ;
+* des permissions ;
+* des règles métier.
+
+Si un backend fonctionne déjà, conserve-le.
+
+Une modification backend est autorisée uniquement si elle est nécessaire pour alimenter correctement un composant existant.
+
+Dans ce cas, elle doit rester minimale.
+
+---
+
+# 25. HTMX
+
+Le dashboard doit continuer à fonctionner sans reload complet pour sa navigation interne lorsque c’est le comportement prévu par le shell.
+
+Le pattern est :
+
+```text
+clic sidebar
+→ requête HTMX
+→ workspace correspondant
+→ remplacement #it-dashboard-workspace
+```
+
+Les drawers :
+
+```text
+requête HTMX
+→ #it-dashboard-drawer-content
+→ ouverture drawer officielle
+```
+
+Les modals :
+
+```text
+requête HTMX
+→ #it-dashboard-modal-content
+→ ouverture modal officielle
+```
+
+Les erreurs de formulaire doivent rester dans l’overlay.
+
+---
+
+# 26. JAVASCRIPT
+
+Le shell officiel utilise :
+
+```text
+static/src/js/portal/certified_dashboard_shell.js
+```
+
+et :
+
+```text
+static/src/js/ui_core/index.js
+```
+
+Je veux que ces scripts deviennent la référence.
+
+Il reste actuellement :
+
+```text
+notesGrid()
+```
+
+et certains comportements historiques dans :
+
+```text
+templates/portal/informaticien/dashboard.html
+```
+
+Analyse-les.
+
+Ne supprime rien tant que tu n’as pas déterminé ce qui est encore nécessaire.
+
+Mais migre progressivement ce qui peut être géré par l’infrastructure officielle.
+
+Objectif final :
+
+```text
+minimum de JavaScript spécifique au template Informaticien.
+```
+
+---
+
+# 27. CSS
+
+Même principe.
+
+Je veux supprimer progressivement les styles locaux inutiles présents dans :
+
+```text
+templates/portal/informaticien/dashboard.html
+```
+
+si UI Core / Tailwind fournit déjà le comportement.
+
+Ne casse rien.
+
+Mais ne laisse pas une deuxième charte visuelle interne au dashboard Informaticien.
+
+---
+
+# 28. RESPONSIVE
+
+Toutes les sections doivent fonctionner en :
+
+```text
+1920×1080
+1600×900
+1366×768
+1280×720
+tablette
+mobile
+```
+
+Attention particulièrement à :
+
+* grille de notes ;
+* tables ;
+* cartes statistiques ;
+* filtres ;
+* toolbar ;
+* tabs ;
+* modals ;
+* drawers.
+
+Aucun workspace ne doit casser le shell.
+
+---
+
+# 29. DENSITÉ VISUELLE
+
+Je veux le même niveau de finition que le Gestionnaire et le Directeur des Études.
+
+Évite :
+
+* cartes gigantesques ;
+* espaces verticaux inutiles ;
+* headers énormes ;
+* boutons dispersés ;
+* tableaux trop hauts ;
+* répétition d’informations ;
+* empilement interminable.
+
+Le dashboard doit rester dense, lisible et professionnel.
+
+---
+
+# 30. NE PAS CHERCHER À TOUT FAIRE TENIR DANS 100VH
+
+Une section peut être longue.
+
+C’est normal.
+
+Mais :
+
+* le shell doit rester stable ;
+* la sidebar doit rester stable ;
+* la topbar doit rester stable ;
+* les composants doivent rester alignés.
+
+Ne réduis pas artificiellement la hauteur des données.
+
+---
+
+# 31. AUCUNE DONNÉE HORS ANNEXE
+
+Règle métier fondamentale :
+
+```text
+Informaticien = périmètre de son annexe.
+```
+
+Ne transforme jamais une requête locale en queryset global lors de la migration UI.
+
+Préserve :
+
+```text
+branch
+annexe
+get_user_branch()
+selectors scoped
+services scoped
+```
+
+Toutes les opérations :
+
+* comptes ;
+* tickets ;
+* étudiants ;
+* classes ;
+* notes ;
+* logs ;
+* archives ;
+
+restent liées à l’annexe autorisée.
+
+---
+
+# 32. ORDRE DE TRAVAIL OBLIGATOIRE
+
+Ne modifie pas tout simultanément.
+
+Procède dans cet ordre.
+
+## Phase 1 — Shell
+
+Stabiliser :
+
+```text
+dashboard.html
+shell
+sidebar
+topbar
+workspace officiel
+drawer officiel
+modal officielle
+confirm_dialog
+```
+
+## Phase 2 — Accueil
+
+Migrer :
+
+```text
+home_workspace
+```
+
+## Phase 3 — Notes
+
+Migrer proprement :
+
+```text
+notes_workspace
+grille
+drawer
+rattrapage
+OTP
+```
+
+sans toucher aux calculs.
+
+## Phase 4 — Structure académique
+
+```text
+structure_workspace
+structure_drawer
+structure_modal
+```
+
+## Phase 5 — Import / Archives / Cartes
+
+```text
+import
+archives
+cards
+```
+
+## Phase 6 — Utilisateurs / Support
+
+```text
+accounts
+user_modal
+support
+```
+
+## Phase 7 — Supervision / Audit / Notifications
+
+## Phase 8 — Catalogue / Paramètres / Mon compte
+
+## Phase 9 — Nettoyage historique
+
+Seulement après tests :
+
+* supprimer éléments inutilisés ;
+* supprimer styles locaux inutiles ;
+* supprimer anciens wrappers inutilisés ;
+* supprimer JS mort.
+
+---
+
+# 33. TESTER APRÈS CHAQUE PHASE
+
+Ne fais pas une migration gigantesque puis seulement les tests.
+
+Après chaque famille :
+
+```bash
+python manage.py check --settings=config.settings_test_local
+```
+
+Puis tests ciblés.
+
+À la fin :
+
+```bash
+python manage.py test accounts.tests.PortalPhaseOneTests --settings=config.settings_test_local
+```
+
+---
+
+# 34. TESTS IT À PRÉSERVER
+
+Tu dois notamment préserver :
+
+```text
+test_portal_dashboard_renders_it_dashboard_from_single_entry
+test_it_v2_route_redirects_to_the_certified_dashboard
+test_it_dashboard_keeps_notes_module_inside_dashboard
+test_it_notes_workspace_returns_filters_only_before_selection
+test_it_notes_grid_htmx_returns_shared_maquette
+test_it_notes_decisions_uses_official_annual_decision
+test_it_notes_workflow_publishes_normal_session_then_unlocks_retake_modal
+test_it_notes_retake_edit_is_blocked_for_validated_subject
+test_it_structure_workspace_renders_academic_configuration_module
+test_it_structure_action_can_create_academic_class
+test_it_structure_action_keeps_modal_open_on_validation_error
+test_it_support_workspace_uses_certified_subnavigation
+```
+
+Plus les tests :
+
+* import ;
+* archives ;
+* comptes ;
+* filtrage annexe.
+
+---
+
+# 35. INTERDICTIONS FORMELLES
+
+Ne fais PAS :
+
+* un nouveau dashboard Informaticien ;
+* un nouveau shell ;
+* une nouvelle sidebar ;
+* une nouvelle topbar ;
+* une nouvelle grille de notes ;
+* un nouveau système modal ;
+* un nouveau drawer ;
+* une nouvelle bibliothèque CSS ;
+* un deuxième système de navigation ;
+* du copier-coller massif du Directeur des Études ;
+* la réécriture du backend métier ;
+* la suppression aveugle des anciens fragments ;
+* des données fictives pour donner l’impression que l’UI fonctionne ;
+* des boutons décoratifs sans actions ;
+* des workspaces statiques qui ignorent les vraies données Django.
+
+---
+
+# 36. CE QUE SIGNIFIE « ADAPTER COMME LE DIRECTEUR DES ÉTUDES »
+
+Cela ne veut PAS dire :
+
+```text
+copier le dashboard DE
+et changer les textes
+```
+
+Cela signifie :
+
+```text
+même shell
++
+même design system
++
+mêmes composants fondamentaux
++
+même UX
++
+même comportement navigation
++
+même système drawer/modal
++
+même niveau de finition
++
+contenu métier propre à l’Informaticien
+```
+
+C’est exactement ce qui a déjà été fait pour les autres rôles.
+
+---
+
+# 37. UTILISER LES COMPOSANTS RÉELLEMENT
+
+Si tu trouves ceci :
+
+```text
+ui_core.panel
+```
+
+n’écris pas toi-même une card générique équivalente.
+
+Si tu trouves :
+
+```text
+academic_table
+```
+
+ne recrée pas une deuxième table académique.
+
+Si tu trouves :
+
+```text
+grades_maquette
+```
+
+ne recrée pas la grille.
+
+Si tu trouves :
+
+```text
+support_panel
+```
+
+ne réécris pas son contenu directement dans le workspace.
+
+Si tu trouves :
+
+```text
+audit_log_table
+```
+
+utilise-le.
+
+Le but de la bibliothèque de composants est précisément d’éviter cette duplication.
+
+---
+
+# 38. SI UN COMPOSANT N’EST PAS SUFFISANT
+
+Tu peux améliorer le composant existant.
+
+Mais avant :
+
+1. identifier ses consommateurs ;
+2. préserver son API ;
+3. vérifier qu’une modification ne casse pas les autres dashboards ;
+4. rendre l’amélioration générique lorsque possible.
+
+Ne crée un nouveau composant que lorsqu’aucun composant existant ne correspond réellement au besoin.
+
+---
+
+# 39. RÉSULTAT FINAL ATTENDU
+
+À la fin, lorsque je me connecte en Informaticien :
+
+```text
+/portal/dashboard/
+```
+
+je veux entrer dans un dashboard totalement cohérent avec les autres rôles.
+
+Je dois pouvoir naviguer :
+
+```text
+Accueil
+Supervision
+Journal d’audit
+Notifications
+
+Notes et résultats
+Paramétrage académique
+Import / export
+Archives
+Cartes étudiants
+
+Utilisateurs
+Support
+
+Catalogue
+Paramètres d’annexe
+Mon compte
+```
+
+et avoir l’impression d’utiliser **une seule application**, pas 14 pages développées séparément.
+
+---
+
+# 40. RAPPORT FINAL
+
+À la fin de la mission, donne-moi :
+
+```text
+DASHBOARD INFORMATICIEN — RAPPORT DE STABILISATION
+
+1. Shell
+2. Navigation
+3. Workspaces migrés
+4. Composants UI Core utilisés
+5. Composants académiques utilisés
+6. Composants Informaticien utilisés
+7. Grille de notes
+8. Drawers
+9. Modals
+10. HTMX
+11. JavaScript spécifique restant
+12. Styles locaux restant
+13. Éléments historiques supprimés
+14. Éléments historiques conservés et justification
+15. Backend modifié éventuellement
+16. Tests exécutés
+17. Tests PASS / FAIL
+18. Responsive vérifié
+19. Points restant éventuellement à traiter
+```
+
+Et seulement lorsque tout est réellement fonctionnel :
+
+```text
+DASHBOARD INFORMATICIEN : STABILISÉ
+```
+
+---
+
+# RÈGLE FINALE
+
+Tu as maintenant l’inventaire complet.
+
+Ne me refais pas un audit général.
+
+Ne me propose pas une nouvelle architecture.
+
+Ne reconstruis pas le dashboard.
+
+**Prends ce qui existe, branche correctement les composants déjà construits, uniformise les fragments, migre les overlays historiques vers le shell certifié, conserve la logique métier et transforme le dashboard Informaticien en dashboard professionnel cohérent avec le reste du système.**
+
+Commence directement par l’analyse comparative :
+
+```text
+Director Dashboard stabilisé
+VS
+Informaticien Dashboard actuel
+```
+
+puis attaque la Phase 1 immédiatement.
+
+---
+
+# 41. MODE SAISIE CONCENTRÉE — DÉCISION À PRENDRE
+
+## Proposition retenue pour essai
+
+Ne pas modifier globalement le composant Drawer, car il est utilisé par les
+autres dashboards.
+
+Utiliser le drawer certifié existant, mais le faire passer en plein écran
+uniquement lorsqu'il contient la saisie des notes de l'Informaticien.
+
+Conséquences attendues :
+
+* la grille prend tout l'écran ;
+* les drawers Structure, Utilisateurs, Notifications et autres restent à leur
+  largeur normale ;
+* aucun second système de drawer n'est créé ;
+* aucun calcul, endpoint ou règle de note n'est modifié.
+
+## Contenu recommandé du plein écran Notes
+
+Conserver seulement :
+
+* une barre compacte avec classe, semestre et statut de session ;
+* Retour et Fermer ;
+* les retours de sauvegarde et erreurs ;
+* la grille, avec son scroll local horizontal et vertical ;
+* la toolbar métier existante.
+
+Retirer de cette vue :
+
+* les grandes cartes de statistiques ;
+* la frise de workflow ;
+* les explications répétées ;
+* les panneaux de résumé qui ne servent pas à saisir une note.
+
+Le flux devient :
+
+    Notes -> choix classe / semestre -> workflow -> Ouvrir la saisie
+    -> drawer plein écran centré sur la grille.
+
+## Boutons et actions de la grille
+
+Les actions doivent rester dans une barre d'outils compacte au-dessus de la
+grille, alignée à droite et toujours accessible :
+
+* changement de session Normale / Rattrapage ;
+* PDF A4 / PDF A3 ;
+* impression A4 / A3 ;
+* téléchargement et import Excel ;
+* exports et relevés quand les permissions du workflow les autorisent.
+
+Les actions secondaires pourront ensuite être regroupées dans un menu "..."
+si la barre devient trop dense. Elles ne doivent pas être dupliquées : la
+toolbar existante de la maquette les contient déjà.
+
+---
+
+# 42. GRILLE DE NOTES — FICHIERS RÉELLEMENT RESPONSABLES
+
+## Chaîne d'affichage actuelle
+
+1. Entrée du drawer plein écran :
+
+   templates/portal/informaticien/drawers/notes_drawer.html
+
+2. Chargeur HTMX de la grille :
+
+   ui/templates/notes/notes_table.html
+
+3. Fragment rendu après le chargement HTMX :
+
+   portal/templates/portal/admin/grades/partials/notes_maquette.html
+
+4. Grille visuelle principale :
+
+   ui/templates/grades/maquette/maquette.html
+
+5. Cellule de note éditable, sauvegarde HTMX et statut de cellule :
+
+   ui/templates/notes/ec_note_cell_live.html
+
+6. Toolbar sessions / PDF / impression / import / export :
+
+   ui/templates/notes/notes_actions_bar.html
+
+7. Informations compactes de la toolbar :
+
+   ui/templates/notes/notes_header.html
+
+8. Navigation clavier et recalcul visuel uniquement :
+
+   templates/portal/informaticien/dashboard.html
+   fonction JavaScript notesGrid()
+
+9. Construction serveur des UE, EC, étudiants, résultats et permissions :
+
+   portal/views/admin_grades.py
+   fonction _build_notes_grid_context()
+
+10. Chargement IT de la maquette :
+
+    portal/views/it_workflows.py
+    fonction load_notes_workspace()
+
+## Fichier principal à polir
+
+Le fichier principal est :
+
+    ui/templates/grades/maquette/maquette.html
+
+Il gère la structure CSS Grid, les UE/EC, les colonnes figées, les résultats,
+le scroll, les couleurs et le responsive. C'est le premier fichier à travailler
+pour rendre la grille prête à la production.
+
+## Ordre de finition recommandé
+
+1. maquette.html : densité, hiérarchie, sticky headers, scroll et lisibilité ;
+2. ec_note_cell_live.html : saisie, feedback de sauvegarde et erreurs ;
+3. notes_actions_bar.html : toolbar compacte et actions regroupées ;
+4. notesGrid() : navigation clavier et calcul visuel, sans modifier la vérité
+   serveur.
+
+## Élément historique à ne pas modifier pendant ce chantier
+
+portal/templates/portal/admin/grades/partials/notes_grid.html est une ancienne
+grille, encore potentiellement utilisée par l'ancienne vue ou des exports. Ce
+n'est pas la grille du drawer Informaticien actuel. Elle doit rester intacte
+tant que tous ses consommateurs ne sont pas vérifiés.
+
+
+
+# MISSION — FINALISER UNIQUEMENT LA GRILLE DE SAISIE DES NOTES DE L’INFORMATICIEN
+
+Nous mettons temporairement de côté les autres sections du dashboard Informaticien.
+
+À partir de maintenant, je veux que tu travailles **uniquement sur le module Notes et résultats, plus précisément sur la grille de saisie des notes**, jusqu’à obtenir une version réellement propre, stable, dense, professionnelle et prête pour la production.
+
+Tu as déjà recensé la chaîne technique concernée. Je veux que tu t’appuies strictement dessus.
+
+La chaîne actuelle est :
+
+```text
+templates/portal/informaticien/drawers/notes_drawer.html
+        ↓
+ui/templates/notes/notes_table.html
+        ↓
+portal/templates/portal/admin/grades/partials/notes_maquette.html
+        ↓
+ui/templates/grades/maquette/maquette.html
+        ↓
+ui/templates/notes/ec_note_cell_live.html
+```
+
+Avec également :
+
+```text
+ui/templates/notes/notes_actions_bar.html
+ui/templates/notes/notes_header.html
+templates/portal/informaticien/dashboard.html -> notesGrid()
+portal/views/admin_grades.py -> _build_notes_grid_context()
+portal/views/it_workflows.py -> load_notes_workspace()
+```
+
+Le fichier principal à travailler est :
+
+```text
+ui/templates/grades/maquette/maquette.html
+```
+
+---
+
+# 1. NE COMMENCE PAS PAR MODIFIER LE CODE
+
+Avant toute modification, analyse la grille actuelle et fais-moi un diagnostic court mais précis.
+
+Je veux que tu identifies :
+
+* la structure DOM actuelle de la grille ;
+* le système de colonnes ;
+* les colonnes sticky ;
+* les headers UE/EC ;
+* la colonne Étudiant ;
+* les colonnes de résultats ;
+* le scroll horizontal ;
+* le scroll vertical ;
+* la toolbar ;
+* les cellules éditables ;
+* les zones responsive ;
+* les éléments devenus trop grands ;
+* les répétitions ;
+* les endroits où la grille casse ou devient difficile à utiliser.
+
+Puis indique clairement :
+
+```text
+À CONSERVER
+À COMPACTER
+À DÉPLACER
+À RENDRE STICKY
+À RENDRE SCROLLABLE
+À RETIRER DU MODE SAISIE
+```
+
+Ensuite seulement, commence la modification.
+
+---
+
+# 2. OBJECTIF UX
+
+Je ne veux pas une simple table HTML améliorée.
+
+Je veux que la grille se comporte comme un **véritable mini-tableur académique de saisie**.
+
+L’informaticien doit pouvoir travailler rapidement sur beaucoup d’étudiants et beaucoup d’EC sans perdre ses repères.
+
+Le mode saisie doit être :
+
+* dense ;
+* lisible ;
+* rapide ;
+* stable ;
+* orienté clavier ;
+* adapté aux grands volumes ;
+* professionnel.
+
+---
+
+# 3. MODE SAISIE CONCENTRÉE
+
+Lorsque l’utilisateur clique sur :
+
+```text
+Ouvrir la saisie
+```
+
+la grille doit s’ouvrir dans le drawer certifié existant, mais ce drawer doit passer en **mode plein écran uniquement pour les notes**.
+
+Ne crée surtout pas un deuxième système de drawer.
+
+Les autres drawers du dashboard doivent conserver leur taille normale.
+
+Le flux doit être :
+
+```text
+Notes et résultats
+↓
+Choix classe
+↓
+Choix semestre
+↓
+Workflow
+↓
+Ouvrir la saisie
+↓
+Mode saisie plein écran
+```
+
+---
+
+# 4. CONTENU DU MODE SAISIE
+
+Dans cette vue, je veux retirer tout ce qui n’est pas utile à la saisie.
+
+Conserver uniquement une barre compacte contenant :
+
+```text
+Classe
+Semestre
+Session
+Statut
+Retour
+Fermer
+```
+
+Puis :
+
+```text
+Toolbar métier
+```
+
+Puis immédiatement :
+
+```text
+Grille de notes
+```
+
+Ne pas afficher dans le mode saisie :
+
+* grosses cartes KPI ;
+* longues explications ;
+* workflow complet ;
+* panneaux de résumé volumineux ;
+* blocs redondants ;
+* textes déjà visibles avant l’ouverture de la grille.
+
+---
+
+# 5. TOOLBAR
+
+Le composant concerné est :
+
+```text
+ui/templates/notes/notes_actions_bar.html
+```
+
+Je veux une toolbar compacte.
+
+Elle doit contenir, selon les permissions et l’état du workflow :
+
+```text
+Session normale / Rattrapage
+PDF A4
+PDF A3
+Impression A4
+Impression A3
+Téléchargement Excel
+Import Excel
+Exports / relevés disponibles
+```
+
+Ne duplique aucune action.
+
+Si la toolbar devient trop large, regroupe les actions secondaires dans :
+
+```text
+...
+```
+
+mais garde visibles les actions les plus utilisées.
+
+---
+
+# 6. HEADER DE LA GRILLE
+
+Le composant :
+
+```text
+ui/templates/notes/notes_header.html
+```
+
+doit devenir compact.
+
+Il ne doit pas prendre une grosse partie de l’écran.
+
+Je veux pouvoir identifier immédiatement :
+
+```text
+Classe
+Semestre
+Session
+État
+```
+
+sans perdre de hauteur utile.
+
+---
+
+# 7. GRILLE PRINCIPALE
+
+Travaille prioritairement :
+
+```text
+ui/templates/grades/maquette/maquette.html
+```
+
+Je veux améliorer :
+
+* densité ;
+* hauteur des lignes ;
+* largeur des colonnes ;
+* lisibilité ;
+* hiérarchie UE / EC ;
+* distinction des résultats ;
+* alignement ;
+* sticky headers ;
+* sticky étudiant ;
+* scroll ;
+* responsive ;
+* états visuels.
+
+Le résultat doit donner l’impression d’un outil de saisie académique professionnel.
+
+---
+
+# 8. COLONNE ÉTUDIANT
+
+La colonne étudiant doit rester visible pendant le scroll horizontal.
+
+Elle doit contenir de manière compacte :
+
+```text
+Nom complet
+Matricule ou identifiant utile
+```
+
+Évite les informations secondaires inutiles.
+
+Elle doit être sticky à gauche.
+
+Elle doit rester parfaitement lisible même quand la grille est très large.
+
+---
+
+# 9. HEADERS UE / EC
+
+Les UE et EC doivent être visuellement faciles à distinguer.
+
+Je veux une hiérarchie claire :
+
+```text
+UE
+└── EC
+└── EC
+└── EC
+
+UE
+└── EC
+└── EC
+```
+
+Les headers doivent rester visibles pendant le scroll vertical lorsque c’est techniquement cohérent.
+
+Ne crée pas des blocs gigantesques.
+
+---
+
+# 10. CELLULES DE NOTES
+
+Travaille ensuite :
+
+```text
+ui/templates/notes/ec_note_cell_live.html
+```
+
+Je veux que chaque cellule permette une saisie rapide.
+
+Chaque cellule doit avoir des états visuels clairs :
+
+```text
+vide
+focus
+saisie en cours
+sauvegarde
+sauvegardé
+erreur
+verrouillé
+rattrapage
+```
+
+Le feedback doit rester discret.
+
+Je ne veux pas de popup ou modal à chaque sauvegarde.
+
+Exemple attendu :
+
+```text
+12
+↓
+sauvegarde HTMX
+↓
+petit état visuel "sauvegardé"
+```
+
+En cas d’erreur :
+
+```text
+cellule en erreur
++
+message contextualisé
+```
+
+---
+
+# 11. NAVIGATION CLAVIER
+
+Le script actuel :
+
+```text
+notesGrid()
+```
+
+doit être étudié attentivement.
+
+Je veux une saisie rapide de type tableur.
+
+Si possible et cohérent avec l’implémentation actuelle :
+
+```text
+Entrée -> cellule suivante
+Tab -> cellule suivante
+Shift + Tab -> cellule précédente
+↑ ↓ ← → -> navigation
+```
+
+Mais ne transforme pas JavaScript en moteur métier.
+
+JavaScript sert uniquement à :
+
+* navigation ;
+* focus ;
+* feedback visuel ;
+* ergonomie.
+
+La vérité de la note reste côté serveur.
+
+---
+
+# 12. SAUVEGARDE HTMX
+
+Ne change pas le mécanisme métier existant.
+
+Les sauvegardes continuent de passer par :
+
+```text
+save_grade
+save_grade_confirm_otp
+```
+
+et les endpoints déjà existants.
+
+Préserve :
+
+* CSRF ;
+* OTP ;
+* validations ;
+* permissions ;
+* workflow ;
+* verrouillage ;
+* règles de rattrapage.
+
+---
+
+# 13. PERFORMANCE
+
+Je veux que tu prennes en compte les grands volumes.
+
+Exemple :
+
+```text
+100 étudiants
+×
+15 EC
+=
+1 500 cellules
+```
+
+Donc évite :
+
+* listener JS individuel sur chaque cellule si évitable ;
+* gros recalcul complet après chaque saisie ;
+* duplication de scripts ;
+* animations inutiles ;
+* remplacement complet de la grille pour une seule note ;
+* rechargements HTMX trop lourds.
+
+Utilise au maximum une logique locale et légère.
+
+---
+
+# 14. SCROLL
+
+Je veux un scroll maîtrisé.
+
+La grille peut avoir :
+
+```text
+scroll horizontal local
+scroll vertical local
+```
+
+si nécessaire.
+
+Mais le dashboard entier ne doit pas devenir horizontalement scrollable.
+
+Le shell ne doit jamais casser.
+
+Je veux quelque chose du type :
+
+```text
+Mode saisie
+└── header compact
+└── toolbar
+└── zone grille
+    ├── sticky headers
+    ├── sticky colonne étudiant
+    ├── overflow-x-auto
+    └── overflow-y-auto
+```
+
+---
+
+# 15. RESPONSIVE
+
+La priorité est desktop, puisque la saisie massive de notes se fera principalement sur ordinateur.
+
+Mais la grille doit quand même rester exploitable sur :
+
+```text
+1920×1080
+1600×900
+1366×768
+1280×720
+tablette
+```
+
+Sur mobile, ne cherche pas à afficher 25 colonnes simultanément.
+
+Le comportement doit simplement rester stable et permettre une consultation/saisie raisonnable.
+
+---
+
+# 16. NE PAS MODIFIER L’ANCIENNE GRILLE
+
+Ne touche pas pour l’instant à :
+
+```text
+portal/templates/portal/admin/grades/partials/notes_grid.html
+```
+
+Tu as toi-même identifié qu’il s’agit d’une ancienne grille encore potentiellement consommée ailleurs.
+
+Le chantier actuel concerne la grille du drawer Informaticien basée sur :
+
+```text
+grades_maquette
+```
+
+---
+
+# 17. NE PAS MODIFIER LE MOTEUR MÉTIER
+
+Ne réécris pas :
+
+```text
+admin_grades.py
+notes_workflow.py
+services académiques
+```
+
+sauf si une donnée d’affichage réellement nécessaire manque.
+
+Même dans ce cas, fais une modification minimale.
+
+Ne change pas :
+
+* calcul des moyennes ;
+* calculs UE / EC ;
+* seuils ;
+* décisions ;
+* publication ;
+* rattrapage ;
+* validation ;
+* OTP ;
+* permissions.
+
+---
+
+# 18. ORDRE DE TRAVAIL
+
+Procède exactement dans cet ordre :
+
+```text
+1. Analyse de la grille actuelle
+
+2. notes_drawer.html
+   -> mode plein écran ciblé Notes
+
+3. notes_header.html
+   -> header compact
+
+4. notes_actions_bar.html
+   -> toolbar compacte
+
+5. grades/maquette/maquette.html
+   -> redesign principal
+
+6. ec_note_cell_live.html
+   -> UX de saisie
+
+7. notesGrid()
+   -> navigation clavier / focus
+
+8. tests
+
+9. nettoyage uniquement si nécessaire
+```
+
+---
+
+# 19. TESTS FONCTIONNELS
+
+Je veux vérifier au minimum :
+
+```text
+ouvrir Notes
+choisir classe
+choisir semestre
+ouvrir saisie
+saisir une note
+sauvegarder
+changer de cellule
+saisir plusieurs notes
+tester erreur de validation
+tester cellule verrouillée
+tester rattrapage
+tester OTP
+tester export
+tester import
+tester PDF
+tester impression
+fermer la saisie
+revenir au workflow
+```
+
+---
+
+# 20. TESTS VISUELS
+
+Teste avec :
+
+```text
+petite classe
+classe moyenne
+grande classe
+beaucoup d’EC
+peu d’EC
+```
+
+Je veux vérifier :
+
+* colonne étudiant sticky ;
+* headers sticky ;
+* pas de chevauchement ;
+* pas de clipping ;
+* pas de débordement du dashboard ;
+* toolbar accessible ;
+* scroll horizontal propre ;
+* scroll vertical propre ;
+* fermeture du drawer correcte.
+
+---
+
+# 21. TESTS AUTOMATISÉS
+
+Préserve au minimum :
+
+```text
+test_it_dashboard_keeps_notes_module_inside_dashboard
+test_it_notes_workspace_returns_filters_only_before_selection
+test_it_notes_grid_htmx_returns_shared_maquette
+test_it_notes_decisions_uses_official_annual_decision
+test_it_notes_workflow_publishes_normal_session_then_unlocks_retake_modal
+test_it_notes_retake_edit_is_blocked_for_validated_subject
+```
+
+Puis exécute :
+
+```bash
+python manage.py check --settings=config.settings_test_local
+```
+
+et les tests ciblés Notes.
+
+À la fin, lance aussi :
+
+```bash
+python manage.py test accounts.tests.PortalPhaseOneTests --settings=config.settings_test_local
+```
+
+---
+
+# 22. CE QUE JE NE VEUX PAS
+
+Je ne veux pas :
+
+* une nouvelle grille ;
+* un nouveau moteur de notes ;
+* un nouveau drawer ;
+* un nouveau système de saisie ;
+* une grosse refonte backend ;
+* une simple recoloration ;
+* quelques `padding` modifiés puis "terminé" ;
+* du faux responsive ;
+* des actions dupliquées ;
+* des boutons décoratifs ;
+* des données fictives ;
+* des hacks CSS avec hauteurs arbitraires.
+
+---
+
+# 23. LIVRABLE
+
+À la fin, donne-moi un rapport précis :
+
+```text
+GRILLE DE NOTES INFORMATICIEN — RAPPORT
+
+1. Diagnostic initial
+2. Fichiers modifiés
+3. Structure conservée
+4. Structure supprimée
+5. Mode plein écran
+6. Header
+7. Toolbar
+8. Grille
+9. Colonnes sticky
+10. Headers sticky
+11. Cellules de notes
+12. Navigation clavier
+13. Sauvegarde HTMX
+14. Gestion des erreurs
+15. Performance
+16. Responsive
+17. Tests fonctionnels
+18. Tests automatiques
+19. Points encore perfectibles
+```
+
+Et seulement si le résultat est réellement opérationnel :
+
+```text
+GRILLE DE SAISIE DES NOTES : PRODUCTION-READY
+```
+
+# RÈGLE FINALE
+
+Pour ce chantier, oublie temporairement les autres parties du dashboard Informaticien.
+
+**Ta seule mission maintenant est de transformer la grille de saisie existante en un véritable outil professionnel de saisie académique, sans toucher à la logique métier et sans recréer les composants déjà existants.**
+
+Commence par le diagnostic structurel de la grille actuelle, puis applique directement les corrections.
+
+
+# GRILLE DE NOTES INFORMATICIEN — RAPPORT
+
+## 1. Diagnostic initial
+
+La maquette active utilisait une grille CSS avec trois colonnes séparées pour
+l'identité, cinq niveaux d'en-têtes dont quatre ne pouvaient pas réellement
+rester sticky, des cellules normales trop hautes à cause de l'affichage
+répété N/R/F, et un responsive qui désactivait les champs de saisie sous
+1200 px.
+
+## 2. Fichiers modifiés
+
+- `ui/templates/grades/maquette/maquette.html`
+- `ui/templates/notes/notes_header.html`
+- `ui/templates/notes/notes_actions_bar.html`
+- `ui/templates/notes/ec_note_cell_live.html`
+- `templates/portal/informaticien/dashboard.html` (`notesGrid()` uniquement)
+- `static/public/css/main.css` (reconstruit par Tailwind)
+
+## 3. Structure conservée
+
+La chaîne de rendu, les composants existants, le drawer certifié déjà ciblé,
+la grille CSS partagée, les endpoints, HTMX, les calculs visuels locaux et le
+serveur comme seule source de vérité sont conservés.
+
+## 4. Structure supprimée
+
+Les trois colonnes « N° / NOM / PRÉNOMS » deviennent « N° / Étudiant ».
+Les cinq étages d'en-tête deviennent trois : UE, EC avec coefficient/crédits,
+puis les valeurs. Les jetons N/R/F ne sont plus répétés en session normale.
+
+## 5. Mode plein écran
+
+Le drawer officiel passe déjà en plein écran uniquement lorsque son contenu
+porte `data-it-notes-entry`. Aucun second drawer n'a été créé.
+
+## 6. Header
+
+Le header est compact : classe, nombre d'étudiants, semestre, session et état
+du workflow. Le titre accessible « Gestion des notes » est conservé.
+
+## 7. Toolbar
+
+Les sessions, PDF A4, impression A4, modèle Excel et import restent visibles.
+PDF/Impression A3 et les exports/relevés sont regroupés dans « Autres actions ».
+L'import est désormais relié à l'endpoint existant avec feedback local puis
+rafraîchissement de la même grille.
+
+## 8. Grille
+
+La grille reste une CSS Grid unique, plus dense, avec un scroll horizontal et
+vertical local au tableau. Le shell du dashboard ne reçoit pas de scroll
+horizontal.
+
+## 9. Colonnes sticky
+
+Le numéro et la colonne Étudiant sont sticky à gauche. La colonne Étudiant
+affiche nom complet et matricule. Les trois résultats de semestre restent
+sticky à droite.
+
+## 10. Headers sticky
+
+Les trois rangées UE, EC et valeurs sont réellement sticky avec des offsets
+cohérents dans le conteneur de scroll local.
+
+## 11. Cellules de notes
+
+Les états visuels couvrent la saisie, l'enregistrement, le succès, l'erreur,
+le focus, le verrouillage existant et le rattrapage. Après une sauvegarde
+réussie, aucun message n'est affiché : la cellule confirme naturellement par
+sa couleur, comme un tableur. Seule une erreur reste textuellement visible.
+Aucun popup n'est ajouté.
+
+## 12. Navigation clavier
+
+Entrée passe à la cellule suivante ; flèche haut/bas conserve la matière dans
+la ligne étudiante précédente/suivante ; Tab et Shift+Tab gardent le parcours
+natif. Les cellules verrouillées sont ignorées et le focus reste visible.
+
+## 13. Sauvegarde HTMX
+
+`save_grade`, CSRF, OTP, permissions, validations, sessions et règles de
+rattrapage n'ont pas été modifiés.
+
+## 14. Gestion des erreurs
+
+Une réponse HTMX en erreur colore uniquement le champ concerné et affiche
+« À corriger » avec une indication accessible. L'import signale son erreur à
+côté du bouton.
+
+## 15. Performance
+
+La grille utilise une délégation d'événements par maquette. Un changement de
+note ne recalcule que la ligne concernée. Aucun remplacement complet n'a lieu
+pour une sauvegarde individuelle.
+
+## 16. Responsive
+
+Les champs ne sont plus cachés sous 1200 px. Les dimensions sont réduites à
+1200 px puis à 640 px, tout en conservant le défilement local pour les petits
+écrans.
+
+## 17. Tests fonctionnels
+
+Les tests automatisés couvrent le dashboard Notes, le choix initial,
+l'ouverture de la maquette, les décisions annuelles, la publication normale,
+le rattrapage et le verrouillage d'une matière validée. Une recette visuelle
+authentifiée (petite/grande classe, import réel, impression et PDF) reste à
+faire dans le navigateur avant une déclaration de production.
+
+## 18. Tests automatiques
+
+Succès : les six tests Notes explicitement requis et
+`python manage.py check --settings=config.settings_test_local`.
+
+La suite complète `PortalPhaseOneTests` contient toujours 3 échecs hors
+module Notes : impression EDT DE, verrouillage S2 étudiant et création du
+cahier de texte surveillant. Ils ne sont pas modifiés dans ce chantier.
+
+## 19. Points encore perfectibles
+
+Faire la recette visuelle avec une vraie classe volumineuse et vérifier les
+liens PDF, impression et import avec un fichier Excel réel. La grille Notes
+ne reçoit pas encore le label « PRODUCTION-READY » tant que cette recette et
+les trois régressions globales du portail ne sont pas résolues.
+
+
+
+# MISSION — POLISHING FINAL DE LA GRILLE DE SAISIE DES NOTES
+
+Le travail effectué sur la grille est maintenant très bon.
+
+**Ne reconstruis rien. Ne change pas l’architecture. Ne refais pas le module Notes.**
+
+Nous sommes maintenant dans une phase de **polishing UX/UI ciblée**.
+
+Je veux corriger uniquement les derniers points suivants :
+
+1. rendre la sauvegarde des cellules naturelle et silencieuse ;
+2. supprimer les notifications de succès intrusives ;
+3. compacter fortement toute la zone supérieure du mode saisie ;
+4. afficher seulement les informations contextuelles réellement utiles ;
+5. simplifier l’état du workflow ;
+6. rendre les actions PDF/import/export beaucoup plus discrètes ;
+7. corriger l’alignement vertical et horizontal des cellules et headers ;
+8. conserver absolument tout ce qui fonctionne actuellement.
+
+---
+
+# 1. SAUVEGARDE DES NOTES : SILENCIEUSE ET INSTANTANÉE
+
+C’est maintenant la priorité absolue.
+
+Lorsqu’un informaticien saisit une note, je ne veux plus :
+
+* popup de succès ;
+* toast de succès ;
+* bannière « note enregistrée » ;
+* message global ;
+* notification répétitive ;
+* changement de layout ;
+* interruption du focus.
+
+Le comportement attendu est simplement :
+
+```text
+saisir 14
+↓
+sauvegarde HTMX
+↓
+14 reste dans la cellule
+↓
+feedback visuel discret dans la cellule
+↓
+continuer immédiatement la saisie
+```
+
+Une opération normale réussie ne doit pas demander l’attention de l’utilisateur.
+
+---
+
+# 2. FEEDBACK LOCAL UNIQUEMENT
+
+Le composant concerné est notamment :
+
+```text
+ui/templates/notes/ec_note_cell_live.html
+```
+
+Lorsqu’une sauvegarde réussit, utilise seulement un micro-feedback local.
+
+Par exemple :
+
+```text
+cellule normale
+→ sauvegarde
+→ petit indicateur discret
+→ sauvegardé
+→ retour à l’état normal
+```
+
+Cela peut être :
+
+* une petite coche ;
+* une bordure temporaire ;
+* un indicateur très discret ;
+* un changement visuel léger.
+
+Mais surtout :
+
+```text
+PAS DE TOAST GLOBAL POUR UNE SAUVEGARDE RÉUSSIE.
+```
+
+Le feedback doit disparaître naturellement.
+
+---
+
+# 3. LES ERREURS RESTENT VISIBLES
+
+Attention : je demande de supprimer les messages intrusifs **pour les succès normaux**, pas de masquer les erreurs.
+
+Si une note est refusée :
+
+```text
+valeur invalide
+permission refusée
+session verrouillée
+OTP nécessaire
+erreur serveur
+```
+
+alors l’utilisateur doit être clairement informé.
+
+Mais privilégie encore un feedback contextualisé à proximité de la cellule lorsque c’est possible.
+
+Exemple :
+
+```text
+25
+↓
+serveur refuse
+↓
+cellule signalée en erreur
+↓
+"Note comprise entre 0 et 20"
+```
+
+Ne transforme pas toutes les erreurs métier en notifications silencieuses.
+
+---
+
+# 4. NE PAS PERDRE LE FOCUS
+
+Après une sauvegarde réussie :
+
+* ne ferme rien ;
+* ne remonte pas la page ;
+* ne replace pas le scroll ;
+* ne recharge pas toute la grille ;
+* ne déplace pas inutilement le focus ;
+* ne bloque pas la navigation clavier.
+
+La saisie doit pouvoir s’enchaîner naturellement :
+
+```text
+12 → Entrée
+14 → Entrée
+09 → Entrée
+16 → Entrée
+```
+
+comme dans un tableur.
+
+---
+
+# 5. SUPPRIMER LE GROS EN-TÊTE ACTUEL DU MODE SAISIE
+
+La partie supérieure prend encore trop de place.
+
+Je veux maintenant supprimer/compacter les gros blocs statiques ou pseudo-statiques situés au-dessus de la grille.
+
+Le mode saisie n’a pas besoin d’un deuxième dashboard dans le dashboard.
+
+Nous avons besoin d’une **barre contextuelle compacte**.
+
+---
+
+# 6. INFORMATIONS CONTEXTUELLES À CONSERVER
+
+La zone supérieure doit afficher dynamiquement uniquement les informations réellement utiles :
+
+```text
+Classe
+Année académique
+Semestre
+Session
+État
+```
+
+Exemple conceptuel :
+
+```text
+Biologie Médicale — L1    |    2026-2027    |    Semestre 1    |    Session normale    |    ● Saisie active
+```
+
+ou une disposition équivalente plus adaptée au design system.
+
+Ces informations doivent provenir du contexte réel.
+
+Ne mets aucune valeur en dur.
+
+---
+
+# 7. CLASSE
+
+Afficher clairement la classe actuellement sélectionnée.
+
+Par exemple :
+
+```text
+Biologie Médicale — L1
+```
+
+ou selon les données réellement disponibles :
+
+```text
+Infirmier d'État — L2
+```
+
+L’information doit être immédiatement identifiable sans utiliser une grosse card.
+
+---
+
+# 8. ANNÉE ACADÉMIQUE
+
+Afficher également l’année académique active.
+
+Exemple :
+
+```text
+2026-2027
+```
+
+Cette information doit provenir du contexte/backend existant.
+
+Ne duplique pas une logique de calcul d’année académique dans le template.
+
+---
+
+# 9. SEMESTRE
+
+Afficher le semestre actif :
+
+```text
+Semestre 1
+```
+
+ou :
+
+```text
+S1
+```
+
+selon ce qui donne le meilleur compromis entre lisibilité et compacité.
+
+---
+
+# 10. SESSION
+
+Il faut clairement distinguer :
+
+```text
+Session normale
+```
+
+et :
+
+```text
+Rattrapage
+```
+
+Mais cela ne doit pas devenir un énorme bloc.
+
+Un badge compact est suffisant.
+
+Exemple :
+
+```text
+Session : Normale
+```
+
+ou :
+
+```text
+[ Normale ]
+```
+
+Lorsque l’on passe en rattrapage :
+
+```text
+[ Rattrapage ]
+```
+
+Le changement doit refléter l’état réel du workflow.
+
+---
+
+# 11. ÉTAT : SUPPRIMER LA GROSSE FRISE DE WORKFLOW
+
+Dans le mode de saisie, je ne veux plus afficher tout le parcours :
+
+```text
+Brouillon
+→ saisie
+→ calcul
+→ validation
+→ publication
+→ etc.
+```
+
+Ce parcours complet peut rester dans le workspace Notes principal si nécessaire.
+
+Mais une fois dans le mode saisie, il devient inutile et prend beaucoup trop de place.
+
+Je veux seulement **l’état courant**.
+
+Par exemple :
+
+```text
+● Saisie active
+```
+
+ou :
+
+```text
+● En cours
+```
+
+ou :
+
+```text
+✓ Finalisé
+```
+
+selon l’état réel.
+
+Utilise un badge/status compact du design system si disponible.
+
+---
+
+# 12. CAS FINALISÉ
+
+Lorsque la session est finalisée, l’état doit simplement devenir quelque chose comme :
+
+```text
+✓ Finalisé
+```
+
+Les cellules doivent naturellement respecter les permissions/verrouillages métier existants.
+
+Ne crée aucune nouvelle logique de verrouillage côté template.
+
+Utilise la vérité serveur existante.
+
+---
+
+# 13. ARCHITECTURE VISUELLE DU NOUVEAU HEADER
+
+Je veux tendre vers quelque chose comme :
+
+```text
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Biologie Médicale · L1   2026-2027   S1   Normale   ● Saisie active         │
+│                                                    Actions ⋯   Fermer         │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                              GRILLE                                          │
+```
+
+ou :
+
+```text
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Biologie Médicale — L1                                                       │
+│ 2026-2027 · Semestre 1 · Session normale · ● Saisie active      ⋯   Fermer   │
+├──────────────────────────────────────────────────────────────────────────────┤
+```
+
+Choisis la variante qui s’intègre le mieux au design actuel.
+
+Le principe est :
+
+```text
+maximum d’information utile
++
+minimum de hauteur
+```
+
+---
+
+# 14. ACTIONS IMPORT / EXPORT / PDF
+
+Les actions existent déjà.
+
+Ne les recrée pas.
+
+Mais elles ne doivent pas dominer l’interface.
+
+Les actions secondaires comme :
+
+* import Excel ;
+* export Excel ;
+* relevés ;
+* certains exports ;
+* actions secondaires ;
+
+peuvent être regroupées dans un menu discret :
+
+```text
+⋯
+```
+
+ou :
+
+```text
+Actions
+```
+
+si le composant existant le permet.
+
+---
+
+# 15. PDF / PRÉVISUALISATION
+
+Je veux privilégier la logique :
+
+```text
+Prévisualiser
+```
+
+plutôt qu’un bouton agressif :
+
+```text
+Imprimer
+```
+
+Le flux idéal est :
+
+```text
+Prévisualiser PDF
+↓
+PDF généré
+↓
+ouverture du PDF
+↓
+l’utilisateur décide ensuite d’imprimer
+```
+
+Donc évite autant que possible :
+
+```text
+Imprimer immédiatement
+```
+
+si l’endpoint actuel permet déjà d’ouvrir une version PDF/print preview.
+
+Ne casse pas les endpoints existants.
+
+---
+
+# 16. ACTIONS PRINCIPALES VS SECONDAIRES
+
+Hiérarchie souhaitée :
+
+## Contexte
+
+```text
+Classe
+Année
+Semestre
+Session
+État
+```
+
+## Actions importantes
+
+```text
+Prévisualiser
+Fermer / Retour
+```
+
+## Actions secondaires
+
+```text
+Import
+Export
+Relevés
+autres outils
+```
+
+Ces dernières peuvent être regroupées.
+
+Je ne veux plus une toolbar composée de nombreux gros boutons ayant tous la même importance visuelle.
+
+---
+
+# 17. ALIGNEMENT DES CELLULES
+
+La grille est beaucoup mieux maintenant, mais certains contenus donnent encore l’impression d’être alignés vers le haut.
+
+Je veux corriger cela.
+
+Pour les cellules où c’est pertinent :
+
+```text
+alignement vertical = milieu
+alignement horizontal = centre
+```
+
+Conceptuellement :
+
+```text
+display: flex;
+align-items: center;
+justify-content: center;
+```
+
+ou l’équivalent adapté à la structure actuelle.
+
+Ne transforme pas aveuglément toutes les cellules en flex si cela casse CSS Grid.
+
+Utilise la solution correcte selon la structure DOM existante.
+
+---
+
+# 18. ALIGNEMENT DES NOTES
+
+Les valeurs numériques doivent être parfaitement centrées dans leurs cellules.
+
+Exemple :
+
+```text
+┌──────┐
+│      │
+│  14  │
+│      │
+└──────┘
+```
+
+et non :
+
+```text
+┌──────┐
+│ 14   │
+│      │
+│      │
+└──────┘
+```
+
+Même principe pour les champs de saisie.
+
+Le texte tapé doit apparaître centré verticalement et horizontalement lorsque la cellule représente une valeur numérique.
+
+---
+
+# 19. ALIGNEMENT DES HEADERS
+
+Même travail sur les headers UE/EC lorsque pertinent.
+
+Je veux que les intitulés soient correctement centrés dans leur espace :
+
+```text
+horizontalement
++
+verticalement
+```
+
+sans donner l’impression d’être collés en haut de la cellule.
+
+Pour les intitulés longs, conserve une bonne gestion du wrapping.
+
+---
+
+# 20. COLONNE ÉTUDIANT
+
+Attention : la colonne Étudiant n’a pas nécessairement besoin d’être centrée horizontalement.
+
+Pour :
+
+```text
+Nom étudiant
+Matricule
+```
+
+un alignement à gauche peut rester plus lisible.
+
+Mais verticalement, le contenu doit être correctement centré dans la ligne.
+
+Donc :
+
+```text
+Étudiant :
+horizontal = gauche
+vertical = milieu
+
+Notes :
+horizontal = centre
+vertical = milieu
+```
+
+---
+
+# 21. NE PAS AUGMENTER LA HAUTEUR
+
+Corriger l’alignement ne signifie pas agrandir les cellules.
+
+Je veux conserver la densité obtenue.
+
+Donc :
+
+```text
+meilleur alignement
+≠
+plus de padding
+```
+
+La grille doit rester compacte.
+
+---
+
+# 22. CONSERVATION DU TRAVAIL ACTUEL
+
+Très important :
+
+le travail actuel sur :
+
+* dimensions ;
+* cellules ;
+* grille ;
+* sticky ;
+* scroll ;
+* responsive ;
+* navigation clavier ;
+* sauvegarde HTMX ;
+
+est globalement bon.
+
+Ne recommence pas le composant.
+
+Fais une modification chirurgicale.
+
+---
+
+# 23. FICHIERS À REGARDER EN PRIORITÉ
+
+Concentre-toi sur :
+
+```text
+ui/templates/notes/ec_note_cell_live.html
+
+ui/templates/notes/notes_header.html
+
+ui/templates/notes/notes_actions_bar.html
+
+ui/templates/grades/maquette/maquette.html
+
+templates/portal/informaticien/drawers/notes_drawer.html
+
+templates/portal/informaticien/dashboard.html
+```
+
+Ne touche à :
+
+```text
+portal/views/admin_grades.py
+```
+
+que si une information contextuelle indispensable manque réellement :
+
+* année académique ;
+* session ;
+* état ;
+* classe ;
+* semestre.
+
+Même dans ce cas, fais une modification minimale.
+
+---
+
+# 24. VÉRIFIER LA SOURCE DES MESSAGES DE SUCCÈS
+
+Avant de supprimer quoi que ce soit, identifie exactement qui génère actuellement les notifications de succès :
+
+```text
+HTMX event
+Django messages
+toast global
+JS
+response header
+ec_note_cell_live
+notesGrid()
+certified_dashboard_shell.js
+```
+
+Supprime uniquement la présentation intrusive liée à la sauvegarde normale d’une note.
+
+Ne désactive surtout pas globalement le système de notifications du dashboard.
+
+---
+
+# 25. TEST DE SAISIE RAPIDE
+
+Je veux tester :
+
+```text
+cellule 1 -> 12 -> Entrée
+cellule 2 -> 15 -> Entrée
+cellule 3 -> 09 -> Entrée
+cellule 4 -> 17 -> Entrée
+```
+
+Attendu :
+
+```text
+aucune popup
+aucun toast
+aucun déplacement de page
+aucune perte de focus
+aucun rechargement global
+
+les quatre valeurs restent enregistrées
+```
+
+---
+
+# 26. TEST D’ERREUR
+
+Tester ensuite :
+
+```text
+cellule -> valeur invalide
+```
+
+Attendu :
+
+```text
+erreur visible
+cellule identifiable
+message compréhensible
+pas de destruction de la valeur précédente valide
+```
+
+---
+
+# 27. TEST DU HEADER DYNAMIQUE
+
+Tester au minimum deux classes et deux semestres.
+
+Exemple :
+
+```text
+Biologie Médicale L1
+2026-2027
+S1
+Normale
+Saisie active
+```
+
+puis :
+
+```text
+Anesthésie M1
+2026-2027
+S2
+Rattrapage
+Saisie active
+```
+
+Les informations doivent réellement changer avec le contexte.
+
+Aucune valeur statique.
+
+---
+
+# 28. TEST FINALISÉ
+
+Tester une session finalisée.
+
+Attendu :
+
+```text
+Classe · Année · Semestre · Session · Finalisé
+```
+
+avec le comportement de verrouillage déjà défini par le backend.
+
+---
+
+# 29. OBJECTIF FINAL
+
+Je veux arriver à cette sensation :
+
+```text
+Je sélectionne une classe.
+J’ouvre la saisie.
+Je comprends immédiatement où je suis.
+Je commence à saisir.
+Je n’ai plus besoin de réfléchir à l’interface.
+Je tape les notes.
+Elles sont enregistrées silencieusement.
+Je navigue rapidement.
+Je prévisualise le document si nécessaire.
+Je ferme.
+```
+
+C’est cela que j’appelle une grille de saisie professionnelle.
+
+---
+
+# 30. RAPPORT FINAL
+
+À la fin, indique uniquement :
+
+```text
+POLISHING GRILLE NOTES
+
+- notifications succès :
+- feedback cellule :
+- conservation focus :
+- header compact :
+- classe dynamique :
+- année académique :
+- semestre :
+- session :
+- état compact :
+- workflow détaillé retiré du mode saisie :
+- toolbar :
+- prévisualisation :
+- alignement vertical :
+- alignement horizontal :
+- tests :
+- régressions :
+```
+
+Ne refais pas un audit complet du dashboard.
+
+Ne travaille pas sur les autres modules.
+
+**Corrige uniquement ces derniers détails de la grille de notes et conserve tout le bon travail déjà réalisé.**
+
+
+# POLISHING GRILLE NOTES
+
+- notifications succès : le loader global HTMX ignore désormais uniquement les requêtes `score-input` ; les notifications générales du dashboard restent actives.
+- feedback cellule : succès silencieux avec retour visuel local temporaire ; erreur maintenue auprès de la cellule.
+- conservation focus : aucune grille n'est rechargée pour une note ; le focus et le scroll local ne sont pas déplacés à la fin d'une sauvegarde.
+- header compact : une seule barre contextuelle dans le drawer plein écran.
+- classe dynamique : `selected_class.display_name`.
+- année académique : `selected_class.academic_year`.
+- semestre : `selected_semester.number`.
+- session : statut réel du semestre, complété par le sélecteur Normal/Rattrapage de la toolbar.
+- état compact : `state.label`, issu du workflow serveur ; aucune logique de verrouillage ajoutée au template.
+- workflow détaillé retiré du mode saisie : le header interne de la maquette et le titre de workflow sont masqués uniquement dans le drawer Notes plein écran.
+- toolbar : session et Prévisualiser visibles ; PDF, Excel, import et relevés regroupés sous Actions.
+- prévisualisation : l'action visible ouvre l'endpoint de prévisualisation A4 existant, sans casser PDF ni impression.
+- alignement vertical : cellules et en-têtes centrés via flex, sans augmenter la hauteur.
+- alignement horizontal : valeurs numériques centrées ; Nom et Prénoms restent lisibles à gauche.
+- tests : les 6 tests Notes demandés passent, ainsi que `manage.py check` avec les réglages locaux.
+- régressions : aucune sur le périmètre Notes ; la recette visuelle authentifiée reste à faire pour les volumes réels et les formats PDF/Excel.
+
+
+
+
+# Mission : remplacer la grille de saisie des notes actuelle par Tabulator
+
+Je veux que tu interviennes uniquement sur **l'interface de saisie et de gestion des notes** du projet actuel.
+
+Le backend académique existe déjà et fonctionne. Il contient déjà la logique métier liée aux étudiants, classes, matières, évaluations, notes, sessions/semestres, calculs, validations, permissions, etc.
+
+**Il ne faut surtout pas réécrire ou casser cette architecture existante.**
+
+L'objectif est de remplacer la grille/tableau HTML actuellement fabriquée manuellement par une vraie grille interactive de type Excel utilisant **Tabulator**.
+
+---
+
+# 1. Commencer par auditer l'existant
+
+Avant de modifier quoi que ce soit :
+
+* identifier les modèles Django concernés par les notes ;
+* identifier les views/services/forms existants ;
+* identifier les routes existantes ;
+* identifier la logique de calcul des notes ;
+* identifier les permissions liées à la saisie ;
+* identifier les templates actuels de saisie ;
+* identifier le JavaScript/HTMX/Alpine actuellement utilisé ;
+* identifier comment les modifications de notes sont actuellement sauvegardées ;
+* identifier comment les moyennes, résultats ou statuts sont recalculés.
+
+Ne duplique aucune logique existante.
+
+Réutilise au maximum ce qui fonctionne déjà.
+
+---
+
+# 2. Installer Tabulator
+
+Tabulator est une bibliothèque JavaScript, pas Python.
+
+Utiliser de préférence l'installation NPM :
+
+```bash
+npm install tabulator-tables --save
+```
+
+Intégrer ensuite Tabulator correctement dans le système frontend déjà utilisé par le projet.
+
+Exemple :
+
+```javascript
+import { TabulatorFull as Tabulator } from "tabulator-tables";
+import "tabulator-tables/dist/css/tabulator.min.css";
+```
+
+Adapter évidemment cela au pipeline frontend réel du projet.
+
+Ne pas introduire React, Vue, Angular ou un autre framework.
+
+La stack doit rester :
+
+* Django
+* Python
+* PostgreSQL
+* HTML/templates Django
+* Tailwind CSS
+* HTMX
+* Alpine.js si nécessaire
+* JavaScript vanilla
+* Tabulator
+
+---
+
+# 3. Ne pas utiliser CDN en production si le projet possède déjà un pipeline frontend
+
+Je préfère que Tabulator fasse partie du projet et de ses dépendances.
+
+Donc privilégier :
+
+```bash
+npm install tabulator-tables --save
+```
+
+et l'intégration dans les assets existants.
+
+Le CDN peut éventuellement être utilisé uniquement pour un test extrêmement rapide si nécessaire, mais la version finale doit être intégrée proprement au projet.
+
+---
+
+# 4. Remplacer seulement la zone de grille actuelle
+
+Ne refais pas toute la page.
+
+La maquette actuelle du dashboard doit être conservée :
+
+* sidebar ;
+* navigation ;
+* header ;
+* breadcrumbs éventuels ;
+* filtres ;
+* cartes ;
+* boutons ;
+* informations de classe ;
+* informations de session/semestre ;
+* styles généraux ;
+* composants UI existants.
+
+Tabulator doit simplement prendre la place de **la grille de saisie des notes**.
+
+Exemple conceptuel :
+
+```html
+<div class="grade-sheet-wrapper">
+    <div id="grade-table"></div>
+</div>
+```
+
+Puis Tabulator doit générer le contenu du tableau.
+
+Je ne veux plus une architecture du genre :
+
+```html
+<input>
+<input>
+<input>
+<input>
+```
+
+générée manuellement pour chaque étudiant et chaque colonne.
+
+---
+
+# 5. Générer les colonnes dynamiquement
+
+Les colonnes ne doivent pas être codées en dur si le backend possède déjà la structure des évaluations.
+
+Le backend doit pouvoir fournir quelque chose de ce genre :
+
+```json
+{
+    "context": {
+        "class": "...",
+        "semester": "...",
+        "subject": "...",
+        "session": "..."
+    },
+
+    "columns": [
+        {
+            "id": 12,
+            "field": "cc_12",
+            "title": "CC1",
+            "type": "grade",
+            "max_score": 20
+        },
+        {
+            "id": 13,
+            "field": "exam_13",
+            "title": "Examen",
+            "type": "grade",
+            "max_score": 20
+        }
+    ],
+
+    "students": [
+        {
+            "student_id": 153,
+            "matricule": "ESFE-2026-001",
+            "name": "Aminata Camara",
+            "cc_12": 14,
+            "exam_13": 16
+        }
+    ]
+}
+```
+
+Ceci est seulement un exemple.
+
+**Adapter la réponse JSON aux modèles existants.**
+
+Ne pas modifier les modèles juste pour correspondre à cet exemple.
+
+---
+
+# 6. Colonnes fixes
+
+Les informations d'identification doivent être verrouillées.
+
+Exemple :
+
+```text
+N°
+Matricule
+Étudiant
+```
+
+Ces colonnes :
+
+* ne doivent pas être éditables ;
+* doivent rester visibles horizontalement si possible ;
+* utiliser `frozen` si cela améliore l'UX ;
+* doivent conserver le style de la maquette actuelle.
+
+Les colonnes de notes sont éditables.
+
+Les colonnes calculées sont en lecture seule.
+
+---
+
+# 7. Expérience de saisie type Excel
+
+Je veux une vraie expérience de saisie professionnelle.
+
+Implémenter correctement :
+
+* clic dans une cellule ;
+* édition immédiate ;
+* navigation avec `Tab` ;
+* navigation clavier ;
+* `Enter` ;
+* déplacement entre cellules ;
+* sélection ;
+* copier/coller ;
+* collage de plusieurs valeurs venant d'Excel si Tabulator le permet correctement ;
+* édition numérique rapide ;
+* scroll horizontal ;
+* scroll vertical ;
+* colonnes fixes ;
+* headers fixes si pertinent ;
+* grand nombre d'étudiants sans dégradation majeure des performances.
+
+Éviter les comportements artificiels.
+
+---
+
+# 8. Autosave silencieux
+
+C'est un point extrêmement important.
+
+Je ne veux PLUS :
+
+* popup « Note enregistrée » ;
+* modal de confirmation ;
+* toast après chaque cellule ;
+* SweetAlert après chaque saisie ;
+* message success qui interrompt le travail.
+
+La saisie doit ressembler à Excel ou Google Sheets.
+
+Quand une note est modifiée :
+
+```text
+saisie
+→ sauvegarde silencieuse
+→ retour backend
+→ cellule mise à jour
+```
+
+Utiliser l'événement approprié de Tabulator, par exemple :
+
+```javascript
+table.on("cellEdited", function(cell) {
+    // autosave
+});
+```
+
+Créer ou adapter un endpoint Django léger si nécessaire.
+
+Par exemple :
+
+```text
+POST /.../grades/cell/update/
+```
+
+Payload conceptuel :
+
+```json
+{
+    "student_id": 153,
+    "assessment_id": 12,
+    "value": 14.5
+}
+```
+
+Mais utiliser les identifiants et conventions existants du projet.
+
+---
+
+# 9. Debounce / gestion des requêtes
+
+Éviter de provoquer inutilement des centaines de requêtes simultanées.
+
+Évaluer la meilleure stratégie selon le backend actuel :
+
+* sauvegarde à la sortie de cellule ;
+* debounce léger ;
+* queue de sauvegarde ;
+* batch pour les collages multiples.
+
+L'utilisateur doit pouvoir saisir rapidement :
+
+```text
+14
+Tab
+15
+Tab
+12
+Tab
+17
+```
+
+sans attendre le serveur à chaque cellule.
+
+L'interface ne doit pas freezer.
+
+---
+
+# 10. Feedback visuel discret
+
+Je veux uniquement des indicateurs subtils.
+
+Par exemple :
+
+```text
+saving
+saved
+error
+```
+
+avec éventuellement :
+
+* petite icône ;
+* bordure temporaire ;
+* point discret ;
+* mini indicateur dans la cellule.
+
+Pas de popup.
+
+En cas de succès :
+
+```text
+aucune interruption
+```
+
+En cas d'erreur :
+
+* remettre éventuellement l'ancienne valeur ;
+* indiquer clairement la cellule concernée ;
+* afficher un message uniquement si une véritable erreur nécessite une intervention.
+
+---
+
+# 11. Validation frontend
+
+Pour une note sur 20 :
+
+```text
+0 <= note <= 20
+```
+
+Accepter :
+
+```text
+0
+10
+14.5
+19.75
+20
+```
+
+Refuser :
+
+```text
+-1
+21
+abc
+valeurs invalides
+```
+
+Mais ne pas supposer que toutes les évaluations sont obligatoirement sur 20.
+
+Si le backend contient déjà :
+
+```python
+max_score
+```
+
+ou une règle équivalente, utiliser cette valeur.
+
+---
+
+# 12. Le backend reste l'autorité
+
+La validation JavaScript sert seulement à améliorer l'UX.
+
+Toutes les règles importantes doivent rester vérifiées côté Django.
+
+Ne jamais faire confiance à :
+
+```javascript
+value
+average
+status
+result
+```
+
+envoyés par le navigateur.
+
+Django doit valider :
+
+* utilisateur ;
+* permission ;
+* étudiant ;
+* classe ;
+* évaluation ;
+* semestre/session ;
+* valeur ;
+* limites ;
+* verrouillage éventuel ;
+* état de publication/validation ;
+* règles académiques existantes.
+
+---
+
+# 13. Les calculs officiels restent côté backend
+
+Si une moyenne doit être recalculée après modification d'une note, utiliser le service/mécanisme existant.
+
+Architecture voulue :
+
+```text
+Tabulator
+    ↓
+note modifiée
+    ↓
+endpoint Django
+    ↓
+validation
+    ↓
+enregistrement
+    ↓
+service de calcul existant
+    ↓
+réponse JSON
+    ↓
+mise à jour des cellules calculées
+```
+
+Exemple de réponse :
+
+```json
+{
+    "success": true,
+    "value": 14,
+    "calculated": {
+        "average": 13.75,
+        "status": "..."
+    }
+}
+```
+
+La structure réelle doit correspondre au backend existant.
+
+---
+
+# 14. Ne jamais envoyer une moyenne calculée par le navigateur comme valeur officielle
+
+Le frontend peut éventuellement calculer une valeur temporaire pour rendre l'affichage instantané.
+
+Mais Django reste l'autorité.
+
+Donc ne jamais accepter quelque chose comme :
+
+```json
+{
+    "score": 14,
+    "average": 18
+}
+```
+
+en considérant `average` comme fiable.
+
+La moyenne officielle doit être recalculée côté serveur.
+
+---
+
+# 15. Identité métier des cellules
+
+Ne pas identifier une note uniquement par :
+
+```text
+row 5
+column 8
+```
+
+Une cellule de note correspond à quelque chose comme :
+
+```text
+student_id
+assessment_id
+```
+
+ou aux objets métiers équivalents du projet.
+
+Exemple :
+
+```json
+{
+    "student_id": 153,
+    "assessment_id": 12,
+    "value": 14
+}
+```
+
+La position de la cellule dans Tabulator est une information d'interface.
+
+Elle ne doit pas devenir l'identité métier de la note.
+
+---
+
+# 16. Copier/coller en masse
+
+C'est une fonctionnalité importante.
+
+Tester sérieusement :
+
+```text
+copie depuis Excel
+→ collage dans Tabulator
+```
+
+Par exemple l'utilisateur copie :
+
+```text
+12
+14
+15.5
+08
+17
+16
+```
+
+et colle cela sur six étudiants.
+
+Les valeurs doivent être associées correctement aux étudiants concernés.
+
+La sauvegarde doit ensuite être effectuée proprement.
+
+Si plusieurs cellules sont collées simultanément, privilégier un endpoint bulk du genre :
+
+```text
+POST /grades/bulk-update/
+```
+
+si cela est plus efficace que 50 requêtes individuelles.
+
+Exemple conceptuel :
+
+```json
+{
+    "changes": [
+        {
+            "student_id": 1,
+            "assessment_id": 12,
+            "value": 14
+        },
+        {
+            "student_id": 2,
+            "assessment_id": 12,
+            "value": 16
+        }
+    ]
+}
+```
+
+Mais réutiliser l'architecture existante si un mécanisme similaire existe déjà.
+
+---
+
+# 17. Gestion des erreurs
+
+Une erreur sur une cellule ne doit pas détruire toute la feuille.
+
+Prévoir notamment :
+
+* valeur hors limite ;
+* permission insuffisante ;
+* note verrouillée ;
+* étudiant inexistant ;
+* évaluation inexistante ;
+* erreur réseau ;
+* timeout ;
+* CSRF ;
+* session expirée ;
+* conflit de modification si pertinent.
+
+Une cellule en erreur doit être identifiable visuellement.
+
+Ne pas perdre silencieusement les données.
+
+---
+
+# 18. CSRF Django
+
+Toutes les requêtes POST doivent respecter correctement la protection CSRF Django.
+
+Réutiliser l'implémentation CSRF existante du projet.
+
+Ne pas désactiver CSRF pour faciliter l'intégration.
+
+---
+
+# 19. HTMX
+
+Le dashboard utilise HTMX.
+
+Faire attention à l'initialisation de Tabulator lorsqu'une section est chargée ou remplacée via HTMX.
+
+Ne pas supposer que :
+
+```javascript
+DOMContentLoaded
+```
+
+sera toujours suffisant.
+
+L'initialisation doit fonctionner :
+
+* au premier chargement ;
+* après navigation HTMX ;
+* après retour vers la section ;
+* sans créer plusieurs instances Tabulator sur le même élément ;
+* sans multiplier les event listeners.
+
+Créer si nécessaire quelque chose comme :
+
+```javascript
+initGradeTable()
+destroyGradeTable()
+```
+
+et intégrer cela proprement au cycle de vie HTMX existant.
+
+---
+
+# 20. Ne pas casser Alpine.js
+
+Si Alpine est utilisé autour de la page :
+
+* conserver Alpine pour l'état UI existant ;
+* ne pas réimplémenter Tabulator avec Alpine ;
+* éviter les conflits d'état.
+
+Tabulator est responsable de la grille.
+
+Alpine reste responsable des petits états UI du dashboard.
+
+---
+
+# 21. Tailwind + Tabulator
+
+Tabulator possède son propre CSS structurel.
+
+Ne tente pas de remplacer entièrement son moteur CSS avec des centaines de classes Tailwind.
+
+Utiliser :
+
+```text
+CSS Tabulator
++
+petite couche de personnalisation
++
+tokens/styles du projet
+```
+
+afin d'adapter :
+
+* typographie ;
+* couleurs ;
+* bordures ;
+* arrondis ;
+* hauteur des lignes ;
+* header ;
+* hover ;
+* focus ;
+* état édité ;
+* état erreur ;
+* responsive.
+
+L'objectif est que Tabulator ressemble à **la maquette existante**, pas à une bibliothèque étrangère déposée dans la page.
+
+---
+
+# 22. Dimensions et stabilité
+
+Le problème actuel vient notamment de tableaux qui dépassent et de composants dessinés manuellement.
+
+La nouvelle grille doit respecter son conteneur.
+
+Éviter :
+
+```text
+body scroll horizontal global
+page qui dépasse l'écran
+hauteur infinie
+colonnes qui cassent le dashboard
+```
+
+Prévoir une structure stable :
+
+```text
+dashboard
+    └── content
+        └── grade module
+            └── toolbar/header
+            └── tabulator container
+```
+
+La grille peut avoir son propre scroll.
+
+Elle ne doit pas casser la sidebar ou la hauteur globale du dashboard.
+
+---
+
+# 23. Responsive
+
+Desktop est prioritaire pour la saisie intensive des notes.
+
+Mais vérifier également :
+
+* laptop ;
+* tablette ;
+* écrans plus petits.
+
+Sur petit écran, privilégier le scroll horizontal plutôt que de rendre les colonnes illisibles.
+
+Ne pas essayer de compresser 15 colonnes en 320 px.
+
+---
+
+# 24. Performance
+
+La grille doit rester fluide avec :
+
+* plusieurs centaines d'étudiants ;
+* potentiellement plusieurs colonnes de notes ;
+* scroll ;
+* modification répétée ;
+* chargement AJAX ;
+* collage massif.
+
+Exploiter la virtualisation offerte par Tabulator.
+
+Éviter de recréer toute la table après chaque modification.
+
+Une note modifiée ne doit pas déclencher :
+
+```text
+reload complet de la page
+reload complet du tableau
+requête de toutes les données
+```
+
+si cela n'est pas nécessaire.
+
+Mettre à jour uniquement ce qui doit l'être.
+
+---
+
+# 25. Import/export Excel existant
+
+Le projet possède ou peut posséder des mécanismes Python/OpenPyXL pour importer/exporter Excel.
+
+Ne pas les supprimer.
+
+Séparer clairement :
+
+```text
+Tabulator
+= interface Web interactive
+
+OpenPyXL
+= fichiers XLSX côté Python
+```
+
+Les deux peuvent coexister.
+
+Si un bouton :
+
+```text
+Importer Excel
+```
+
+ou :
+
+```text
+Exporter Excel
+```
+
+existe déjà, préserver son fonctionnement.
+
+---
+
+# 26. Sécurité
+
+Ne jamais autoriser une modification simplement parce qu'une cellule est `editable: true`.
+
+Django doit vérifier les permissions.
+
+Un utilisateur qui appelle directement l'endpoint doit être soumis aux mêmes règles que l'interface.
+
+Respecter les permissions métier existantes.
+
+---
+
+# 27. Audit
+
+Si le système possède déjà un système d'audit des modifications de notes, le conserver absolument.
+
+Une modification doit continuer à pouvoir enregistrer si prévu :
+
+```text
+ancienne valeur
+nouvelle valeur
+utilisateur
+date/heure
+étudiant
+évaluation
+classe/session
+```
+
+Ne contourner aucun mécanisme d'audit existant.
+
+---
+
+# 28. Première version à réaliser
+
+Pour cette première intégration Tabulator, je veux principalement :
+
+1. affichage correct des étudiants ;
+2. colonnes dynamiques ;
+3. colonnes Matricule/Nom verrouillées ;
+4. cellules de notes éditables ;
+5. validation numérique ;
+6. navigation clavier ;
+7. autosave silencieux ;
+8. calcul backend conservé ;
+9. mise à jour des résultats calculés ;
+10. copier/coller ;
+11. scroll propre ;
+12. intégration visuelle avec la maquette ;
+13. fonctionnement avec HTMX ;
+14. absence totale de popup de succès ;
+15. gestion propre des erreurs.
+
+Ne surcharge pas cette première version avec des fonctionnalités secondaires inutiles.
+
+---
+
+# 29. Important : ne pas réécrire ce qui existe
+
+Je répète :
+
+**le backend fonctionne déjà.**
+
+Tu dois d'abord comprendre comment il fonctionne puis adapter Tabulator dessus.
+
+Ne crée pas un deuxième système de notes parallèle.
+
+Ne crée pas :
+
+```text
+GradeV2
+NewGrade
+TabulatorGrade
+SpreadsheetGrade
+```
+
+si les modèles existants suffisent.
+
+Ne duplique pas les services de calcul.
+
+Ne réécris pas la logique LMD existante.
+
+Ne change pas les migrations sauf nécessité réellement démontrée.
+
+---
+
+# 30. Ne pas introduire de dépendance payante
+
+Pour cette implémentation, utiliser **Tabulator open source**.
+
+Ne pas ajouter :
+
+* Handsontable payant ;
+* AG Grid Enterprise ;
+* Syncfusion commercial ;
+* DevExpress ;
+* Kendo UI ;
+* autre composant commercial.
+
+Je veux une solution pouvant fonctionner sans licence commerciale supplémentaire.
+
+---
+
+# 31. Procédure de travail
+
+Procède dans cet ordre :
+
+```text
+1. Audit backend actuel
+2. Audit frontend actuel
+3. Identifier le template de notes
+4. Installer Tabulator
+5. Créer l'intégration JS
+6. Connecter les données existantes
+7. Ajouter/adapter API JSON si nécessaire
+8. Connecter cellEdited/autosave
+9. Connecter recalcul backend
+10. Gérer copier/coller
+11. Adapter CSS à la maquette
+12. Vérifier HTMX
+13. Tester permissions
+14. Tester validation
+15. Tester erreurs réseau
+16. Tester plusieurs étudiants
+17. Tester gros tableau
+18. Nettoyer l'ancien code devenu inutile
+```
+
+Ne commence pas par supprimer l'ancienne implémentation.
+
+Obtenir d'abord une version Tabulator fonctionnelle.
+
+Ensuite seulement supprimer les éléments devenus obsolètes.
+
+---
+
+# 32. Tests obligatoires
+
+Tester au minimum :
+
+```text
+note vide → 14
+14 → 16
+16 → vide si métier autorise
+0
+20
+14.5
+valeur > maximum
+valeur négative
+texte
+copier/coller une cellule
+copier/coller plusieurs cellules
+Tab
+Enter
+scroll vertical
+scroll horizontal
+rechargement page
+navigation HTMX
+retour dans la section
+erreur réseau
+permission refusée
+CSRF
+session expirée
+```
+
+Tester également que les calculs existants restent corrects après modification.
+
+---
+
+# 33. Résultat UX attendu
+
+Je veux atteindre une expérience proche de :
+
+```text
+Google Sheets / Excel
+```
+
+pour la rapidité de saisie,
+
+tout en gardant l'identité visuelle de notre dashboard.
+
+L'utilisateur doit pouvoir :
+
+```text
+cliquer
+taper
+Tab
+taper
+Tab
+taper
+```
+
+sans popup et sans attendre.
+
+Le système sauvegarde derrière lui.
+
+---
+
+# 34. Rapport final
+
+À la fin, me fournir un résumé extrêmement concret :
+
+```text
+Fichiers modifiés
+Fichiers créés
+Dépendances ajoutées
+Endpoints utilisés/créés
+Ancien code supprimé
+Logique backend réutilisée
+Fonctionnement autosave
+Fonctionnement copier/coller
+Tests exécutés
+Résultats
+Points restant éventuellement à traiter
+```
+
+Je veux également que tu confirmes explicitement :
+
+```text
+- aucune logique métier importante n'a été dupliquée ;
+- les calculs officiels restent côté Django ;
+- les permissions backend sont conservées ;
+- Tabulator ne sert que de couche d'interface ;
+- aucune dépendance commerciale payante n'a été introduite.
+```
+
+Objectif final :
+
+**transformer la saisie actuelle des notes en une vraie grille professionnelle de type tableur, rapide, stable et naturelle, sans refaire le backend et sans reconstruire Excel manuellement en HTML/CSS.**
+Ok 
+
+
+
+# Mission : mettre en place la prévisualisation, l’impression PDF et les exports/imports Excel du module de notes
+
+Le module de saisie des notes utilise maintenant **Tabulator** avec succès.
+
+Je veux poursuivre cette intégration proprement sans casser le backend académique existant.
+
+Le backend Django contient déjà la logique des notes, étudiants, classes, matières, sessions, semestres, calculs, résultats, permissions et validations.
+
+## OBJECTIF GÉNÉRAL
+
+Mettre en place trois couches complémentaires :
+
+```text
+TABULATOR
+→ saisie et consultation interactive
+
+OPENPYXL
+→ import/export Excel XLSX
+
+PRINT PREVIEW / PDF
+→ relevés officiels imprimables
+```
+
+Je veux maintenant pouvoir produire :
+
+* relevé général d'une classe ;
+* relevé individuel d'un étudiant ;
+* éventuellement procès-verbal / liste générale des résultats ;
+* impression papier ;
+* enregistrement en PDF ;
+* prévisualisation avant impression.
+
+Ne réécris pas le backend métier.
+
+Commence par auditer et réutiliser l'existant.
+
+---
+
+# 1. ARCHITECTURE ATTENDUE
+
+La logique générale doit être :
+
+```text
+PostgreSQL
+     ↓
+Django backend
+     ↓
+données académiques officielles
+     ↓
+┌───────────────────────────────┐
+│                               │
+▼                               ▼
+Tabulator                    OpenPyXL
+interface Web              Import / Export XLSX
+│
+▼
+Prévisualisation impression
+│
+▼
+PDF / Imprimante
+```
+
+Tabulator ne doit pas devenir la source officielle des données.
+
+Django reste l'autorité métier.
+
+---
+
+# 2. AUDITER L'EXISTANT AVANT DE MODIFIER
+
+Identifier :
+
+* modèles des notes ;
+* modèles étudiants ;
+* classes ;
+* niveaux ;
+* matières / EC / UE ;
+* évaluations ;
+* sessions ;
+* semestres ;
+* années académiques ;
+* services de calcul ;
+* services de publication ;
+* permissions ;
+* endpoints Tabulator existants ;
+* import/export Excel déjà existant ;
+* éventuelle génération PDF existante ;
+* templates de relevés existants ;
+* logo et informations institutionnelles ;
+* système actuel de fichiers statiques.
+
+Ne duplique aucune fonctionnalité existante.
+
+---
+
+# 3. CRÉER UNE VRAIE PRÉVISUALISATION DU DOCUMENT
+
+Je ne veux PAS imprimer directement le dashboard avec :
+
+```text
+sidebar
+navigation
+boutons
+filtres
+cards
+etc.
+```
+
+Créer une vue spécifique de prévisualisation du document.
+
+Par exemple :
+
+```text
+/grades/reports/class/<id>/preview/
+/grades/reports/student/<id>/preview/
+```
+
+ou adapter les routes existantes.
+
+Cette vue doit ressembler au document final imprimé.
+
+---
+
+# 4. BOUTON "PRÉVISUALISER"
+
+Dans la section des notes, ajouter ou connecter un bouton :
+
+```text
+Prévisualiser
+```
+
+Au clic :
+
+```text
+Tableau de notes
+      ↓
+Prévisualiser
+      ↓
+Vue document officielle
+```
+
+Cette prévisualisation doit afficher exactement ou presque exactement le rendu destiné à l'impression.
+
+Elle peut être :
+
+* une page dédiée ;
+* une modal/drawer plein écran si l'architecture actuelle le permet proprement ;
+* ou un nouvel onglet si cela améliore l'impression.
+
+Choisir la solution la plus robuste dans le projet actuel.
+
+---
+
+# 5. STRUCTURE DU RELEVÉ GÉNÉRAL
+
+Créer un document professionnel dans cet esprit :
+
+```text
+┌───────────────────────────────────────────────┐
+│ LOGO                         NOM DE L'ÉCOLE    │
+│                              informations...  │
+│                                               │
+│            RELEVÉ GÉNÉRAL DES NOTES           │
+│                                               │
+│ Année académique : 2026-2027                  │
+│ Classe : ...                                  │
+│ Niveau : ...                                  │
+│ Semestre : ...                                │
+│ Session : ...                                 │
+│ Filière : ...                                 │
+│ Matière / UE / EC : ...                       │
+│                                               │
+│ ┌───────────────────────────────────────────┐ │
+│ │ N° │ Matricule │ Étudiant │ ... notes... │ │
+│ ├───────────────────────────────────────────┤ │
+│ │                                            │ │
+│ └───────────────────────────────────────────┘ │
+│                                               │
+│ Date d'édition : ...                          │
+│                                               │
+│ Directeur des Études     Cachet / Signature   │
+└───────────────────────────────────────────────┘
+```
+
+Adapter les champs aux modèles existants.
+
+Ne coder aucune donnée métier en dur.
+
+---
+
+# 6. EN-TÊTE OFFICIEL
+
+Le document doit pouvoir afficher :
+
+* logo de l'établissement ;
+* nom complet de l'établissement ;
+* éventuellement ministère / tutelle si déjà présents ;
+* adresse ;
+* contacts institutionnels si disponibles ;
+* année académique ;
+* classe ;
+* niveau ;
+* filière ;
+* semestre ;
+* session ;
+* matière / UE / EC selon le document ;
+* titre du document.
+
+Utiliser les données réelles du projet.
+
+Ne pas écrire en dur :
+
+```text
+ESFé
+2026-2027
+S1
+```
+
+si ces informations sont disponibles dans la base.
+
+---
+
+# 7. RELEVÉ INDIVIDUEL
+
+Créer également le fonctionnement pour :
+
+```text
+Relevé individuel
+```
+
+Le relevé individuel doit être centré sur un étudiant.
+
+Exemple :
+
+```text
+RELEVÉ INDIVIDUEL DE NOTES
+
+Étudiant : ...
+Matricule : ...
+Classe : ...
+Filière : ...
+Année académique : ...
+Semestre : ...
+Session : ...
+
+┌──────────────────────────────────────┐
+│ UE │ EC │ Note │ Crédit │ Résultat  │
+├──────────────────────────────────────┤
+│                                    │
+└──────────────────────────────────────┘
+
+Moyenne générale :
+Crédits obtenus :
+Décision :
+...
+```
+
+Réutiliser strictement les calculs existants.
+
+Ne jamais recalculer différemment dans le template.
+
+---
+
+# 8. NE PAS DÉPENDRE DU TABLEAU VISIBLE POUR LE DOCUMENT OFFICIEL
+
+C'est très important.
+
+Le document officiel ne doit pas dépendre uniquement de ce qui est actuellement rendu dans le DOM par Tabulator.
+
+Pourquoi ?
+
+Tabulator utilise notamment de la virtualisation.
+
+Le document officiel doit récupérer ses données depuis Django ou depuis un endpoint fiable.
+
+Architecture recommandée :
+
+```text
+Django
+   ↓
+Report service
+   ↓
+dataset officiel
+   ↓
+template print
+```
+
+et non :
+
+```text
+DOM visible Tabulator
+   ↓
+capture approximative
+```
+
+---
+
+# 9. TABULATOR RESTE UTILE POUR L'APERÇU DES DONNÉES
+
+Dans la partie interactive, conserver Tabulator pour :
+
+* saisie ;
+* consultation ;
+* tri ;
+* navigation ;
+* édition ;
+* import rapide ;
+* export ;
+* copie/collage.
+
+Mais le template officiel d'impression peut utiliser un tableau HTML optimisé pour l'impression si c'est plus propre.
+
+Ne force pas Tabulator dans le document officiel si un tableau HTML généré par Django produit un meilleur résultat.
+
+---
+
+# 10. IMPRESSION
+
+Dans la prévisualisation, ajouter :
+
+```text
+[ Retour ]
+[ Imprimer ]
+[ Télécharger PDF ]
+```
+
+Pour l'impression navigateur :
+
+```javascript
+window.print();
+```
+
+peut être utilisé dans la vue dédiée.
+
+Créer une feuille CSS d'impression propre avec :
+
+```css
+@media print {
+    ...
+}
+```
+
+Masquer :
+
+* boutons ;
+* navigation ;
+* éléments interactifs ;
+* scrollbar ;
+* éléments non destinés au document.
+
+---
+
+# 11. FORMAT PAPIER
+
+Prévoir correctement :
+
+```css
+@page
+```
+
+Pour les documents larges comme un relevé général :
+
+```text
+A4 paysage
+```
+
+ou éventuellement :
+
+```text
+A3 paysage
+```
+
+si le nombre de colonnes l'exige.
+
+Pour un relevé individuel :
+
+```text
+A4 portrait
+```
+
+Exemple conceptuel :
+
+```css
+@page {
+    size: A4 landscape;
+    margin: 10mm;
+}
+```
+
+Pour le relevé individuel :
+
+```css
+@page {
+    size: A4 portrait;
+    margin: 15mm;
+}
+```
+
+Adapter cela proprement par type de document.
+
+---
+
+# 12. NE PAS LAISSER LE TABLEAU CASSER LA PAGE
+
+Gérer :
+
+* largeur ;
+* taille des caractères ;
+* répétition des en-têtes ;
+* sauts de page ;
+* grandes classes ;
+* nombreuses colonnes ;
+* longues listes.
+
+Pour les tableaux imprimables :
+
+```css
+thead {
+    display: table-header-group;
+}
+```
+
+doit être évalué afin que l'en-tête du tableau se répète sur chaque page si nécessaire.
+
+Éviter de couper une ligne étudiant au milieu d'une page lorsque possible.
+
+---
+
+# 13. PRÉVISUALISATION FIDÈLE
+
+La prévisualisation doit être suffisamment fidèle à ce qui sera imprimé.
+
+Créer un conteneur du genre :
+
+```text
+print-sheet
+```
+
+avec les dimensions visuelles d'une feuille.
+
+Sur écran :
+
+```text
+fond gris autour
++
+feuille blanche
++
+ombre légère
+```
+
+mais à l'impression :
+
+```text
+fond blanc
+pas d'ombre
+pas de bord externe inutile
+```
+
+---
+
+# 14. PDF
+
+Évaluer le système PDF déjà présent dans le projet.
+
+Si une solution serveur existe déjà, la réutiliser.
+
+Pour les documents officiels, privilégier une génération PDF serveur robuste si cela existe déjà dans l'architecture.
+
+Le PDF doit correspondre au même design que la prévisualisation autant que possible.
+
+Architecture idéale :
+
+```text
+template commun
+     ↓
+HTML Print Preview
+     ↓
+PDF
+```
+
+afin d'éviter deux designs complètement différents.
+
+---
+
+# 15. NE PAS UTILISER OPENPYXL POUR LE PDF
+
+OpenPyXL doit rester dédié aux fichiers :
+
+```text
+.xlsx
+```
+
+Ne pas utiliser OpenPyXL comme moteur PDF.
+
+---
+
+# 16. IMPORT EXCEL AVEC OPENPYXL
+
+Pour les imports Excel :
+
+```text
+Importer Excel
+```
+
+continuer à utiliser ou mettre en place :
+
+```python
+openpyxl
+```
+
+Le workflow doit être :
+
+```text
+fichier XLSX
+   ↓
+upload Django
+   ↓
+OpenPyXL
+   ↓
+validation structure
+   ↓
+validation étudiants
+   ↓
+validation notes
+   ↓
+aperçu / confirmation si déjà prévu
+   ↓
+enregistrement backend
+   ↓
+rafraîchissement Tabulator
+```
+
+Ne jamais importer directement dans PostgreSQL sans validation métier.
+
+---
+
+# 17. EXPORT EXCEL
+
+Pour un export Excel officiel ou structuré :
+
+```text
+Exporter Excel
+```
+
+utiliser OpenPyXL côté serveur si cela permet de produire un document plus propre.
+
+Le fichier Excel peut comporter :
+
+* logo si nécessaire ;
+* titre ;
+* classe ;
+* session ;
+* semestre ;
+* année académique ;
+* en-têtes ;
+* notes ;
+* moyennes ;
+* colonnes calculées ;
+* largeur de colonnes ;
+* gel des volets ;
+* formats numériques ;
+* bordures ;
+* alignements.
+
+---
+
+# 18. EXPORT TABULATOR
+
+Tabulator peut également conserver ses fonctions d'export rapide.
+
+Il faut donc distinguer :
+
+```text
+Export rapide
+→ données de la grille
+
+Export Excel officiel
+→ OpenPyXL
+```
+
+Si un seul bouton Excel suffit au projet, privilégier la version OpenPyXL officielle si elle est plus propre.
+
+Ne pas créer inutilement deux boutons identiques.
+
+---
+
+# 19. NOMMAGE DES FICHIERS
+
+Les fichiers générés doivent avoir des noms cohérents.
+
+Exemple :
+
+```text
+Releve_General_Classe_[classe]_[semestre]_[session].pdf
+```
+
+ou :
+
+```text
+Releve_Notes_[matricule]_[semestre].pdf
+```
+
+Pour Excel :
+
+```text
+Notes_[classe]_[semestre]_[session].xlsx
+```
+
+Nettoyer les caractères incompatibles dans les noms de fichiers.
+
+---
+
+# 20. PRÉVOIR PLUSIEURS TYPES DE RAPPORTS
+
+Construire une architecture extensible.
+
+Par exemple :
+
+```python
+GradeReportService
+```
+
+ou réutiliser le service existant.
+
+Il pourrait permettre à terme :
+
+```text
+CLASS_GRADE_REPORT
+INDIVIDUAL_TRANSCRIPT
+RESULTS_REPORT
+SESSION_REPORT
+RETAKE_REPORT
+```
+
+Mais ne créer cette abstraction que si elle s'intègre naturellement à l'architecture actuelle.
+
+Ne pas surarchitecturer inutilement.
+
+---
+
+# 21. DONNÉES OFFICIELLES
+
+Toutes les valeurs du PDF doivent provenir du backend :
+
+* note ;
+* moyenne ;
+* crédits ;
+* statut ;
+* validation ;
+* décision ;
+* étudiant ;
+* classe ;
+* session ;
+* semestre ;
+* année académique.
+
+Ne pas reprendre une valeur modifiable du frontend comme source officielle.
+
+---
+
+# 22. PERMISSIONS
+
+Respecter les permissions existantes.
+
+Un utilisateur ne doit pas pouvoir générer un relevé simplement en connaissant une URL.
+
+Vérifier :
+
+* rôle ;
+* établissement ;
+* annexe ;
+* classe ;
+* droit de consultation ;
+* droit de publication ;
+* état des notes.
+
+Réutiliser les permission checks existants.
+
+---
+
+# 23. DOCUMENTS NON ENCORE VALIDÉS
+
+Si les notes ne sont pas encore officiellement validées ou publiées, respecter le workflow existant.
+
+Si nécessaire, afficher dans la prévisualisation :
+
+```text
+BROUILLON
+```
+
+ou :
+
+```text
+NON VALIDÉ
+```
+
+mais uniquement si cela correspond déjà aux règles métier du système.
+
+Ne pas inventer une nouvelle règle de publication.
+
+---
+
+# 24. SIGNATURES ET CACHET
+
+Préparer dans le template les zones :
+
+```text
+Directeur des Études
+
+Signature
+
+Cachet
+```
+
+ou les rôles réels existants.
+
+Ne pas intégrer de fausse signature.
+
+Si le projet possède déjà des signatures électroniques, QR codes ou mécanismes de validation, les réutiliser.
+
+---
+
+# 25. QR CODE / IDENTIFIANT DOCUMENT
+
+Si le projet possède déjà un système de vérification de document, l'intégrer.
+
+Exemple :
+
+```text
+Document ID
+QR Code
+Hash
+URL de vérification
+```
+
+Mais ne pas créer cela dans cette tâche si aucune architecture de vérification n'existe encore, sauf si c'est très simple et cohérent.
+
+Priorité à l'impression.
+
+---
+
+# 26. UI DANS LE DASHBOARD
+
+Après finalisation de la saisie :
+
+```text
+[ Importer Excel ]
+[ Exporter Excel ]
+[ Prévisualiser ]
+[ Imprimer ]
+```
+
+ou une organisation similaire cohérente avec la maquette.
+
+Éviter la multiplication de boutons.
+
+On peut aussi avoir :
+
+```text
+Actions
+  ├── Importer Excel
+  ├── Exporter Excel
+  ├── Prévisualiser le relevé
+  └── Imprimer
+```
+
+si cela s'intègre mieux au design actuel.
+
+---
+
+# 27. FLOW UTILISATEUR DU RELEVÉ GÉNÉRAL
+
+Je veux exactement un parcours simple :
+
+```text
+1. utilisateur saisit les notes avec Tabulator
+2. autosave
+3. calcul backend
+4. utilisateur clique "Prévisualiser"
+5. document officiel s'affiche
+6. vérification visuelle
+7. utilisateur clique "Imprimer"
+8. dialogue d'impression
+```
+
+Et éventuellement :
+
+```text
+Télécharger PDF
+```
+
+---
+
+# 28. FLOW UTILISATEUR DU RELEVÉ INDIVIDUEL
+
+Depuis une ligne étudiant ou une section dédiée :
+
+```text
+Étudiant
+   ↓
+Relevé individuel
+   ↓
+Prévisualiser
+   ↓
+Imprimer / PDF
+```
+
+Ne pas obliger l'utilisateur à reconstruire manuellement le contexte.
+
+La classe, session, semestre, année académique, étudiant, etc. doivent être récupérés automatiquement.
+
+---
+
+# 29. DESIGN
+
+Respecter le design institutionnel existant.
+
+Le document officiel doit être :
+
+* sobre ;
+* lisible ;
+* administratif ;
+* propre ;
+* facile à imprimer en noir et blanc ;
+* suffisamment compact ;
+* sans composants dashboard inutiles.
+
+Les documents officiels ne doivent pas ressembler à une interface SaaS.
+
+Ils doivent ressembler à de vrais documents académiques.
+
+---
+
+# 30. TABLEAU DU RELEVÉ GÉNÉRAL
+
+Adapter les colonnes dynamiquement au contexte existant.
+
+Exemple seulement :
+
+```text
+N°
+Matricule
+Nom et prénom
+CC
+TP
+Examen
+Moyenne
+Crédit
+Résultat
+```
+
+Mais NE PAS coder ces colonnes en dur si la structure académique actuelle permet différents types d'évaluations.
+
+Construire la grille d'impression à partir de la structure réelle.
+
+---
+
+# 31. GRANDES CLASSES
+
+Tester le relevé général avec :
+
+```text
+20 étudiants
+50 étudiants
+100 étudiants
+plus si possible
+```
+
+Vérifier :
+
+* pagination ;
+* répétition headers ;
+* taille texte ;
+* lignes ;
+* aucune disparition de données ;
+* aucune colonne coupée.
+
+---
+
+# 32. TABLEAUX TRÈS LARGES
+
+Si beaucoup de colonnes existent :
+
+* réduire légèrement la taille typographique ;
+* passer en paysage ;
+* éventuellement A3 ;
+* calculer intelligemment la largeur ;
+* éviter le débordement hors page.
+
+Ne pas faire simplement :
+
+```css
+overflow-x: scroll;
+```
+
+pour un document imprimé.
+
+---
+
+# 33. NE PAS IMPRIMER LES INPUTS DE TABULATOR
+
+Le document officiel ne doit pas être une capture de cellules éditables.
+
+Il doit être en lecture seule.
+
+Pas de :
+
+```text
+input
+select
+editor
+focus
+checkbox d'édition
+```
+
+dans le document final.
+
+---
+
+# 34. OPENPYXL
+
+Vérifier si OpenPyXL est déjà installé :
+
+```bash
+pip show openpyxl
+```
+
+Sinon :
+
+```bash
+pip install openpyxl
+```
+
+Ajouter proprement la dépendance au système de dépendances Python du projet.
+
+Ne pas installer si elle existe déjà.
+
+---
+
+# 35. TESTS IMPORT EXCEL
+
+Tester :
+
+```text
+fichier valide
+fichier vide
+colonnes manquantes
+étudiant inexistant
+matricule incorrect
+note > maximum
+note négative
+texte à la place d'une note
+doublon
+mauvais semestre
+mauvaise classe
+```
+
+Les erreurs doivent être remontées clairement.
+
+---
+
+# 36. TESTS EXPORT EXCEL
+
+Vérifier :
+
+* fichier XLSX valide ;
+* ouverture dans Excel ;
+* ouverture LibreOffice si possible ;
+* données correctes ;
+* nombres réellement numériques ;
+* accents ;
+* noms étudiants ;
+* pagination visuelle ;
+* largeur colonnes ;
+* mise en forme.
+
+---
+
+# 37. TESTS IMPRESSION
+
+Tester :
+
+```text
+Chrome
+Edge
+```
+
+au minimum.
+
+Tester :
+
+```text
+A4 portrait
+A4 paysage
+PDF via navigateur
+imprimante si disponible
+```
+
+Vérifier que l'aperçu navigateur correspond au résultat attendu.
+
+---
+
+# 38. PAS DE POPUP INUTILE
+
+Comme pour Tabulator :
+
+ne pas afficher :
+
+```text
+PDF généré avec succès
+Document prêt
+Export réussi
+```
+
+à chaque opération normale.
+
+L'expérience doit rester naturelle.
+
+Afficher uniquement une erreur si nécessaire.
+
+---
+
+# 39. ÉVITER LES DUPLICATIONS
+
+Si le relevé général et le PDF utilisent presque le même template, factoriser intelligemment.
+
+Par exemple :
+
+```text
+reports/base_report.html
+reports/class_grades.html
+reports/student_transcript.html
+```
+
+ou utiliser l'architecture de templates existante.
+
+Mais ne pas imposer ces noms si le projet suit déjà une convention.
+
+---
+
+# 40. LIVRABLE FINAL
+
+Après implémentation, me donner un rapport clair :
+
+```text
+1. fichiers créés
+2. fichiers modifiés
+3. routes ajoutées/modifiées
+4. views/services ajoutés
+5. templates de prévisualisation
+6. CSS print
+7. fonctionnement PDF
+8. fonctionnement impression
+9. fonctionnement relevé général
+10. fonctionnement relevé individuel
+11. fonctionnement OpenPyXL import
+12. fonctionnement OpenPyXL export
+13. permissions utilisées
+14. tests effectués
+15. éventuels points restant à traiter
+```
+
+Confirmer explicitement :
+
+```text
+- Tabulator reste la grille interactive.
+- Django reste l'autorité métier.
+- OpenPyXL gère XLSX.
+- La prévisualisation est séparée du dashboard.
+- Le document imprimé utilise les données officielles du backend.
+- Aucun calcul métier important n'a été déplacé vers JavaScript.
+- Aucun backend parallèle n'a été créé.
+```
+
+# PRIORITÉ D'IMPLÉMENTATION
+
+Procéder dans cet ordre :
+
+```text
+PHASE 1
+Prévisualisation relevé général
+
+PHASE 2
+CSS impression A4/A3
+
+PHASE 3
+Impression navigateur
+
+PHASE 4
+PDF
+
+PHASE 5
+Relevé individuel
+
+PHASE 6
+Export Excel OpenPyXL
+
+PHASE 7
+Import Excel OpenPyXL
+
+PHASE 8
+Tests et nettoyage
+```
+
+Ne refais pas le système de notes.
+
+Branche ces fonctionnalités sur ce qui existe déjà.
+
+# RÉSULTAT FINAL ATTENDU
+
+Je dois pouvoir terminer la saisie d'une classe puis faire :
+
+```text
+Prévisualiser
+```
+
+et obtenir immédiatement un document ressemblant à une vraie feuille officielle de l'établissement avec :
+
+```text
+logo
+en-tête
+titre
+classe
+session
+semestre
+année académique
+informations nécessaires
+tableau complet des notes
+date
+signature/cachet si prévus
+```
+
+Puis :
+
+```text
+Imprimer
+```
+
+ou :
+
+```text
+Télécharger PDF
+```
+
+Pour Excel :
+
+```text
+Importer XLSX
+Exporter XLSX
+```
+
+avec OpenPyXL.
+
+L'ensemble doit être propre, rapide, fiable et intégré au backend existant.

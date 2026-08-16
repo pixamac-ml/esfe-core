@@ -1,98 +1,53 @@
 {% load component_tags %}
-<div class="sg-drawer-page">
-  <header class="sg-drawer-head">
-    <div style="min-width:0;">
-      <p class="sg-badge-sm sg-badge-blue">{{ modal_kicker|default:"Formulaire" }}</p>
-      <h3 style="margin-top:8px;font-size:1.15rem;font-weight:950;">{{ page_title }}</h3>
-      <p class="help-text">{{ modal_description|default:"Completez le formulaire." }}</p>
-    </div>
-    <button type="button" class="sg-btn sg-btn-outline" style="height:38px;flex-shrink:0;" onclick="window.sgCloseDrawer && window.sgCloseDrawer()">
-      {% component "icon" name="x" %}{% endcomponent %}Fermer
-    </button>
-  </header>
+<section class="mx-auto max-w-3xl space-y-5" data-ui-core="secretary-form-drawer">
+  {% component "ui_core.page_header" title=page_title subtitle=modal_description|default:"Complétez les informations puis enregistrez." eyebrow=modal_kicker|default:"Secrétariat" %}{% endcomponent %}
 
-  <div class="sg-drawer-body">
-    <div class="sg-drawer-form">
-      {% if registry_routing_rules %}
-        {{ registry_routing_rules|json_script:"registry-routing-rules" }}
-        <section id="registry-smart-routing" class="sg-panel" style="border-left:4px solid #2563eb;background:#fbfcff;">
-          <div class="sg-section-header" style="margin-bottom:10px;">
-            <div>
-              <div class="sg-panel-title" style="margin-bottom:4px;">Routage intelligent</div>
-              <div class="help-text">Le systeme deduit automatiquement le service, la priorite, le workflow et les actions a declencher.</div>
-            </div>
-            <span id="registry-route-priority" class="sg-priority-pill sg-priority-low">En attente</span>
-          </div>
-          <div class="sg-row-3">
-            <div class="sg-stat-box" style="background:#eff6ff;text-align:left;">
-              <div class="sg-stat-lbl" style="color:#2563eb;">Service cible</div>
-              <div id="registry-route-service" style="margin-top:6px;font-size:.9rem;font-weight:900;">Choisir un type</div>
-            </div>
-            <div class="sg-stat-box" style="background:#f5f3ff;text-align:left;">
-              <div class="sg-stat-lbl" style="color:#7c3aed;">Workflow</div>
-              <div id="registry-route-workflow" style="margin-top:6px;font-size:.9rem;font-weight:900;">-</div>
-            </div>
-            <div class="sg-stat-box" style="background:#f0fdf4;text-align:left;">
-              <div class="sg-stat-lbl" style="color:#16a34a;">Actions prevues</div>
-              <div id="registry-route-actions" style="margin-top:6px;font-size:.78rem;font-weight:800;color:#475569;">-</div>
-            </div>
-          </div>
-        </section>
-      {% endif %}
+  {% if registry_routing_rules %}
+    {{ registry_routing_rules|json_script:"registry-routing-rules" }}
+    {% component "ui_core.panel" title="Routage automatique" subtitle="Les règles du registre préremplissent les paramètres opérationnels." tone="primary" %}
+      <div class="grid gap-3 sm:grid-cols-3">
+        <div><p class="text-xs font-semibold text-ui-text-muted">Service cible</p><p id="registry-route-service" class="mt-1 text-sm font-bold text-ui-text">Choisir un type</p></div>
+        <div><p class="text-xs font-semibold text-ui-text-muted">Workflow</p><p id="registry-route-workflow" class="mt-1 text-sm font-bold text-ui-text">—</p></div>
+        <div><p class="text-xs font-semibold text-ui-text-muted">Priorité</p><div class="mt-1"><span id="registry-route-priority" class="inline-flex rounded-ui-badge bg-ui-surface-muted px-2 py-1 text-xs font-semibold text-ui-text-muted">En attente</span></div></div>
+      </div>
+      <p id="registry-route-actions" class="mt-3 text-xs text-ui-text-muted">Les actions prévues apparaîtront ici.</p>
+    {% endcomponent %}
+  {% endif %}
 
-      <form
-          method="post"
-          enctype="multipart/form-data"
-          style="display:grid;gap:16px;"
-          hx-post="{% if form_action_pk %}{% url form_action_url form_action_pk %}{% else %}{% url form_action_url|default:return_url %}{% endif %}"
-          hx-target="#sg-drawer-content"
-          hx-swap="innerHTML"
-          hx-encoding="multipart/form-data"
-      >
-          {% csrf_token %}
-          {% include "secretary/htmx/form_fields.html" %}
+  {% component "ui_core.panel" title="Informations" %}
+    <form method="post" enctype="multipart/form-data" class="grid gap-4" hx-post="{% if form_action_pk %}{% url form_action_url form_action_pk %}{% else %}{% url form_action_url|default:return_url %}{% endif %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" hx-encoding="multipart/form-data">
+      {% csrf_token %}
+      {% for field in form %}{% component "ui_core.django_form_field" field=field %}{% endcomponent %}{% endfor %}
+      <div class="flex flex-wrap items-center justify-end gap-3 border-t border-ui-border pt-4"><button type="button" onclick="window.sgCloseDrawer && window.sgCloseDrawer()" class="rounded-ui-button border border-ui-border px-4 py-2 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">Annuler</button><button type="submit" class="rounded-ui-button bg-ui-primary px-4 py-2 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong">{{ submit_label|default:"Enregistrer" }}</button></div>
+    </form>
+  {% endcomponent %}
+</section>
 
-          <div class="sg-form-footer">
-              <button class="sg-btn sg-btn-primary" type="submit">{% component "icon" name="check" %}{% endcomponent %}{{ submit_label|default:"Enregistrer" }}</button>
-              <span class="sg-form-note">Le formulaire se ferme automatiquement apres validation.</span>
-          </div>
-      </form>
-
-      {% if registry_routing_rules %}
-        <script>
-          (function () {
-            const dataNode = document.getElementById("registry-routing-rules");
-            const typeField = document.getElementById("id_entry_type");
-            const targetField = document.getElementById("id_target_service");
-            const priorityField = document.getElementById("id_priority");
-            const serviceNode = document.getElementById("registry-route-service");
-            const priorityNode = document.getElementById("registry-route-priority");
-            const workflowNode = document.getElementById("registry-route-workflow");
-            const actionsNode = document.getElementById("registry-route-actions");
-            if (!dataNode || !typeField) return;
-            const rules = JSON.parse(dataNode.textContent);
-
-            function applySmartRouting() {
-              const rule = rules[typeField.value];
-              if (!rule) return;
-              if (targetField) targetField.value = rule.target_service || "";
-              if (priorityField) priorityField.value = rule.priority || "normal";
-              if (serviceNode) serviceNode.textContent = rule.target_service || "Accueil";
-              if (workflowNode) workflowNode.textContent = rule.workflow_code || "administrative";
-              if (actionsNode) actionsNode.textContent = (rule.actions || []).join(" -> ") || "-";
-              if (priorityNode) {
-                const priorityClass = rule.priority === "immediate" ? "sg-priority-immediate" : rule.priority === "high" ? "sg-priority-high" : rule.priority === "low" ? "sg-priority-low" : "sg-priority-normal";
-                priorityNode.className = "sg-priority-pill " + priorityClass;
-                const dot = rule.priority === "immediate" ? '<span class="sg-priority-dot"></span>' : "";
-                priorityNode.innerHTML = dot + (rule.priority_label || "Normale");
-              }
-            }
-
-            typeField.addEventListener("change", applySmartRouting);
-            applySmartRouting();
-          })();
-        </script>
-      {% endif %}
-    </div>
-  </div>
-</div>
+{% if registry_routing_rules %}
+<script>
+  (function () {
+    const dataNode = document.getElementById("registry-routing-rules");
+    const typeField = document.getElementById("id_entry_type");
+    if (!dataNode || !typeField) return;
+    const rules = JSON.parse(dataNode.textContent);
+    const targetField = document.getElementById("id_target_service");
+    const priorityField = document.getElementById("id_priority");
+    const serviceNode = document.getElementById("registry-route-service");
+    const workflowNode = document.getElementById("registry-route-workflow");
+    const priorityNode = document.getElementById("registry-route-priority");
+    const actionsNode = document.getElementById("registry-route-actions");
+    function applyRouting() {
+      const rule = rules[typeField.value];
+      if (!rule) return;
+      if (targetField) targetField.value = rule.target_service || "";
+      if (priorityField) priorityField.value = rule.priority || "normal";
+      if (serviceNode) serviceNode.textContent = rule.target_service || "Accueil";
+      if (workflowNode) workflowNode.textContent = rule.workflow_code || "administrative";
+      if (actionsNode) actionsNode.textContent = (rule.actions || []).join(" · ") || "Aucune action complémentaire";
+      if (priorityNode) priorityNode.textContent = rule.priority_label || "Normale";
+    }
+    typeField.addEventListener("change", applyRouting);
+    applyRouting();
+  })();
+</script>
+{% endif %}

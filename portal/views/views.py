@@ -102,6 +102,7 @@ from academics.services.calendar_service import (
 )
 from portal.permissions import get_post_login_portal_url
 from portal.services import (
+    build_certified_navigation,
     build_certified_dashboard_shell,
     build_role_dashboard_shell,
     build_it_dashboard_context,
@@ -879,6 +880,7 @@ def _build_director_workspace_context(request, *, toast=None):
             subview=timetable_subview,
             selected_class_id=raw_class,
             week_start=week_start,
+            page_number=request.GET.get("timetable_page", 1),
         )
 
     selected_class_rows = semester_rows_by_class.get(getattr(selected_class, "id", None), []) if selected_class else []
@@ -919,7 +921,7 @@ def _build_director_workspace_context(request, *, toast=None):
             "student__student_profile__inscription__candidature__last_name",
             "student__student_profile__inscription__candidature__first_name",
             "student__username",
-        )[:40]:
+        )[:10]:
             student_profile = getattr(enrollment.student, "student_profile", None)
             selected_class_students.append({
                 "enrollment": enrollment,
@@ -969,7 +971,7 @@ def _build_director_workspace_context(request, *, toast=None):
         }
 
     teacher_rows = teacher_context["teacher_rows"]
-    teacher_rows_page = paginate_queryset(request, teacher_rows, per_page=20, page_param="teachers_page")
+    teacher_rows_page = paginate_queryset(request, teacher_rows, per_page=10, page_param="teachers_page")
     class_cards_page = paginate_queryset(request, class_cards, per_page=10, page_param="classes_page")
 
     validation_q = (request.GET.get("validation_q") or "").strip()
@@ -1139,8 +1141,8 @@ def _build_director_workspace_context(request, *, toast=None):
             "anomalies_count": len(result_anomalies),
         }
 
-    result_anomalies_page = paginate_queryset(request, result_anomalies, per_page=12, page_param="anomalies_page")
-    result_table_rows_page = paginate_queryset(request, result_table_rows, per_page=25, page_param="results_page")
+    result_anomalies_page = paginate_queryset(request, result_anomalies, per_page=10, page_param="anomalies_page")
+    result_table_rows_page = paginate_queryset(request, result_table_rows, per_page=10, page_param="results_page")
 
     ready_to_publish = [row for row in semester_rows if row["can_publish"]]
     ready_to_validate = [row for row in semester_rows if row["can_validate"]]
@@ -1204,7 +1206,7 @@ def _build_director_workspace_context(request, *, toast=None):
             "class_without_events",
         }
     ]
-    upcoming_events = list((timetable.get("events") or [])[:8])
+    upcoming_events = list((timetable.get("events") or [])[:5])
     recent_lesson_logs = []
     if (section in _NEEDS_SCHEDULE or section == "home") and branch:
         recent_lesson_logs = list(
@@ -1215,7 +1217,7 @@ def _build_director_workspace_context(request, *, toast=None):
                 "branch",
             )
             .filter(branch=branch)
-            .order_by("-date", "-start_time", "-id")[:8]
+            .order_by("-date", "-start_time", "-id")[:5]
         )
 
     raw_document_teacher = (request.GET.get("teacher_id") or request.POST.get("teacher_id") or "").strip()
@@ -1244,7 +1246,7 @@ def _build_director_workspace_context(request, *, toast=None):
             "transfer_metrics": {}, "transfer_q": "", "transfer_type_filter": "",
         }
     transfer_rows_page = paginate_queryset(
-        request, transfer_context["transfer_rows"], per_page=12, page_param="transfer_page"
+        request, transfer_context["transfer_rows"], per_page=10, page_param="transfer_page"
     )
 
     salary_context = build_director_salary_context(
@@ -1255,7 +1257,7 @@ def _build_director_workspace_context(request, *, toast=None):
     salary_history_page = paginate_queryset(
         request,
         salary_context["salary_history_rows"],
-        per_page=15,
+        per_page=10,
         page_param="salary_page",
     )
 
@@ -1283,7 +1285,7 @@ def _build_director_workspace_context(request, *, toast=None):
     programme_ec_form = DirectorECForm(branch=branch, academic_class=selected_class)
 
     admin_documents = list(
-        AdministrativeDocument.objects.filter(branch=branch).order_by("-created_at")[:50]
+        AdministrativeDocument.objects.filter(branch=branch).order_by("-created_at")[:10]
     ) if ((section in _NEEDS_DOCUMENTS or section == "home") and branch) else []
     admin_doc_type_choices = AdministrativeDocument.TYPE_CHOICES
     if section == "correspondances":
@@ -1299,7 +1301,7 @@ def _build_director_workspace_context(request, *, toast=None):
     else:
         administrative_document_context = {
             "administrative_documents_page": paginate_queryset(
-                request, [], per_page=12, page_param="documents_page"
+                request, [], per_page=10, page_param="documents_page"
             ),
             "administrative_document_metrics": {"total": 0, "draft": 0, "published": 0},
             "administrative_document_selected": None,
@@ -4121,34 +4123,58 @@ def _render_it_dashboard(request, *, initial_module=None, initial_workspace_html
         context["initial_workspace_html"] = mark_safe(initial_workspace_html)
     branch = context.get("branch")
     dashboard_url = reverse("accounts_portal:portal_dashboard")
-    it_modules = [
-        ("home", "Accueil", "home", "accounts_portal:it_home_workspace"),
-        ("notes", "Notes et resultats", "file-spreadsheet", "accounts_portal:it_notes_flow_workspace"),
-        ("structure", "Parametrage academique", "blocks", "accounts_portal:it_structure_workspace"),
-        ("import", "Import / export", "upload-cloud", "accounts_portal:it_import_workspace"),
-        ("archives", "Archives", "folder-archive", "accounts_portal:it_archives_workspace"),
-        ("cards", "Cartes etudiants", "badge", "accounts_portal:it_cards_workspace"),
-        ("accounts", "Utilisateurs", "shield-check", "accounts_portal:it_accounts_flow_workspace"),
-        ("support", "Support", "life-buoy", "accounts_portal:it_support_flow_workspace"),
-        ("supervision", "Supervision", "alert-triangle", "accounts_portal:it_supervision_workspace"),
-        ("audit", "Journal d'audit", "history", "accounts_portal:it_audit_workspace"),
-        ("catalog", "Catalogue", "library", "accounts_portal:it_catalog_workspace"),
-        ("notifications", "Notifications", "bell", "accounts_portal:it_notifications_workspace"),
-        ("settings", "Compte", "settings", "accounts_portal:it_my_account_workspace"),
-    ]
-    module_items = []
-    for key, label, icon, url_name in it_modules:
-        module_items.append(
-            {
-                "key": key,
-                "label": label,
-                "icon": icon,
-                "url": f"{dashboard_url}?module={key}",
-                "hx_get": reverse(url_name),
-                "hx_target": "#it-workspace",
-                "hx_push_url": f"{dashboard_url}?module={key}",
-            }
-        )
+    it_module_groups = (
+        (
+            "Administration IT",
+            (
+                ("home", "Accueil", "home", "accounts_portal:it_home_workspace"),
+                ("supervision", "Supervision", "alert-triangle", "accounts_portal:it_supervision_workspace"),
+                ("audit", "Journal d'audit", "history", "accounts_portal:it_audit_workspace"),
+                ("notifications", "Notifications", "bell", "accounts_portal:it_notifications_workspace"),
+            ),
+        ),
+        (
+            "Scolarité",
+            (
+                ("notes", "Notes et résultats", "file-spreadsheet", "accounts_portal:it_notes_flow_workspace"),
+                ("structure", "Paramétrage académique", "blocks", "accounts_portal:it_structure_workspace"),
+                ("import", "Import / export", "upload-cloud", "accounts_portal:it_import_workspace"),
+                ("archives", "Archives", "folder-archive", "accounts_portal:it_archives_workspace"),
+                ("cards", "Cartes étudiants", "badge", "accounts_portal:it_cards_workspace"),
+            ),
+        ),
+        (
+            "Support et accès",
+            (
+                ("accounts", "Utilisateurs", "shield-check", "accounts_portal:it_accounts_flow_workspace"),
+                ("support", "Support", "life-buoy", "accounts_portal:it_support_flow_workspace"),
+            ),
+        ),
+        (
+            "Référentiels et compte",
+            (
+                ("catalog", "Catalogue", "library", "accounts_portal:it_catalog_workspace"),
+                ("branch_settings", "Paramètres d'annexe", "sliders-horizontal", "accounts_portal:it_branch_settings_workspace"),
+                ("settings", "Mon compte", "settings", "accounts_portal:it_my_account_workspace"),
+            ),
+        ),
+    )
+    module_groups = []
+    for group_label, modules in it_module_groups:
+        items = []
+        for key, label, icon, url_name in modules:
+            items.append(
+                {
+                    "key": key,
+                    "label": label,
+                    "icon": icon,
+                    "url": f"{dashboard_url}?module={key}",
+                    "hx_get": reverse(url_name),
+                    "hx_target": "#it-dashboard-workspace",
+                    "hx_push_url": f"{dashboard_url}?module={key}",
+                }
+            )
+        module_groups.append({"label": group_label, "items": items})
     context.update(
         build_role_dashboard_shell(
             request,
@@ -4158,10 +4184,10 @@ def _render_it_dashboard(request, *, initial_module=None, initial_workspace_html
             subtitle="Support et qualite des donnees",
             active_section=initial_module,
             dashboard_url=dashboard_url,
-            workspace_target="#it-workspace",
+            workspace_target="#it-dashboard-workspace",
             branch=branch,
             context_label=f"Annexe - {branch.name}" if branch else "Support global",
-            groups=[{"label": "Administration IT", "items": module_items}],
+            groups=module_groups,
             modal_title="Administration technique",
         )
     )
@@ -4319,14 +4345,238 @@ def _teacher_nav_items(active_section):
             "id": section,
             "label": label,
             "icon": icon,
-            "url": f"?section={section}",
+            "href": f"?section={section}",
             "hx_get": f"?section={section}",
             "hx_target": "#teacher-workspace",
-            "hx_swap": "outerHTML",
+            "hx_swap": "innerHTML",
+            "hx_push_url": f"?section={section}",
             "active": active_section == section,
         }
         for section, label, icon in definitions
     ]
+
+
+def _teacher_certified_navigation(active_section):
+    """Expose teacher modules through the single certified dashboard sidebar."""
+
+    dashboard_url = reverse("accounts_portal:portal_teacher")
+    definitions = (
+        ("overview", "Accueil", "layout-dashboard", "Mon espace"),
+        ("classes", "Mes classes", "graduation-cap", "Mon espace"),
+        ("schedule", "Planning", "calendar-days", "Mon espace"),
+        ("supports", "Supports", "folder-open", "PÃ©dagogie"),
+        ("logs", "Cahier de texte", "book-open", "PÃ©dagogie"),
+        ("salary", "Honoraires", "wallet", "Suivi"),
+        ("notifications", "Notifications", "bell", "Suivi"),
+        ("settings", "ParamÃ¨tres", "settings", "Suivi"),
+    )
+    groups_by_label = {}
+    for key, label, icon, group_label in definitions:
+        groups_by_label.setdefault(group_label, []).append(
+            {
+                "key": key,
+                "label": label,
+                "icon": icon,
+                "hx_get": f"{dashboard_url}?section={key}",
+            }
+        )
+    return build_certified_navigation(
+        groups=[
+            {"label": label, "items": items}
+            for label, items in groups_by_label.items()
+        ],
+        active_section=active_section,
+        dashboard_url=dashboard_url,
+        workspace_target="#teacher-workspace",
+    )
+
+
+def _apply_teacher_certified_shell(request, context, active_section):
+    """Attach the official management-dashboard contract to teacher context."""
+
+    branch = context.get("branch")
+    context["notification_count"] = context.get("notifications_count", 0)
+    context.update(
+        build_certified_dashboard_shell(
+            role="teacher",
+            key="teacher",
+            page_title=context.get("page_title") or "Dashboard enseignant - ESFE",
+            title="Espace Enseignant",
+            subtitle="Espace Enseignant",
+            context_label=getattr(branch, "name", None) or "Annexe non dÃ©finie",
+            user_name=request.user.get_full_name() or request.user.username,
+            navigation=_teacher_certified_navigation(active_section),
+            active_section=active_section,
+            workspace_template="portal/teacher/v2/workspace.html",
+            topbar_template="portal/staff/shared/topbar_actions.html",
+            script_path="src/js/portal/teacher_certified_dashboard.js",
+            stylesheet_path="portal/css/teacher_dashboard.css",
+            notifications_url=reverse("notification_center:notifications"),
+            show_notifications_button=True,
+            drawer_title="DÃ©tail pÃ©dagogique",
+            modal_title="Espace enseignant",
+            empty_drawer_message="SÃ©lectionnez une classe, une sÃ©ance ou un support pour afficher ses dÃ©tails.",
+        )
+    )
+    return context
+
+
+def _teacher_ui_tables(context):
+    """Map scoped teacher data to the UI Core data-table contract.
+
+    This is presentation-only: all query scoping remains in the teacher
+    dashboard service and the individual drawer views.
+    """
+
+    drawer_target = "#sg-drawer-content"
+    classes = []
+    for row in context.get("class_focus_rows") or []:
+        next_event = row.get("next_event")
+        actions = [
+            {
+                "label": "DÃ©tails",
+                "icon": "eye",
+                "get_url": reverse("accounts_portal:teacher_class_detail", args=[row["class_id"]]),
+                "target": drawer_target,
+                "swap": "innerHTML",
+            }
+        ]
+        if next_event:
+            actions.append(
+                {
+                    "label": "Cahier",
+                    "icon": "pen-line",
+                    "tone": "primary",
+                    "get_url": reverse("accounts_portal:teacher_lesson_log_panel", args=[next_event.id]),
+                    "target": drawer_target,
+                    "swap": "innerHTML",
+                }
+            )
+        classes.append(
+            {
+                "id": f"teacher-class-{row['class_id']}",
+                "label": row.get("class_name"),
+                "cells": [
+                    {"value": row.get("class_name"), "strong": True},
+                    {"value": row.get("programme_title")},
+                    {"value": row.get("student_count", 0), "secondary": "Ã©tudiant(s)"},
+                    {"value": ", ".join(row.get("subjects") or []) or "Ã€ confirmer"},
+                    {"value": row.get("event_count", 0), "secondary": f"{row.get('slot_count', 0)} crÃ©neau(x)"},
+                    {"value": next_event.start_datetime.strftime("%d/%m %H:%M") if next_event else "Non planifiÃ©e"},
+                ],
+                "actions": actions,
+            }
+        )
+
+    schedule = []
+    for day in context.get("teaching_days") or []:
+        for event in day.get("events") or []:
+            schedule.append(
+                {
+                    "id": f"teacher-event-{event['id']}",
+                    "label": event.get("title"),
+                    "cells": [
+                        {"value": day.get("label"), "secondary": day.get("date").strftime("%d/%m")},
+                        {"value": event.get("time_range")},
+                        {"value": event.get("title"), "strong": True},
+                        {"value": event.get("class_name")},
+                        {"value": event.get("location") or "â€”"},
+                    ],
+                    "actions": [
+                        {
+                            "label": "Cahier",
+                            "icon": "pen-line",
+                            "get_url": reverse("accounts_portal:teacher_lesson_log_panel", args=[event["id"]]),
+                            "target": drawer_target,
+                            "swap": "innerHTML",
+                        }
+                    ],
+                }
+            )
+
+    logs = []
+    for log in context.get("recent_lesson_logs") or []:
+        if log.status == "done" and log.validated_by_id:
+            status, tone = "ValidÃ©", "success"
+        elif log.status == "done":
+            status, tone = "Soumis", "warning"
+        elif log.status == "absent_teacher":
+            status, tone = "Absence", "danger"
+        else:
+            status, tone = log.get_status_display(), "neutral"
+        actions = []
+        if log.schedule_event_id:
+            actions.append(
+                {
+                    "label": "Voir",
+                    "icon": "eye",
+                    "get_url": reverse("accounts_portal:teacher_lesson_log_panel", args=[log.schedule_event_id]),
+                    "target": drawer_target,
+                    "swap": "innerHTML",
+                }
+            )
+        logs.append(
+            {
+                "id": f"teacher-log-{log.id}",
+                "label": log.ec.title,
+                "cells": [
+                    {"value": log.ec.title, "strong": True},
+                    {"value": log.academic_class.display_name},
+                    {"value": log.date.strftime("%d/%m/%Y"), "secondary": log.start_time.strftime("%H:%M") if log.start_time else ""},
+                    {"value": f"{getattr(log, 'duration_minutes', 0) or 0} min"},
+                    {"value": status, "tone": tone},
+                ],
+                "actions": actions,
+            }
+        )
+
+    honoraria = []
+    for row in context.get("teacher_hour_rows") or []:
+        tone = "success" if row.get("status") == "paid" else "warning" if row.get("status") == "pending" else "neutral"
+        honoraria.append(
+            {
+                "id": f"teacher-honorarium-{row['entry_id']}",
+                "label": row.get("month_label"),
+                "cells": [
+                    {"value": row.get("month_label"), "strong": True},
+                    {"value": f"{row.get('hours', 0):.1f} h"},
+                    {"value": f"{row.get('tarif', 0):,.0f} FCFA", "amount": True},
+                    {"value": f"{row.get('gross_amount', 0):,.0f} FCFA", "amount": True},
+                    {"value": row.get("status_display"), "tone": tone},
+                ],
+                "actions": [
+                    {
+                        "label": "PDF",
+                        "icon": "file-down",
+                        "href": reverse("accounts:honorarium_download", args=[row["entry_id"]]),
+                        "external": True,
+                    }
+                ],
+            }
+        )
+
+    return {
+        "classes": classes,
+        "classes_headers": [
+            {"label": "Classe"}, {"label": "Programme"}, {"label": "Effectif"},
+            {"label": "Matières"}, {"label": "Séances"}, {"label": "Prochaine séance"},
+        ],
+        "schedule": schedule,
+        "schedule_headers": [
+            {"label": "Jour"}, {"label": "Horaire"}, {"label": "Cours"},
+            {"label": "Classe"}, {"label": "Salle"},
+        ],
+        "logs": logs,
+        "logs_headers": [
+            {"label": "Cours"}, {"label": "Classe"}, {"label": "Date"},
+            {"label": "Durée"}, {"label": "Statut"},
+        ],
+        "honoraria": honoraria,
+        "honoraria_headers": [
+            {"label": "Mois"}, {"label": "Heures"}, {"label": "Tarif"},
+            {"label": "Montant brut"}, {"label": "Statut"},
+        ],
+    }
 
 
 @login_required
@@ -4390,7 +4640,8 @@ def teacher_portal(request):
             "notifications_count": 0,
             "kpi_cards": [],
         }
-        return render(request, "portal/teacher/v2/dashboard.html", context)
+        _apply_teacher_certified_shell(request, context, active_section)
+        return render(request, "portal/staff/director_dashboard.html", context)
 
     context_builder = TEACHER_SECTION_CONTEXT_BUILDERS[active_section]
     context = context_builder(
@@ -4446,9 +4697,11 @@ def teacher_portal(request):
         ],
     }
     context["section_kpi_cards"] = section_kpis.get(active_section, [])
+    context["teacher_ui_tables"] = _teacher_ui_tables(context)
     if request.headers.get("HX-Request") == "true":
         return render(request, "portal/teacher/v2/workspace.html", context)
-    return render(request, "portal/teacher/v2/dashboard.html", context)
+    _apply_teacher_certified_shell(request, context, active_section)
+    return render(request, "portal/staff/director_dashboard.html", context)
 
 
 @_position_required({"teacher"})

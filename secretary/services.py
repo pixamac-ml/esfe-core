@@ -618,6 +618,7 @@ def get_student_snapshot(student_id, *, user=None, branch=None):
         "schedule": schedule,
         "today_events": schedule.get("today_events", []),
         "current_event": schedule.get("current_event"),
+        "next_event": schedule.get("next_event"),
         "presence_state": schedule.get("presence_state", {}),
     }
 
@@ -638,6 +639,7 @@ def _get_secretary_student_schedule(student):
     }
 
     current_event = None
+    next_event = None
     today_events = []
     for event in events:
         duration_minutes = event.get("duration_minutes") or 0
@@ -652,6 +654,8 @@ def _get_secretary_student_schedule(student):
             end_dt = timezone.localtime(event["end_datetime"])
             if start_dt <= now <= end_dt and not event.get("is_cancelled"):
                 current_event = event
+            elif start_dt > now and not event.get("is_cancelled") and next_event is None:
+                next_event = event
 
     for day_index, day in enumerate(schedule.get("days", [])):
         day_events = [
@@ -664,11 +668,13 @@ def _get_secretary_student_schedule(student):
     schedule["today_events"] = today_events
     schedule["today_events_count"] = len(today_events)
     schedule["current_event"] = current_event
+    schedule["next_event"] = next_event
     schedule["week_end"] = schedule["days"][-1]["date"] if schedule.get("days") else schedule.get("week_start")
     schedule["presence_state"] = {
         "has_course_now": current_event is not None,
         "label": _student_presence_label(current_event),
         "tone": _student_presence_tone(current_event),
+        "ui_tone": _student_presence_ui_tone(current_event),
     }
     return schedule
 
@@ -697,6 +703,19 @@ def _student_presence_tone(current_event):
     if status == StudentAttendance.STATUS_ABSENT:
         return "red"
     return "blue"
+
+
+def _student_presence_ui_tone(current_event):
+    if current_event is None:
+        return "neutral"
+    status = current_event.get("attendance_status")
+    if status == StudentAttendance.STATUS_PRESENT:
+        return "success"
+    if status == StudentAttendance.STATUS_LATE:
+        return "warning"
+    if status == StudentAttendance.STATUS_ABSENT:
+        return "danger"
+    return "info"
 
 
 def get_secretary_dashboard_data(user):

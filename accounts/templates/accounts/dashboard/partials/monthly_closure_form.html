@@ -1,116 +1,57 @@
-{% load component_tags %}
-{% load humanize dashboard_forms %}
-<div class="space-y-4">
-    {% if closure_error %}
-    <div class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ closure_error }}</div>
-    {% endif %}
+{% load component_tags humanize %}
+<div class="space-y-5">
+  {% if closure_error %}{% component "ui_core.alert" title="Clôture impossible" message=closure_error tone="danger" %}{% endcomponent %}{% endif %}
 
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-400">Recettes</p>
-            <p class="mt-2 text-lg font-bold text-slate-900">{{ period_summary.total_revenue|default:0|intcomma }} FCFA</p>
-        </div>
-        <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-400">Charges</p>
-            <p class="mt-2 text-lg font-bold text-slate-900">{{ period_summary.total_expenses|default:0|intcomma }} FCFA</p>
-        </div>
-        <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-400">Resultat</p>
-            <p class="mt-2 text-lg font-bold text-slate-900">{{ period_summary.net_result|default:0|intcomma }} FCFA</p>
-        </div>
-        <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
-            <p class="text-xs uppercase tracking-wide text-slate-400">Caisse</p>
-            <p class="mt-2 text-lg font-bold text-slate-900">{{ available_cash_balance|default:0|intcomma }} FCFA</p>
-        </div>
+  <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    {% component "ui_core.stat_card" label="Recettes" value=period_summary.total_revenue|default:0|intcomma unit="FCFA" icon="trending-up" tone="success" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Charges" value=period_summary.total_expenses|default:0|intcomma unit="FCFA" icon="trending-down" tone="danger" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Résultat" value=period_summary.net_result|default:0|intcomma unit="FCFA" icon="scale" tone="primary" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Caisse" value=available_cash_balance|default:0|intcomma unit="FCFA" icon="vault" tone="info" compact=True %}{% endcomponent %}
+  </div>
+
+  {% component "ui_core.alert" title="Versement bancaire suggéré" message="Le montant proposé est ajustable avant la préparation de la clôture." tone="info" %}{% endcomponent %}
+  <p class="text-sm text-ui-text-muted">Fonds de roulement à conserver : <strong class="text-ui-text">{{ cash_reserve_target|default:0|intcomma }} FCFA</strong> · montant suggéré : <strong class="text-ui-text">{{ suggested_transfer_amount|default:0|intcomma }} FCFA</strong>.</p>
+
+  {% if report_closure_blockers %}
+    {% component "ui_core.alert" title="Clôture bloquée" message="Des anomalies financières doivent être corrigées avant de préparer cette période." tone="danger" %}{% endcomponent %}
+    <a href="?section=rapport&report_month={{ report_period.month }}&report_year={{ report_period.year }}" class="inline-flex h-ui-control items-center rounded-ui-button border border-ui-danger px-4 text-sm font-semibold text-ui-danger hover:bg-ui-danger-soft">Consulter les alertes financières</a>
+  {% endif %}
+
+  <form method="post" action="{% url 'accounts:htmx_manager_monthly_closure_create' %}" enctype="multipart/form-data" class="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]" hx-boost="false">
+    {% csrf_token %}
+    <div class="space-y-4">
+      {% include "accounts/dashboard/partials/dg_form_fields.html" with form=closure_form %}
+      <input type="hidden" name="total_entries" value="{{ period_summary.total_revenue|default:0 }}">
+      <input type="hidden" name="total_exits" value="{{ period_summary.total_expenses|default:0 }}">
+      <input type="hidden" name="student_revenue" value="{{ period_summary.student_revenue|default:0 }}">
+      <input type="hidden" name="shop_revenue" value="{{ period_summary.shop_revenue|default:0 }}">
+      <input type="hidden" name="salary_paid" value="{{ period_summary.salary_paid|default:0 }}">
+      <input type="hidden" name="honorarium_paid" value="{{ period_summary.honorarium_paid|default:0 }}">
+      <input type="hidden" name="expenses_paid" value="{{ period_summary.expenses_paid|default:0 }}">
+      <input type="hidden" name="result_amount" value="{{ period_summary.net_result|default:0 }}">
+      {% component "ui_core.alert" title="Archive sans suppression" message="La clôture archive la période et préserve tout l'historique consultable." tone="warning" %}{% endcomponent %}
     </div>
 
-    <div class="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-800">
-        <p>
-            <span class="font-semibold">Fonds de roulement a conserver : {{ cash_reserve_target|default:0|intcomma }} FCFA.</span>
-            Versement bancaire suggere (caisse disponible - fonds de roulement) :
-            <span class="font-bold">{{ suggested_transfer_amount|default:0|intcomma }} FCFA</span>.
-            Ce montant est pre-rempli ci-dessous, vous pouvez l'ajuster avant de cloturer.
-        </p>
-    </div>
-
-    {% if report_closure_blockers %}
-    <div class="dashboard-closure-alert" role="alert">
-        <div class="dashboard-closure-alert-title">
-            {% component "icon" name="triangle-alert" %}{% endcomponent %}
-            Clôture bloquée : anomalies financières à corriger
+    {% component "ui_core.panel" title="Versement bancaire" subtitle="Enregistrer le reliquat versé" %}
+      {% fill "default" %}
+        <div class="grid grid-cols-1 gap-4">
+          {% component "ui_core.django_form_field" field=transfer_form.bank_name %}{% endcomponent %}
+          {% component "ui_core.django_form_field" field=transfer_form.reference %}{% endcomponent %}
+          {% component "ui_core.django_form_field" field=transfer_form.transfer_date %}{% endcomponent %}
+          <input type="hidden" id="transfer-amount-sync" name="amount" value="{{ closure_form.bank_transfer_amount.value|default:0 }}">
+          {% component "ui_core.django_form_field" field=transfer_form.proof %}{% endcomponent %}
+          {% component "ui_core.django_form_field" field=transfer_form.comment %}{% endcomponent %}
+          <button type="submit" class="inline-flex h-ui-control w-full items-center justify-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong disabled:cursor-not-allowed disabled:opacity-50" {% if report_closure_blockers %}disabled aria-disabled="true" title="Corrigez les anomalies financières avant de préparer la clôture"{% endif %}><i data-lucide="lock" class="h-4 w-4"></i>{% if report_closure_blockers %}Clôture bloquée{% else %}Préparer la clôture{% endif %}</button>
         </div>
-        <ul>
-            {% for blocker in report_closure_blockers %}<li>{{ blocker }}</li>{% endfor %}
-        </ul>
-        <a href="?section=rapport&report_month={{ report_period.month }}&report_year={{ report_period.year }}" class="dashboard-btn dashboard-btn-danger" style="margin-top:10px; text-decoration:none;">Consulter les alertes financières</a>
-    </div>
-    {% endif %}
-
-    <form method="post" action="{% url 'accounts:htmx_manager_monthly_closure_create' %}" enctype="multipart/form-data" class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-6" hx-boost="false">
-        {% csrf_token %}
-        <div class="space-y-4">
-            {% include "accounts/dashboard/partials/dg_form_fields.html" with form=closure_form %}
-
-            <input type="hidden" name="total_entries" value="{{ period_summary.total_revenue|default:0 }}">
-            <input type="hidden" name="total_exits" value="{{ period_summary.total_expenses|default:0 }}">
-            <input type="hidden" name="student_revenue" value="{{ period_summary.student_revenue|default:0 }}">
-            <input type="hidden" name="shop_revenue" value="{{ period_summary.shop_revenue|default:0 }}">
-            <input type="hidden" name="salary_paid" value="{{ period_summary.salary_paid|default:0 }}">
-            <input type="hidden" name="honorarium_paid" value="{{ period_summary.honorarium_paid|default:0 }}">
-            <input type="hidden" name="expenses_paid" value="{{ period_summary.expenses_paid|default:0 }}">
-            <input type="hidden" name="result_amount" value="{{ period_summary.net_result|default:0 }}">
-
-            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                La cloture archivera la periode, puis le versement bancaire pourra etre enregistre sans supprimer l'historique.
-            </div>
-        </div>
-
-        <div class="rounded-3xl bg-white border border-slate-100 p-5 space-y-4">
-            <div>
-                <p class="text-xs uppercase tracking-wide text-slate-400">Versement bancaire</p>
-                <h3 class="text-lg font-semibold text-slate-900 mt-1">Enregistrer le reliquat verse</h3>
-            </div>
-            <div class="dashboard-form-grid" style="grid-template-columns:1fr;">
-                <div class="dashboard-field">
-                    <label for="{{ transfer_form.bank_name.id_for_label }}">{% component "icon" name="building-columns" %}{% endcomponent %}{{ transfer_form.bank_name.label }}</label>
-                    {{ transfer_form.bank_name }}
-                </div>
-                <div class="dashboard-field">
-                    <label for="{{ transfer_form.reference.id_for_label }}">{% component "icon" name="hash" %}{% endcomponent %}{{ transfer_form.reference.label }}</label>
-                    {{ transfer_form.reference }}
-                </div>
-                <div class="dashboard-field">
-                    <label for="{{ transfer_form.transfer_date.id_for_label }}">{% component "icon" name="calendar" %}{% endcomponent %}{{ transfer_form.transfer_date.label }}</label>
-                    {{ transfer_form.transfer_date }}
-                </div>
-                <input type="hidden" id="transfer-amount-sync" name="amount" value="{{ closure_form.bank_transfer_amount.value|default:0 }}">
-                <div class="dashboard-field">
-                    <label for="{{ transfer_form.proof.id_for_label }}">{% component "icon" name="file-text" %}{% endcomponent %}{{ transfer_form.proof.label }}</label>
-                    {{ transfer_form.proof }}
-                </div>
-                <div class="dashboard-field">
-                    <label for="{{ transfer_form.comment.id_for_label }}">{% component "icon" name="message-square" %}{% endcomponent %}{{ transfer_form.comment.label }}</label>
-                    {{ transfer_form.comment }}
-                </div>
-            </div>
-            <div class="dashboard-form-footer">
-                <button type="submit" class="dashboard-btn dashboard-btn-primary" style="width:100%;" {% if report_closure_blockers %}disabled aria-disabled="true" title="Corrigez les anomalies financières avant de préparer la clôture"{% endif %}>
-                    {% component "icon" name="lock" %}{% endcomponent %}
-                    {% if report_closure_blockers %}Clôture bloquée{% else %}Préparer la clôture{% endif %}
-                </button>
-            </div>
-        </div>
-    </form>
+      {% endfill %}
+    {% endcomponent %}
+  </form>
 </div>
 <script>
-(function () {
-    const bankTransferInput = document.getElementById("id_bank_transfer_amount");
-    const syncInput = document.getElementById("transfer-amount-sync");
-    if (!bankTransferInput || !syncInput) {
-        return;
-    }
-    bankTransferInput.addEventListener("input", function () {
-        syncInput.value = bankTransferInput.value || 0;
-    });
-})();
+  (function () {
+    const source = document.getElementById("id_bank_transfer_amount");
+    const target = document.getElementById("transfer-amount-sync");
+    if (!source || !target) return;
+    source.addEventListener("input", () => { target.value = source.value || 0; });
+  }());
 </script>

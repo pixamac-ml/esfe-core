@@ -53,11 +53,7 @@ class SuperadminUserManagementTests(TestCase):
         self.client.force_login(self.user)
         self.branch = Branch.objects.create(name='Annexe Test', code='ATS', slug='annexe-test')
 
-    def test_create_user_with_role_and_group(self):
-        list_response = self.client.get(reverse('superadmin:user_list'))
-        self.assertEqual(list_response.status_code, 200)
-        group_id = str(list_response.context['groups'].first().id)
-
+    def test_create_user_synchronizes_position_and_group(self):
         response = self.client.post(
             reverse('superadmin:user_create'),
             {
@@ -66,9 +62,8 @@ class SuperadminUserManagementTests(TestCase):
                 'first_name': 'Agent',
                 'last_name': 'Admission',
                 'password': 'pass1234',
-                'role': 'admissions',
+                'position': 'admissions',
                 'branch': str(self.branch.pk),
-                'groups': [group_id],
                 'is_staff': 'on',
                 'is_active': 'on',
             },
@@ -78,21 +73,18 @@ class SuperadminUserManagementTests(TestCase):
         created = User.objects.get(username='agent_adm')
         self.assertTrue(created.is_staff)
         self.assertTrue(created.is_active)
+        self.assertEqual(created.profile.position, 'admissions')
         self.assertEqual(created.profile.role, 'admissions')
         self.assertEqual(created.profile.branch_id, self.branch.pk)
-        self.assertTrue(created.groups.exists())
+        self.assertEqual(list(created.groups.values_list('name', flat=True)), ['admissions'])
 
-    def test_edit_user_updates_role_groups(self):
+    def test_edit_user_synchronizes_position_group(self):
         target = User.objects.create_user(
             username='agent_finance',
             email='agent_finance@example.com',
             password='pass1234',
             is_staff=True,
         )
-
-        list_response = self.client.get(reverse('superadmin:user_list'))
-        self.assertEqual(list_response.status_code, 200)
-        group_id = str(list_response.context['groups'].first().id)
 
         response = self.client.post(
             reverse('superadmin:user_edit', args=[target.pk]),
@@ -101,9 +93,8 @@ class SuperadminUserManagementTests(TestCase):
                 'email': 'agent_finance@example.com',
                 'first_name': 'Agent',
                 'last_name': 'Finance',
-                'role': 'finance',
+                'position': 'finance_manager',
                 'branch': str(self.branch.pk),
-                'groups': [group_id],
                 'is_staff': 'on',
                 'is_active': 'on',
             },
@@ -111,9 +102,26 @@ class SuperadminUserManagementTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         target.refresh_from_db()
+        self.assertEqual(target.profile.position, 'finance_manager')
         self.assertEqual(target.profile.role, 'finance')
         self.assertEqual(target.profile.branch_id, self.branch.pk)
-        self.assertEqual(target.groups.count(), 1)
+        self.assertEqual(list(target.groups.values_list('name', flat=True)), ['finance_manager'])
+
+    def test_staff_position_requires_branch_when_scoped(self):
+        response = self.client.post(
+            reverse('superadmin:user_create'),
+            {
+                'username': 'supervisor_without_branch',
+                'password': 'pass1234',
+                'position': 'academic_supervisor',
+                'is_staff': 'on',
+                'is_active': 'on',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(User.objects.filter(username='supervisor_without_branch').exists())
+        self.assertContains(response, 'Une annexe est obligatoire')
 
     def test_non_staff_user_is_denied_superadmin_dashboard(self):
         basic_user = User.objects.create_user(

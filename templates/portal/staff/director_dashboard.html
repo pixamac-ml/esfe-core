@@ -47,7 +47,7 @@
   {% endfill %}
 
   {% fill "default" %}
-    <div class="relative">
+    <div class="relative min-w-0 max-w-full">
       <div
         id="{{ dashboard_shell.loading_id }}"
         class="hidden fixed left-1/2 top-20 z-40 -translate-x-1/2 rounded-ui-button border border-ui-border bg-ui-surface px-4 py-2 text-sm font-semibold text-ui-text shadow-ui-dropdown"
@@ -65,6 +65,7 @@
         tabindex="-1"
         aria-live="polite"
         aria-busy="false"
+        class="min-w-0 max-w-full"
       >
         {% block dashboard_content %}
           {% include dashboard_shell.workspace_template %}
@@ -74,13 +75,25 @@
 
     {% component "ui_core.drawer" id=dashboard_shell.drawer_id title=dashboard_shell.drawer_title size="wide" %}
       {% fill "default" %}
-        <p class="text-sm text-ui-text-muted">{{ dashboard_shell.empty_drawer_message }}</p>
+        {% if dashboard_shell.role == "teacher" or dashboard_shell.role == "secretary" %}
+          <div id="sg-drawer-content">
+            <p class="text-sm text-ui-text-muted">{{ dashboard_shell.empty_drawer_message }}</p>
+          </div>
+        {% else %}
+          <p class="text-sm text-ui-text-muted">{{ dashboard_shell.empty_drawer_message }}</p>
+        {% endif %}
       {% endfill %}
     {% endcomponent %}
 
     {% component "ui_core.modal" id=dashboard_shell.modal_id title=dashboard_shell.modal_title size="wide" %}
       {% fill "default" %}
-        <p class="text-sm text-ui-text-muted">{{ dashboard_shell.empty_modal_message }}</p>
+        {% if dashboard_shell.role == "teacher" or dashboard_shell.role == "secretary" %}
+          <div id="sg-modal-content">
+            <p class="text-sm text-ui-text-muted">{{ dashboard_shell.empty_modal_message }}</p>
+          </div>
+        {% else %}
+          <p class="text-sm text-ui-text-muted">{{ dashboard_shell.empty_modal_message }}</p>
+        {% endif %}
       {% endfill %}
     {% endcomponent %}
 

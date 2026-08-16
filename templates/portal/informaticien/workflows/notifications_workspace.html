@@ -1,10 +1,12 @@
+{% load component_tags %}
 {% if toast %}
 <div class="panel mb-4" style="border-left:5px solid {% if toast.level == 'success' %}#059669{% elif toast.level == 'error' %}#be123c{% else %}#d97706{% endif %}">
   <p class="text-sm font-black">{{ toast.message }}</p>
 </div>
 {% endif %}
 
-<div class="space-y-4">
+<div class="space-y-5">
+  {% component "ui_core.page_header" eyebrow="Communication" title="Notifications et messages" subtitle="Lecture des alertes internes, suivi des emails et contrôle des messages." %}{% endcomponent %}
   <div class="band {% if stats.critical %}b-ready_to_validate{% elif stats.unread %}b-in_progress{% else %}b-validated{% endif %}">
     <div>
       <p class="kicker">Communication</p>
@@ -45,7 +47,7 @@
   <form
     class="wkc"
     hx-get="{% url 'accounts_portal:it_notifications_workspace' %}"
-    hx-target="#it-workspace"
+    hx-target="#it-dashboard-workspace"
     hx-swap="innerHTML"
   >
     <label>Recherche
@@ -92,7 +94,7 @@
         class="btn btn-secondary"
         type="button"
         hx-post="{% url 'accounts_portal:it_notifications_action' %}"
-        hx-target="#it-workspace"
+        hx-target="#it-dashboard-workspace"
         hx-swap="innerHTML"
         hx-include="closest form"
         hx-vals='{"action":"mark_all_read"}'
@@ -125,7 +127,7 @@
                 type="button"
                 class="btn btn-secondary"
                 hx-get="{% url 'accounts_portal:it_notifications_workspace' %}?notification_id={{ notification.id }}&channel={{ filters.channel }}&status={{ filters.status }}&priority={{ filters.priority }}&source={{ filters.source }}&q={{ filters.q|urlencode }}&page={{ page_obj.number }}"
-                hx-target="#it-workspace"
+                hx-target="#it-dashboard-workspace"
                 hx-swap="innerHTML"
               >
                 Ouvrir
@@ -134,7 +136,7 @@
                 type="button"
                 class="btn {% if notification.read_at %}btn-secondary{% else %}btn-primary{% endif %}"
                 hx-post="{% url 'accounts_portal:it_notifications_action' %}"
-                hx-target="#it-workspace"
+                hx-target="#it-dashboard-workspace"
                 hx-swap="innerHTML"
                 hx-vals='{"action":"{% if notification.read_at %}mark_unread{% else %}mark_read{% endif %}","notification_id":"{{ notification.id }}","channel":"{{ filters.channel }}","status":"{{ filters.status }}","priority":"{{ filters.priority }}","source":"{{ filters.source }}","q":"{{ filters.q|escapejs }}","page":"{{ page_obj.number }}"}'
                 hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
@@ -153,10 +155,10 @@
           <span class="text-sm font-semibold text-slate-500">Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
           <div class="flex gap-2">
             {% if page_obj.has_previous %}
-              <button class="btn btn-secondary" type="button" hx-get="{% url 'accounts_portal:it_notifications_workspace' %}?page={{ page_obj.previous_page_number }}&channel={{ filters.channel }}&status={{ filters.status }}&priority={{ filters.priority }}&source={{ filters.source }}&q={{ filters.q|urlencode }}" hx-target="#it-workspace" hx-swap="innerHTML">Précédent</button>
+              <button class="btn btn-secondary" type="button" hx-get="{% url 'accounts_portal:it_notifications_workspace' %}?page={{ page_obj.previous_page_number }}&channel={{ filters.channel }}&status={{ filters.status }}&priority={{ filters.priority }}&source={{ filters.source }}&q={{ filters.q|urlencode }}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">Précédent</button>
             {% endif %}
             {% if page_obj.has_next %}
-              <button class="btn btn-secondary" type="button" hx-get="{% url 'accounts_portal:it_notifications_workspace' %}?page={{ page_obj.next_page_number }}&channel={{ filters.channel }}&status={{ filters.status }}&priority={{ filters.priority }}&source={{ filters.source }}&q={{ filters.q|urlencode }}" hx-target="#it-workspace" hx-swap="innerHTML">Suivant</button>
+              <button class="btn btn-secondary" type="button" hx-get="{% url 'accounts_portal:it_notifications_workspace' %}?page={{ page_obj.next_page_number }}&channel={{ filters.channel }}&status={{ filters.status }}&priority={{ filters.priority }}&source={{ filters.source }}&q={{ filters.q|urlencode }}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">Suivant</button>
             {% endif %}
           </div>
         </div>

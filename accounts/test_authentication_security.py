@@ -497,7 +497,7 @@ class SystemProfileEditTests(TestCase):
         self.assertEqual(self.user.profile.address, "Bamako")
         self.assertEqual(self.user.profile.position, "teacher")
         self.assertEqual(self.user.profile.branch, self.branch)
-        self.assertEqual(list(self.user.groups.values_list("name", flat=True)), [])
+        self.assertEqual(list(self.user.groups.values_list("name", flat=True)), ["teacher"])
         self.user.public_community_profile.refresh_from_db()
         self.assertEqual(self.user.public_community_profile.bio, "Bio communautaire verrouillee")
         self.assertEqual(self.user.profile.bio, "Bio publique")
@@ -857,7 +857,8 @@ class MarketingPositionPolicyTests(TestCase):
 class CentralAccessPolicyV2AdditionalTests(TestCase):
     def test_teacher_group_without_position_is_denied(self):
         user = User.objects.create_user(username="teacher-group-only-v2")
-        user.groups.add(Group.objects.create(name="teacher"))
+        teacher_group, _created = Group.objects.get_or_create(name="teacher")
+        user.groups.add(teacher_group)
 
         self.assertFalse(can_access(user, "view_portal", "teacher"))
 

@@ -14,7 +14,14 @@ from django.urls import reverse
 from django.utils import formats
 
 from admissions.models import Candidature
-from accounts.models import BranchCashMovement, BranchExpense, PayrollEntry
+from accounts.models import (
+    BranchCashMovement,
+    BranchExpense,
+    BranchMonthlyClosure,
+    Donation,
+    PayrollEntry,
+    TeacherHonorariumEntry,
+)
 from inscriptions.models import Inscription
 from payments.models import Payment
 
@@ -93,6 +100,147 @@ SECTION_PRESENTATION = {
         "components": ("page_header", "panel", "profile_view", "security_settings"),
     },
 }
+
+
+# A manager section is a business domain.  These are deliberately limited to
+# workflows that already exist in the manager workspace; a tab must never be
+# a promise for a future, empty screen.
+MANAGER_SUBVIEW_DEFINITIONS = {
+    "candidatures": (
+        ("overview", "Vue d'ensemble", "layout-dashboard"),
+        ("list", "Candidatures", "files"),
+        ("to_process", "À traiter", "clock-3"),
+    ),
+    "inscriptions": (
+        ("overview", "Vue d'ensemble", "layout-dashboard"),
+        ("list", "Inscriptions", "id-card"),
+        ("pending", "En attente", "clock-3"),
+    ),
+    "paiements": (
+        ("overview", "Vue d'ensemble", "layout-dashboard"),
+        ("payments", "Paiements", "credit-card"),
+        ("cash_sessions", "Sessions espèces", "badge-dollar-sign"),
+        ("to_validate", "À valider", "circle-check"),
+    ),
+    "salaires": (
+        ("overview", "Vue d'ensemble", "layout-dashboard"),
+        ("entries", "Fiches", "files"),
+        ("to_validate", "À valider", "circle-check"),
+    ),
+    "depenses": (
+        ("overview", "Vue d'ensemble", "layout-dashboard"),
+        ("expenses", "Dépenses", "receipt"),
+        ("new", "Nouvelle dépense", "plus"),
+        ("to_approve", "À approuver", "circle-check"),
+    ),
+    "caisse": (
+        ("overview", "Vue d'ensemble", "layout-dashboard"),
+        ("movements", "Mouvements", "arrow-left-right"),
+        ("operations", "Opérations", "plus"),
+    ),
+    "rapport": (
+        ("overview", "Vue d'ensemble", "layout-dashboard"),
+        ("movements", "Mouvements", "arrow-left-right"),
+        ("exports", "Exports", "download"),
+    ),
+    "cloture": (
+        ("overview", "Vue d'ensemble", "layout-dashboard"),
+        ("honoraria", "Honoraires", "graduation-cap"),
+        ("closures", "Clôtures", "lock"),
+        ("archives", "Archives", "archive"),
+    ),
+    "dons": (
+        ("overview", "Vue d'ensemble", "layout-dashboard"),
+        ("register", "Enregistrer", "plus"),
+        ("history", "Historique", "history"),
+    ),
+}
+
+# A focused tab starts with the matching existing server-side filter.  The
+# user can still refine it through the normal filter bar; branch filtering
+# remains owned by the queryset layer.
+MANAGER_SUBVIEW_FILTERS = {
+    ("candidatures", "to_process"): {"cand_status": "under_review"},
+    ("inscriptions", "pending"): {"ins_status": "awaiting_payment"},
+    ("paiements", "to_validate"): {"pay_status": "pending"},
+    ("salaires", "to_validate"): {"salary_status": "ready"},
+    ("depenses", "to_approve"): {"expense_status": "submitted"},
+}
+
+
+def normalize_manager_subview(section, raw_subview):
+    """Return a safe, existing subview for a manager business domain."""
+
+    allowed = {item[0] for item in MANAGER_SUBVIEW_DEFINITIONS.get(section, ())}
+    subview = str(raw_subview or "overview").strip().lower()
+    return subview if subview in allowed else "overview"
+
+
+def manager_subcontent_template(section):
+    """Return the HTMX subcontent partial for a manager business domain."""
+
+    if section in MANAGER_SUBVIEW_DEFINITIONS:
+        return f"accounts/dashboard/partials/manager_subcontents/{section}.html"
+    return ""
+
+
+def manager_subcontent_target(section):
+    return f"#manager-{section}-subcontent"
+
+
+def manager_subcontent_indicator(section):
+    return f"#manager-{section}-loading"
+
+
+def _manager_section_query(section, context, **params):
+    """Build a GET query preserving the active subview when relevant."""
+
+    query = {"section": section, **params}
+    subview = context.get("manager_subview") or ""
+    if subview and subview != "overview":
+        query["view"] = subview
+    return query
+
+
+def _manager_subnav_items(*, section, active, dashboard_url, subcontent_url):
+    definitions = MANAGER_SUBVIEW_DEFINITIONS.get(section, ())
+    if not definitions:
+        return []
+    target = manager_subcontent_target(section)
+    indicator = manager_subcontent_indicator(section)
+    items = []
+    for item_id, label, icon in definitions:
+        query = {"section": section, "view": item_id}
+        query.update(MANAGER_SUBVIEW_FILTERS.get((section, item_id), {}))
+        encoded_query = urlencode(query)
+        items.append(
+            {
+                "id": item_id,
+                "label": label,
+                "icon": icon,
+                "href": f"{dashboard_url}?{encoded_query}",
+                "hx_get": f"{subcontent_url}?{encoded_query}",
+                "hx_target": target,
+                "hx_swap": "innerHTML",
+                "hx_push_url": f"{dashboard_url}?{encoded_query}",
+                "hx_indicator": indicator,
+                "hx_sync": f"{target}:replace",
+            }
+        )
+    return items
+
+
+def _augment_manager_filters(filters, *, section, subview):
+    if not filters or not subview or subview == "overview":
+        return filters
+    payload = dict(filters)
+    hidden_fields = list(payload.get("hidden_fields") or [])
+    if not any(field.get("name") == "view" for field in hidden_fields):
+        hidden_fields.append({"name": "view", "value": subview})
+    payload["hidden_fields"] = hidden_fields
+    reset_query = urlencode({"section": section, "view": subview})
+    payload["reset_url"] = f"{payload.get('action', '')}?{reset_query}"
+    return payload
 
 
 def _money(value):
@@ -366,13 +514,14 @@ def build_payment_table_row(payment, capabilities=()):
 def _payment_table(context, *, capabilities, dashboard_url):
     payments = context.get("payments")
     rows = [build_payment_table_row(payment, capabilities) for payment in payments.object_list]
-    query = {
-        "section": "paiements",
-        "pay_status": context.get("pay_status") or "",
-        "pay_method": context.get("pay_method") or "",
-        "pay_date": context.get("pay_date") or "",
-        "pay_q": context.get("pay_search") or "",
-    }
+    query = _manager_section_query(
+        "paiements",
+        context,
+        pay_status=context.get("pay_status") or "",
+        pay_method=context.get("pay_method") or "",
+        pay_date=context.get("pay_date") or "",
+        pay_q=context.get("pay_search") or "",
+    )
 
     def page_url(number):
         return f"{dashboard_url}?{urlencode({**query, 'pay_page': number})}"
@@ -536,7 +685,12 @@ def build_candidature_table_row(candidature, capabilities=()):
 def _admission_table(context, *, capabilities, dashboard_url):
     page = context.get("candidatures")
     rows = [build_candidature_table_row(item, capabilities) for item in page.object_list]
-    query = {"section": "candidatures", "cand_status": context.get("cand_status") or "", "cand_q": context.get("cand_search") or ""}
+    query = _manager_section_query(
+        "candidatures",
+        context,
+        cand_status=context.get("cand_status") or "",
+        cand_q=context.get("cand_search") or "",
+    )
 
     def page_url(number):
         return f"{dashboard_url}?{urlencode({**query, 'cand_page': number})}"
@@ -623,7 +777,12 @@ def build_inscription_table_row(inscription, capabilities=()):
 def _inscription_table(context, *, capabilities, dashboard_url):
     page = context.get("inscriptions")
     rows = [build_inscription_table_row(item, capabilities) for item in page.object_list]
-    query = {"section": "inscriptions", "ins_status": context.get("ins_status") or "", "ins_q": context.get("ins_search") or ""}
+    query = _manager_section_query(
+        "inscriptions",
+        context,
+        ins_status=context.get("ins_status") or "",
+        ins_q=context.get("ins_search") or "",
+    )
 
     def page_url(number):
         return f"{dashboard_url}?{urlencode({**query, 'ins_page': number})}"
@@ -700,12 +859,13 @@ def build_cash_movement_table_row(movement):
 def _cash_table(context, *, dashboard_url):
     page = context.get("cash_movements")
     rows = [build_cash_movement_table_row(item) for item in page.object_list]
-    query = {
-        "section": "caisse",
-        "cash_type": context.get("cash_type") or "",
-        "cash_source": context.get("cash_source") or "",
-        "cash_q": context.get("cash_search") or "",
-    }
+    query = _manager_section_query(
+        "caisse",
+        context,
+        cash_type=context.get("cash_type") or "",
+        cash_source=context.get("cash_source") or "",
+        cash_q=context.get("cash_search") or "",
+    )
 
     def page_url(number):
         return f"{dashboard_url}?{urlencode({**query, 'cash_page': number})}"
@@ -823,7 +983,13 @@ def build_expense_table_row(expense):
 def _expense_table(context, *, dashboard_url):
     page = context.get("expenses")
     rows = [build_expense_table_row(item) for item in page.object_list]
-    query = {"section": "depenses", "expense_status": context.get("expense_status") or "", "expense_category": context.get("expense_category") or "", "expense_q": context.get("expense_search") or ""}
+    query = _manager_section_query(
+        "depenses",
+        context,
+        expense_status=context.get("expense_status") or "",
+        expense_category=context.get("expense_category") or "",
+        expense_q=context.get("expense_search") or "",
+    )
 
     def page_url(number):
         return f"{dashboard_url}?{urlencode({**query, 'expense_page': number})}"
@@ -923,7 +1089,13 @@ def _payroll_table(context, *, dashboard_url):
     page = context.get("payroll_entries")
     month = context.get("salary_month_value") or ""
     rows = [build_payroll_table_row(item, salary_month_value=month) for item in page.object_list]
-    query = {"section": "salaires", "salary_month": month, "salary_status": context.get("salary_status") or "", "salary_q": context.get("salary_search") or ""}
+    query = _manager_section_query(
+        "salaires",
+        context,
+        salary_month=month,
+        salary_status=context.get("salary_status") or "",
+        salary_q=context.get("salary_search") or "",
+    )
 
     def page_url(number):
         return f"{dashboard_url}?{urlencode({**query, 'salary_page': number})}"
@@ -939,16 +1111,460 @@ def _payroll_table(context, *, dashboard_url):
     }
 
 
-def build_manager_dashboard_presentation(*, active_section, context, capabilities=(), dashboard_url=""):
+def _report_stat_cards(context):
+    summary = context.get("report_summary") or {}
+    closure_possible = bool(context.get("report_closure_possible"))
+    return [
+        {"label": "Recettes totales", "value": _money(summary.get("total_revenue")), "unit": "FCFA", "icon": "trending-up", "tone": "success", "description": "Encaissements consolidés de la période"},
+        {"label": "Dépenses totales", "value": _money(summary.get("total_expenses")), "unit": "FCFA", "icon": "trending-down", "tone": "danger", "description": "Charges consolidées de la période"},
+        {"label": "Résultat net", "value": _money(summary.get("net_result")), "unit": "FCFA", "icon": "scale", "tone": "primary" if (summary.get("net_result") or 0) >= 0 else "danger", "description": "Recettes moins dépenses"},
+        {"label": "Versement bancaire recommandé", "value": _money(context.get("report_recommended_bank_transfer")), "unit": "FCFA", "icon": "landmark", "tone": "info", "description": "Montant disponible après réserve de caisse"},
+        {"label": "Caisse réelle", "value": _money(summary.get("available_cash_balance")), "unit": "FCFA", "icon": "vault", "tone": "success" if closure_possible else "warning", "description": "Clôture possible" if closure_possible else "Contrôles requis avant clôture"},
+    ]
+
+
+def _report_filters(context, *, dashboard_url):
+    period = context.get("report_period") or {}
+    preset = period.get("preset") or "month"
+    cash_type = context.get("report_cash_type") or ""
+    cash_source = context.get("report_cash_source") or ""
+    active_filters = [period.get("label") or "Période courante"]
+    if cash_type:
+        active_filters.append(dict(context.get("report_type_options") or ()).get(cash_type, cash_type))
+    if cash_source:
+        active_filters.append(dict(context.get("report_source_options") or ()).get(cash_source, cash_source))
+    return {
+        "action": dashboard_url,
+        "reset_url": f"{dashboard_url}?section=rapport",
+        "hidden_fields": [{"name": "section", "value": "rapport"}],
+        "active_filters": active_filters,
+        "items": [
+            {
+                "name": "report_period",
+                "label": "Période",
+                "options": _choice_options(
+                    (
+                        ("month", "Mois"),
+                        ("today", "Aujourd'hui"),
+                        ("week", "Semaine"),
+                        ("two_weeks", "Deux semaines"),
+                        ("three_months", "Trois mois"),
+                        ("semester", "Semestre"),
+                        ("year", "Année"),
+                        ("custom", "Personnalisée"),
+                    ),
+                    preset,
+                    empty_label="Période",
+                ),
+            },
+            {"name": "report_start", "label": "Du", "type": "date", "value": formats.date_format(period.get("start"), "Y-m-d") if period.get("start") else ""},
+            {"name": "report_end", "label": "Au", "type": "date", "value": formats.date_format(period.get("end"), "Y-m-d") if period.get("end") else ""},
+            {"name": "cash_type", "label": "Flux", "options": _choice_options(context.get("report_type_options") or (), cash_type, empty_label="Tous les flux")},
+            {"name": "cash_source", "label": "Source", "options": _choice_options(context.get("report_source_options") or (), cash_source, empty_label="Toutes les sources")},
+        ],
+    }
+
+
+def _report_rows_table(context):
+    rows = [
+        {
+            "id": f"manager-report-summary-{index}",
+            "label": item.get("label"),
+            "cells": [
+                {"value": item.get("label"), "strong": True},
+                {"value": f"{_money(item.get('amount'))} FCFA", "amount": True},
+            ],
+        }
+        for index, item in enumerate(context.get("report_rows") or (), start=1)
+    ]
+    return {"headers": ["Indicateur", "Montant"], "rows": rows, "result_count": len(rows), "page": 1, "page_count": 1}
+
+
+def _report_movement_table(context):
+    movements = context.get("report_movements") or ()
+    rows = []
+    for movement in movements:
+        rows.append(
+            {
+                "id": f"manager-report-movement-{movement.pk}",
+                "label": movement.label,
+                "cells": [
+                    {"value": formats.date_format(movement.movement_date, "d/m/Y")},
+                    {"value": movement.label, "secondary": movement.reference or "", "strong": True},
+                    {"value": movement.get_source_display()},
+                    {"value": movement.get_movement_type_display(), "tone": "success" if movement.movement_type == BranchCashMovement.TYPE_IN else "danger"},
+                    {"value": f"{_money(movement.amount)} FCFA", "amount": True},
+                ],
+            }
+        )
+    return {
+        "headers": ["Date", "Libellé", "Source", "Flux", "Montant"],
+        "rows": rows,
+        "result_count": context.get("report_movements_count") or len(rows),
+        "page": 1,
+        "page_count": 1,
+    }
+
+
+def _annual_revenue_table(context):
+    rows = []
+    for item in context.get("annual_revenue_rows") or ():
+        year = item.get("paid_at__year")
+        if year is None:
+            continue
+        rows.append(
+            {
+                "id": f"manager-annual-revenue-{year}",
+                "label": str(year),
+                "cells": [
+                    {"value": year, "strong": True},
+                    {"value": f"{_money(item.get('total_amount'))} FCFA", "amount": True},
+                    {"value": item.get("payments_count") or 0},
+                ],
+            }
+        )
+    return {
+        "headers": ["Année", "Encaissements", "Paiements validés"],
+        "rows": rows,
+        "result_count": len(rows),
+        "page": 1,
+        "page_count": 1,
+    }
+
+
+def _report_presentation(context, *, dashboard_url):
+    period = context.get("report_period") or {}
+    export_query = {
+        "section": "rapport",
+        "report_period": period.get("preset") or "month",
+        "report_start": formats.date_format(period.get("start"), "Y-m-d") if period.get("start") else "",
+        "report_end": formats.date_format(period.get("end"), "Y-m-d") if period.get("end") else "",
+        "cash_type": context.get("report_cash_type") or "",
+        "cash_source": context.get("report_cash_source") or "",
+    }
+    source_rows = context.get("report_source_rows") or ()
+    return {
+        "filters": _report_filters(context, dashboard_url=dashboard_url),
+        "summary_table": _report_rows_table(context),
+        "movement_table": _report_movement_table(context),
+        "annual_revenue_table": _annual_revenue_table(context),
+        "chart_labels": [item.get("label") for item in source_rows],
+        "chart_datasets": [
+            {"label": "Entrées", "data": [item.get("in_total") or 0 for item in source_rows], "backgroundColor": "#16a34a"},
+            {"label": "Sorties", "data": [item.get("out_total") or 0 for item in source_rows], "backgroundColor": "#ef4444"},
+        ],
+        "xlsx_url": f"{reverse('accounts:manager_export_report_xlsx')}?{urlencode(export_query)}",
+        "pdf_url": f"{reverse('accounts:manager_export_report_pdf')}?{urlencode(export_query)}",
+    }
+
+
+def _honorarium_stat_cards(context):
+    stats = context.get("honorarium_stats") or {}
+    return [
+        {"label": "Enseignants", "value": intcomma(stats.get("teachers") or 0), "icon": "graduation-cap", "tone": "primary", "description": "Enseignants rattachés à l'annexe"},
+        {"label": "Fiches préparées", "value": intcomma(stats.get("prepared") or 0), "icon": "file-check", "tone": "info", "description": "Heures validées × tarif officiel"},
+        {"label": "Honoraires payés", "value": _money(stats.get("paid_total")), "unit": "FCFA", "icon": "circle-check", "tone": "success", "description": f"{intcomma(stats.get('paid') or 0)} fiche(s) soldée(s)"},
+        {"label": "Reste à payer", "value": _money(stats.get("remaining_total")), "unit": "FCFA", "icon": "wallet-cards", "tone": "warning" if stats.get("remaining_total") else "neutral", "description": "Séparé des salaires du personnel"},
+    ]
+
+
+def _honorarium_filters(context, *, dashboard_url):
+    status = context.get("honorarium_status") or ""
+    search = context.get("honorarium_search") or ""
+    month = context.get("salary_month_value") or ""
+    status_choices = tuple(TeacherHonorariumEntry.STATUS_CHOICES) + (("missing", "Sans fiche"),)
+    active_filters = []
+    if status:
+        active_filters.append(dict(status_choices).get(status, status))
+    if month:
+        active_filters.append(f"Mois : {month}")
+    if search:
+        active_filters.append(f'Recherche : "{search}"')
+    return {
+        "action": dashboard_url,
+        "reset_url": f"{dashboard_url}?section=cloture",
+        "hidden_fields": [{"name": "section", "value": "cloture"}],
+        "active_filters": active_filters,
+        "items": [
+            {"name": "salary_month", "label": "Mois", "type": "month", "value": month},
+            {"name": "honorarium_status", "label": "Statut", "options": _choice_options(status_choices, status, empty_label="Tous les statuts")},
+            {"name": "honorarium_q", "label": "Enseignant", "value": search, "placeholder": "Nom, code ou fonction…", "clearable": True},
+        ],
+    }
+
+
+def build_honorarium_table_row(profile, *, salary_month_value):
+    entry = getattr(profile, "current_honorarium", None)
+    status_tones = {
+        TeacherHonorariumEntry.STATUS_DRAFT: "neutral",
+        TeacherHonorariumEntry.STATUS_READY: "primary",
+        TeacherHonorariumEntry.STATUS_PARTIAL: "warning",
+        TeacherHonorariumEntry.STATUS_PAID: "success",
+    }
+    detail_url = reverse("accounts:htmx_manager_teacher_honorarium_detail", args=[profile.user_id])
+    if salary_month_value:
+        detail_url = f"{detail_url}?{urlencode({'salary_month': salary_month_value})}"
+    actions = [{"label": "Gérer", "icon": "eye", "get_url": detail_url, "target": "#manager-modal-content", "swap": "innerHTML", "open_overlay": "manager-modal"}]
+    if entry:
+        actions.append({"label": "Bordereau", "icon": "file-text", "href": reverse("accounts:manager_honorarium_statement_pdf", args=[entry.pk]), "external": True})
+    return {
+        "id": f"manager-honorarium-profile-{profile.user_id}",
+        "label": profile.user.get_full_name() or profile.user.username,
+        "cells": [
+            {"value": profile.user.get_full_name() or profile.user.username, "secondary": profile.employee_code or "Enseignant", "strong": True},
+            {"value": f"{_money(entry.hourly_rate if entry else profile.teacher_hourly_rate)} FCFA", "amount": True},
+            {"value": f"{entry.validated_hours} h" if entry else "—"},
+            {"value": f"{_money(entry.net_amount)} FCFA" if entry else "—", "amount": bool(entry)},
+            {"value": f"{_money(entry.paid_amount)} FCFA" if entry else "—", "amount": bool(entry)},
+            {"value": entry.get_status_display() if entry else "À vérifier", "tone": status_tones.get(entry.status, "neutral") if entry else "neutral"},
+        ],
+        "actions": actions,
+    }
+
+
+def _honorarium_table(context, *, dashboard_url):
+    page = context.get("honorarium_entries")
+    month = context.get("salary_month_value") or ""
+    rows = [build_honorarium_table_row(item, salary_month_value=month) for item in page.object_list]
+    query = _manager_section_query(
+        "cloture",
+        context,
+        salary_month=month,
+        honorarium_status=context.get("honorarium_status") or "",
+        honorarium_q=context.get("honorarium_search") or "",
+    )
+
+    def page_url(number):
+        return f"{dashboard_url}?{urlencode({**query, 'honorarium_page': number})}"
+
+    return {
+        "headers": ["Enseignant", "Taux", "Heures", "Net", "Payé", "Statut"],
+        "rows": rows,
+        "result_count": page.paginator.count,
+        "page": page.number,
+        "page_count": page.paginator.num_pages,
+        "previous_url": page_url(page.previous_page_number()) if page.has_previous() else "",
+        "next_url": page_url(page.next_page_number()) if page.has_next() else "",
+    }
+
+
+def _closure_tables(context, *, subcontent_url):
+    closure_tones = {
+        BranchMonthlyClosure.STATUS_DRAFT: "neutral",
+        BranchMonthlyClosure.STATUS_VALIDATED: "primary",
+        BranchMonthlyClosure.STATUS_CLOSED: "success",
+    }
+    closures_page = context.get("monthly_closures")
+    transfers_page = context.get("bank_transfers")
+    closure_rows = []
+    for closure in closures_page.object_list if closures_page else ():
+        actions = []
+        if closure.status == BranchMonthlyClosure.STATUS_DRAFT:
+            actions.append({"label": "Valider", "icon": "check", "post_url": reverse("accounts:htmx_manager_monthly_closure_validate", args=[closure.pk]), "csrf": True, "confirm": f"Valider la clôture de {closure.period_month:%m/%Y} ?"})
+        elif closure.status == BranchMonthlyClosure.STATUS_VALIDATED:
+            actions.append({"label": "Clôturer", "icon": "lock", "post_url": reverse("accounts:htmx_manager_monthly_closure_close", args=[closure.pk]), "csrf": True, "confirm": f"Clôturer définitivement {closure.period_month:%m/%Y} ?", "tone": "success"})
+        transfer = getattr(closure, "bank_transfer", None)
+        closure_rows.append(
+            {
+                "id": f"manager-closure-{closure.pk}",
+                "label": f"Clôture {closure.period_month:%m/%Y}",
+                "cells": [
+                    {"value": formats.date_format(closure.period_month, "m/Y"), "strong": True},
+                    {"value": closure.get_status_display(), "tone": closure_tones.get(closure.status, "neutral")},
+                    {"value": f"{_money(closure.result_amount)} FCFA", "amount": True},
+                    {"value": f"{_money(transfer.amount)} FCFA" if transfer else "—", "amount": bool(transfer)},
+                    {"value": transfer.reference if transfer else "Aucun versement"},
+                ],
+                "actions": actions,
+            }
+        )
+    transfer_rows = []
+    for transfer in transfers_page.object_list if transfers_page else ():
+        actions = []
+        if transfer.proof and transfer.proof.name.lower().endswith(".pdf"):
+            actions.append({"label": "Bordereau", "icon": "file-text", "href": reverse("accounts:manager_bank_transfer_slip_pdf", args=[transfer.pk]), "external": True})
+        transfer_rows.append(
+            {
+                "id": f"manager-bank-transfer-{transfer.pk}",
+                "label": transfer.reference,
+                "cells": [
+                    {"value": transfer.bank_name, "strong": True},
+                    {"value": transfer.reference},
+                    {"value": formats.date_format(transfer.transfer_date, "d/m/Y")},
+                    {"value": f"{_money(transfer.amount)} FCFA", "amount": True},
+                    {"value": transfer.comment or "—"},
+                ],
+                "actions": actions,
+            }
+        )
+    def page_url(param_name, number):
+        query = {"section": "cloture", "view": "archives", param_name: number}
+        if closures_page:
+            query["closure_page"] = closures_page.number
+        if transfers_page:
+            query["transfer_page"] = transfers_page.number
+        query[param_name] = number
+        return f"{subcontent_url}?{urlencode(query)}"
+
+    def table_payload(page, rows, headers, param_name):
+        return {
+            "headers": headers,
+            "rows": rows,
+            "result_count": page.paginator.count if page else 0,
+            "page": page.number if page else 1,
+            "page_count": page.paginator.num_pages if page else 1,
+            "previous_url": page_url(param_name, page.previous_page_number()) if page and page.has_previous() else "",
+            "next_url": page_url(param_name, page.next_page_number()) if page and page.has_next() else "",
+        }
+    return {
+        "closures": table_payload(closures_page, closure_rows, ["Periode", "Etat", "Resultat", "Versement", "Reference"], "closure_page"),
+        "transfers": table_payload(transfers_page, transfer_rows, ["Banque", "Reference", "Date", "Montant", "Commentaire"], "transfer_page"),
+    }
+def _donation_stat_cards(context):
+    stats = context.get("donation_stats") or {}
+    return [
+        {"label": "Dons enregistrés", "value": intcomma(stats.get("count") or 0), "icon": "hand-heart", "tone": "primary", "description": "Historique de l'annexe"},
+        {"label": "Montant total", "value": _money(stats.get("total")), "unit": "FCFA", "icon": "landmark", "tone": "success", "description": "Appuis financiers cumulés"},
+        {"label": "Ce mois", "value": _money(stats.get("this_month")), "unit": "FCFA", "icon": "calendar-days", "tone": "info", "description": "Dons reçus sur la période"},
+    ]
+
+
+def _donation_table(context, *, dashboard_url, subcontent_url):
+    page = context.get("donations")
+    rows = []
+    for donation in page.object_list if page else ():
+        actions = [{"label": "Reçu", "icon": "file-text", "href": reverse("accounts:manager_donation_receipt_pdf", args=[donation.pk]), "external": True}]
+        rows.append(
+            {
+                "id": f"manager-donation-{donation.pk}",
+                "label": donation.donor_name,
+                "cells": [
+                    {"value": donation.donor_name, "secondary": donation.receipt_number or "Reçu généré automatiquement", "strong": True},
+                    {"value": f"{_money(donation.amount)} FCFA", "amount": True},
+                    {"value": donation.get_motif_display()},
+                    {"value": donation.get_payment_method_display()},
+                    {"value": formats.date_format(donation.date, "d/m/Y")},
+                ],
+                "actions": actions,
+            }
+        )
+    def page_url(number):
+        return f"{subcontent_url}?{urlencode({'section': 'dons', 'view': 'history', 'donation_page': number})}"
+
+    return {
+        "headers": ["Donateur", "Montant", "Motif", "Paiement", "Date"],
+        "rows": rows,
+        "result_count": page.paginator.count if page else 0,
+        "page": page.number if page else 1,
+        "page_count": page.paginator.num_pages if page else 1,
+        "previous_url": page_url(page.previous_page_number()) if page and page.has_previous() else "",
+        "next_url": page_url(page.next_page_number()) if page and page.has_next() else "",
+    }
+
+
+def _shop_stat_cards(context):
+    stats = context.get("shop_stats") or {}
+    return [
+        {"label": "Articles", "value": intcomma(stats.get("products") or 0), "icon": "package", "tone": "primary", "description": f"{intcomma(stats.get('required') or 0)} obligatoire(s)"},
+        {"label": "Stock faible", "value": intcomma(stats.get("low_stock") or 0), "icon": "package-search", "tone": "danger" if stats.get("low_stock") else "success", "description": "Articles au seuil d'alerte"},
+        {"label": "Commandes à traiter", "value": intcomma((stats.get("pending_orders") or 0) + (stats.get("paid_not_delivered") or 0) + (stats.get("ready_orders") or 0)), "icon": "shopping-bag", "tone": "warning", "description": "Paiement, préparation ou remise"},
+        {"label": "Ventes du mois", "value": _money(stats.get("month_sales")), "unit": "FCFA", "icon": "badge-dollar-sign", "tone": "success", "description": "Recettes boutique de l'annexe"},
+    ]
+
+
+def _shop_order_table(context):
+    status_tones = {
+        "draft": "neutral",
+        "pending_payment": "warning",
+        "paid": "primary",
+        "ready": "info",
+        "delivered": "success",
+        "cancelled": "danger",
+    }
+    rows = []
+    for order in context.get("shop_orders") or ():
+        actions = []
+        for payment in order.payments.all():
+            if payment.status == "pending":
+                actions.append(
+                    {
+                        "label": "Valider paiement",
+                        "icon": "check",
+                        "post_url": reverse("shop:manager_payment_validate", args=[payment.pk]),
+                        "target": "#manager-shop-module",
+                        "swap": "outerHTML",
+                        "csrf": True,
+                        "confirm": f"Valider le paiement de la commande {order.reference} ?",
+                        "tone": "success",
+                    }
+                )
+            if payment.receipt_pdf:
+                actions.append({"label": "Reçu", "icon": "file-text", "href": reverse("shop:payment_receipt", args=[payment.pk]), "external": True})
+        if order.status == "paid":
+            actions.append(
+                {
+                    "label": "Préparer",
+                    "icon": "package-check",
+                    "post_url": reverse("shop:manager_order_mark_ready", args=[order.pk]),
+                    "target": "#manager-shop-module",
+                    "swap": "outerHTML",
+                    "csrf": True,
+                    "confirm": f"Marquer la commande {order.reference} comme prête ?",
+                }
+            )
+        if order.status in {"paid", "ready"}:
+            actions.append(
+                {
+                    "label": "Remettre",
+                    "icon": "package-open",
+                    "post_url": reverse("shop:manager_order_deliver", args=[order.pk]),
+                    "target": "#manager-shop-module",
+                    "swap": "outerHTML",
+                    "csrf": True,
+                    "confirm": f"Confirmer la remise de la commande {order.reference} ?",
+                    "tone": "success",
+                }
+            )
+        item_summary = ", ".join(f"{item.quantity} × {item.product.name}" for item in order.items.all()) or "Aucun article"
+        rows.append(
+            {
+                "id": f"manager-shop-order-{order.pk}",
+                "label": order.reference,
+                "cells": [
+                    {"value": order.reference, "secondary": formats.date_format(order.created_at, "d/m/Y H:i"), "strong": True},
+                    {"value": order.buyer_display, "secondary": order.get_buyer_type_display()},
+                    {"value": item_summary},
+                    {"value": f"{_money(order.total_amount)} FCFA", "amount": True},
+                    {"value": order.get_status_display(), "tone": status_tones.get(order.status, "neutral")},
+                ],
+                "actions": actions,
+            }
+        )
+    return {"headers": ["Commande", "Acheteur", "Articles", "Total", "État"], "rows": rows, "result_count": len(rows), "page": 1, "page_count": 1}
+
+
+def build_manager_dashboard_presentation(
+    *,
+    active_section,
+    context,
+    capabilities=(),
+    dashboard_url="",
+    workspace_url="",
+    subcontent_url="",
+    active_subview="overview",
+):
     """Return the UI-only contract for one manager workspace section."""
 
     section = active_section if active_section in SECTION_PRESENTATION else "overview"
+    subview = normalize_manager_subview(section, active_subview)
     page_header = dict(SECTION_PRESENTATION[section])
     page_header.pop("components", None)
     header_actions = []
     stat_cards = []
     filters = {}
     table = {}
+    report = {}
+    closure_tables = {}
 
     if section == "overview":
         stat_cards = _overview_stat_cards(context)
@@ -997,13 +1613,58 @@ def build_manager_dashboard_presentation(*, active_section, context, capabilitie
         filters = _payroll_filters(context, dashboard_url=dashboard_url)
         table = _payroll_table(context, dashboard_url=dashboard_url)
         header_actions = [{"label": "Voir la caisse", "icon": "vault", "href": f"{dashboard_url}?section=caisse", "primary": False}]
+    elif section == "rapport":
+        stat_cards = _report_stat_cards(context)
+        report = _report_presentation(context, dashboard_url=dashboard_url)
+        filters = report["filters"]
+        table = report["movement_table"]
+        header_actions = [
+            {"label": "Exporter Excel", "icon": "sheet", "href": report["xlsx_url"], "primary": True, "external": True},
+            {"label": "État PDF", "icon": "file-text", "href": report["pdf_url"], "primary": False, "external": True},
+        ]
+    elif section == "cloture":
+        stat_cards = _honorarium_stat_cards(context)
+        filters = _honorarium_filters(context, dashboard_url=dashboard_url)
+        table = _honorarium_table(context, dashboard_url=dashboard_url)
+        closure_tables = _closure_tables(
+            context,
+            subcontent_url=subcontent_url or workspace_url or dashboard_url,
+        )
+        header_actions = [{"label": "Rapport financier", "icon": "chart-no-axes-combined", "href": f"{dashboard_url}?section=rapport", "primary": False}]
+    elif section == "dons":
+        stat_cards = _donation_stat_cards(context)
+        table = _donation_table(
+            context,
+            dashboard_url=dashboard_url,
+            subcontent_url=subcontent_url or workspace_url or dashboard_url,
+        )
+        header_actions = [{"label": "Voir la caisse", "icon": "vault", "href": f"{dashboard_url}?section=caisse", "primary": False}]
+    elif section == "boutique":
+        stat_cards = _shop_stat_cards(context)
+        table = _shop_order_table(context)
+        header_actions = [{"label": "Voir la caisse", "icon": "vault", "href": f"{dashboard_url}?section=caisse", "primary": False}]
+
+    filters = _augment_manager_filters(filters, section=section, subview=subview)
+    subcontent_endpoint = subcontent_url or workspace_url or dashboard_url
 
     return {
         "section": section,
+        "subview": subview,
+        "subnavigation": _manager_subnav_items(
+            section=section,
+            active=subview,
+            dashboard_url=dashboard_url,
+            subcontent_url=subcontent_endpoint,
+        ),
+        "subcontent_template": manager_subcontent_template(section),
+        "subcontent_target": manager_subcontent_target(section),
+        "subcontent_indicator": manager_subcontent_indicator(section),
         "page_header": page_header,
         "header_actions": header_actions,
         "stat_cards": stat_cards,
         "filters": filters,
         "table": table,
+        "report": report,
+        "closure_tables": closure_tables,
         "component_targets": SECTION_PRESENTATION[section]["components"],
     }

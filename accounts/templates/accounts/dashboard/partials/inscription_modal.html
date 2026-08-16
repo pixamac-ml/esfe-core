@@ -178,7 +178,5 @@
     </div>
 </div>
 
-<span id="inscription-status-{{ inscription.id }}"
-      hx-swap-oob="outerHTML"
-      class="dashboard-badge-sm {% if inscription.status == 'active' %}dashboard-badge-green{% elif inscription.status == 'partial_paid' %}dashboard-badge-amber{% elif inscription.status == 'awaiting_payment' %}dashboard-badge-blue{% else %}dashboard-badge-gray{% endif %}">{{ inscription.get_status_display }}</span>
+<span id="inscription-status-{{ inscription.id }}" hx-swap-oob="outerHTML">{% if inscription.status == 'active' %}{% component "ui_core.status_badge" label=inscription.get_status_display tone="success" %}{% endcomponent %}{% elif inscription.status == 'partial_paid' %}{% component "ui_core.status_badge" label=inscription.get_status_display tone="warning" %}{% endcomponent %}{% elif inscription.status == 'awaiting_payment' %}{% component "ui_core.status_badge" label=inscription.get_status_display tone="info" %}{% endcomponent %}{% else %}{% component "ui_core.status_badge" label=inscription.get_status_display tone="neutral" %}{% endcomponent %}{% endif %}</span>
 <span id="inscription-balance-{{ inscription.id }}" hx-swap-oob="outerHTML">{{ inscription.balance|intcomma }} FCFA</span>

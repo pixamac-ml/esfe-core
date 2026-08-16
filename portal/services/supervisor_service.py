@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
+from django.core.paginator import Paginator
 from django.db.models import Q
 from django.utils import timezone
 
@@ -12,6 +13,14 @@ from students.models import Student, StudentAttendance, TeacherAttendance
 from students.services.attendance_service import get_branch_attendance_anomalies, list_students_for_schedule_event
 from students.services.attendance_workflow import build_attendance_workflow_payload, is_roll_locked_for_event
 from students.services.case_service import count_open_cases
+
+
+SUPERVISOR_LIST_PAGE_SIZE = 10
+SUPERVISOR_PREVIEW_SIZE = 5
+
+
+def _page(rows, page_number):
+    return Paginator(rows, SUPERVISOR_LIST_PAGE_SIZE).get_page(page_number or 1)
 
 
 def build_home_section_context(*, branch, selected_class=None):
@@ -76,12 +85,12 @@ def build_home_section_context(*, branch, selected_class=None):
         "home_absent_teachers_count": anomalies["absent_teacher_event_count"],
         "home_open_cases_count": kpi_cards[3]["value"],
         "supervisor_kpi_cards": kpi_cards,
-        "home_today_sessions": today_rows[:8],
+        "home_today_sessions": today_rows[:SUPERVISOR_PREVIEW_SIZE],
         "home_alerts": alerts[:5],
     }
 
 
-def build_teachers_section_context(*, branch):
+def build_teachers_section_context(*, branch, page_number=1):
     """Build one operational observation row per published session of the day."""
     today = timezone.localdate()
     events = list(
@@ -128,8 +137,10 @@ def build_teachers_section_context(*, branch):
             }
         )
 
+    sessions_page = _page(sessions, page_number)
     return {
-        "teacher_sessions": sessions,
+        "teacher_sessions": sessions_page.object_list,
+        "teacher_sessions_page": sessions_page,
         "teachers_total_count": len({item["teacher_id"] for item in sessions}),
         "teachers_present_count": sum(
             1 for item in sessions if item["status"] == TeacherAttendance.STATUS_PRESENT
@@ -144,15 +155,18 @@ def build_teachers_section_context(*, branch):
     }
 
 
-def build_schedule_section_context(*, branch, academic_class, week_start):
+def build_schedule_section_context(*, branch, academic_class, week_start, page_number=1):
     schedule = get_published_class_week_schedule(academic_class, week_start)
+    schedule_events = schedule.get("events") or []
+    schedule["events"] = _page(schedule_events, page_number)
     summary = schedule.get("summary") or {}
     day_event_counts = schedule.get("day_event_counts") or []
     return {
         "schedule": schedule,
         "prev_week_start": schedule["week_start"] - timedelta(days=7),
         "next_week_start": schedule["week_start"] + timedelta(days=7),
-        "schedule_week_total": len(schedule.get("events") or []),
+        "schedule_week_total": len(schedule_events),
+        "schedule_events_page": schedule["events"],
         "schedule_week_planned": summary.get("planned", 0),
         "schedule_week_completed": summary.get("completed", 0),
         "schedule_empty_days_count": len([item for item in day_event_counts if not item.get("has_events")]),
@@ -197,7 +211,7 @@ def build_courses_section_context(*, request, branch, academic_class):
     }
 
 
-def build_attendance_monthly_report_context(*, branch, academic_class, month):
+def build_attendance_monthly_report_context(*, branch, academic_class, month, page_number=1):
     """Rapport mensuel de présence par étudiant pour une classe donnée."""
     import calendar
     from datetime import timedelta as _td
@@ -253,18 +267,20 @@ def build_attendance_monthly_report_context(*, branch, academic_class, month):
         r["student"].matricule,
     ))
 
+    rows_page = _page(rows, page_number)
     return {
         "attendance_report_month": month,
         "attendance_report_month_end": month_end,
         "attendance_report_prev_month": prev_month,
         "attendance_report_next_month": next_month,
-        "attendance_report_rows": rows,
+        "attendance_report_rows": rows_page.object_list,
+        "attendance_report_page": rows_page,
         "attendance_report_class": academic_class,
         "attendance_report_total_students": len(rows),
     }
 
 
-def build_teachers_weekly_report_context(*, branch, week_start):
+def build_teachers_weekly_report_context(*, branch, week_start, page_number=1):
     """Rapport hebdomadaire de régularité pour chaque enseignant de l'annexe."""
     from datetime import timedelta as _td
 
@@ -367,12 +383,14 @@ def build_teachers_weekly_report_context(*, branch, week_start):
         )
     teachers.sort(key=lambda t: t["name"])
 
+    teachers_page = _page(teachers, page_number)
     return {
         "report_week_start": week_start,
         "report_week_end": week_end - _td(days=1),
         "report_prev_week": week_start - _td(days=7),
         "report_next_week": week_start + _td(days=7),
-        "report_teachers": teachers,
+        "report_teachers": teachers_page.object_list,
+        "report_teachers_page": teachers_page,
         "report_total_events": len(events),
         "report_absent_count": sum(t["absent"] for t in teachers),
         "report_late_count": sum(t["late"] for t in teachers),
@@ -441,12 +459,14 @@ def build_attendance_section_context(*, request, branch, academic_class, roll_da
                 }
             )
 
+    rows_page = _page(rows, request.GET.get("attendance_page") or request.POST.get("attendance_page"))
     return {
         "roll_date": roll_date,
         "roll_date_iso": roll_date.isoformat(),
         "attendance_events": events,
         "selected_event": selected_event,
-        "attendance_rows": rows,
+        "attendance_rows": rows_page.object_list,
+        "attendance_rows_page": rows_page,
         "roll_locked": roll_locked,
         "attendance_workflow": build_attendance_workflow_payload(
             branch=branch,
@@ -484,8 +504,10 @@ def build_students_section_context(*, request, branch, academic_class):
         academic_class=academic_class,
         date=today,
     )
+    students_page = _page(students_qs, request.GET.get("students_page") or request.POST.get("students_page"))
     return {
-        "students_list": list(students_qs[:200]),
+        "students_list": students_page.object_list,
+        "students_page": students_page,
         "student_query": query,
         "students_total_count": academic_class.enrollments.filter(is_active=True).count(),
         "students_present_today": attendance_today.filter(status=StudentAttendance.STATUS_PRESENT).count(),

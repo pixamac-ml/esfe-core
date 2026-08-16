@@ -1,0 +1,63 @@
+{% load component_tags %}
+<div class="min-w-0 space-y-5">
+  {% if manager_ui.subview == "overview" %}
+    {% component "ui_core.filter_bar" filters=manager_ui.filters.items action=manager_ui.filters.action reset_url=manager_ui.filters.reset_url hidden_fields=manager_ui.filters.hidden_fields active_filters=manager_ui.filters.active_filters submit_label="Actualiser le rapport" density="compact" %}{% endcomponent %}
+    {% if report_alerts %}
+      <div class="space-y-2">
+        {% for alert in report_alerts|slice:":5" %}
+          {% if alert.level == "danger" %}{% component "ui_core.alert" title=alert.title message=alert.message tone="danger" %}{% endcomponent %}
+          {% else %}{% component "ui_core.alert" title=alert.title message=alert.message tone="warning" %}{% endcomponent %}{% endif %}
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% include "accounts/dashboard/partials/manager_subview_kpi_grid.html" %}
+    <div class="grid grid-cols-1 gap-5 xl:grid-cols-2">
+      {% component "ui_core.data_table" id="manager-report-summary" caption="Synthèse de la période" headers=manager_ui.report.summary_table.headers rows=manager_ui.report.summary_table.rows result_count=manager_ui.report.summary_table.result_count page=1 page_count=1 density="compact" empty_title="Aucune donnée financière" empty_message="La période ne contient aucun mouvement consolidé." %}{% endcomponent %}
+      {% component "ui_core.chart_panel" id="manager-report-sources-chart" title="Flux par source comptable" description="Comparaison des entrées et sorties de la période." chart_type="bar" labels=manager_ui.report.chart_labels datasets=manager_ui.report.chart_datasets %}{% endcomponent %}
+    </div>
+    {% component "ui_core.panel" title="Recettes par source" subtitle="Les encaissements conservés pour la période et l'annexe sélectionnées." %}
+      {% fill "default" %}
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          {% for item in report_receipt_rows %}{% component "ui_core.stat_card" label=item.label value=item.amount unit="FCFA" icon="circle-dollar-sign" tone="success" compact=True %}{% endcomponent %}{% endfor %}
+        </div>
+      {% endfill %}
+    {% endcomponent %}
+    {% component "ui_core.data_table" id="manager-annual-revenue-table" caption="Recettes annuelles" headers=manager_ui.report.annual_revenue_table.headers rows=manager_ui.report.annual_revenue_table.rows result_count=manager_ui.report.annual_revenue_table.result_count page=1 page_count=1 density="compact" empty_title="Aucun encaissement annuel" empty_message="Aucun paiement validé n'est disponible pour l'historique annuel de cette annexe." %}{% endcomponent %}
+    {% component "ui_core.panel" title="Accès rapides" subtitle="Mouvements détaillés ou exports." padding=False %}
+      <div class="grid divide-y divide-ui-border md:grid-cols-2 md:divide-x md:divide-y-0">
+        {% for item in manager_ui.subnavigation %}
+          {% if item.id != "overview" %}
+            <a href="{{ item.href }}" hx-get="{{ item.hx_get }}" hx-target="{{ item.hx_target }}" hx-indicator="{{ item.hx_indicator }}" hx-push-url="{{ item.hx_push_url }}" hx-swap="innerHTML" data-manager-subview="{{ item.id }}" class="ui-focus-ring flex min-w-0 items-center gap-3 p-4 hover:bg-ui-surface-hover">
+              <span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button bg-ui-primary-soft text-ui-primary"><i data-lucide="{{ item.icon }}" class="h-5 w-5" aria-hidden="true"></i></span>
+              <span class="min-w-0"><strong class="block text-sm text-ui-text">{{ item.label }}</strong></span>
+              <i data-lucide="chevron-right" class="ml-auto h-4 w-4 shrink-0 text-ui-text-muted" aria-hidden="true"></i>
+            </a>
+          {% endif %}
+        {% endfor %}
+      </div>
+    {% endcomponent %}
+  {% elif manager_ui.subview == "movements" %}
+    {% component "ui_core.filter_bar" filters=manager_ui.filters.items action=manager_ui.filters.action reset_url=manager_ui.filters.reset_url hidden_fields=manager_ui.filters.hidden_fields active_filters=manager_ui.filters.active_filters submit_label="Actualiser le rapport" density="compact" %}{% endcomponent %}
+    {% component "ui_core.data_table" id="manager-report-movements" caption="Mouvements de la période" headers=manager_ui.table.headers rows=manager_ui.table.rows result_count=manager_ui.table.result_count page=1 page_count=1 density="compact" empty_title="Aucun mouvement" empty_message="Aucun flux ne correspond à cette période et à ces filtres." %}{% endcomponent %}
+  {% else %}
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {% component "ui_core.stat_card" label="Versement recommandé" value=report_recommended_bank_transfer unit="FCFA" icon="building-columns" tone="primary" description="Après conservation de la réserve de caisse" compact=True %}{% endcomponent %}
+      {% component "ui_core.stat_card" label="Déjà versé en banque" value=report_bank_transfer_total unit="FCFA" icon="landmark" tone="info" description="Versements de la période" compact=True %}{% endcomponent %}
+      {% component "ui_core.stat_card" label="Solde avant clôture" value=report_balance_before_closure unit="FCFA" icon="calculator" tone="warning" description="Avant réserve et versement" compact=True %}{% endcomponent %}
+      {% if report_closure_possible %}
+        {% component "ui_core.stat_card" label="Solde après versement" value=report_balance_after_bank_transfer unit="FCFA" icon="circle-check" tone="success" description="La clôture peut être préparée" compact=True %}{% endcomponent %}
+      {% else %}
+        {% component "ui_core.stat_card" label="Solde après versement" value=report_balance_after_bank_transfer unit="FCFA" icon="shield-alert" tone="danger" description="Corriger les alertes avant clôture" compact=True %}{% endcomponent %}
+      {% endif %}
+    </div>
+    {% component "ui_core.panel" title="Exports" subtitle="Téléchargements conservant la période, les filtres et l'annexe verrouillée." %}
+      {% fill "default" %}
+        <div class="flex flex-wrap gap-2">
+          {% for action in manager_ui.header_actions %}
+            <a href="{{ action.href }}" {% if action.external %}target="_blank" rel="noopener noreferrer"{% endif %} class="inline-flex h-ui-control items-center gap-2 rounded-ui-button px-4 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus {% if action.primary %}bg-ui-primary text-ui-on-primary hover:bg-ui-primary-strong{% else %}border border-ui-border bg-ui-surface text-ui-text hover:bg-ui-surface-hover{% endif %}"><i data-lucide="{{ action.icon }}" class="h-4 w-4" aria-hidden="true"></i>{{ action.label }}</a>
+          {% endfor %}
+        </div>
+      {% endfill %}
+    {% endcomponent %}
+  {% endif %}
+</div>

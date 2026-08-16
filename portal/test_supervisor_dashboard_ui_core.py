@@ -46,10 +46,23 @@ class SupervisorDashboardUiCoreTests(TestCase):
         self.assertContains(response, 'data-ui-core="confirm-dialog"')
         self.assertContains(response, "src/js/portal/certified_dashboard_shell.js")
         self.assertContains(response, "src/js/portal/supervisor_dashboard.js")
+        self.assertNotContains(response, "portal/css/supervisor_dashboard.css")
         self.assertContains(response, 'id="supervisor-workspace"')
         self.assertContains(response, reverse("accounts:logout"))
         self.assertNotContains(response, 'class="shell"')
         self.assertNotContains(response, 'class="rail"')
+
+    def test_workspace_uses_paginated_supervisor_lists_contract(self):
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[1]
+        workspace_source = (root / "portal/services/supervisor_workspace_service.py").read_text(encoding="utf-8")
+        service_source = (root / "portal/services/supervisor_service.py").read_text(encoding="utf-8")
+
+        self.assertIn("SUPERVISOR_LIST_PAGE_SIZE = 10", service_source)
+        self.assertIn("signalment_rows_page", workspace_source)
+        self.assertIn("attendance_alerts_page", workspace_source)
+        self.assertIn("class_picker_page", workspace_source)
 
     def test_navigation_uses_canonical_urls_and_htmx_workspace(self):
         response = self.client.get(

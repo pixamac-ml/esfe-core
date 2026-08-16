@@ -8,4 +8,14 @@
   inchangé de `_build_notes_grid_context()` dans admin_grades.py.
 {% endcomment %}
 {% load component_tags %}
+{% if import_feedback %}
+  <div class="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-xs font-semibold {% if import_feedback.is_complete %}border-emerald-200 bg-emerald-50 text-emerald-800{% else %}border-amber-200 bg-amber-50 text-amber-900{% endif %}" role="status">
+    <span>{{ import_feedback.updated }} note(s) importée(s){% if import_feedback.empty %} · {{ import_feedback.empty }} cellule(s) vide(s) à compléter{% endif %}.</span>
+    {% if import_feedback.empty %}
+      <span>La validation reste bloquée tant que la grille est incomplète.</span>
+    {% else %}
+      <span>Grille complète : le workflow peut être vérifié.</span>
+    {% endif %}
+  </div>
+{% endif %}
 {% component "grades_maquette" academic_class=academic_class semester=semester ues=ues rows=rows active_session_type=active_session_type active_session_label=active_session_label workflow_permissions=workflow_permissions workflow_badge=workflow_badge publish_ready=publish_ready first_enrollment=first_enrollment embedded_in_dashboard=embedded_in_dashboard %}{% endcomponent %}

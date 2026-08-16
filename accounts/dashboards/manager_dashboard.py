@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from urllib.parse import urlencode
 
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
@@ -16,7 +17,11 @@ from accounts.models import BranchBankTransfer, BranchCashMovement, BranchExpens
 from accounts.services.manager_intelligence import build_manager_intelligence_context
 from accounts.services.manager_intelligence import get_branch_cash_balance
 from accounts.services.financial_reports import build_manager_financial_report_context, resolve_financial_report_period
-from accounts.services.manager_dashboard_presentation import build_manager_dashboard_presentation
+from accounts.services.manager_dashboard_presentation import (
+    MANAGER_SUBVIEW_DEFINITIONS,
+    build_manager_dashboard_presentation,
+    normalize_manager_subview,
+)
 from accounts.services.manager_workspace_access import manager_workspace_required
 from coupons.services.querysets import active_coupons_for_branch
 from shop.forms import ShopCounterOrderForm, ShopProductForm, ShopStockInForm
@@ -37,6 +42,12 @@ PAYABLE_INSCRIPTION_STATUSES = {
     Inscription.STATUS_PARTIAL,
 }
 
+# Dashboard workspaces stay scannable: pages show at most ten records and
+# summary widgets show at most five. The complete branch-scoped data remains
+# available through the existing pagination controls.
+DASHBOARD_LIST_PAGE_SIZE = 10
+DASHBOARD_PREVIEW_SIZE = 5
+
 
 def manager_required(view_func):
     """Authorize a role context inside the single manager workspace."""
@@ -44,7 +55,7 @@ def manager_required(view_func):
     return login_required(manager_workspace_required("view_manager_workspace")(view_func))
 
 
-def _paginate(request, queryset, *, param_name, per_page=20):
+def _paginate(request, queryset, *, param_name, per_page=DASHBOARD_LIST_PAGE_SIZE):
     paginator = Paginator(queryset, per_page)
     return paginator.get_page(request.GET.get(param_name, 1))
 
@@ -120,8 +131,9 @@ def _manager_context(request, active_section="overview"):
     branch_teacher_user_ids = list(branch_teacher_profiles.values_list("user_id", flat=True))
     manager_agent = _get_manager_agent(request.user, branch)
     active_cash_sessions = []
+    active_cash_sessions_count = 0
     if manager_agent:
-        active_cash_sessions = list(
+        active_cash_sessions_qs = (
             CashPaymentSession.objects
             .filter(
                 agent=manager_agent,
@@ -134,14 +146,22 @@ def _manager_context(request, active_section="overview"):
                 "inscription__candidature",
                 "inscription__candidature__programme",
             )
-            .order_by("-created_at")[:10]
+            .order_by("-created_at")[:DASHBOARD_PREVIEW_SIZE]
         )
+        active_cash_sessions = list(active_cash_sessions_qs)
+        active_cash_sessions_count = CashPaymentSession.objects.filter(
+            agent=manager_agent,
+            is_used=False,
+            expires_at__gt=now,
+        ).count()
     active_cash_sessions_by_inscription = {
         session.inscription_id: session for session in active_cash_sessions
     }
     active_shop_cash_sessions = []
     if manager_agent:
-        active_shop_cash_sessions = manager_shop_sessions_for_agent(manager_agent, limit=12)
+        active_shop_cash_sessions = manager_shop_sessions_for_agent(
+            manager_agent, limit=DASHBOARD_PREVIEW_SIZE
+        )
 
     overview_inscriptions = (
         base_inscriptions
@@ -150,7 +170,7 @@ def _manager_context(request, active_section="overview"):
             "candidature__programme",
             "candidature__programme__cycle",
         )
-        .order_by("-created_at")[:10]
+        .order_by("-created_at")[:DASHBOARD_PREVIEW_SIZE]
     )
     recent_candidatures = (
         base_candidatures
@@ -330,7 +350,7 @@ def _manager_context(request, active_section="overview"):
             "candidature__programme",
             "candidature__programme__cycle",
         )
-        .order_by("-created_at")[:20]
+        .order_by("-created_at")[:DASHBOARD_LIST_PAGE_SIZE]
     )
     for inscription in payable_inscriptions:
         inscription.active_cash_session = active_cash_sessions_by_inscription.get(inscription.id)
@@ -386,7 +406,9 @@ def _manager_context(request, active_section="overview"):
             | Q(supplier__icontains=expense_search)
             | Q(reference__icontains=expense_search)
         )
-    expenses_page = _paginate(request, expenses_qs, param_name="expense_page", per_page=15)
+    expenses_page = _paginate(
+        request, expenses_qs, param_name="expense_page", per_page=DASHBOARD_LIST_PAGE_SIZE
+    )
     expenses_month = BranchExpense.objects.filter(branch=branch, expense_date__gte=start_of_month)
     expense_stats = {
         "total": BranchExpense.objects.filter(branch=branch).count(),
@@ -419,7 +441,7 @@ def _manager_context(request, active_section="overview"):
         request,
         cash_movements_qs.order_by("-movement_date", "-created_at"),
         param_name="cash_page",
-        per_page=15,
+        per_page=DASHBOARD_LIST_PAGE_SIZE,
     )
     cash_month_movements = BranchCashMovement.objects.filter(branch=branch, movement_date__gte=start_of_month)
     cash_in_month = cash_month_movements.filter(movement_type=BranchCashMovement.TYPE_IN).aggregate(total=Sum("amount"))["total"] or 0
@@ -457,7 +479,7 @@ def _manager_context(request, active_section="overview"):
         FinancialLog.objects
         .filter(branch=branch)
         .select_related("actor", "payment", "correction")
-        .order_by("-created_at")[:25]
+        .order_by("-created_at")[:DASHBOARD_LIST_PAGE_SIZE]
     )
 
     payroll_entries_qs = (
@@ -505,7 +527,7 @@ def _manager_context(request, active_section="overview"):
         request,
         staff_profiles_filtered,
         param_name="salary_page",
-        per_page=15,
+        per_page=DASHBOARD_LIST_PAGE_SIZE,
     )
     payroll_total_due = sum(entry.net_salary for entry in payroll_entries_qs)
     payroll_total_paid = sum(entry.paid_amount for entry in payroll_entries_qs)
@@ -562,7 +584,7 @@ def _manager_context(request, active_section="overview"):
         request,
         teacher_profiles_filtered,
         param_name="honorarium_page",
-        per_page=15,
+        per_page=DASHBOARD_LIST_PAGE_SIZE,
     )
     honorarium_total_due = sum(entry.net_amount for entry in honorarium_entries_qs)
     honorarium_total_paid = sum(entry.paid_amount for entry in honorarium_entries_qs)
@@ -693,6 +715,27 @@ def _manager_context(request, active_section="overview"):
             ).select_related("inscription__candidature")[:5]
         )
 
+    donations_page = _paginate(
+        request,
+        Donation.objects.filter(branch=branch).order_by("-date", "-created_at"),
+        param_name="donation_page",
+        per_page=DASHBOARD_LIST_PAGE_SIZE,
+    )
+    monthly_closures_page = _paginate(
+        request,
+        BranchMonthlyClosure.objects.filter(branch=branch).order_by(
+            "-period_month", "-created_at"
+        ),
+        param_name="closure_page",
+    )
+    bank_transfers_page = _paginate(
+        request,
+        BranchBankTransfer.objects.filter(branch=branch)
+        .select_related("closure")
+        .order_by("-transfer_date", "-created_at"),
+        param_name="transfer_page",
+    )
+
     return {
         "active_page": "manager",
         "active_section": active_section,
@@ -719,7 +762,7 @@ def _manager_context(request, active_section="overview"):
         "branch_staff_count": len(branch_staff_user_ids),
         "manager_agent": manager_agent,
         "active_cash_sessions": active_cash_sessions,
-        "active_cash_sessions_count": len(active_cash_sessions),
+        "active_cash_sessions_count": active_cash_sessions_count,
         "active_shop_cash_sessions": active_shop_cash_sessions,
         "active_shop_cash_sessions_count": len(active_shop_cash_sessions),
         "coupons": active_coupons_for_branch(branch),
@@ -787,9 +830,9 @@ def _manager_context(request, active_section="overview"):
         }),
         **financial_report,
         "manager_intelligence": intelligence,
-        "monthly_closures": BranchMonthlyClosure.objects.filter(branch=branch).order_by("-period_month", "-created_at")[:12],
-        "bank_transfers": BranchBankTransfer.objects.filter(branch=branch).select_related("closure").order_by("-transfer_date", "-created_at")[:12],
-        "donations": Donation.objects.filter(branch=branch).order_by("-date", "-created_at")[:20],
+        "monthly_closures": monthly_closures_page,
+        "bank_transfers": bank_transfers_page,
+        "donations": donations_page,
         "donation_stats": {
             "total": Donation.objects.filter(branch=branch).aggregate(total=Sum("amount"))["total"] or 0,
             "count": Donation.objects.filter(branch=branch).count(),
@@ -810,7 +853,7 @@ def _manager_context(request, active_section="overview"):
     }
 
 
-def _manager_navigation_groups(context, access):
+def _manager_navigation_groups(context, access, *, dashboard_url="", workspace_url=""):
     groups = [
         {
             "label": "Pilotage",
@@ -842,7 +885,22 @@ def _manager_navigation_groups(context, access):
     ]
     filtered_groups = []
     for group in groups:
-        items = [item for item in group["items"] if item["key"] in access.allowed_sections]
+        items = []
+        for source in group["items"]:
+            if source["key"] not in access.allowed_sections:
+                continue
+            item = dict(source)
+            if workspace_url:
+                item.update(
+                    {
+                        "hx_get": f"{workspace_url}?section={item['key']}",
+                        "hx_target": "#manager-workspace",
+                        "hx_swap": "innerHTML",
+                        "hx_push_url": f"{dashboard_url}?section={item['key']}",
+                        "hx_indicator": "#manager-loading",
+                    }
+                )
+            items.append(item)
         if items:
             filtered_groups.append({"label": group["label"], "items": items})
 
@@ -863,7 +921,14 @@ def _manager_navigation_groups(context, access):
     return filtered_groups
 
 
-def _render_manager_dashboard(request, active_section):
+def _render_manager_dashboard(
+    request,
+    active_section,
+    *,
+    workspace_only=False,
+    subcontent_only=False,
+    forced_subview=None,
+):
     access = request.manager_workspace_access
     if active_section not in access.allowed_sections:
         return render(request, "core/errors/403.html", status=403)
@@ -879,12 +944,32 @@ def _render_manager_dashboard(request, active_section):
         dashboard_url = reverse("accounts_portal:portal_admissions")
     else:
         dashboard_url = reverse("accounts_portal:portal_annex_manager")
+    workspace_url = reverse("accounts_portal:manager_workspace")
+    subcontent_url = reverse("accounts_portal:manager_subcontent")
+    requested_subview = (
+        forced_subview if forced_subview is not None else request.GET.get("view")
+    )
+    role_default_subview = {
+        "paiements": "payments" if finance_context else "overview",
+        "candidatures": "list" if admissions_context else "overview",
+    }.get(active_section, "overview")
+    active_subview = normalize_manager_subview(
+        active_section,
+        requested_subview or role_default_subview,
+    )
+    context["manager_subview"] = active_subview
+    context["manager_subcontent_url"] = subcontent_url
+    context["manager_dashboard_url"] = dashboard_url
     context["manager_ui"] = build_manager_dashboard_presentation(
         active_section=active_section,
         context=context,
         capabilities=access.capabilities,
         dashboard_url=dashboard_url,
+        workspace_url=workspace_url,
+        subcontent_url=subcontent_url,
+        active_subview=active_subview,
     )
+    context["manager_subview"] = active_subview
     context.update(
         build_role_dashboard_shell(
             request,
@@ -902,10 +987,42 @@ def _render_manager_dashboard(request, active_section):
             dashboard_url=dashboard_url,
             branch=branch,
             context_label=f"Annexe - {branch.name}",
-            groups=_manager_navigation_groups(context, access),
+            groups=_manager_navigation_groups(
+                context,
+                access,
+                dashboard_url=dashboard_url,
+                workspace_url=workspace_url,
+            ),
+            workspace_target="#manager-workspace",
             modal_title="Gestion d'annexe",
+            script_path="src/js/portal/manager_dashboard.js",
         )
     )
+    if subcontent_only:
+        if active_section not in MANAGER_SUBVIEW_DEFINITIONS:
+            return render(request, "core/errors/404.html", status=404)
+        response = render(
+            request,
+            context["manager_ui"]["subcontent_template"],
+            context,
+        )
+        push_query = request.GET.copy()
+        push_query["section"] = active_section
+        push_query["view"] = active_subview
+        response["HX-Push-Url"] = (
+            f"{dashboard_url}?{push_query.urlencode()}"
+        )
+        return response
+    if workspace_only:
+        response = render(
+            request,
+            "accounts/dashboard/partials/manager_workspace.html",
+            context,
+        )
+        response["HX-Push-Url"] = (
+            f"{dashboard_url}?{urlencode({'section': active_section, 'view': active_subview})}"
+        )
+        return response
     return render(
         request,
         "accounts/dashboard/manager_dashboard.html",
@@ -924,6 +1041,35 @@ def manager_dashboard(request, default_section=None):
     if section not in access.allowed_sections:
         section = default_section
     return _render_manager_dashboard(request, section)
+
+
+@manager_required
+@require_GET
+def manager_workspace(request):
+    """HTMX-only workspace endpoint sharing the Director dashboard contract."""
+
+    access = request.manager_workspace_access
+    default_section = access.default_section
+    section = request.GET.get("section", default_section).strip() or default_section
+    if section not in access.allowed_sections:
+        section = default_section
+    return _render_manager_dashboard(request, section, workspace_only=True)
+
+
+@manager_required
+@require_GET
+def manager_subcontent(request):
+    """HTMX subview endpoint — swaps only the domain subcontent region."""
+
+    access = request.manager_workspace_access
+    section = request.GET.get("section", "").strip()
+    if section not in access.allowed_sections:
+        return render(request, "core/errors/403.html", status=403)
+    return _render_manager_dashboard(
+        request,
+        section,
+        subcontent_only=True,
+    )
 
 
 @manager_required

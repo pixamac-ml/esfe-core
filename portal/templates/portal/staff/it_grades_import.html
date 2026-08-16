@@ -72,12 +72,12 @@
       <div class="flex items-start justify-between gap-3">
         <div>
           <h2 class="text-sm font-black text-slate-900">Structure d'import (UE → EC)</h2>
-          <p class="text-xs text-slate-500 mt-1">Le modèle Excel contient NOM, PRENOM puis une colonne par matière lisible.</p>
+          <p class="text-xs text-slate-500 mt-1">Le modèle Excel contient les identifiants étudiants et une colonne par EC de la maquette.</p>
         </div>
         {% if selected_class and selected_semester %}
           <a
             class="rounded-full bg-indigo-600 px-4 py-2 text-xs font-bold text-white"
-            href="{% url 'academics:download_import_template' selected_class.id selected_semester.id %}"
+            href="{% url 'academics:download_import_template' selected_class.id selected_semester.id %}?session_type={{ active_session_type }}"
           >Télécharger le modèle Excel</a>
         {% else %}
           <span class="rounded-full bg-slate-100 px-4 py-2 text-xs font-bold text-slate-500">Sélectionner classe+semestre</span>
@@ -159,6 +159,7 @@
             {% csrf_token %}
             <input type="hidden" name="class_id" value="{{ selected_class.id }}">
             <input type="hidden" name="semester_id" value="{{ selected_semester.id }}">
+            <input type="hidden" name="session_type" value="{{ active_session_type }}">
 
             <input
               type="file"
@@ -277,7 +278,10 @@
         const data = await resp.json().catch(() => null);
         if (!resp.ok || !data || data.ok !== true) {
           const msg = (data && (data.error || data.errors)) ? (data.error || data.errors) : ('Import échoué (HTTP ' + resp.status + ')');
-          showError(Array.isArray(msg) ? msg.join('\n') : String(msg));
+          const issues = data && data.result && Array.isArray(data.result.student_issues)
+            ? data.result.student_issues.slice(0, 3).map((issue) => issue.message).filter(Boolean)
+            : [];
+          showError((Array.isArray(msg) ? msg.join('\n') : String(msg)) + (issues.length ? '\n' + issues.join('\n') : ''));
           return;
         }
 

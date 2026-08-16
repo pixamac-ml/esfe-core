@@ -1,47 +1,18 @@
-{% load humanize component_tags %}
-        <!-- =========== SUPPORTS =========== -->
-        <div id="teacher-panel-supports" class="sg-section-panel {% if active_section == 'supports' %}is-active{% endif %}" data-sg-panel="supports" {% if active_section != 'supports' %}hidden{% endif %}>
-          {% component "section_header" title="Supports de cours" subtitle="Deposez et organisez vos supports par classe, matiere et chapitre." icon="folder-open" %}
-            {% fill "action" %}
-              <button type="button" class="inline-flex items-center gap-1.5 rounded-lg bg-[color:var(--school-primary)] px-3 py-2 text-xs font-bold text-white transition hover:opacity-90"
-                      hx-get="{% url 'accounts_portal:teacher_support_workspace' %}?support_target=%23sg-drawer-content" hx-target="#sg-drawer-content" hx-swap="innerHTML"
-                      >
-                <i data-lucide="plus" style="width:14px;height:14px;"></i> Deposer un support
-              </button>
-            {% endfill %}
-          {% endcomponent %}
-
-          <div class="mb-4">{% component "kpi_row" cards=section_kpi_cards columns=4 %}{% endcomponent %}</div>
-
-          {% component "dashboard_card" %}
-            {% fill "default" %}
-              <div class="flex items-center justify-between mb-3">
-                <div>
-                  <span class="text-xs font-bold text-[color:var(--text)]">Depot rapide</span>
-                  <p class="text-[11px] font-semibold text-[color:var(--muted-2)]">Choisissez une classe pour deposer un support.</p>
-                </div>
-              </div>
-              <div class="grid gap-2 sm:grid-cols-2">
-                {% for row in class_focus_rows %}
-                <button type="button" class="flex items-center justify-between gap-3 rounded-lg border border-[color:var(--line)] p-3 text-left transition hover:border-[color:var(--school-primary-soft)] hover:bg-[color:var(--card-soft)]"
-                        hx-get="{% url 'accounts_portal:teacher_support_workspace' %}?class_id={{ row.class_id }}&support_target=%23sg-drawer-content" hx-target="#sg-drawer-content" hx-swap="innerHTML"
-                        >
-                  <div class="min-w-0">
-                    <div class="text-xs font-bold text-[color:var(--text)]">{{ row.class_name }}</div>
-                    <div class="text-[11px] font-semibold text-[color:var(--muted-2)] truncate">{{ row.subjects|join:", "|truncatechars:60 }}</div>
-                  </div>
-                  <span class="shrink-0 flex items-center gap-1 rounded-full bg-[color:var(--school-primary-soft)] px-2.5 py-1 text-[10px] font-bold text-[color:var(--school-primary)]">
-                    <i data-lucide="upload" style="width:12px;height:12px;"></i>
-                  </span>
-                </button>
-                {% empty %}
-                <div class="col-span-2 sg-empty">
-                  <div class="sg-empty-icon"><i data-lucide="folder-open"></i></div>
-                  <div class="sg-empty-text">Aucune classe rattachee.</div>
-                </div>
-                {% endfor %}
-              </div>
-            {% endfill %}
-          {% endcomponent %}
-        </div>
-
+{% load component_tags %}
+<section id="teacher-panel-supports" data-teacher-section="supports" class="space-y-5">
+  {% component "ui_core.page_header" eyebrow="Pédagogie" title="Supports de cours" subtitle="Déposez et organisez vos ressources par classe, matière et chapitre." %}
+    {% fill "actions" %}{% component "button" label="Déposer un support" icon="plus" variant="primary" hx_get="/portal/teacher/supports/?support_target=%23sg-drawer-content" hx_target="#sg-drawer-content" hx_swap="innerHTML" %}{% endcomponent %}{% endfill %}
+  {% endcomponent %}
+  <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    {% for card in section_kpi_cards %}{% component "ui_core.stat_card" label=card.label value=card.value icon=card.icon tone=card.tone compact=True %}{% endcomponent %}{% endfor %}
+  </div>
+  {% component "ui_core.panel" title="Dépôt rapide" subtitle="Choisissez une classe pour ouvrir l’espace de dépôt." %}
+    {% if class_focus_rows %}
+      <div class="grid gap-3 sm:grid-cols-2">
+        {% for row in class_focus_rows %}
+          <button type="button" hx-get="{% url 'accounts_portal:teacher_support_workspace' %}?class_id={{ row.class_id }}&support_target=%23sg-drawer-content" hx-target="#sg-drawer-content" hx-swap="innerHTML" class="flex w-full items-center justify-between rounded-ui-button border border-ui-border px-3 py-2 text-left text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">{{ row.class_name }}<i data-lucide="upload" class="h-4 w-4 text-ui-primary"></i></button>
+        {% endfor %}
+      </div>
+    {% else %}{% component "ui_core.empty_state" icon="folder-open" title="Aucune classe rattachée" message="Un support peut être ajouté dès qu'une affectation est publiée." %}{% endcomponent %}{% endif %}
+  {% endcomponent %}
+</section>

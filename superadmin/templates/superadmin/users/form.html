@@ -1,7 +1,7 @@
 {% extends "superadmin/base.html" %}
 
 {% block page_title %}{% if target_user %}Modifier utilisateur{% else %}Nouvel utilisateur{% endif %}{% endblock %}
-{% block page_subtitle %}Creation de compte, role, groupe et annexe{% endblock %}
+{% block page_subtitle %}Creation de compte, position institutionnelle et annexe{% endblock %}
 
 {% block content_main %}
 <div class="space-y-6 max-w-5xl mx-auto">
@@ -62,19 +62,10 @@
 			</div>
 
 			<div class="space-y-3">
-				<h3 class="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-0">Role et affectation</h3>
+				<h3 class="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-0">Position et affectation</h3>
 				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 					<div>
-						<label for="id_role" class="form-label">Role applicatif</label>
-						<select id="id_role" name="role" class="form-input">
-							<option value="">Aucun role</option>
-							{% for role_key, role_label in role_choices %}
-							<option value="{{ role_key }}" {% if form_data.role == role_key %}selected{% endif %}>{{ role_label }}</option>
-							{% endfor %}
-						</select>
-					</div>
-					<div>
-						<label for="id_position" class="form-label">Position metier</label>
+						<label for="id_position" class="form-label">Position metier *</label>
 						<select id="id_position" name="position" class="form-input">
 							<option value="">Aucune position</option>
 							{% for position_key, position_label in position_choices %}
@@ -92,21 +83,7 @@
 						</select>
 					</div>
 				</div>
-				<p class="text-xs text-slate-500 mb-0">Conseil: admissions/finance doivent en general etre rattaches a une annexe.</p>
-			</div>
-
-			<div class="space-y-3">
-				<h3 class="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-0">Groupes staff</h3>
-				<div class="grid grid-cols-1 md:grid-cols-2 gap-2 rounded-lg border border-slate-200 p-3 bg-slate-50">
-					{% for g in groups %}
-					<label class="inline-flex items-center gap-2 text-sm text-slate-700">
-						<input type="checkbox" name="groups" value="{{ g.id }}" {% if g.id|stringformat:"s" in selected_group_ids %}checked{% endif %}>
-						<span>{{ g.name }}</span>
-					</label>
-					{% empty %}
-					<p class="text-sm text-slate-500 mb-0">Aucun groupe disponible.</p>
-					{% endfor %}
-				</div>
+				<p class="text-xs text-slate-500 mb-0">Le groupe et les droits techniques sont synchronises automatiquement a partir de la position. Une annexe est obligatoire pour tout poste rattache a une annexe.</p>
 			</div>
 
 			<div class="space-y-2">

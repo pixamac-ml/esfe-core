@@ -1,38 +1,9 @@
-{% load humanize component_tags %}
-        <!-- =========== NOTIFICATIONS =========== -->
-        <div id="teacher-panel-notifications" class="sg-section-panel {% if active_section == 'notifications' %}is-active{% endif %}" data-sg-panel="notifications" {% if active_section != 'notifications' %}hidden{% endif %}>
-          {% component "section_header" title="Notifications" subtitle="Toutes vos notifications et alertes." icon="bell" %}
-            {% fill "action" %}{% component "status_badge" label=teacher_notifications.unread_count|default:0 tone="primary" icon="bell" %}{% endcomponent %}{% endfill %}
-          {% endcomponent %}
-
-          {% component "dashboard_card" %}
-            {% fill "default" %}
-              {% if teacher_notifications.items %}
-                <div class="space-y-2">
-                  {% for n in teacher_notifications.items %}
-                  <div class="flex items-center justify-between gap-3 rounded-lg border border-[color:var(--line)] p-3 {% if not n.is_read %}bg-[color:var(--school-primary-soft)]{% endif %}">
-                    <div class="min-w-0">
-                      <div class="text-xs font-bold text-[color:var(--text)]">{{ n.title }}</div>
-                      <div class="text-[11px] font-semibold text-[color:var(--muted-2)]">{{ n.message|truncatechars:80 }} &middot; {{ n.created_at|date:"d/m/Y H:i" }}</div>
-                    </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                      {% if not n.is_read %}
-                      {% component "status_badge" label="Nouveau" tone="primary" %}{% endcomponent %}
-                      {% endif %}
-                      <a href="{{ n.url|default:'#' }}" aria-label="Consulter la notification {{ n.title }}" class="rounded-lg border border-[color:var(--line)] p-1.5 text-[color:var(--muted)] hover:border-[color:var(--school-primary-soft)]">
-                        <i data-lucide="eye" class="h-3.5 w-3.5" aria-hidden="true"></i>
-                      </a>
-                    </div>
-                  </div>
-                  {% endfor %}
-                </div>
-              {% else %}
-                <div class="text-center py-8 text-[color:var(--muted-2)]">
-                  <div class="mb-2 flex justify-center"><i data-lucide="bell" class="h-7 w-7 opacity-35" aria-hidden="true"></i></div>
-                  <div class="text-sm font-bold">Aucune notification.</div>
-                </div>
-              {% endif %}
-            {% endfill %}
-          {% endcomponent %}
-        </div>
-
+{% load component_tags %}
+<section id="teacher-panel-notifications" data-teacher-section="notifications" class="space-y-5">
+  {% component "ui_core.page_header" eyebrow="Centre de notifications" title="Notifications" subtitle="Alertes et messages associés à votre périmètre enseignant." %}
+    {% fill "actions" %}{% component "ui_core.status_badge" label=teacher_notifications.unread_count tone="primary" icon="bell" %}{% endcomponent %}{% endfill %}
+  {% endcomponent %}
+  {% component "ui_core.panel" title="Messages récents" padding=False %}
+    {% if teacher_notifications.items %}<div class="divide-y divide-ui-border">{% for notification in teacher_notifications.items %}<article class="flex items-start justify-between gap-4 px-4 py-4 {% if not notification.is_read %}bg-ui-primary-soft/40{% endif %}"><div class="min-w-0"><strong class="block text-sm text-ui-text">{{ notification.title }}</strong><p class="mt-1 text-sm text-ui-text-muted">{{ notification.message|truncatechars:160 }}</p><span class="mt-2 block text-xs text-ui-text-muted">{{ notification.created_at|date:"d/m/Y H:i" }}</span></div>{% if not notification.is_read %}{% component "ui_core.status_badge" label="Nouveau" tone="primary" %}{% endcomponent %}{% endif %}</article>{% endfor %}</div>{% else %}<div class="p-5">{% component "ui_core.empty_state" icon="bell-off" title="Aucune notification" message="Les nouveaux messages apparaîtront ici." %}{% endcomponent %}</div>{% endif %}
+  {% endcomponent %}
+</section>

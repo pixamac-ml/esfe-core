@@ -1,3 +1,5 @@
+{% load component_tags %}
+
 {% if toast %}
 <div class="panel mb-4" style="border-left:5px solid {% if toast.level == 'success' %}#059669{% elif toast.level == 'error' %}#be123c{% else %}#d97706{% endif %}">
   <p class="text-sm font-black">{{ toast.message }}</p>
@@ -5,68 +7,17 @@
 {% endif %}
 
 <div class="space-y-4">
-  <div class="band b-in_progress">
-    <div>
-      <p class="kicker">Paramétrage académique</p>
-      <h3>Classes, maquettes et affectations</h3>
-      <p>Une section autonome pour gérer la structure académique sans mélanger le workflow notes.</p>
-    </div>
-    <span class="badge">{{ branch.name|default:"Annexe" }}</span>
-  </div>
+  {% component "ui_core.page_header" eyebrow="Scolarité / Paramétrage académique" title="Classes, maquettes et affectations" subtitle="Un espace autonome pour administrer la structure sans modifier le workflow de notes." %}
+    {% fill "actions" %}<span class="rounded-ui-badge bg-ui-info-soft px-3 py-1.5 text-xs font-semibold text-ui-info">{{ branch.name|default:"Annexe" }}</span>{% endfill %}
+  {% endcomponent %}
 
-  <div class="panel">
-    <div class="flex flex-wrap gap-2">
-      <button
-        type="button"
-        class="btn {% if section == 'classes' %}btn-primary{% else %}btn-secondary{% endif %}"
-        hx-get="{% url 'accounts_portal:it_structure_workspace' %}?section=classes{% if selected_class %}&class_id={{ selected_class.id }}{% endif %}"
-        hx-target="#it-workspace"
-        hx-swap="innerHTML"
-      >
-        Classes
-      </button>
-      <button
-        type="button"
-        class="btn {% if section == 'maquettes' %}btn-primary{% else %}btn-secondary{% endif %}"
-        hx-get="{% url 'accounts_portal:it_structure_workspace' %}?section=maquettes{% if selected_class %}&class_id={{ selected_class.id }}{% endif %}"
-        hx-target="#it-workspace"
-        hx-swap="innerHTML"
-      >
-        Maquettes
-      </button>
-      <button
-        type="button"
-        class="btn {% if section == 'affectations' %}btn-primary{% else %}btn-secondary{% endif %}"
-        hx-get="{% url 'accounts_portal:it_structure_workspace' %}?section=affectations{% if selected_class %}&class_id={{ selected_class.id }}{% endif %}"
-        hx-target="#it-workspace"
-        hx-swap="innerHTML"
-      >
-        Affectations
-      </button>
-    </div>
-  </div>
+  {% component "ui_core.tabs" id="it-structure-subnavigation" items=structure_subnavigation active=section density="compact" subview_event="it-structure-subview" subview_attr="it-structure-subview" %}{% endcomponent %}
 
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-    <div class="panel">
-      <p class="kicker">Classes</p>
-      <h3 class="mt-1 text-3xl font-black">{{ metrics.classes }}</h3>
-      <p class="mt-1 text-xs font-semibold text-slate-400">Classes configurées dans l'annexe.</p>
-    </div>
-    <div class="panel">
-      <p class="kicker">UE</p>
-      <h3 class="mt-1 text-3xl font-black">{{ metrics.ues }}</h3>
-      <p class="mt-1 text-xs font-semibold text-slate-400">UE de la classe active.</p>
-    </div>
-    <div class="panel">
-      <p class="kicker">EC</p>
-      <h3 class="mt-1 text-3xl font-black">{{ metrics.ecs }}</h3>
-      <p class="mt-1 text-xs font-semibold text-slate-400">Matières de la classe active.</p>
-    </div>
-    <div class="panel">
-      <p class="kicker">Sans classe</p>
-      <h3 class="mt-1 text-3xl font-black">{{ metrics.students_without_class }}</h3>
-      <p class="mt-1 text-xs font-semibold text-slate-400">Étudiants à affecter.</p>
-    </div>
+  <div class="grid min-w-0 grid-cols-2 gap-4 xl:grid-cols-4">
+    {% component "ui_core.stat_card" label="Classes" value=metrics.classes icon="graduation-cap" tone="primary" description="Configurées dans l'annexe." compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="UE" value=metrics.ues icon="blocks" tone="info" description="De la classe active." compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="EC" value=metrics.ecs icon="book-open-check" tone="accent" description="Matières de la classe active." compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Sans classe" value=metrics.students_without_class icon="user-round-x" tone="warning" description="Étudiants à affecter." compact=True %}{% endcomponent %}
   </div>
 
   {% if section == "classes" %}
@@ -80,7 +31,7 @@
         type="button"
         class="btn btn-primary"
         hx-get="{% url 'accounts_portal:it_structure_modal' %}?kind=class&section=classes"
-        hx-target="#it-modal-root"
+        hx-target="#it-dashboard-modal-content"
         hx-swap="innerHTML"
       >
         <i data-lucide="plus" class="h-4 w-4"></i>
@@ -108,7 +59,7 @@
                 type="button"
                 class="text-left font-black text-slate-900 hover:text-blue-700"
                 hx-get="{% url 'accounts_portal:it_structure_drawer' %}?class_id={{ class_item.id }}&section={{ section }}"
-                hx-target="#it-drawer-content"
+                hx-target="#it-dashboard-drawer-content"
                 hx-swap="innerHTML"
               >
                 {{ class_item.display_name }}
@@ -128,7 +79,7 @@
                   type="button"
                   class="btn btn-primary"
                   hx-get="{% url 'accounts_portal:it_structure_drawer' %}?class_id={{ class_item.id }}&section={{ section }}"
-                  hx-target="#it-drawer-content"
+                  hx-target="#it-dashboard-drawer-content"
                   hx-swap="innerHTML"
                 >
                   Voir
@@ -137,7 +88,7 @@
                   type="button"
                   class="btn btn-secondary"
                   hx-get="{% url 'accounts_portal:it_structure_modal' %}?kind=class&id={{ class_item.id }}&section=classes"
-                  hx-target="#it-modal-root"
+                  hx-target="#it-dashboard-modal-content"
                   hx-swap="innerHTML"
                 >
                   Modifier
@@ -147,7 +98,7 @@
                   method="post"
                   action="{% url 'accounts_portal:it_structure_action' %}"
                   hx-post="{% url 'accounts_portal:it_structure_action' %}"
-                  hx-target="#it-workspace"
+                  hx-target="#it-dashboard-workspace"
                   hx-swap="innerHTML"
                 >
                   {% csrf_token %}
@@ -173,10 +124,10 @@
       </p>
       <div class="flex flex-wrap gap-2">
         {% if classes_page.has_previous %}
-        <button type="button" class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_structure_workspace' %}?section=classes&class_page={{ classes_page.previous_page_number }}{% if selected_class %}&class_id={{ selected_class.id }}{% endif %}" hx-target="#it-workspace" hx-swap="innerHTML">Précédent</button>
+        <button type="button" class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_structure_workspace' %}?section=classes&class_page={{ classes_page.previous_page_number }}{% if selected_class %}&class_id={{ selected_class.id }}{% endif %}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">Précédent</button>
         {% endif %}
         {% if classes_page.has_next %}
-        <button type="button" class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_structure_workspace' %}?section=classes&class_page={{ classes_page.next_page_number }}{% if selected_class %}&class_id={{ selected_class.id }}{% endif %}" hx-target="#it-workspace" hx-swap="innerHTML">Suivant</button>
+        <button type="button" class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_structure_workspace' %}?section=classes&class_page={{ classes_page.next_page_number }}{% if selected_class %}&class_id={{ selected_class.id }}{% endif %}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">Suivant</button>
         {% endif %}
       </div>
     </div>
@@ -198,7 +149,7 @@
           type="button"
           class="btn btn-secondary"
           hx-get="{% url 'accounts_portal:it_structure_drawer' %}?class_id={{ selected_class.id }}&section=maquettes"
-          hx-target="#it-drawer-content"
+          hx-target="#it-dashboard-drawer-content"
           hx-swap="innerHTML"
         >
           Ouvrir le drawer
@@ -208,7 +159,7 @@
           type="button"
           class="btn btn-secondary"
           hx-get="{% url 'accounts_portal:it_structure_modal' %}?kind=ue&class_id={{ selected_class.id }}&semester_id={{ semester.id }}&section=maquettes"
-          hx-target="#it-modal-root"
+          hx-target="#it-dashboard-modal-content"
           hx-swap="innerHTML"
         >
           Ajouter UE S{{ semester.number }}
@@ -241,7 +192,7 @@
                     type="button"
                     class="btn btn-secondary"
                     hx-get="{% url 'accounts_portal:it_structure_modal' %}?kind=ue&id={{ ue.id }}&class_id={{ selected_class.id }}&section=maquettes"
-                    hx-target="#it-modal-root"
+                    hx-target="#it-dashboard-modal-content"
                     hx-swap="innerHTML"
                   >
                     Modifier UE
@@ -250,7 +201,7 @@
                     type="button"
                     class="btn btn-primary"
                     hx-get="{% url 'accounts_portal:it_structure_modal' %}?kind=ec&ue_id={{ ue.id }}&class_id={{ selected_class.id }}&section=maquettes"
-                    hx-target="#it-modal-root"
+                    hx-target="#it-dashboard-modal-content"
                     hx-swap="innerHTML"
                   >
                     Ajouter EC
@@ -279,7 +230,7 @@
                             type="button"
                             class="btn btn-secondary"
                             hx-get="{% url 'accounts_portal:it_structure_modal' %}?kind=ec&id={{ ec.id }}&class_id={{ selected_class.id }}&section=maquettes"
-                            hx-target="#it-modal-root"
+                            hx-target="#it-dashboard-modal-content"
                             hx-swap="innerHTML"
                           >
                             <i data-lucide="pencil" class="h-4 w-4"></i>
@@ -289,7 +240,7 @@
                             method="post"
                             action="{% url 'accounts_portal:it_structure_action' %}"
                             hx-post="{% url 'accounts_portal:it_structure_action' %}"
-                            hx-target="#it-workspace"
+                            hx-target="#it-dashboard-workspace"
                             hx-swap="innerHTML"
                           >
                             {% csrf_token %}
@@ -336,7 +287,7 @@
       <form
         class="flex flex-wrap gap-2"
         hx-get="{% url 'accounts_portal:it_structure_workspace' %}"
-        hx-target="#it-workspace"
+        hx-target="#it-dashboard-workspace"
         hx-swap="innerHTML"
       >
         <input type="hidden" name="section" value="affectations">
@@ -375,7 +326,7 @@
                 type="button"
                 class="btn btn-primary"
                 hx-get="{% url 'accounts_portal:it_structure_modal' %}?kind=assign&student_id={{ student.id }}&section=affectations{% if selected_class %}&class_id={{ selected_class.id }}{% endif %}"
-                hx-target="#it-modal-root"
+                hx-target="#it-dashboard-modal-content"
                 hx-swap="innerHTML"
               >
                 Affecter
@@ -395,10 +346,10 @@
       </p>
       <div class="flex flex-wrap gap-2">
         {% if unassigned_students_page.has_previous %}
-        <button type="button" class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_structure_workspace' %}?section=affectations&student_page={{ unassigned_students_page.previous_page_number }}{% if selected_class %}&class_id={{ selected_class.id }}{% endif %}{% if student_query %}&student_q={{ student_query|urlencode }}{% endif %}" hx-target="#it-workspace" hx-swap="innerHTML">Précédent</button>
+        <button type="button" class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_structure_workspace' %}?section=affectations&student_page={{ unassigned_students_page.previous_page_number }}{% if selected_class %}&class_id={{ selected_class.id }}{% endif %}{% if student_query %}&student_q={{ student_query|urlencode }}{% endif %}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">Précédent</button>
         {% endif %}
         {% if unassigned_students_page.has_next %}
-        <button type="button" class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_structure_workspace' %}?section=affectations&student_page={{ unassigned_students_page.next_page_number }}{% if selected_class %}&class_id={{ selected_class.id }}{% endif %}{% if student_query %}&student_q={{ student_query|urlencode }}{% endif %}" hx-target="#it-workspace" hx-swap="innerHTML">Suivant</button>
+        <button type="button" class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_structure_workspace' %}?section=affectations&student_page={{ unassigned_students_page.next_page_number }}{% if selected_class %}&class_id={{ selected_class.id }}{% endif %}{% if student_query %}&student_q={{ student_query|urlencode }}{% endif %}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">Suivant</button>
         {% endif %}
       </div>
     </div>
@@ -412,11 +363,11 @@
     if (window.__itStructureDrawerRefreshAttached) return;
     window.__itStructureDrawerRefreshAttached = true;
     document.body.addEventListener("it-structure-updated", function () {
-      const root = document.getElementById("it-drawer-content");
+      const root = document.getElementById("it-dashboard-drawer-content");
       const drawer = root && root.firstElementChild;
       const drawerUrl = drawer && drawer.dataset ? drawer.dataset.drawerUrl : "";
       if (!root || !drawerUrl || !window.htmx) return;
-      window.htmx.ajax("GET", drawerUrl, "#it-drawer-content");
+      window.htmx.ajax("GET", drawerUrl, "#it-dashboard-drawer-content");
     });
   })();
 </script>

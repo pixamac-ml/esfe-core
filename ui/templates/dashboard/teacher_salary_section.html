@@ -1,54 +1,13 @@
 {% load humanize component_tags %}
-        <!-- =========== SALARY =========== -->
-        <div id="teacher-panel-salary" class="sg-section-panel {% if active_section == 'salary' %}is-active{% endif %}" data-sg-panel="salary" {% if active_section != 'salary' %}hidden{% endif %}>
-          {% component "section_header" title="Mes honoraires" subtitle="Suivi des heures declarees, des bordereaux et des paiements." icon="wallet" %}{% endcomponent %}
-
-          <div class="mb-4">{% component "kpi_row" cards=section_kpi_cards columns=4 %}{% endcomponent %}</div>
-
-          {% component "dashboard_card" %}
-            {% fill "default" %}
-              <span class="block text-xs font-bold text-[color:var(--text)] mb-3">Detail des heures</span>
-              <div class="sg-table-wrap">
-                <table class="sg-table">
-                  <thead><tr><th>Mois</th><th>Heures</th><th>Tarif horaire</th><th>Montant brut</th><th>Statut</th><th>PDF</th></tr></thead>
-                  <tbody>
-                    {% for row in teacher_hour_rows %}
-                    <tr>
-                      <td style="font-weight:900;">{{ row.month_label }}</td>
-                      <td>{{ row.hours|floatformat:1 }} h</td>
-                      <td>{{ row.tarif|floatformat:0 }} FCFA</td>
-                      <td>{{ row.gross_amount|floatformat:0|intcomma }} FCFA</td>
-                      <td><span class="sg-badge-sm {% if row.status == 'paid' %}sg-badge-green{% elif row.status == 'pending' %}sg-badge-amber{% else %}sg-badge-gray{% endif %}">{{ row.status_display }}</span></td>
-                      <td><a href="{% url 'accounts:honorarium_download' row.entry_id %}" target="_blank" class="inline-flex items-center gap-1 rounded-lg border border-[color:var(--line)] p-1.5 text-[color:var(--muted)] hover:border-[color:var(--school-primary-soft)]" title="Telecharger le bordereau"><i data-lucide="file-down" style="width:14px;height:14px;"></i></a></td>
-                    </tr>
-                    {% empty %}
-                    <tr><td colspan="6"><div class="sg-empty"><div class="sg-empty-icon"><i data-lucide="wallet"></i></div><div class="sg-empty-text">Aucune donnee d'honoraires.</div></div></td></tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
-            {% endfill %}
-          {% endcomponent %}
-
-          {% if teacher_payments.recent_payments %}
-          <div class="mt-4">
-            {% component "dashboard_card" %}
-              {% fill "default" %}
-                <span class="block text-xs font-bold text-[color:var(--text)] mb-3">Paiements recents</span>
-                <div class="space-y-2">
-                  {% for p in teacher_payments.recent_payments %}
-                  <div class="flex items-center justify-between gap-3 rounded-lg border border-[color:var(--line)] p-3">
-                    <div class="min-w-0">
-                      <div class="text-xs font-bold text-[color:var(--text)]">{{ p.label }}</div>
-                      <div class="text-[11px] font-semibold text-[color:var(--muted-2)]">{{ p.date|date:"d/m/Y" }} &middot; {{ p.montant|floatformat:0|intcomma }} FCFA</div>
-                    </div>
-                    <span class="shrink-0 sg-badge-sm sg-badge-green">Paye</span>
-                  </div>
-                  {% endfor %}
-                </div>
-              {% endfill %}
-            {% endcomponent %}
-          </div>
-          {% endif %}
-        </div>
-
+<section id="teacher-panel-salary" data-teacher-section="salary" class="space-y-5">
+  {% component "ui_core.page_header" eyebrow="Rémunération" title="Mes honoraires" subtitle="Heures déclarées, bordereaux et paiements enregistrés." %}{% endcomponent %}
+  <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    {% for card in section_kpi_cards %}{% component "ui_core.stat_card" label=card.label value=card.value icon=card.icon tone=card.tone compact=True %}{% endcomponent %}{% endfor %}
+  </div>
+  {% component "ui_core.data_table" id="teacher-honoraria-table" caption="Détail des honoraires" headers=teacher_ui_tables.honoraria_headers rows=teacher_ui_tables.honoraria density="compact" empty_title="Aucune donnée d'honoraires" empty_message="Les bordereaux validés par l'administration apparaîtront ici." %}{% endcomponent %}
+  {% if teacher_payments.recent_payments %}
+    {% component "ui_core.panel" title="Paiements récents" subtitle="Versements enregistrés pour vos honoraires." %}
+      <div class="space-y-3">{% for payment in teacher_payments.recent_payments %}<div class="flex items-center justify-between gap-3 rounded-ui-button border border-ui-border p-3"><div class="min-w-0"><strong class="block text-sm text-ui-text">{{ payment.label }}</strong><span class="text-xs text-ui-text-muted">{{ payment.date|date:"d/m/Y" }}</span></div><div class="text-right"><strong class="block text-sm tabular-nums text-ui-text">{{ payment.montant|floatformat:0|intcomma }} FCFA</strong>{% component "ui_core.status_badge" label="Payé" tone="success" %}{% endcomponent %}</div></div>{% endfor %}</div>
+    {% endcomponent %}
+  {% endif %}
+</section>

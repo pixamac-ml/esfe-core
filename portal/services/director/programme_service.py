@@ -12,7 +12,7 @@ from formations.models import Programme
 PROGRAMME_SUBVIEWS = {"overview", "classes", "maquettes"}
 
 
-def _page(queryset, page_number, *, per_page=12):
+def _page(queryset, page_number, *, per_page=10):
     paginator = Paginator(queryset, per_page)
     try:
         return paginator.page(page_number or 1)
@@ -146,7 +146,7 @@ def build_director_programme_context(
         selected_class = filtered_classes.first()
 
     structure_rows, structure_totals = _structure_for_class(selected_class)
-    classes_page = _page(filtered_classes, page_number, per_page=12)
+    classes_page = _page(filtered_classes, page_number, per_page=10)
 
     total_classes = base_classes.count()
     total_semesters = Semester.objects.filter(

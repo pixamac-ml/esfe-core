@@ -269,6 +269,88 @@ def _build_notes_grid_context(*, academic_class, semester, requested_session_typ
     }
 
 
+def _build_class_grade_report_pages(*, ues, rows, print_format):
+    """Build print pages from the same ordered UE/EC blocks as the notes grid.
+
+    A printed report cannot keep the whole semester on one physical sheet without
+    reducing its cells to an unreadable size.  The page structure is therefore
+    explicit: up to two UEs per A4 page (including the first page, which keeps
+    the official identity), and a measured group of up to three UEs on A3.
+    """
+    max_columns = 24 if print_format == "a3" else 0
+    chunks, current_chunk, current_columns = [], [], 0
+
+    for ue in ues:
+        # Note, note coefficient and obtained credits for every EC and the UE.
+        ue_columns = 3 * (len(ue.ecs.all()) + 1)
+        page_max_ues = 3 if print_format == "a3" else 2
+        exceeds_page = current_chunk and (
+            len(current_chunk) >= page_max_ues
+            or (max_columns and current_columns + ue_columns > max_columns)
+        )
+        if exceeds_page:
+            chunks.append(current_chunk)
+            current_chunk, current_columns = [], 0
+        current_chunk.append(ue)
+        current_columns += ue_columns
+    if current_chunk:
+        chunks.append(current_chunk)
+
+    pages = []
+    preferred_score_column_width_mm = 10.5 if print_format == "a3" else 8.5
+    usable_page_width_mm = 400 if print_format == "a3" else 270
+    for page_number, chunk in enumerate(chunks, start=1):
+        chunk_ids = {ue.id for ue in chunk}
+        page_rows = []
+        for row in rows:
+            blocks_by_ue_id = {block["ue"].id: block for block in row["ue_blocks"]}
+            page_rows.append({
+                "index": row["index"],
+                "student_matricule": row["student_matricule"],
+                "student_first_name": row["student_first_name"],
+                "student_last_name": row["student_last_name"],
+                "blocks": [
+                    blocks_by_ue_id[ue.id]
+                    for ue in chunk
+                    if ue.id in blocks_by_ue_id and ue.id in chunk_ids
+                ],
+                "semester_average_display": row["semester_average_display"],
+                "semester_percentage_display": row["semester_percentage_display"],
+                "semester_credits_display": row["semester_credits_display"],
+                "semester_required_credits_display": row["semester_required_credits_display"],
+                "semester_total_coefficients_display": row["semester_total_coefficients_display"],
+            })
+        show_semester_result = page_number == len(chunks)
+        identity_width_mm = 76 if page_number == 1 else 26
+        score_column_count = sum(3 * (len(ue.ecs.all()) + 1) for ue in chunk)
+        if show_semester_result:
+            score_column_count += 3
+        score_column_width_mm = min(
+            preferred_score_column_width_mm,
+            (usable_page_width_mm - identity_width_mm) / max(score_column_count, 1),
+        )
+        table_width_mm = round(
+            identity_width_mm + score_column_count * score_column_width_mm,
+            1,
+        )
+        pages.append({
+            "number": page_number,
+            "ues": chunk,
+            "header_blocks": [
+                {"ue": ue, "column_span": 3 * (len(ue.ecs.all()) + 1)}
+                for ue in chunk
+            ],
+            "rows": page_rows,
+            "show_full_identity": page_number == 1,
+            "identity_column_count": 4 if page_number == 1 else 2,
+            "show_semester_result": show_semester_result,
+            "table_width_css": f"{table_width_mm:.1f}",
+            "score_column_width_css": f"{score_column_width_mm:.2f}",
+        })
+
+    return pages
+
+
 def _build_excel_row(enrollment, semester, ues, index, active_session_type="normal", updated_ec_id=None):
     permissions = get_semester_permissions(semester)
     can_edit_current_session = (
@@ -776,6 +858,19 @@ def it_notes_grid_view(request):
         semester=semester,
         requested_session_type=request.GET.get("session", "normal"),
     )
+    imported_raw = request.GET.get("imported")
+    empty_raw = request.GET.get("empty")
+    if imported_raw is not None or empty_raw is not None:
+        try:
+            imported_count = max(int(imported_raw or 0), 0)
+            empty_count = max(int(empty_raw or 0), 0)
+        except (TypeError, ValueError):
+            imported_count = empty_count = 0
+        context["import_feedback"] = {
+            "updated": imported_count,
+            "empty": empty_count,
+            "is_complete": empty_count == 0,
+        }
     return render(
         request,
         "portal/admin/grades/partials/notes_maquette.html",
@@ -826,6 +921,9 @@ def class_grade_sheet_pdf_view(request, class_id, semester_id):
     fmt = request.GET.get("format", "a4").lower()
     if fmt not in ("a3", "a4"):
         fmt = "a4"
+    session_type = request.GET.get("session", "normal").strip().lower()
+    if session_type not in {"normal", "retake"}:
+        session_type = "normal"
 
     from portal.views.it_grades_import import build_it_grade_selection_context
 
@@ -842,17 +940,20 @@ def class_grade_sheet_pdf_view(request, class_id, semester_id):
     context = _build_notes_grid_context(
         academic_class=academic_class,
         semester=semester,
-        requested_session_type="normal",
+        requested_session_type=session_type,
     )
     context["today"] = date.today()
     context["print_format"] = fmt
+    context["report_session_label"] = "Session de rattrapage" if session_type == "retake" else "Session normale"
 
-    ues = context.get("ues", [])
-    chunk_size = 3
-    context["ue_chunks"] = [ues[i:i + chunk_size] for i in range(0, len(ues), chunk_size)]
+    context["report_pages"] = _build_class_grade_report_pages(
+        ues=context.get("ues", []),
+        rows=context.get("rows", []),
+        print_format=fmt,
+    )
 
     html = render_to_string(
-        "academics/reports/class_grade_sheet_pdf.html",
+        "academics/reports/class_grade_sheet_document.html",
         context,
         request=request,
     )
@@ -860,9 +961,10 @@ def class_grade_sheet_pdf_view(request, class_id, semester_id):
         presentational_hints=True,
     )
 
-    filename = f"releve-classe-{slugify(academic_class.name)}-s{semester.number}-{fmt}.pdf"
+    filename = f"releve-classe-{slugify(academic_class.name)}-s{semester.number}-{session_type}-{fmt}.pdf"
     response = HttpResponse(pdf_bytes, content_type="application/pdf")
-    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    disposition = "inline" if request.GET.get("preview") == "1" else "attachment"
+    response["Content-Disposition"] = f'{disposition}; filename="{filename}"'
     response["Content-Length"] = len(pdf_bytes)
     return response
 
@@ -875,6 +977,9 @@ def class_grade_sheet_print_view(request, class_id, semester_id):
     fmt = request.GET.get("format", "a4").lower()
     if fmt not in ("a3", "a4"):
         fmt = "a4"
+    session_type = request.GET.get("session", "normal").strip().lower()
+    if session_type not in {"normal", "retake"}:
+        session_type = "normal"
 
     from portal.views.it_grades_import import build_it_grade_selection_context
 
@@ -891,17 +996,21 @@ def class_grade_sheet_print_view(request, class_id, semester_id):
     context = _build_notes_grid_context(
         academic_class=academic_class,
         semester=semester,
-        requested_session_type="normal",
+        requested_session_type=session_type,
     )
     context["today"] = date.today()
     context["print_format"] = fmt
+    context["report_session_label"] = "Session de rattrapage" if session_type == "retake" else "Session normale"
 
-    ues = context.get("ues", [])
-    chunk_size = 3
-    context["ue_chunks"] = [ues[i:i + chunk_size] for i in range(0, len(ues), chunk_size)]
+    context["report_pages"] = _build_class_grade_report_pages(
+        ues=context.get("ues", []),
+        rows=context.get("rows", []),
+        print_format=fmt,
+    )
+    context["show_browser_actions"] = True
 
     return render(
         request,
-        "academics/reports/class_grade_sheet_print.html",
+        "academics/reports/class_grade_sheet_document.html",
         context,
     )

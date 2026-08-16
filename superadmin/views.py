@@ -57,6 +57,7 @@ from memoires.models import Memoire
 from memoires.forms import MemoireForm
 from memoires.services.rendering import render_memoire_pages
 from accounts.models import Profile
+from accounts.position_registry import POSITION_REGISTRY, get_position_definition, normalize_position
 from academics.models import AcademicClass
 from academics.services.academic_years import (
     canonicalize_academic_year_name,
@@ -72,11 +73,8 @@ from portal.services import build_role_dashboard_shell
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
-MANAGED_STAFF_GROUPS = (
-    'admissions_managers',
-    'finance_agents',
-    'executive_director',
-    'gestionnaire',
+MANAGED_STAFF_GROUPS = tuple(
+    sorted({definition.default_group for definition in POSITION_REGISTRY.values()})
 )
 
 
@@ -84,6 +82,28 @@ def _managed_groups_queryset():
     for group_name in MANAGED_STAFF_GROUPS:
         Group.objects.get_or_create(name=group_name)
     return Group.objects.filter(name__in=MANAGED_STAFF_GROUPS).order_by('name')
+
+
+def _institutional_position_choices():
+    """Expose only current positions, never a legacy alias, to administrators."""
+    return [
+        (code, definition.label)
+        for code, definition in POSITION_REGISTRY.items()
+    ]
+
+
+def _validate_institutional_assignment(*, position, branch_id, is_staff):
+    normalized_position = normalize_position(position)
+    definition = get_position_definition(normalized_position)
+    if is_staff and not definition:
+        return None, "Une position métier officielle est obligatoire pour un compte staff."
+    if position and not definition:
+        return None, "La position métier sélectionnée est invalide."
+    if definition and definition.branch_required and not branch_id:
+        return None, "Une annexe est obligatoire pour cette position métier."
+    if branch_id and not Branch.objects.filter(pk=branch_id, is_active=True).exists():
+        return None, "L'annexe sélectionnée est invalide ou inactive."
+    return normalized_position, None
 
 
 # ============================================
@@ -2553,31 +2573,25 @@ def user_list(request):
 
 @user_passes_test(superuser_required, login_url='/accounts/login/')
 def user_create(request):
-    groups = _managed_groups_queryset()
     branches = Branch.objects.filter(is_active=True).order_by('name')
     form_data = {
         'username': '',
         'email': '',
         'first_name': '',
         'last_name': '',
-        'role': '',
         'position': '',
         'branch': '',
         'is_staff': True,
         'is_active': True,
     }
-    selected_group_ids = []
-
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()
         email = request.POST.get('email', '').strip()
         first_name = request.POST.get('first_name', '').strip()
         last_name = request.POST.get('last_name', '').strip()
         password = request.POST.get('password', '').strip()
-        role = request.POST.get('role', '').strip()
         position = request.POST.get('position', '').strip()
         branch_id = request.POST.get('branch', '').strip()
-        selected_groups = request.POST.getlist('groups')
         is_staff = request.POST.get('is_staff') == 'on'
         is_active = request.POST.get('is_active') == 'on'
 
@@ -2586,19 +2600,31 @@ def user_create(request):
             'email': email,
             'first_name': first_name,
             'last_name': last_name,
-            'role': role,
             'position': position,
             'branch': branch_id,
             'is_staff': is_staff,
             'is_active': is_active,
         }
-        selected_group_ids = [str(group_id) for group_id in selected_groups]
-
         if not username or not password:
             messages.error(request, 'Nom utilisateur et mot de passe sont obligatoires.')
         elif User.objects.filter(username=username).exists():
             messages.error(request, 'Ce nom utilisateur existe deja.')
         else:
+            position, assignment_error = _validate_institutional_assignment(
+                position=position,
+                branch_id=branch_id,
+                is_staff=is_staff,
+            )
+            if assignment_error:
+                messages.error(request, assignment_error)
+                return render(request, 'superadmin/users/form.html', {
+                    'page_title': 'Nouvel utilisateur',
+                    'active_menu': 'users',
+                    'target_user': None,
+                    'position_choices': _institutional_position_choices(),
+                    'branches': branches,
+                    'form_data': form_data,
+                })
             user = User.objects.create_user(
                 username=username,
                 email=email,
@@ -2610,12 +2636,10 @@ def user_create(request):
             )
 
             profile, _ = Profile.objects.get_or_create(user=user)
-            profile.role = role
             profile.position = position
             profile.branch_id = branch_id or None
-            profile.save(update_fields=['role', 'position', 'branch'])
+            profile.save(update_fields=['position', 'branch'])
 
-            user.groups.set(groups.filter(id__in=selected_groups))
             messages.success(request, 'Utilisateur cree avec succes.')
             return redirect('superadmin:user_list')
 
@@ -2623,12 +2647,9 @@ def user_create(request):
         'page_title': 'Nouvel utilisateur',
         'active_menu': 'users',
         'target_user': None,
-        'groups': groups,
-        'role_choices': Profile.ROLE_CHOICES,
-        'position_choices': Profile.POSITION_CHOICES,
+        'position_choices': _institutional_position_choices(),
         'branches': branches,
         'form_data': form_data,
-        'selected_group_ids': selected_group_ids,
     })
 
 
@@ -2638,7 +2659,6 @@ def user_edit(request, pk):
         User.objects.select_related('profile', 'profile__branch').prefetch_related('groups'),
         pk=pk,
     )
-    groups = _managed_groups_queryset()
     branches = Branch.objects.filter(is_active=True).order_by('name')
     profile, _ = Profile.objects.get_or_create(user=target_user)
     form_data = {
@@ -2646,23 +2666,18 @@ def user_edit(request, pk):
         'email': target_user.email,
         'first_name': target_user.first_name,
         'last_name': target_user.last_name,
-        'role': profile.role or '',
-        'position': profile.position or '',
+        'position': normalize_position(profile.position) or '',
         'branch': str(profile.branch_id) if profile.branch_id else '',
         'is_staff': target_user.is_staff,
         'is_active': target_user.is_active,
     }
-    selected_group_ids = [str(group.id) for group in target_user.groups.all()]
-
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()
         email = request.POST.get('email', '').strip()
         first_name = request.POST.get('first_name', '').strip()
         last_name = request.POST.get('last_name', '').strip()
-        role = request.POST.get('role', '').strip()
         position = request.POST.get('position', '').strip()
         branch_id = request.POST.get('branch', '').strip()
-        selected_groups = request.POST.getlist('groups')
         is_staff = request.POST.get('is_staff') == 'on'
         is_active = request.POST.get('is_active') == 'on'
 
@@ -2671,19 +2686,31 @@ def user_edit(request, pk):
             'email': email,
             'first_name': first_name,
             'last_name': last_name,
-            'role': role,
             'position': position,
             'branch': branch_id,
             'is_staff': is_staff,
             'is_active': is_active,
         }
-        selected_group_ids = [str(group_id) for group_id in selected_groups]
-
         if not username:
             messages.error(request, 'Le nom utilisateur est obligatoire.')
         elif User.objects.filter(username=username).exclude(pk=target_user.pk).exists():
             messages.error(request, 'Ce nom utilisateur existe deja.')
         else:
+            position, assignment_error = _validate_institutional_assignment(
+                position=position,
+                branch_id=branch_id,
+                is_staff=is_staff,
+            )
+            if assignment_error:
+                messages.error(request, assignment_error)
+                return render(request, 'superadmin/users/form.html', {
+                    'page_title': f"Modifier utilisateur {target_user.username}",
+                    'active_menu': 'users',
+                    'target_user': target_user,
+                    'position_choices': _institutional_position_choices(),
+                    'branches': branches,
+                    'form_data': form_data,
+                })
             target_user.username = username
             target_user.email = email
             target_user.first_name = first_name
@@ -2697,12 +2724,9 @@ def user_edit(request, pk):
 
             target_user.save()
 
-            profile.role = role
             profile.position = position
             profile.branch_id = branch_id or None
-            profile.save(update_fields=['role', 'position', 'branch'])
-
-            target_user.groups.set(groups.filter(id__in=selected_groups))
+            profile.save(update_fields=['position', 'branch'])
 
             if new_password:
                 from accounts.models import AccountSecurityEvent, AccountSessionRecord
@@ -2729,12 +2753,9 @@ def user_edit(request, pk):
         'page_title': f"Modifier utilisateur {target_user.username}",
         'active_menu': 'users',
         'target_user': target_user,
-        'groups': groups,
-        'role_choices': Profile.ROLE_CHOICES,
-        'position_choices': Profile.POSITION_CHOICES,
+        'position_choices': _institutional_position_choices(),
         'branches': branches,
         'form_data': form_data,
-        'selected_group_ids': selected_group_ids,
     })
 
 

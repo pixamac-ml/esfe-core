@@ -1,0 +1,67 @@
+{% load component_tags humanize %}
+<section data-dashboard-section="overview" class="min-w-0 space-y-5">
+  {% component "ui_core.content_grid" columns=4 %}
+    {% fill "default" %}
+      <div id="live-kpi-grid" aria-label="Indicateurs de l'annexe">
+        {% with card=manager_ui.stat_cards.0 %}{% component "ui_core.stat_card" label=card.label value=card.value unit=card.unit icon=card.icon tone=card.tone description=card.description compact=True %}{% endcomponent %}{% endwith %}
+      </div>
+      {% include "accounts/dashboard/partials/widget_today_payments.html" with stat_card=manager_ui.stat_cards.1 %}
+      <div id="alerts-kpi-card">{% with card=manager_ui.stat_cards.2 %}{% component "ui_core.stat_card" label=card.label value=card.value unit=card.unit icon=card.icon tone=card.tone description=card.description compact=True %}{% endcomponent %}{% endwith %}</div>
+      {% include "accounts/dashboard/partials/widget_cash_balance.html" with stat_card=manager_ui.stat_cards.3 %}
+    {% endfill %}
+  {% endcomponent %}
+
+  {% include "accounts/dashboard/partials/widget_active_coupons.html" %}
+
+  {% component "ui_core.page_section" title="Actions rapides" description="Accès aux opérations principales du jour" labelled_by="manager-quick-actions-title" %}
+    {% fill "default" %}
+      <nav class="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4" aria-labelledby="manager-quick-actions-title">
+        <a href="?section=candidatures" class="flex min-h-16 items-center gap-2 rounded-ui-card border border-ui-border bg-ui-surface p-3 text-ui-text shadow-ui-card transition hover:border-ui-primary/40 hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus"><span class="grid h-9 w-9 shrink-0 place-items-center rounded-ui-button bg-ui-primary-soft text-ui-primary"><i data-lucide="user-round-check" class="h-4 w-4" aria-hidden="true"></i></span><span><strong class="block text-sm">Traiter les candidatures</strong><small class="mt-0.5 block text-xs text-ui-text-muted">Dossiers en attente</small></span></a>
+        <a href="?section=paiements" class="flex min-h-16 items-center gap-2 rounded-ui-card border border-ui-border bg-ui-surface p-3 text-ui-text shadow-ui-card transition hover:border-ui-primary/40 hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus"><span class="grid h-9 w-9 shrink-0 place-items-center rounded-ui-button bg-ui-success-soft text-ui-success"><i data-lucide="badge-dollar-sign" class="h-4 w-4" aria-hidden="true"></i></span><span><strong class="block text-sm">Valider un paiement</strong><small class="mt-0.5 block text-xs text-ui-text-muted">Justificatifs reçus</small></span></a>
+        <a href="?section=depenses" class="flex min-h-16 items-center gap-2 rounded-ui-card border border-ui-border bg-ui-surface p-3 text-ui-text shadow-ui-card transition hover:border-ui-primary/40 hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus"><span class="grid h-9 w-9 shrink-0 place-items-center rounded-ui-button bg-ui-warning-soft text-ui-warning"><i data-lucide="receipt-text" class="h-4 w-4" aria-hidden="true"></i></span><span><strong class="block text-sm">Suivre les dépenses</strong><small class="mt-0.5 block text-xs text-ui-text-muted">Charges de la période</small></span></a>
+        <a href="?section=cloture" class="flex min-h-16 items-center gap-2 rounded-ui-card border border-ui-border bg-ui-surface p-3 text-ui-text shadow-ui-card transition hover:border-ui-primary/40 hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus"><span class="grid h-9 w-9 shrink-0 place-items-center rounded-ui-button bg-ui-info-soft text-ui-info"><i data-lucide="calendar-check-2" class="h-4 w-4" aria-hidden="true"></i></span><span><strong class="block text-sm">Préparer la clôture</strong><small class="mt-0.5 block text-xs text-ui-text-muted">Contrôles mensuels</small></span></a>
+      </nav>
+    {% endfill %}
+  {% endcomponent %}
+
+  <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+    {% component "ui_core.panel" title="Priorités" subtitle="Actions à traiter dans l'ordre recommandé" density="compact" %}
+      {% fill "default" %}
+        <div class="space-y-2">
+          {% for item in manager_intelligence.priorities|slice:":3" %}
+            {% if item.level == "high" %}{% component "ui_core.alert" title=item.title message=item.message tone="danger" %}{% endcomponent %}
+            {% elif item.level == "medium" %}{% component "ui_core.alert" title=item.title message=item.message tone="warning" %}{% endcomponent %}
+            {% else %}{% component "ui_core.alert" title=item.title message=item.message tone="info" %}{% endcomponent %}{% endif %}
+          {% empty %}
+            {% component "ui_core.empty_state" title="Aucune priorité immédiate" message="Les flux principaux de l'annexe ne demandent aucune intervention urgente." icon="circle-check" %}{% endcomponent %}
+          {% endfor %}
+        </div>
+      {% endfill %}
+    {% endcomponent %}
+
+    {% component "ui_core.panel" title="Situation de la période" subtitle=report_period.label density="compact" %}
+      {% fill "default" %}
+        <div class="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+          {% component "ui_core.stat_card" label="Recettes" value=period_summary.total_revenue|intcomma unit="FCFA" icon="trending-up" tone="success" description="Paiements scolaires et boutique" compact=True %}{% endcomponent %}
+          {% component "ui_core.stat_card" label="Charges payées" value=period_summary.charges_paid|intcomma unit="FCFA" icon="trending-down" tone="danger" description="Dépenses, salaires et honoraires" compact=True %}{% endcomponent %}
+          {% if period_summary.net_result < 0 %}{% component "ui_core.stat_card" label="Résultat net" value=period_summary.net_result|intcomma unit="FCFA" icon="scale" tone="danger" description="Avant engagements restants" compact=True %}{% endcomponent %}
+          {% else %}{% component "ui_core.stat_card" label="Résultat net" value=period_summary.net_result|intcomma unit="FCFA" icon="scale" tone="primary" description="Avant engagements restants" compact=True %}{% endcomponent %}{% endif %}
+          {% component "ui_core.stat_card" label="Taux de collecte" value=period_summary.collection_rate unit="%" icon="gauge" tone="info" description="Part des montants attendus déjà encaissés" compact=True %}{% endcomponent %}
+        </div>
+      {% endfill %}
+    {% endcomponent %}
+
+    {% component "ui_core.panel" title="Alertes et risques" subtitle="Contrôles automatiques sur le périmètre autorisé" density="compact" %}
+      {% fill "default" %}
+        <div class="space-y-2">
+          {% for alert in manager_intelligence.alerts|slice:":3" %}
+            {% if alert.level == "danger" %}{% component "ui_core.alert" title="À traiter immédiatement" message=alert.message tone="danger" %}{% endcomponent %}
+            {% else %}{% component "ui_core.alert" title="Suivi recommandé" message=alert.message tone="warning" %}{% endcomponent %}{% endif %}
+          {% empty %}
+            {% component "ui_core.empty_state" title="Aucune alerte active" message="Aucun risque opérationnel ou financier n'est signalé pour cette annexe." icon="shield-check" %}{% endcomponent %}
+          {% endfor %}
+        </div>
+      {% endfill %}
+    {% endcomponent %}
+  </div>
+</section>

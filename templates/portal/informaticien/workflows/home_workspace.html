@@ -1,138 +1,90 @@
-<div class="space-y-4">
-  <div class="band b-in_progress">
-    <div>
-      <p class="kicker">Accueil</p>
-      <h3>Que voulez-vous faire aujourd'hui ?</h3>
-      <p>{{ branch.name|default:"Annexe" }} — workflows opérationnels du dashboard informaticien.</p>
-    </div>
-    {% if resume_target %}
-      <button class="btn btn-primary" hx-get="{{ resume_target.url }}" hx-target="#it-workspace" hx-swap="innerHTML">
-        Reprendre dernière classe
-      </button>
-    {% endif %}
+{% load component_tags %}
+<div class="min-w-0 space-y-6">
+  {% component "ui_core.page_header" eyebrow="Administration IT / Accueil" title="Priorités de l'annexe" subtitle="Repérez les traitements académiques et les comptes qui nécessitent une intervention." %}
+    {% fill "actions" %}
+      {% if resume_target %}
+        <button type="button" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" hx-get="{{ resume_target.url }}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">
+          <i data-lucide="rotate-ccw" class="h-4 w-4" aria-hidden="true"></i>Reprendre la dernière classe
+        </button>
+      {% endif %}
+    {% endfill %}
+  {% endcomponent %}
+
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    {% component "ui_core.stat_card" label="Notes incomplètes" value=incomplete_classes|length icon="file-warning" tone="warning" description="Classes dont la saisie doit être finalisée" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Résultats à calculer" value=calculable_classes|length icon="calculator" tone="info" description="Semestres complets en attente de calcul" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Erreurs d'import" value=import_errors|length icon="file-x" tone="danger" description="Erreurs récentes à contrôler" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Comptes bloqués" value=blocked_accounts|length icon="shield-alert" tone="danger" description="Comptes de cette annexe" compact=True %}{% endcomponent %}
   </div>
 
-  <div class="flex flex-wrap gap-3">
-    <button class="btn btn-primary" hx-get="{% url 'accounts_portal:it_notes_flow_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML">
-      <i data-lucide="file-spreadsheet" class="h-4 w-4"></i>
-      Saisir des notes
-    </button>
-    <button class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_import_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML">
-      <i data-lucide="upload-cloud" class="h-4 w-4"></i>
-      Importer Excel
-    </button>
-    {% if calculable_classes %}
-      <button class="btn btn-secondary" hx-get="{{ calculable_classes.0.url }}" hx-target="#it-workspace" hx-swap="innerHTML">
-        <i data-lucide="calculator" class="h-4 w-4"></i>
-        Générer résultats
-      </button>
-    {% else %}
-      <span class="chip c-mute">Aucune classe prête à calculer</span>
-    {% endif %}
-    <button class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_cards_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML">
-      <i data-lucide="badge" class="h-4 w-4"></i>
-      Générer cartes
-    </button>
-    <button class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_my_account_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML">
-      <i data-lucide="settings" class="h-4 w-4"></i>
-      Mon compte
-    </button>
-  </div>
+  {% component "ui_core.panel" title="Actions rapides" subtitle="Accédez directement au bon workflow." padding=False %}
+    {% fill "default" %}
+      <div class="flex flex-wrap gap-2 p-4">
+        <button type="button" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" hx-get="{% url 'accounts_portal:it_notes_flow_workspace' %}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML"><i data-lucide="file-spreadsheet" class="h-4 w-4" aria-hidden="true"></i>Saisir des notes</button>
+        <button type="button" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-4 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" hx-get="{% url 'accounts_portal:it_import_workspace' %}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML"><i data-lucide="upload-cloud" class="h-4 w-4" aria-hidden="true"></i>Importer Excel</button>
+        {% if calculable_classes %}
+          <button type="button" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-4 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" hx-get="{{ calculable_classes.0.url }}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML"><i data-lucide="calculator" class="h-4 w-4" aria-hidden="true"></i>Générer les résultats</button>
+        {% endif %}
+        <button type="button" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-4 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" hx-get="{% url 'accounts_portal:it_cards_workspace' %}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML"><i data-lucide="badge" class="h-4 w-4" aria-hidden="true"></i>Générer les cartes</button>
+      </div>
+    {% endfill %}
+  {% endcomponent %}
 
-  <div class="grid lg:grid-cols-2 gap-4">
-    <div class="panel">
-      <div class="flex items-center justify-between">
-        <p class="kicker">Notes incomplètes</p>
-        <span class="chip c-warn">{{ incomplete_classes|length }}</span>
-      </div>
-      <h3 class="mt-1 text-lg font-black">À traiter</h3>
-      <div class="mt-3">
-        {% for item in incomplete_classes %}
-          <div class="row">
-            <div class="avatar" style="background:#d97706">
-              <i data-lucide="edit-3" class="h-4 w-4"></i>
+  <div class="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-2">
+    {% component "ui_core.panel" title="Notes incomplètes" subtitle="Classes à traiter en priorité." %}
+      {% fill "default" %}
+        <div class="divide-y divide-ui-border">
+          {% for item in incomplete_classes %}
+            <div class="flex min-w-0 items-center gap-3 py-3 first:pt-0 last:pb-0">
+              <span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button bg-ui-warning-soft text-ui-warning"><i data-lucide="edit-3" class="h-4 w-4" aria-hidden="true"></i></span>
+              <div class="min-w-0 flex-1"><p class="truncate text-sm font-semibold text-ui-text">{{ item.class.display_name }} — S{{ item.semester.number }}</p><p class="mt-0.5 text-xs text-ui-text-muted">{{ item.state.missing_grades }} note(s) manquante(s)</p></div>
+              <button type="button" class="inline-flex h-9 shrink-0 items-center rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover" hx-get="{{ item.url }}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">Ouvrir</button>
             </div>
-            <div class="flex-1 min-w-0">
-              <b class="block">{{ item.class.display_name }} — S{{ item.semester.number }}</b>
-              <span class="text-xs font-semibold text-slate-400">{{ item.state.missing_grades }} note(s) manquante(s)</span>
-            </div>
-            <button class="btn btn-secondary" hx-get="{{ item.url }}" hx-target="#it-workspace" hx-swap="innerHTML">Ouvrir</button>
-          </div>
-        {% empty %}
-          <p class="py-4 text-center text-sm font-semibold text-slate-400">Aucune classe avec saisie incomplète.</p>
-        {% endfor %}
-      </div>
-    </div>
+          {% empty %}
+            <p class="py-5 text-center text-sm text-ui-text-muted">Aucune classe avec une saisie incomplète.</p>
+          {% endfor %}
+        </div>
+      {% endfill %}
+    {% endcomponent %}
 
-    <div class="panel">
-      <div class="flex items-center justify-between">
-        <p class="kicker">Résultats</p>
-        <span class="chip c-info">{{ calculable_classes|length }}</span>
-      </div>
-      <h3 class="mt-1 text-lg font-black">Prêts à calculer</h3>
-      <div class="mt-3">
-        {% for item in calculable_classes %}
-          <div class="row">
-            <div class="avatar" style="background:#059669">
-              <i data-lucide="calculator" class="h-4 w-4"></i>
+    {% component "ui_core.panel" title="Résultats prêts à calculer" subtitle="Semestres dont toutes les notes attendues sont présentes." %}
+      {% fill "default" %}
+        <div class="divide-y divide-ui-border">
+          {% for item in calculable_classes %}
+            <div class="flex min-w-0 items-center gap-3 py-3 first:pt-0 last:pb-0">
+              <span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button bg-ui-success-soft text-ui-success"><i data-lucide="calculator" class="h-4 w-4" aria-hidden="true"></i></span>
+              <div class="min-w-0 flex-1"><p class="truncate text-sm font-semibold text-ui-text">{{ item.class.display_name }} — S{{ item.semester.number }}</p><p class="mt-0.5 text-xs text-ui-text-muted">{{ item.state.entered_grades }}/{{ item.state.expected_grades }} notes</p></div>
+              <button type="button" class="inline-flex h-9 shrink-0 items-center rounded-ui-button bg-ui-primary px-3 text-xs font-semibold text-ui-on-primary hover:bg-ui-primary-strong" hx-get="{{ item.url }}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">Calculer</button>
             </div>
-            <div class="flex-1 min-w-0">
-              <b class="block">{{ item.class.display_name }} — S{{ item.semester.number }}</b>
-              <span class="text-xs font-semibold text-slate-400">{{ item.state.entered_grades }}/{{ item.state.expected_grades }} notes</span>
-            </div>
-            <button class="btn btn-primary" hx-get="{{ item.url }}" hx-target="#it-workspace" hx-swap="innerHTML">Calculer</button>
-          </div>
-        {% empty %}
-          <p class="py-4 text-center text-sm font-semibold text-slate-400">Aucun semestre complet non calculé.</p>
-        {% endfor %}
-      </div>
-    </div>
+          {% empty %}
+            <p class="py-5 text-center text-sm text-ui-text-muted">Aucun semestre complet non calculé.</p>
+          {% endfor %}
+        </div>
+      {% endfill %}
+    {% endcomponent %}
 
-    <div class="panel">
-      <div class="flex items-center justify-between">
-        <p class="kicker">Import Excel</p>
-        <span class="chip c-bad">{{ import_errors|length }}</span>
-      </div>
-      <h3 class="mt-1 text-lg font-black">Erreurs récentes</h3>
-      <div class="mt-3">
-        {% for log in import_errors %}
-          <div class="row">
-            <div class="avatar" style="background:#be123c">
-              <i data-lucide="alert-circle" class="h-4 w-4"></i>
-            </div>
-            <div class="flex-1 min-w-0">
-              <b class="block">{{ log.target_label }}</b>
-              <span class="text-xs font-semibold text-slate-400">{{ log.details }}</span>
-            </div>
-          </div>
-        {% empty %}
-          <p class="py-4 text-center text-sm font-semibold text-slate-400">Aucune erreur d'import récente.</p>
-        {% endfor %}
-      </div>
-    </div>
+    {% component "ui_core.panel" title="Erreurs d'import récentes" subtitle="Contrôlez les fichiers à corriger avant une nouvelle importation." %}
+      {% fill "default" %}
+        <div class="divide-y divide-ui-border">
+          {% for log in import_errors %}
+            <div class="flex min-w-0 items-start gap-3 py-3 first:pt-0 last:pb-0"><span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button bg-ui-danger-soft text-ui-danger"><i data-lucide="file-x" class="h-4 w-4" aria-hidden="true"></i></span><div class="min-w-0"><p class="truncate text-sm font-semibold text-ui-text">{{ log.target_label }}</p><p class="mt-0.5 text-xs text-ui-text-muted">{{ log.details }}</p></div></div>
+          {% empty %}
+            <p class="py-5 text-center text-sm text-ui-text-muted">Aucune erreur d'import récente.</p>
+          {% endfor %}
+        </div>
+      {% endfill %}
+    {% endcomponent %}
 
-    <div class="panel">
-      <div class="flex items-center justify-between">
-        <p class="kicker">Comptes</p>
-        <span class="chip c-bad">{{ blocked_accounts|length }}</span>
-      </div>
-      <h3 class="mt-1 text-lg font-black">Comptes bloqués</h3>
-      <div class="mt-3">
-        {% for state in blocked_accounts %}
-          <div class="row">
-            <div class="avatar" style="background:#be123c">
-              <i data-lucide="shield-alert" class="h-4 w-4"></i>
-            </div>
-            <div class="flex-1 min-w-0">
-              <b class="block">{{ state.user.get_full_name|default:state.user.username }}</b>
-              <span class="text-xs font-semibold text-slate-400">{{ state.note|default:"Compte bloqué" }}</span>
-            </div>
-            <button class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_accounts_flow_workspace' %}?q={{ state.user.username }}" hx-target="#it-workspace" hx-swap="innerHTML">Gérer</button>
-          </div>
-        {% empty %}
-          <p class="py-4 text-center text-sm font-semibold text-slate-400">Aucun compte bloqué dans l'annexe.</p>
-        {% endfor %}
-      </div>
-    </div>
+    {% component "ui_core.panel" title="Comptes bloqués" subtitle="Comptes de l'annexe nécessitant une vérification." %}
+      {% fill "default" %}
+        <div class="divide-y divide-ui-border">
+          {% for state in blocked_accounts %}
+            <div class="flex min-w-0 items-center gap-3 py-3 first:pt-0 last:pb-0"><span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button bg-ui-danger-soft text-ui-danger"><i data-lucide="shield-alert" class="h-4 w-4" aria-hidden="true"></i></span><div class="min-w-0 flex-1"><p class="truncate text-sm font-semibold text-ui-text">{{ state.user.get_full_name|default:state.user.username }}</p><p class="mt-0.5 text-xs text-ui-text-muted">{{ state.note|default:"Compte bloqué" }}</p></div><button type="button" class="inline-flex h-9 shrink-0 items-center rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover" hx-get="{% url 'accounts_portal:it_accounts_flow_workspace' %}?q={{ state.user.username }}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">Gérer</button></div>
+          {% empty %}
+            <p class="py-5 text-center text-sm text-ui-text-muted">Aucun compte bloqué dans l'annexe.</p>
+          {% endfor %}
+        </div>
+      {% endfill %}
+    {% endcomponent %}
   </div>
 </div>

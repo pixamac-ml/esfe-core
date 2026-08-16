@@ -6,7 +6,7 @@
 
 {% component "ui_core.panel" title="Classes de l'annexe" subtitle="Consultation des effectifs et accès aux présences" padding=False %}
   <div class="divide-y divide-ui-border">
-    {% for item in class_picker_items %}
+    {% for item in class_picker_page.object_list %}
       <a
         href="{{ supervisor_dashboard_base_url }}?section=classes&view=students&class_id={{ item.id }}"
         hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=classes&view=students&class_id={{ item.id }}"
@@ -21,5 +21,6 @@
     {% empty %}
       <div class="p-5">{% component "ui_core.empty_state" icon="school" title="Aucune classe active" message="La Direction des études n'a publié aucune classe dans cette annexe." %}{% endcomponent %}</div>
     {% endfor %}
+    {% include "portal/staff/supervisor/partials/_pagination.html" with page_obj=class_picker_page page_param="classes_page" %}
   </div>
 {% endcomponent %}

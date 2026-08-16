@@ -341,7 +341,7 @@ class ManagerAccessControlTests(TestCase):
         _login(self.client, self.manager_a)
         response = self.client.get(
             reverse("accounts:manager_dashboard"),
-            {"section": "candidatures"},
+            {"section": "candidatures", "view": "list"},
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Alice")
@@ -997,8 +997,8 @@ class ManagerFinancialReportViewTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Recettes totales")
-        self.assertContains(response, "Versement bancaire recommande")
-        self.assertContains(response, "Paiements etudiants")
+        self.assertContains(response, "Versement bancaire recommandé")
+        self.assertContains(response, "Paiements étudiants")
 
     def test_report_pdf_export_returns_pdf(self):
         url = reverse("accounts:manager_export_report_pdf")
@@ -1021,7 +1021,7 @@ class ManagerFinancialReportViewTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["report_period"]["preset"], "week")
-        self.assertContains(response, 'id="manager-report-month" aria-label="Mois du rapport" disabled')
+        self.assertContains(response, '<option value="week" selected>')
         html = response.content.decode()
         pdf_link = re.search(r'href="([^"]*manager/export/report/pdf/[^"]*)"', html)
         self.assertIsNotNone(pdf_link)
@@ -1038,13 +1038,13 @@ class ManagerFinancialReportViewTests(TestCase):
             },
         )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'id="manager-report-start" value="2026-06-01"')
-        self.assertContains(response, 'id="manager-report-end" value="2026-06-15"')
+        self.assertContains(response, 'name="report_start" value="2026-06-01"')
+        self.assertContains(response, 'name="report_end" value="2026-06-15"')
 
     def test_caisse_identifies_bank_transfers_as_outflows(self):
         response = self.client.get(reverse("accounts:manager_dashboard"), {"section": "caisse"})
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Versements bancaires comptabilisés comme sorties de caisse")
+        self.assertContains(response, "versements bancaires sont comptabilisés comme sorties de caisse")
         self.assertEqual(response.context["report_bank_transfer_total"], 30000)
 
     def test_closure_form_is_visibly_blocked_on_financial_anomaly(self):
@@ -1058,12 +1058,13 @@ class ManagerFinancialReportViewTests(TestCase):
             reverse("accounts:manager_dashboard"),
             {
                 "section": "cloture",
+                "view": "closures",
                 "report_month": self.period_month.month,
                 "report_year": self.period_month.year,
             },
         )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Clôture bloquée : anomalies financières à corriger")
+        self.assertContains(response, "Clôture bloquée")
         self.assertContains(response, 'disabled aria-disabled="true"')
 
     def test_negative_cash_is_reported_as_danger(self):

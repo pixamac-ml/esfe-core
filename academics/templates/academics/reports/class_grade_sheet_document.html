@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Relevé de classe — {{ academic_class.name }} — Semestre {{ semester.number }}</title>
+  <style>
+    @page {
+      size: {% if print_format == "a3" %}A3{% else %}A4{% endif %} landscape;
+      margin: 9mm 7mm 12mm;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #111; font-family: Arial, sans-serif; font-size: {% if print_format == "a3" %}8.5px{% else %}7.8px{% endif %}; line-height: 1.18; }
+    .print-actions { display: flex; justify-content: center; gap: 10px; padding: 14px; background: #f8fafc; }
+    .print-actions button { cursor: pointer; border: 1px solid #94a3b8; border-radius: 7px; background: #fff; padding: 8px 14px; font-weight: 700; }
+    .report-page { break-after: page; page-break-after: always; padding: 0; }
+    .report-page:last-child { break-after: auto; page-break-after: auto; }
+    .official-header { display: flex; align-items: center; gap: 12px; margin: 0 0 8px; padding-bottom: 7px; border-bottom: 2px double #1f2937; }
+    .official-logo { width: 56px; height: 56px; object-fit: contain; }
+    .official-identity { flex: 1; }
+    .official-identity strong { display: block; font-size: {% if print_format == "a3" %}15px{% else %}13px{% endif %}; text-transform: uppercase; }
+    .official-identity span { color: #475569; font-size: 8px; }
+    .report-title { margin: 8px 0; text-align: center; }
+    .report-title h1 { margin: 0 0 5px; font-size: {% if print_format == "a3" %}17px{% else %}14px{% endif %}; letter-spacing: .06em; text-transform: uppercase; }
+    .report-meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; }
+    .report-meta span { border: 1px solid #cbd5e1; background: #f8fafc; padding: 3px 7px; font-weight: 700; }
+    .continuation { margin: 0 0 6px; padding: 4px 0; border-bottom: 1px solid #64748b; text-align: center; font-size: 8px; }
+    table { margin: 0 auto; border-collapse: collapse; table-layout: fixed; }
+    col.c-index { width: 8mm; } col.c-matricule { width: 18mm; } col.c-name { width: 25mm; } col.c-first-name { width: 25mm; } col.c-score { width: var(--score-width); }
+    th, td { overflow: hidden; border: 1px solid #3f3f46; padding: 2px 1px; text-align: center; vertical-align: middle; }
+    thead { display: table-header-group; }
+    thead th { font-weight: 700; }
+    tbody tr { break-inside: avoid; page-break-inside: avoid; }
+    .h-units { height: 28px; background: #fff1c7; color: #0c4a6e; }
+    .h-students { background: #c95c07; color: #fff; }
+    .h-ue { background: #fff1c7; color: #0c4a6e; }
+    .h-ec { height: 42px; background: #c95c07; color: #fff; line-height: 1.1; }
+    .h-unit { height: 42px; background: #f8c7a8; color: #111827; font-family: Georgia, serif; font-size: 10px; }
+    .h-metric { background: #dd731d; color: #fff; }
+    .h-leaf { height: 36px; background: #c95c07; color: #fff; font-size: 6.6px; }
+    .h-result { background: #9a4307; color: #fff; }
+    .student { text-align: left; white-space: nowrap; text-overflow: ellipsis; }
+    .student-index { text-align: center; }
+    .status-ok { background: #dcfce7; } .status-bad { background: #fee2e2; } .status-empty { background: #f8fafc; }
+    .unit-value { background: #f1edff; color: #4c1d95; font-weight: 700; }
+    .semester-value { background: #eef2f7; font-weight: 700; }
+    .page-footer { display: flex; justify-content: space-between; margin-top: 6px; color: #475569; font-size: 7px; }
+    @media print {
+      .print-actions { display: none; }
+      .h-units, .h-students, .h-ue, .h-ec, .h-unit, .h-metric, .h-leaf, .h-result, .status-ok, .status-bad, .status-empty, .unit-value, .semester-value { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+  {% if show_browser_actions %}
+    <div class="print-actions"><button type="button" onclick="window.print()">Imprimer</button><button type="button" onclick="window.close()">Fermer</button></div>
+  {% endif %}
+
+  {% for page in report_pages %}
+    <section class="report-page">
+      {% if forloop.first %}
+        <header class="official-header">
+          <img class="official-logo" src="{% static 'institution/logo_esfe.png' %}" alt="ESFE">
+          <div class="official-identity"><strong>École de Santé Félix Houphouët-Boigny — Mali</strong><span>Djélibougou, Bamako · ESFÉ</span></div>
+        </header>
+        <div class="report-title"><h1>Relevé général des notes</h1><div class="report-meta"><span>{{ academic_class.name }}</span><span>Semestre {{ semester.number }}</span><span>{{ report_session_label }}</span><span>{{ semester.academic_class.academic_year.name }}</span></div></div>
+      {% else %}
+        <div class="continuation"><strong>{{ academic_class.name }}</strong> · Semestre {{ semester.number }} · {{ report_session_label }} — suite · mêmes étudiants, même ordre (référence : N° et matricule)</div>
+      {% endif %}
+
+      <table style="width: {{ page.table_width_css }}mm; --score-width: {{ page.score_column_width_css }}mm">
+        <colgroup>
+          <col class="c-index"><col class="c-matricule">{% if page.show_full_identity %}<col class="c-name"><col class="c-first-name">{% endif %}
+          {% for header_block in page.header_blocks %}{% for ec in header_block.ue.ecs.all %}<col class="c-score"><col class="c-score"><col class="c-score">{% endfor %}<col class="c-score"><col class="c-score"><col class="c-score">{% endfor %}
+          {% if page.show_semester_result %}<col class="c-score"><col class="c-score"><col class="c-score">{% endif %}
+        </colgroup>
+        <thead>
+          <tr>
+            <th colspan="{{ page.identity_column_count }}" class="h-units">UNITÉS / COMPÉTENCES</th>
+            {% for header_block in page.header_blocks %}<th colspan="{{ header_block.column_span }}" class="h-ue">{{ header_block.ue.code }} — {{ header_block.ue.title }}</th>{% endfor %}
+            {% if page.show_semester_result %}<th colspan="3" rowspan="2" class="h-result">RÉSULTAT DU SEMESTRE</th>{% endif %}
+          </tr>
+          <tr>
+            <th colspan="{{ page.identity_column_count }}" class="h-students">MATIÈRES</th>
+            {% for header_block in page.header_blocks %}{% for ec in header_block.ue.ecs.all %}<th colspan="3" class="h-ec">{{ ec.title }}</th>{% endfor %}<th colspan="3" class="h-unit">Unité</th>{% endfor %}
+          </tr>
+          <tr>
+            <th colspan="{{ page.identity_column_count }}" class="h-students">crédits requis</th>
+            {% for header_block in page.header_blocks %}{% for ec in header_block.ue.ecs.all %}<th colspan="3" class="h-metric">{{ ec.credit_required }}</th>{% endfor %}<th colspan="3" class="h-metric">{{ header_block.ue.credit_required }}</th>{% endfor %}
+            {% if page.show_semester_result %}<th colspan="3" class="h-metric">{% if page.rows %}{{ page.rows.0.semester_required_credits_display }}{% endif %}</th>{% endif %}
+          </tr>
+          <tr>
+            <th colspan="{{ page.identity_column_count }}" class="h-students">coefficients</th>
+            {% for header_block in page.header_blocks %}{% for ec in header_block.ue.ecs.all %}<th colspan="3" class="h-metric">{{ ec.coefficient }}</th>{% endfor %}<th colspan="3" class="h-metric">{{ header_block.ue.coefficient }}</th>{% endfor %}
+            {% if page.show_semester_result %}<th colspan="3" class="h-metric">{% if page.rows %}{{ page.rows.0.semester_total_coefficients_display }}{% endif %}</th>{% endif %}
+          </tr>
+          <tr>
+            <th class="h-leaf">N°</th><th class="h-leaf">Matricule</th>{% if page.show_full_identity %}<th class="h-leaf">Nom</th><th class="h-leaf">Prénoms</th>{% endif %}
+            {% for header_block in page.header_blocks %}{% for ec in header_block.ue.ecs.all %}<th class="h-leaf">Note</th><th class="h-leaf">N. coef.</th><th class="h-leaf">Crédits</th>{% endfor %}<th class="h-leaf">Moyenne</th><th class="h-leaf">N. coef.</th><th class="h-leaf">Crédits</th>{% endfor %}
+            {% if page.show_semester_result %}<th class="h-leaf">Moyenne</th><th class="h-leaf">Pourcentage</th><th class="h-leaf">Crédits</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for report_row in page.rows %}
+            <tr>
+              <td class="student-index">{{ report_row.index }}</td><td class="student">{{ report_row.student_matricule|default:"" }}</td>{% if page.show_full_identity %}<td class="student">{{ report_row.student_last_name|default:"" }}</td><td class="student">{{ report_row.student_first_name|default:"" }}</td>{% endif %}
+              {% for ue_block in report_row.blocks %}{% for ec_row in ue_block.rows %}<td class="{% if ec_row.display_status == 'validated' %}status-ok{% elif ec_row.display_status == 'failed' %}status-bad{% else %}status-empty{% endif %}">{{ ec_row.note_display|default:"-" }}</td><td>{{ ec_row.note_coefficient_display|default:"0,00" }}</td><td class="{% if ec_row.is_validated %}status-ok{% else %}status-bad{% endif %}">{{ ec_row.credit_obtained_display|default:"0,00" }}</td>{% endfor %}<td class="unit-value">{{ ue_block.average_display|default:"0,00" }}</td><td class="unit-value">{{ ue_block.total_note_coefficients_display|default:"0,00" }}</td><td class="unit-value">{{ ue_block.credit_obtained_display|default:"0,00" }}</td>{% endfor %}
+              {% if page.show_semester_result %}<td class="semester-value">{{ report_row.semester_average_display }}</td><td class="semester-value">{{ report_row.semester_percentage_display }}</td><td class="semester-value">{{ report_row.semester_credits_display }}</td>{% endif %}
+            </tr>
+          {% empty %}
+            <tr><td colspan="{{ page.identity_column_count }}">Aucun étudiant inscrit dans cette classe.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <footer class="page-footer"><span>Document officiel — données académiques validées côté serveur</span><span>Édité le {{ today|date:"d/m/Y" }} · Partie {{ page.number }} / {{ report_pages|length }}</span></footer>
+    </section>
+  {% empty %}
+    <p>Aucune unité d’enseignement configurée pour ce semestre.</p>
+  {% endfor %}
+</body>
+</html>

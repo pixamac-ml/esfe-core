@@ -1,133 +1,21 @@
+{% load component_tags %}
 {% if content %}
-<div class="sg-drawer-page">
-  <div class="sg-drawer-hero" style="background:linear-gradient(135deg,var(--text),#1e293b);">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
-      <div style="flex:1;min-width:0;">
-        <div class="sg-drawer-hero-sub"><i data-lucide="eye"></i> {{ content.get_content_type_display }}</div>
-        <div class="sg-drawer-hero-title" style="font-size:1.3rem;">{{ content.title }}</div>
-        <div class="sg-drawer-hero-meta">
-          {% if content.chapter %}{{ content.chapter.ec.title }} &middot; {{ content.chapter.title }}{% endif %}
-        </div>
-      </div>
-      <div style="display:flex;gap:8px;flex-shrink:0;">
-        {% if content.file and content.file.url %}
-        <a href="{{ content.file.url }}" target="_blank" class="sg-btn" style="min-height:36px;font-size:.7rem;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2);color:#fff;">
-          <i data-lucide="download"></i> Telecharger
-        </a>
-        {% endif %}
-        <button type="button" class="sg-drawer-hero-badge" onclick="if(window.teacherCloseDrawer)window.teacherCloseDrawer()" style="background:rgba(255,255,255,.12);cursor:pointer;">
-          <i data-lucide="x"></i> Fermer
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <div class="sg-drawer-body">
-    {% if content.content_type == 'pdf' and content.file and content.file.url %}
-    <div class="sg-drawer-section" style="padding:0;overflow:hidden;">
-      <iframe src="{{ content.file.url }}#view=FitH" title="{{ content.title }}" style="width:100%;height:calc(100vh - 220px);border:none;display:block;"></iframe>
-    </div>
-
-    {% elif content.content_type == 'video' %}
-    {% with embed_url=content.video_embed_url %}
-    {% if embed_url %}
-    <div class="sg-drawer-section" style="padding:0;overflow:hidden;">
-      <div style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;background:#000;">
-        {% if 'youtube' in embed_url or 'youtu.be' in embed_url or 'youtube.com/embed' in embed_url %}
-        <iframe src="{{ embed_url }}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;" allowfullscreen></iframe>
-        {% elif 'vimeo' in embed_url %}
-        <iframe src="{{ embed_url }}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:none;" allowfullscreen></iframe>
-        {% else %}
-        <video controls style="position:absolute;top:0;left:0;width:100%;height:100%;">
-          <source src="{{ embed_url }}">
-        </video>
-        {% endif %}
-      </div>
-    </div>
-    {% elif content.file and content.file.url %}
-    <div class="sg-drawer-section" style="padding:0;overflow:hidden;">
-      <video controls style="width:100%;display:block;max-height:calc(100vh - 220px);background:#000;">
-        <source src="{{ content.file.url }}">
-      </video>
-    </div>
-    {% endif %}
-    <div class="flex gap-2 items-center pt-2">
-      <span class="sg-badge-sm sg-badge-blue"><i data-lucide="video"></i> Video</span>
-      {% if embed_url %}
-      <a href="{{ content.video_url }}" target="_blank" class="sg-btn sg-btn-outline" style="min-height:32px;font-size:.68rem;">
-        <i data-lucide="external-link"></i> Ouvrir
-      </a>
-      {% endif %}
-      {% if content.file and content.file.url %}
-      <a href="{{ content.file.url }}" target="_blank" class="sg-btn sg-btn-outline" style="min-height:32px;font-size:.68rem;">
-        <i data-lucide="download"></i> Telecharger
-      </a>
-      {% endif %}
-    </div>
-    {% endwith %}
-
-    {% elif content.content_type == 'text' and rendered_text %}
-    <div class="sg-drawer-section">
-      <div class="sg-drawer-section-title"><i data-lucide="align-left"></i> Contenu du cours</div>
-      <div style="font-size:.92rem;line-height:1.7;color:var(--text);max-width:800px;">
-        {{ rendered_text|linebreaks }}
-      </div>
-    </div>
-
-    {% elif content.content_type == 'image' and content.file and content.file.url %}
-    <div class="sg-drawer-section" style="padding:0;overflow:hidden;text-align:center;background:var(--card-soft);">
-      <img src="{{ content.file.url }}" alt="{{ content.title }}" style="max-width:100%;max-height:calc(100vh - 240px);object-fit:contain;display:block;margin:0 auto;">
-    </div>
-
-    {% elif content.content_type == 'audio' and content.file and content.file.url %}
-    <div class="sg-drawer-section" style="text-align:center;padding:32px;">
-      <div style="font-size:3rem;margin-bottom:12px;color:var(--school-primary);"><i data-lucide="headphones"></i></div>
-      <div style="font-size:1.1rem;font-weight:900;margin-bottom:16px;">{{ content.title }}</div>
-      <audio controls style="width:100%;max-width:500px;">
-        <source src="{{ content.file.url }}">
-      </audio>
-    </div>
-
-    {% elif content.file and content.file.url %}
-    <div class="sg-drawer-section" style="text-align:center;padding:48px 32px;">
-      <div style="font-size:3rem;margin-bottom:12px;color:var(--muted-2);"><i data-lucide="file"></i></div>
-      <div style="font-size:1.1rem;font-weight:900;margin-bottom:4px;">{{ content.title }}</div>
-      <div style="font-size:.78rem;color:var(--muted);margin-bottom:20px;">{{ content.get_content_type_display }} &middot; {{ content.file.size|filesizeformat }}</div>
-      <a href="{{ content.file.url }}" target="_blank" class="sg-btn sg-btn-primary" style="min-height:40px;font-size:.82rem;">
-        <i data-lucide="download"></i> Telecharger le fichier
-      </a>
-    </div>
-
-    {% else %}
-    <div class="sg-drawer-empty" style="min-height:40vh;">
-      <div>
-        <div class="sg-drawer-empty-icon"><i data-lucide="eye-off"></i></div>
-        <div class="sg-drawer-empty-text">Aucun apercu disponible pour ce type de contenu.</div>
-      </div>
-    </div>
-    {% endif %}
-  </div>
+<div class="space-y-5">
+  {% component "ui_core.page_header" eyebrow=content.get_content_type_display title=content.title subtitle=content.chapter.ec.title|default:"Support de cours" %}
+    {% fill "actions" %}{% if content.file and content.file.url %}<a href="{{ content.file.url }}" target="_blank" class="rounded-ui-button border border-ui-border px-3 py-2 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">Télécharger</a>{% endif %}<button type="button" onclick="window.teacherCloseDrawer()" class="rounded-ui-button px-3 py-2 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">Fermer</button>{% endfill %}
+  {% endcomponent %}
+  {% if content.content_type == 'pdf' and content.file and content.file.url %}
+    {% component "ui_core.panel" title="Aperçu du document" padding=False %}<iframe src="{{ content.file.url }}#view=FitH" title="{{ content.title }}" class="h-[70vh] w-full border-0"></iframe>{% endcomponent %}
+  {% elif content.content_type == 'video' %}
+    {% component "ui_core.panel" title="Vidéo" padding=False %}{% with embed_url=content.video_embed_url %}{% if embed_url %}<div class="aspect-video bg-black">{% if 'youtube' in embed_url or 'vimeo' in embed_url %}<iframe src="{{ embed_url }}" class="h-full w-full border-0" allowfullscreen></iframe>{% else %}<video controls class="h-full w-full"><source src="{{ embed_url }}"></video>{% endif %}</div>{% elif content.file and content.file.url %}<video controls class="max-h-[70vh] w-full bg-black"><source src="{{ content.file.url }}"></video>{% else %}{% component "ui_core.empty_state" icon="video-off" title="Vidéo indisponible" message="Aucune source vidéo n'est disponible." %}{% endcomponent %}{% endif %}{% endwith %}{% endcomponent %}
+  {% elif content.content_type == 'text' and rendered_text %}
+    {% component "ui_core.panel" title="Contenu du cours" %}<div class="prose max-w-none text-ui-text">{{ rendered_text|linebreaks }}</div>{% endcomponent %}
+  {% elif content.content_type == 'image' and content.file and content.file.url %}
+    {% component "ui_core.panel" title="Image" padding=False %}<img src="{{ content.file.url }}" alt="{{ content.title }}" class="max-h-[70vh] w-full object-contain bg-ui-surface-muted">{% endcomponent %}
+  {% elif content.content_type == 'audio' and content.file and content.file.url %}
+    {% component "ui_core.panel" title="Audio" %}<audio controls class="w-full"><source src="{{ content.file.url }}"></audio>{% endcomponent %}
+  {% elif content.file and content.file.url %}
+    {% component "ui_core.panel" title="Fichier joint" %}<div class="text-center">{% component "ui_core.status_badge" label=content.get_content_type_display tone="neutral" icon="file" %}{% endcomponent %}<p class="mt-3 text-sm text-ui-text-muted">{{ content.file.size|filesizeformat }}</p><a href="{{ content.file.url }}" target="_blank" class="mt-4 inline-flex rounded-ui-button bg-ui-primary px-4 py-2 text-sm font-semibold text-ui-on-primary">Télécharger le fichier</a></div>{% endcomponent %}
+  {% else %}{% component "ui_core.empty_state" icon="eye-off" title="Aucun aperçu disponible" message="Ce support ne contient pas de média consultable." %}{% endcomponent %}{% endif %}
 </div>
-{% else %}
-<div class="sg-drawer-page">
-  <div class="sg-drawer-hero" style="background:linear-gradient(135deg,var(--danger),#7f1d1d);">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
-      <div>
-        <div class="sg-drawer-hero-sub"><i data-lucide="triangle-alert"></i> Erreur</div>
-        <div class="sg-drawer-hero-title">Contenu introuvable</div>
-      </div>
-      <button type="button" class="sg-drawer-hero-badge" onclick="if(window.teacherCloseDrawer)window.teacherCloseDrawer()" style="background:rgba(255,255,255,.12);cursor:pointer;">
-        <i data-lucide="x"></i> Fermer
-      </button>
-    </div>
-  </div>
-  <div class="sg-drawer-body">
-    <div class="sg-drawer-empty" style="min-height:40vh;">
-      <div>
-        <div class="sg-drawer-empty-icon"><i data-lucide="file-warning"></i></div>
-        <div class="sg-drawer-empty-text">{{ error|default:"Ce contenu n'est pas accessible." }}</div>
-      </div>
-    </div>
-  </div>
-</div>
-{% endif %}
+{% else %}{% component "ui_core.empty_state" icon="file-warning" title="Contenu introuvable" message=error|default:"Ce contenu n'est pas accessible." %}{% endcomponent %}{% endif %}

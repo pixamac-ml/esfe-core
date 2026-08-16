@@ -124,6 +124,14 @@ def audit_direct_institutional_assignment_change(sender, instance, created, **kw
     revoke_user_sessions(instance.user, reason=AccountSessionRecord.END_ADMIN_REVOKED, global_scope=True)
 
 
+@receiver(post_save, sender=InstitutionalProfile)
+def synchronize_direct_institutional_position_group(sender, instance, **kwargs):
+    """Keep the technical group aligned when an institutional assignment changes."""
+    from accounts.services.institutional_access import synchronize_user_position_groups
+
+    synchronize_user_position_groups(instance.user, position=instance.position)
+
+
 @receiver(pre_delete, sender=InstitutionalProfile)
 def audit_direct_institutional_assignment_delete(sender, instance, **kwargs):
     # Quand Profile.position vient d'etre vide, le signal Profile a deja audite
@@ -251,6 +259,28 @@ def mirror_legacy_profile_into_split_profiles(sender, instance, **kwargs):
         # La suppression explicite d'une affectation SYSTEM ne doit jamais
         # laisser une position institutionnelle fantôme.
         InstitutionalProfile.objects.filter(user=instance.user).delete()
+
+
+@receiver(post_save, sender=Profile)
+def synchronize_profile_position_access(sender, instance, **kwargs):
+    """Derive legacy role and group from the official position.
+
+    This is deliberately additive for users with no position: they are reported
+    by the audit command instead of being silently assigned or stripped.
+    """
+    from accounts.services.institutional_access import (
+        compatibility_role_for_position,
+        synchronize_user_position_groups,
+    )
+
+    if not instance.position:
+        return
+
+    expected_role = compatibility_role_for_position(instance.position)
+    if instance.role != expected_role:
+        Profile.objects.filter(pk=instance.pk).update(role=expected_role)
+        instance.role = expected_role
+    synchronize_user_position_groups(instance.user, position=instance.position)
 
 
 # ==========================================================

@@ -387,7 +387,7 @@ class ManagerDashboardRegressionTests(TestCase):
 		response = self.client.get(reverse("accounts:manager_dashboard"), {"section": "rapport"})
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, "Recettes annee")
+		self.assertContains(response, "Recettes annuelles")
 
 	def test_salary_ready_notifies_employee_dashboard(self):
 		employee = USER_MANAGER.create_user(
@@ -740,6 +740,8 @@ class PortalPhaseOneTests(TestCase):
 		self.assertContains(response, self.branch.name)
 		self.assertContains(response, 'id="teacher-workspace"')
 		self.assertContains(response, 'id="teacher-panel-overview"')
+		self.assertContains(response, 'data-certified-dashboard-shell="true"')
+		self.assertTemplateUsed(response, "portal/staff/director_dashboard.html")
 
 	def test_teacher_overview_htmx_renders_only_the_active_workspace_section(self):
 		teacher = self._create_user("portal_teacher_overview_htmx", role="teacher", position="teacher")
@@ -752,7 +754,7 @@ class PortalPhaseOneTests(TestCase):
 		)
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, 'id="teacher-workspace"')
+		self.assertContains(response, 'data-dashboard-section="overview"')
 		self.assertContains(response, 'id="teacher-panel-overview"')
 		self.assertNotContains(response, 'id="teacher-panel-salary"')
 		self.assertNotContains(response, "<!DOCTYPE html>")
@@ -772,7 +774,7 @@ class PortalPhaseOneTests(TestCase):
 				)
 
 				self.assertEqual(response.status_code, 200)
-				self.assertContains(response, 'id="teacher-workspace"', count=1)
+				self.assertContains(response, f'data-dashboard-section="{section}"', count=1)
 				self.assertContains(response, f'id="teacher-panel-{section}"', count=1)
 				self.assertNotContains(response, "<!DOCTYPE html>")
 				self.assertTemplateUsed(response, "portal/teacher/v2/workspace.html")
@@ -831,7 +833,7 @@ class PortalPhaseOneTests(TestCase):
 		self.assertNotContains(dashboard_response, other_class.display_name)
 		self.assertNotContains(dashboard_response, other_ec.title)
 		self.assertEqual(detail_response.status_code, 200)
-		self.assertIn("appartient pas a votre annexe", detail_response.content.decode())
+		self.assertIn("n&#x27;appartient pas à votre annexe", detail_response.content.decode())
 
 	def test_teacher_class_detail_renders_for_assigned_teacher(self):
 		teacher = self._create_user("portal_teacher_class_detail", role="teacher", position="teacher")
@@ -843,7 +845,7 @@ class PortalPhaseOneTests(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, academic_class.display_name)
-		self.assertContains(response, "Etudiants de la classe")
+		self.assertContains(response, "Étudiants de la classe")
 
 	def test_teacher_lesson_log_panel_post_creates_log(self):
 		teacher = self._create_user("portal_teacher_log_panel", role="teacher", position="teacher")
@@ -1859,7 +1861,19 @@ class PortalPhaseOneTests(TestCase):
 		self.assertContains(response, "Dashboard Informaticien")
 		self.assertContains(response, 'data-certified-dashboard-shell="true"')
 		self.assertContains(response, 'data-dashboard-role="it_support"')
+		self.assertContains(response, 'src="/static/src/js/portal/certified_dashboard_shell.js"', html=False)
 		self.assertContains(response, "Administration IT")
+		self.assertContains(response, "Scolarité")
+		self.assertContains(response, "Support et accès")
+		self.assertContains(response, "Référentiels et compte")
+
+	def test_it_v2_route_redirects_to_the_certified_dashboard(self):
+		it_user = self._create_user("portal_it_v2", position="it_support")
+		self.client.force_login(it_user)
+
+		response = self.client.get(reverse("accounts_portal:portal_it_v2"))
+
+		self.assertRedirects(response, reverse("accounts_portal:portal_dashboard"))
 
 	def test_it_user_can_access_grade_dashboard(self):
 		it_user = self._create_user("portal_it_grades", position="it_support")
@@ -2055,6 +2069,26 @@ class PortalPhaseOneTests(TestCase):
 		self.assertContains(response, "Paramétrage académique")
 		self.assertContains(response, "Classes, maquettes et affectations")
 		self.assertContains(response, academic_class.display_name)
+		self.assertContains(response, 'id="it-structure-subnavigation-classes-tab"', html=False)
+		self.assertContains(response, 'data-ui-core="tabs"', html=False)
+		self.assertContains(response, '#it-dashboard-modal-content', html=False)
+		self.assertContains(response, '#it-dashboard-drawer-content', html=False)
+
+	def test_it_support_workspace_uses_certified_subnavigation(self):
+		it_user = self._create_user("portal_it_support_subnavigation", position="it_support")
+		self.client.force_login(it_user)
+
+		response = self.client.get(
+			reverse("accounts_portal:it_support_flow_workspace"),
+			{"status": "open"},
+			HTTP_HX_REQUEST="true",
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'id="it-support-subnavigation-open-tab"', html=False)
+		self.assertContains(response, "Tous")
+		self.assertContains(response, "En cours")
+		self.assertContains(response, "Résolus")
 
 	def test_it_structure_action_can_create_academic_class(self):
 		it_user = self._create_user("portal_it_structure_create", position="it_support")
@@ -2108,7 +2142,7 @@ class PortalPhaseOneTests(TestCase):
 		)
 
 		self.assertEqual(response.status_code, 200)
-		self.assertEqual(response.headers.get("HX-Retarget"), "#it-modal-root")
+		self.assertEqual(response.headers.get("HX-Retarget"), "#it-dashboard-modal-content")
 		self.assertNotIn("HX-Trigger", response.headers)
 		self.assertContains(response, "Seuil de validation invalide.")
 		self.assertContains(response, "Enregistrer la classe")
@@ -2167,6 +2201,9 @@ class PortalPhaseOneTests(TestCase):
 		self.assertTrue(str(sheet["E5"].value).startswith("NOTE /20 - "))
 		self.assertEqual(str(sheet["A6"].value), str(enrollment.id))
 		self.assertEqual(sheet["E6"].fill.fgColor.rgb, "00FEF3C7")
+		validation = next(iter(sheet.data_validations.dataValidation))
+		self.assertEqual(validation.type, "custom")
+		self.assertIn("ROUND(E6,2)=E6", validation.formula1)
 		sheet["E6"] = "14,5"
 		output = BytesIO()
 		workbook.save(output)
@@ -2189,6 +2226,96 @@ class PortalPhaseOneTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, "1 note(s) importee(s)")
 		grade = ECGrade.objects.get(enrollment=enrollment, ec=ec)
+		self.assertEqual(grade.normal_score, Decimal("14.5"))
+
+		export_response = self.client.get(
+			reverse("accounts_portal:it_export_notes_excel"),
+			{"class_id": academic_class.id, "semester_id": semester.id, "session": "normal"},
+		)
+		self.assertEqual(export_response.status_code, 200)
+		exported_workbook = load_workbook(BytesIO(export_response.content))
+		exported_sheet = exported_workbook.active
+		self.assertEqual(exported_sheet["A5"].value, "ENROLLMENT_ID")
+		self.assertEqual(exported_sheet["E6"].value, 14.5)
+		self.assertEqual(exported_workbook["_ESFE_META"].sheet_state, "hidden")
+
+		exported_workbook["_ESFE_META"]["B4"] = "retake"
+		wrong_session_output = BytesIO()
+		exported_workbook.save(wrong_session_output)
+		wrong_session_output.seek(0)
+		wrong_session_response = self.client.post(
+			reverse("academics:upload_grades"),
+			{
+				"class_id": academic_class.id,
+				"semester_id": semester.id,
+				"session_type": "normal",
+				"file": SimpleUploadedFile(
+					"notes-session-invalide.xlsx",
+					wrong_session_output.getvalue(),
+					content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+				),
+			},
+		)
+		self.assertEqual(wrong_session_response.status_code, 400)
+		exported_workbook["_ESFE_META"]["B4"] = "normal"
+		exported_sheet["E6"] = "note invalide"
+		invalid_output = BytesIO()
+		exported_workbook.save(invalid_output)
+		invalid_output.seek(0)
+		invalid_response = self.client.post(
+			reverse("academics:upload_grades"),
+			{
+				"class_id": academic_class.id,
+				"semester_id": semester.id,
+				"session_type": "normal",
+				"file": SimpleUploadedFile(
+					"notes-invalides.xlsx",
+					invalid_output.getvalue(),
+					content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+				),
+			},
+		)
+		self.assertEqual(invalid_response.status_code, 400)
+		self.assertFalse(invalid_response.json()["ok"])
+		exported_sheet["E6"] = "14,567"
+		precision_output = BytesIO()
+		exported_workbook.save(precision_output)
+		precision_output.seek(0)
+		precision_response = self.client.post(
+			reverse("academics:upload_grades"),
+			{
+				"class_id": academic_class.id,
+				"semester_id": semester.id,
+				"session_type": "normal",
+				"file": SimpleUploadedFile(
+					"notes-precision-invalide.xlsx",
+					precision_output.getvalue(),
+					content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+				),
+			},
+		)
+		self.assertEqual(precision_response.status_code, 400)
+		self.assertFalse(precision_response.json()["ok"])
+		exported_sheet["E6"] = None
+		empty_output = BytesIO()
+		exported_workbook.save(empty_output)
+		empty_output.seek(0)
+		empty_response = self.client.post(
+			reverse("academics:upload_grades"),
+			{
+				"class_id": academic_class.id,
+				"semester_id": semester.id,
+				"session_type": "normal",
+				"file": SimpleUploadedFile(
+					"notes-vides.xlsx",
+					empty_output.getvalue(),
+					content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+				),
+			},
+		)
+		self.assertEqual(empty_response.status_code, 400)
+		self.assertFalse(empty_response.json()["ok"])
+		grade.refresh_from_db()
 		self.assertEqual(grade.normal_score, Decimal("14.5"))
 
 	def test_it_archives_class_and_restores_it(self):

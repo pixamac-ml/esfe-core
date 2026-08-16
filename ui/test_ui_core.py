@@ -137,6 +137,22 @@ class UiCoreComponentTests(SimpleTestCase):
         self.assertIn("Aucune navigation disponible", html)
         self.assertIn('data-ui-core="app-sidebar"', html)
 
+    def test_dashboard_shell_keeps_one_vertical_scroll_owner(self):
+        shell = Path(
+            settings.BASE_DIR, "ui", "templates", "ui_core", "layout", "app_shell.html"
+        ).read_text(encoding="utf-8")
+        sidebar = Path(
+            settings.BASE_DIR, "ui", "templates", "ui_core", "navigation", "app_sidebar.html"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("min-h-screen", shell)
+        self.assertIn("items-stretch", shell)
+        self.assertNotIn("overflow-x-hidden", shell)
+        self.assertIn("h-screen", sidebar)
+        self.assertIn("lg:sticky", sidebar)
+        self.assertIn("min-h-0", sidebar)
+        self.assertIn("overflow-y-auto", sidebar)
+
     def test_overlay_templates_keep_keyboard_focus_contract(self):
         registered = registry.all()
 

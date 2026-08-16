@@ -20,6 +20,7 @@ from .academic_calendar import AcademicCalendar
 from .academic_page_layout import AcademicPageLayout
 from .academic_button import AcademicButton
 from .academic_sidebar import AcademicSidebar
+from .academic_student_live_status import AcademicStudentLiveStatus
 
 __all__ = [
     "AcademicCard",
@@ -43,4 +44,5 @@ __all__ = [
     "AcademicPageLayout",
     "AcademicButton",
     "AcademicSidebar",
+    "AcademicStudentLiveStatus",
 ]

@@ -1,10 +1,21 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import io
 
+from django.conf import settings
 from django.db.models import QuerySet
 
 from academics.models import AcademicClass, AcademicEnrollment, EC, Semester
+
+
+IMPORT_WORKBOOK_SCHEMA = "ESFE_NOTES_IMPORT_V1"
+
+
+def get_notes_workbook_signature(*, academic_class_id, semester_id, session_type):
+    payload = f"{IMPORT_WORKBOOK_SCHEMA}:{academic_class_id}:{semester_id}:{session_type}".encode()
+    return hmac.new(settings.SECRET_KEY.encode(), payload, hashlib.sha256).hexdigest()
 
 
 def _get_class_enrollments(academic_class: AcademicClass) -> QuerySet[AcademicEnrollment]:
@@ -60,13 +71,14 @@ def _get_ec_note_label(ec: EC) -> str:
     return f"NOTE /20 - {_get_ec_human_label(ec)}"
 
 
-def generate_import_template(
+def generate_notes_workbook(
     academic_class: AcademicClass,
     semester: Semester,
     *,
     session_type: str = "normal",
+    scores_by_cell: dict[tuple[int, int], object] | None = None,
 ) -> io.BytesIO:
-    """Genere un template Excel lisible pour l'import des notes."""
+    """Build the one official workbook used for notes import and export."""
 
     if semester.academic_class_id != academic_class.id:
         raise ValueError("Le semestre ne correspond pas a la classe academique.")
@@ -96,6 +108,21 @@ def generate_import_template(
         f"Semestre {semester.number} - session {session_label.lower()} - saisir les notes dans les colonnes jaunes NOTE /20",
     ])
 
+    metadata = wb.create_sheet("_ESFE_META")
+    metadata.sheet_state = "hidden"
+    metadata.append(["schema", IMPORT_WORKBOOK_SCHEMA])
+    metadata.append(["class_id", academic_class.id])
+    metadata.append(["semester_id", semester.id])
+    metadata.append(["session_type", session_type])
+    metadata.append([
+        "signature",
+        get_notes_workbook_signature(
+            academic_class_id=academic_class.id,
+            semester_id=semester.id,
+            session_type=session_type,
+        ),
+    ])
+
     headers = ["ENROLLMENT_ID", "MATRICULE", "NOM", "PRENOM", *[_get_ec_note_label(ec) for ec in ecs]]
     ws.append(headers)
 
@@ -120,7 +147,10 @@ def generate_import_template(
         cell.alignment = align_center
         cell.border = thin_border
         if col_idx >= 5:
-            cell.comment = Comment("Saisir ici la note de cette matiere sur 20. Exemple: 14,5", "ESFE")
+            cell.comment = Comment(
+                "Saisir une note de 0 a 20 avec au maximum deux decimales. Exemple : 14,50.",
+                "ESFE",
+            )
 
     for enrollment in enrollments:
         ws.append([
@@ -128,7 +158,10 @@ def generate_import_template(
             _get_student_matricule(enrollment),
             _get_student_last_name(enrollment),
             _get_student_first_name(enrollment),
-            *([""] * len(ecs)),
+            *(
+                (scores_by_cell or {}).get((enrollment.id, ec.id), "")
+                for ec in ecs
+            ),
         ])
 
     ws.freeze_panes = "E6"
@@ -143,15 +176,15 @@ def generate_import_template(
 
     if ecs and enrollments:
         validation = DataValidation(
-            type="decimal",
-            operator="between",
-            formula1="0",
-            formula2="20",
+            type="custom",
+            formula1='OR(E6="",AND(ISNUMBER(E6),E6>=0,E6<=20,ROUND(E6,2)=E6))',
             allow_blank=True,
         )
-        validation.error = "La note doit etre comprise entre 0 et 20."
+        validation.errorStyle = "stop"
+        validation.showErrorMessage = True
+        validation.error = "Saisissez une note entre 0 et 20 avec au maximum deux decimales."
         validation.errorTitle = "Note invalide"
-        validation.prompt = "Entrer la note de la matiere sur 20."
+        validation.prompt = "Entrer une note de 0 a 20, avec au maximum deux decimales."
         validation.promptTitle = "Note /20"
         ws.add_data_validation(validation)
         first_note_cell = ws.cell(row=6, column=5).coordinate
@@ -175,3 +208,17 @@ def generate_import_template(
     wb.save(output)
     output.seek(0)
     return output
+
+
+def generate_import_template(
+    academic_class: AcademicClass,
+    semester: Semester,
+    *,
+    session_type: str = "normal",
+) -> io.BytesIO:
+    """Generate an empty official notes workbook for data entry."""
+    return generate_notes_workbook(
+        academic_class=academic_class,
+        semester=semester,
+        session_type=session_type,
+    )

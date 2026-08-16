@@ -9,6 +9,7 @@ from django.utils.text import slugify
 from django.views.decorators.http import require_GET, require_POST
 
 from accounts.dashboards.helpers import get_user_branch, is_manager
+from accounts.services.manager_dashboard_presentation import build_manager_dashboard_presentation
 from branches.models import Branch
 from payments.models import PaymentAgent
 from shop.forms import (
@@ -72,6 +73,7 @@ def render_manager_shop_panel(request, *, product_form=None, stock_form=None, co
     active_shop_cash_sessions = manager_shop_sessions_for_agent(manager_agent, limit=12) if manager_agent else []
     context = {
         **shop_context,
+        "branch": request.branch,
         "shop_error": shop_error or shop_context.get("shop_error", ""),
         "shop_product_form": product_form or ShopProductForm(),
         "shop_stock_form": stock_form or ShopStockInForm(branch=request.branch),
@@ -79,7 +81,13 @@ def render_manager_shop_panel(request, *, product_form=None, stock_form=None, co
         "manager_agent": manager_agent,
         "active_shop_cash_sessions": active_shop_cash_sessions,
         "active_shop_cash_sessions_count": len(active_shop_cash_sessions),
+        "shop_public_identifier": get_branch_public_shop_identifier(request.branch),
     }
+    context["manager_ui"] = build_manager_dashboard_presentation(
+        active_section="boutique",
+        context=context,
+        dashboard_url=reverse("accounts:manager_dashboard"),
+    )
     response = render(request, "shop/partials/manager_shop_panel.html", context)
     response.status_code = status
     return response

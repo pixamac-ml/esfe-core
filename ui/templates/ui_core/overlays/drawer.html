@@ -7,8 +7,8 @@
   data-ui-core="drawer"
 >
   {% if trigger_label %}<button type="button" @click="show()" {% if content_url %}hx-get="{{ content_url }}" hx-target="#{{ drawer_id }}-content" hx-swap="innerHTML"{% endif %} class="rounded-ui-button border border-ui-border px-4 py-2 text-sm font-semibold hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus">{{ trigger_label }}</button>{% endif %}
-  <div x-show="open" x-cloak class="fixed inset-0 z-50 bg-ui-overlay/45" role="dialog" aria-modal="true" aria-labelledby="{{ drawer_id }}-title">
-  <aside x-ref="dialog" tabindex="-1" @keydown.tab="trap($event)" class="absolute inset-y-0 flex flex-col {% if side == 'left' %}left-0{% else %}right-0{% endif %} w-full {{ size_class }} overflow-hidden bg-ui-surface shadow-ui-drawer focus:outline-none">
+  <div x-show="open" x-cloak @click="close()" class="fixed inset-0 z-50 bg-ui-overlay/45" role="dialog" aria-modal="true" aria-labelledby="{{ drawer_id }}-title">
+  <aside x-ref="dialog" tabindex="-1" @keydown.tab="trap($event)" @click.stop class="absolute inset-y-0 flex flex-col {% if side == 'left' %}left-0{% else %}right-0{% endif %} w-full {{ size_class }} overflow-hidden bg-ui-surface shadow-ui-drawer focus:outline-none">
     <header class="flex flex-shrink-0 items-center justify-between border-b border-ui-border px-5 py-4">
       <h2 id="{{ drawer_id }}-title" class="text-base font-bold">{{ title|default:"Détails" }}</h2>
       <button type="button" @click="{% if has_form %}if (document.querySelector('#{{ drawer_id }}-content form') && document.querySelector('#{{ drawer_id }}-content form').dataset.dirty === 'true') { if (!confirm('Des modifications non enregistrées seront perdues. Voulez-vous continuer ?')) return; }{% endif %}close()" class="grid h-9 w-9 place-items-center rounded-ui-button hover:bg-ui-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" aria-label="Fermer"><i data-lucide="x" class="h-4 w-4"></i></button>

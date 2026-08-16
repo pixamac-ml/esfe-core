@@ -4,11 +4,27 @@ from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
 
-from accounts.dashboards.manager_dashboard import manager_dashboard
+from accounts.dashboards.manager_dashboard import (
+    manager_dashboard,
+    manager_subcontent,
+    manager_workspace,
+)
 
 
 def annex_manager_portal(request):
     return manager_dashboard(request)
+
+
+def annex_manager_workspace(request):
+    """Return only the Gestionnaire workspace for certified HTMX navigation."""
+
+    return manager_workspace(request)
+
+
+def annex_manager_subcontent(request):
+    """Return only the active Gestionnaire subview for tab navigation."""
+
+    return manager_subcontent(request)
 
 
 @login_required

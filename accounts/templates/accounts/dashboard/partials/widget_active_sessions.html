@@ -1,24 +1,23 @@
 {% load component_tags %}
 {% load humanize %}
 <div id="widget-active-sessions"
-     class="dashboard-panel"
-     style="margin-bottom:16px;"
+     class="mb-4"
      hx-get="{% url 'accounts:widget_active_sessions' %}"
      hx-trigger="every 15s, cashBalanceUpdated from:body"
      hx-swap="outerHTML">
-  <div class="dashboard-panel-title">Sessions caisse actives <span class="dashboard-badge-sm dashboard-badge-green">{{ count }}</span></div>
-  {% for session in sessions %}
-  <div class="dashboard-action-card" style="margin-bottom:4px;">
-    <div>
-      <div class="dashboard-action-label">{{ session.inscription.candidature.full_name }}</div>
-      <div class="dashboard-action-sub">Code: {{ session.verification_code }} &middot; expire dans {{ session.expires_at|timeuntil }}</div>
-    </div>
-    <span class="dashboard-badge-sm dashboard-badge-green">Active</span>
-  </div>
-  {% empty %}
-  <div class="dashboard-empty">
-    <div class="dashboard-empty-icon">{% component "icon" name="clock" %}{% endcomponent %}</div>
-    <div class="dashboard-empty-text">Aucune session active</div>
-  </div>
-  {% endfor %}
+  {% component "ui_core.panel" title="Sessions caisse actives" density="compact" %}
+    {% fill "header" %}{% component "ui_core.status_badge" label=count tone="success" dot=True %}{% endcomponent %}{% endfill %}
+    {% fill "default" %}
+      <div class="space-y-2">
+        {% for session in sessions %}
+        <div class="flex items-center justify-between gap-3 rounded-ui-input border border-ui-border bg-ui-surface-muted px-3 py-2.5">
+          <div class="min-w-0"><p class="truncate text-sm font-semibold text-ui-text">{{ session.inscription.candidature.full_name }}</p><p class="text-xs text-ui-text-muted">Code: {{ session.verification_code }} &middot; expire dans {{ session.expires_at|timeuntil }}</p></div>
+          {% component "ui_core.status_badge" label="Active" tone="success" dot=True %}{% endcomponent %}
+        </div>
+        {% empty %}
+        {% component "ui_core.empty_state" icon="clock" title="Aucune session active" message="Les codes de paiement actifs apparaîtront ici." %}{% endcomponent %}
+        {% endfor %}
+      </div>
+    {% endfill %}
+  {% endcomponent %}
 </div>

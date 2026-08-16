@@ -301,6 +301,7 @@ main {
     }
     function toast(msg,t,d){t=t||'info';d=d||3000;window.dispatchEvent(new CustomEvent('esfe:toast',{detail:{message:msg,type:t,duration:d}}))}
     function path(evt){return(evt.detail.pathInfo&&evt.detail.pathInfo.requestPath)||evt.detail.path||''}
+    function silentGradeSave(el,evt){return!!((el&&el.classList&&el.classList.contains('score-input'))||path(evt).indexOf('/grades/save/')!==-1)}
     function refresh(p){
       document.body.dispatchEvent(new CustomEvent('esfe:data-changed',{bubbles:true}));
       var m={
@@ -320,6 +321,7 @@ main {
 
     document.addEventListener('htmx:beforeRequest',function(evt){
       var el=evt.detail.elt;if(!el)return;
+      if(silentGradeSave(el,evt))return;
       var id=el.id||Math.random().toString(36).slice(2);reqs[id]=true;
       var c=el.closest('form')||el.closest('tr,div[id],.sg-panel')||el;
       overlay(c,true);disable(c);
@@ -329,6 +331,7 @@ main {
 
     document.addEventListener('htmx:afterRequest',function(evt){
       var el=evt.detail.elt;if(!el)return;delete reqs[el.id||''];
+      if(silentGradeSave(el,evt))return;
       if(!evt.detail.successful)return;
       var c=el.closest('form')||el.closest('tr,div[id],.sg-panel')||el;
       overlay(c,false);enable(c);
@@ -339,6 +342,7 @@ main {
 
     document.addEventListener('htmx:responseError',function(evt){
       var el=evt.detail.elt;if(!el)return;delete reqs[el.id||''];
+      if(silentGradeSave(el,evt))return;
       var c=el.closest('form')||el.closest('tr,div[id],.sg-panel')||el;
       overlay(c,false);enable(c);
       toast('Erreur '+(evt.detail.xhr?evt.detail.xhr.status:'réseau'),'error',5000);
@@ -346,6 +350,7 @@ main {
 
     document.addEventListener('htmx:sendError',function(evt){
       var el=evt.detail.elt;if(!el)return;
+      if(silentGradeSave(el,evt))return;
       var c=el.closest('form')||el.closest('tr,div[id],.sg-panel')||el;
       overlay(c,false);enable(c);
       toast('Erreur réseau - vérifiez votre connexion','error',5000);
@@ -373,8 +378,8 @@ main {
       Alpine.data('uiOverlay',(initiallyOpen)=>({
         open:Boolean(initiallyOpen),
         opener:null,
-        show(){this.opener=document.activeElement;this.open=true;document.documentElement.classList.add('overflow-hidden');this.$nextTick(()=>this.$refs.dialog&&this.$refs.dialog.focus())},
-        close(){this.open=false;document.documentElement.classList.remove('overflow-hidden');this.$nextTick(()=>this.opener&&this.opener.focus())},
+        show(){this.opener=document.activeElement;this.open=true;if(window.ESFEUI&&window.ESFEUI.overlay){window.ESFEUI.overlay.lockPage()}else{document.documentElement.classList.add('overflow-hidden')}this.$nextTick(()=>this.$refs.dialog&&this.$refs.dialog.focus())},
+        close(){this.open=false;if(window.ESFEUI&&window.ESFEUI.overlay){window.ESFEUI.overlay.unlockPage()}else{document.documentElement.classList.remove('overflow-hidden')}this.$nextTick(()=>{if(window.ESFEUI&&window.ESFEUI.overlay){window.ESFEUI.overlay.restoreFocus.call(this)}else if(this.opener){this.opener.focus()}})},
         trap(event){
           const nodes=[...this.$refs.dialog.querySelectorAll("a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])")];
           if(!nodes.length)return;
@@ -389,7 +394,7 @@ main {
   {% block extra_head %}{% endblock %}
 </head>
 
-<body class="min-h-screen flex flex-col bg-slate-50 text-slate-800 font-roboto antialiased overflow-x-hidden"
+<body class="min-h-screen flex flex-col bg-slate-50 text-slate-800 font-roboto antialiased overflow-x-clip"
       hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
 
   <!-- ================= GLOBAL TOAST SYSTEM ================= -->
@@ -688,15 +693,23 @@ main {
   <script>
     const loader = document.getElementById("global-loader");
 
-    document.body.addEventListener("htmx:beforeRequest", () => {
+    const isSilentGradeSave = (event) => {
+      const source = event.detail && event.detail.elt;
+      return Boolean(source && source.classList && source.classList.contains("score-input"));
+    };
+
+    document.body.addEventListener("htmx:beforeRequest", (event) => {
+      if (isSilentGradeSave(event)) return;
       loader.classList.remove("hidden");
     });
 
-    document.body.addEventListener("htmx:afterRequest", () => {
+    document.body.addEventListener("htmx:afterRequest", (event) => {
+      if (isSilentGradeSave(event)) return;
       loader.classList.add("hidden");
     });
 
-    document.body.addEventListener("htmx:responseError", () => {
+    document.body.addEventListener("htmx:responseError", (event) => {
+      if (isSilentGradeSave(event)) return;
       loader.classList.add("hidden");
       console.error("Erreur HTMX détectée.");
     });

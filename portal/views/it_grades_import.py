@@ -106,6 +106,10 @@ def it_grades_import_view(request):
         class_id=request.GET.get("class_id"),
         semester_id=request.GET.get("semester_id"),
     )
+    permissions = context.get("workflow_permissions") or {}
+    context["active_session_type"] = (
+        "retake" if permissions.get("can_enter_retake") else "normal"
+    )
 
     return render(
         request,

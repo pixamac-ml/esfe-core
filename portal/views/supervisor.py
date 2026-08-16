@@ -189,7 +189,6 @@ def _render_supervisor_dashboard(request, *, section=None):
             workspace_template="portal/staff/supervisor/partials/workflow_workspace.html",
             topbar_template="portal/staff/supervisor/partials/topbar_actions.html",
             script_path="src/js/portal/supervisor_dashboard.js",
-            stylesheet_path="portal/css/supervisor_dashboard.css",
             notifications_url=context.get("notifications_url") or "",
             show_notifications_button=False,
             drawer_title="Détail",

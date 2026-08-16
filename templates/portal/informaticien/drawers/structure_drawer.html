@@ -13,12 +13,12 @@
         type="button"
         class="btn btn-secondary"
         hx-get="{% url 'accounts_portal:it_structure_modal' %}?kind=class&id={{ drawer_class.id }}&section=classes"
-        hx-target="#it-modal-root"
+        hx-target="#it-dashboard-modal-content"
         hx-swap="innerHTML"
       >
         Modifier la classe
       </button>
-      <button type="button" class="btn btn-secondary" onclick="window.itCloseDrawer && window.itCloseDrawer()">
+      <button type="button" class="btn btn-secondary" onclick="window.dispatchEvent(new CustomEvent('ui-overlay-close', {detail: {id: 'it-dashboard-drawer'}}))">
         Fermer
       </button>
     </div>
@@ -79,7 +79,7 @@
             type="button"
             class="btn btn-secondary"
             hx-get="{% url 'accounts_portal:it_structure_modal' %}?kind=ue&class_id={{ drawer_class.id }}&semester_id={{ semester.id }}&section=maquettes"
-            hx-target="#it-modal-root"
+            hx-target="#it-dashboard-modal-content"
             hx-swap="innerHTML"
           >
             Ajouter UE S{{ semester.number }}
@@ -101,7 +101,7 @@
                 type="button"
                 class="btn btn-secondary"
                 hx-get="{% url 'accounts_portal:it_structure_modal' %}?kind=ue&class_id={{ drawer_class.id }}&semester_id={{ row.semester.id }}&section=maquettes"
-                hx-target="#it-modal-root"
+                hx-target="#it-dashboard-modal-content"
                 hx-swap="innerHTML"
               >
                 Nouvelle UE
@@ -126,7 +126,7 @@
                     type="button"
                     class="btn btn-secondary"
                     hx-get="{% url 'accounts_portal:it_structure_modal' %}?kind=ue&id={{ ue.id }}&class_id={{ drawer_class.id }}&section=maquettes"
-                    hx-target="#it-modal-root"
+                    hx-target="#it-dashboard-modal-content"
                     hx-swap="innerHTML"
                   >
                     Modifier UE
@@ -135,7 +135,7 @@
                     type="button"
                     class="btn btn-primary"
                     hx-get="{% url 'accounts_portal:it_structure_modal' %}?kind=ec&ue_id={{ ue.id }}&class_id={{ drawer_class.id }}&section=maquettes"
-                    hx-target="#it-modal-root"
+                    hx-target="#it-dashboard-modal-content"
                     hx-swap="innerHTML"
                   >
                     Ajouter EC
@@ -165,7 +165,7 @@
                           type="button"
                           class="btn btn-secondary"
                           hx-get="{% url 'accounts_portal:it_structure_modal' %}?kind=ec&id={{ ec.id }}&class_id={{ drawer_class.id }}&section=maquettes"
-                          hx-target="#it-modal-root"
+                          hx-target="#it-dashboard-modal-content"
                           hx-swap="innerHTML"
                         >
                           Modifier
@@ -188,10 +188,10 @@
                 </p>
                 <div class="flex flex-wrap gap-2">
                   {% if item.ecs_page.has_previous %}
-                  <button type="button" class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_structure_drawer' %}?class_id={{ drawer_class.id }}&section={{ section }}&ue_page={{ drawer_ues_page.number }}&ec_ue_id={{ ue.id }}&ec_page={{ item.ecs_page.previous_page_number }}" hx-target="#it-drawer-content" hx-swap="innerHTML">EC précédents</button>
+                  <button type="button" class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_structure_drawer' %}?class_id={{ drawer_class.id }}&section={{ section }}&ue_page={{ drawer_ues_page.number }}&ec_ue_id={{ ue.id }}&ec_page={{ item.ecs_page.previous_page_number }}" hx-target="#it-dashboard-drawer-content" hx-swap="innerHTML">EC précédents</button>
                   {% endif %}
                   {% if item.ecs_page.has_next %}
-                  <button type="button" class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_structure_drawer' %}?class_id={{ drawer_class.id }}&section={{ section }}&ue_page={{ drawer_ues_page.number }}&ec_ue_id={{ ue.id }}&ec_page={{ item.ecs_page.next_page_number }}" hx-target="#it-drawer-content" hx-swap="innerHTML">EC suivants</button>
+                  <button type="button" class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_structure_drawer' %}?class_id={{ drawer_class.id }}&section={{ section }}&ue_page={{ drawer_ues_page.number }}&ec_ue_id={{ ue.id }}&ec_page={{ item.ecs_page.next_page_number }}" hx-target="#it-dashboard-drawer-content" hx-swap="innerHTML">EC suivants</button>
                   {% endif %}
                 </div>
               </div>
@@ -218,10 +218,10 @@
         </p>
         <div class="flex flex-wrap gap-2">
           {% if drawer_ues_page.has_previous %}
-          <button type="button" class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_structure_drawer' %}?class_id={{ drawer_class.id }}&section={{ section }}&ue_page={{ drawer_ues_page.previous_page_number }}" hx-target="#it-drawer-content" hx-swap="innerHTML">UE précédentes</button>
+          <button type="button" class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_structure_drawer' %}?class_id={{ drawer_class.id }}&section={{ section }}&ue_page={{ drawer_ues_page.previous_page_number }}" hx-target="#it-dashboard-drawer-content" hx-swap="innerHTML">UE précédentes</button>
           {% endif %}
           {% if drawer_ues_page.has_next %}
-          <button type="button" class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_structure_drawer' %}?class_id={{ drawer_class.id }}&section={{ section }}&ue_page={{ drawer_ues_page.next_page_number }}" hx-target="#it-drawer-content" hx-swap="innerHTML">UE suivantes</button>
+          <button type="button" class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_structure_drawer' %}?class_id={{ drawer_class.id }}&section={{ section }}&ue_page={{ drawer_ues_page.next_page_number }}" hx-target="#it-dashboard-drawer-content" hx-swap="innerHTML">UE suivantes</button>
           {% endif %}
         </div>
       </div>
@@ -233,7 +233,7 @@
     <div>
       <div class="text-lg font-black text-slate-900">Aucune classe sélectionnée</div>
       <div class="mt-2">Ouvrez une classe depuis la section classes ou la section maquettes pour afficher sa structure complète.</div>
-      <button type="button" class="btn btn-primary mt-5" onclick="window.itCloseDrawer && window.itCloseDrawer()">Fermer</button>
+      <button type="button" class="btn btn-primary mt-5" onclick="window.dispatchEvent(new CustomEvent('ui-overlay-close', {detail: {id: 'it-dashboard-drawer'}}))">Fermer</button>
     </div>
   </div>
   {% endif %}

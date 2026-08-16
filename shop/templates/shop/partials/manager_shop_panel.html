@@ -1,4 +1,4 @@
-{% load humanize %}
+{% load humanize component_tags %}
 <div
     id="manager-shop-module"
     class="space-y-6"
@@ -24,41 +24,14 @@
     @keydown.escape.window="openCreateProduct = false; openStockIn = false; openCounterOrder = false">
 
     {% if shop_error %}
-    <div class="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800">
-        <i class="fas fa-triangle-exclamation mr-2"></i>{{ shop_error }}
-    </div>
+    {% component "ui_core.alert" title="Boutique momentanément indisponible" message=shop_error tone="warning" %}{% endcomponent %}
     {% endif %}
 
     <!-- ===================== STATS ===================== -->
-    <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-            <p class="text-xs font-medium text-slate-500">Articles</p>
-            <p class="text-2xl font-bold text-slate-900 mt-1">{{ shop_stats.products }}</p>
-        </div>
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-            <p class="text-xs font-medium text-slate-500">Obligatoires</p>
-            <p class="text-2xl font-bold text-primary mt-1">{{ shop_stats.required }}</p>
-        </div>
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-            <p class="text-xs font-medium text-slate-500">Stock faible</p>
-            <p class="text-2xl font-bold text-rose-600 mt-1">{{ shop_stats.low_stock }}</p>
-        </div>
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-            <p class="text-xs font-medium text-slate-500">En attente paiement</p>
-            <p class="text-2xl font-bold text-amber-600 mt-1">{{ shop_stats.pending_orders }}</p>
-        </div>
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-            <p class="text-xs font-medium text-slate-500">A préparer</p>
-            <p class="text-2xl font-bold text-blue-600 mt-1">{{ shop_stats.paid_not_delivered }}</p>
-        </div>
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-            <p class="text-xs font-medium text-slate-500">Prêtes</p>
-            <p class="text-2xl font-bold text-emerald-600 mt-1">{{ shop_stats.ready_orders }}</p>
-        </div>
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-            <p class="text-xs font-medium text-slate-500">Entrées caisse</p>
-            <p class="text-2xl font-bold text-violet-600 mt-1">{{ shop_stats.cash_entries }}</p>
-        </div>
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Indicateurs de la boutique">
+        {% for card in manager_ui.stat_cards %}
+            {% component "ui_core.stat_card" label=card.label value=card.value unit=card.unit icon=card.icon tone=card.tone description=card.description %}{% endcomponent %}
+        {% endfor %}
     </div>
 
     <!-- ===================== BARRE D'ACTIONS ===================== -->
@@ -111,95 +84,8 @@
     {% endif %}
 
     <!-- ===================== TABLEAU COMMANDES ===================== -->
-    <div id="manager-shop-orders" class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
-            <div>
-                <h3 class="text-lg font-semibold text-slate-900">Commandes boutique</h3>
-                <p class="text-sm text-slate-500">Paiement, préparation puis remise à l'annexe.</p>
-            </div>
-        </div>
-        <div class="overflow-x-auto">
-            <table class="w-full min-w-[1080px] divide-y divide-slate-100">
-                <thead class="bg-slate-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Commande</th>
-                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Acheteur</th>
-                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">Articles</th>
-                        <th class="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Total</th>
-                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase text-slate-500">État</th>
-                        <th class="px-6 py-3 text-right text-xs font-semibold uppercase text-slate-500">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-50">
-                {% for order in shop_orders %}
-                    <tr class="align-top hover:bg-slate-50 transition">
-                        <td class="px-6 py-4">
-                            <p class="text-sm font-semibold text-slate-900">{{ order.reference }}</p>
-                            <p class="text-xs text-slate-500">{{ order.created_at|date:"d/m/Y H:i" }}</p>
-                        </td>
-                        <td class="px-6 py-4">
-                            <p class="text-sm font-medium text-slate-900">{{ order.buyer_display }}</p>
-                            <p class="text-xs text-slate-500">{{ order.get_buyer_type_display }}</p>
-                        </td>
-                        <td class="px-6 py-4 text-sm text-slate-600">
-                            {% for item in order.items.all %}
-                                <p>{{ item.quantity }} × {{ item.product.name }}</p>
-                            {% empty %}<p>-</p>{% endfor %}
-                        </td>
-                        <td class="px-6 py-4 text-right text-sm font-semibold text-slate-900">{{ order.total_amount|intcomma }} FCFA</td>
-                        <td class="px-6 py-4">
-                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold
-                                {% if order.status == 'delivered' %}bg-emerald-100 text-emerald-700
-                                {% elif order.status == 'ready' %}bg-cyan-100 text-cyan-700
-                                {% elif order.status == 'paid' %}bg-blue-100 text-blue-700
-                                {% elif order.status == 'pending_payment' %}bg-amber-100 text-amber-700
-                                {% else %}bg-slate-100 text-slate-700{% endif %}">
-                                {{ order.get_status_display }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4">
-                            <div class="flex flex-wrap justify-end gap-2">
-                                {% for payment in order.payments.all %}
-                                    {% if payment.status == "pending" %}
-                                    <button hx-post="{% url 'shop:manager_payment_validate' payment.id %}"
-                                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                                        hx-target="#manager-shop-module" hx-swap="outerHTML"
-                                        class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700">
-                                        <i class="fas fa-check mr-1"></i>Valider paiement
-                                    </button>
-                                    {% endif %}
-                                    {% if payment.receipt_pdf %}
-                                    <a href="{% url 'shop:payment_receipt' payment.id %}" target="_blank"
-                                       class="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200">
-                                        <i class="fas fa-file-pdf mr-1"></i>Reçu
-                                    </a>
-                                    {% endif %}
-                                {% endfor %}
-                                {% if order.status == "paid" %}
-                                <button hx-post="{% url 'shop:manager_order_mark_ready' order.id %}"
-                                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                                    hx-target="#manager-shop-module" hx-swap="outerHTML"
-                                    class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">
-                                    <i class="fas fa-box-open mr-1"></i>Marquer prête
-                                </button>
-                                {% endif %}
-                                {% if order.status == "ready" or order.status == "paid" %}
-                                <button hx-post="{% url 'shop:manager_order_deliver' order.id %}"
-                                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                                    hx-target="#manager-shop-module" hx-swap="outerHTML"
-                                    class="rounded-lg border border-primary-800 bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-primary-700">
-                                    <i class="fas fa-hand-holding-box mr-1"></i>Remettre
-                                </button>
-                                {% endif %}
-                            </div>
-                        </td>
-                    </tr>
-                {% empty %}
-                    <tr><td colspan="6" class="px-6 py-10 text-center text-slate-400">Aucune commande boutique.</td></tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </div>
+    <div id="manager-shop-orders">
+        {% component "ui_core.data_table" id="manager-shop-orders-table" caption="Commandes boutique" headers=manager_ui.table.headers rows=manager_ui.table.rows result_count=manager_ui.table.result_count page=1 page_count=1 density="compact" empty_title="Aucune commande boutique" empty_message="Les commandes de cette annexe apparaîtront ici pour validation, préparation et remise." %}{% endcomponent %}
     </div>
 
     <!-- ===================== CATALOGUE ARTICLES ===================== -->

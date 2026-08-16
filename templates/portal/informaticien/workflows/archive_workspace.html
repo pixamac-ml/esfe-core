@@ -1,4 +1,6 @@
-<div class="space-y-4">
+{% load component_tags %}
+<div class="space-y-5">
+  {% component "ui_core.page_header" eyebrow="Scolarité" title="Archives académiques" subtitle="Les données sont conservées, journalisées et restaurables." %}{% endcomponent %}
   {% if toast %}
   <div class="panel mb-4" style="border-left:5px solid {% if toast.level == 'success' %}#059669{% elif toast.level == 'error' %}#be123c{% else %}#d97706{% endif %}">
     <p class="text-sm font-black">{{ toast.message }}</p>
@@ -26,7 +28,7 @@
       method="get"
       hx-get="{% url 'accounts_portal:it_archives_workspace' %}"
       hx-trigger="change from:select"
-      hx-target="#it-workspace"
+      hx-target="#it-dashboard-workspace"
       hx-swap="innerHTML"
     >
       <label>Année académique
@@ -78,7 +80,7 @@
       class="mt-4"
       method="post"
       hx-post="{% url 'accounts_portal:it_archives_action' %}"
-      hx-target="#it-workspace"
+      hx-target="#it-dashboard-workspace"
       hx-swap="innerHTML"
     >
       {% csrf_token %}
@@ -136,9 +138,9 @@
             <td class="text-slate-700">{{ batch.created_by.get_full_name|default:batch.created_by.username }}</td>
             <td style="text-align:right">
               <div class="flex justify-end gap-2">
-                <button class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_archive_detail' batch.id %}" hx-target="#it-workspace" hx-swap="innerHTML" type="button">Voir</button>
+                <button class="btn btn-secondary" hx-get="{% url 'accounts_portal:it_archive_detail' batch.id %}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML" type="button">Voir</button>
                 {% if batch.status == 'archived' %}
-                <form method="post" hx-post="{% url 'accounts_portal:it_archives_action' %}" hx-target="#it-workspace" hx-swap="innerHTML">
+                <form method="post" hx-post="{% url 'accounts_portal:it_archives_action' %}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">
                   {% csrf_token %}
                   <input type="hidden" name="action" value="restore">
                   <input type="hidden" name="batch_id" value="{{ batch.id }}">

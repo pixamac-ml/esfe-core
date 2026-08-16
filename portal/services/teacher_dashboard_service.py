@@ -15,7 +15,7 @@ from academics.services.schedule_service import get_teacher_next_events, get_tea
 from accounts.models import BranchCashMovement, TeacherHonorariumEntry, UserPreference
 from notification_center.selectors import get_user_in_app_messages, get_user_unread_count
 from portal.models import AccountSupportState
-from students.models import Student, TeacherAttendance
+from students.models import Student, StudentAttendance, TeacherAttendance
 from portal.models import TeacherDashboardPreference
 from portal.services.director.exam_session_service import get_upcoming_exam_sessions_for_class
 
@@ -1557,6 +1557,61 @@ def build_teacher_class_detail_context(request, *, branch, class_id, week_start=
         for slot in weekly_slots
     ]
 
+    current_class_event = next(
+        (event for event in week_events if event.start_datetime <= now <= event.end_datetime),
+        None,
+    )
+    next_class_event = next((event for event in week_events if event.start_datetime > now), None)
+    attendance_by_student_id = {}
+    if current_class_event is not None:
+        attendance_by_student_id = {
+            attendance.student_id: attendance
+            for attendance in StudentAttendance.objects.filter(
+                branch=branch,
+                schedule_event=current_class_event,
+                student__in=students,
+            )
+        }
+
+    def event_snapshot(event):
+        if event is None:
+            return None
+        return {
+            "title": event.ec.title,
+            "time_range": f"{event.start_datetime:%H:%M} - {event.end_datetime:%H:%M}",
+            "start_datetime": event.start_datetime,
+            "location": event.location or "Salle non précisée",
+            "teacher_name": teacher.get_full_name() or teacher.username,
+        }
+
+    student_status_rows = []
+    for student in students:
+        attendance = attendance_by_student_id.get(student.id)
+        if current_class_event is None:
+            presence_state = {"label": "Hors cours", "ui_tone": "neutral"}
+        elif attendance is None:
+            presence_state = {"label": "Présence non pointée", "ui_tone": "warning"}
+        elif attendance.status == StudentAttendance.STATUS_PRESENT:
+            presence_state = {"label": "Présent", "ui_tone": "success"}
+        elif attendance.status == StudentAttendance.STATUS_LATE:
+            presence_state = {"label": "En retard", "ui_tone": "warning"}
+        else:
+            presence_state = {"label": attendance.get_status_display(), "ui_tone": "danger"}
+        current_event = event_snapshot(current_class_event)
+        if current_event is not None:
+            current_event["attendance_label"] = attendance.get_status_display() if attendance else "Présence non pointée"
+        student_status_rows.append(
+            {
+                "student_id": student.id,
+                "full_name": student.full_name,
+                "matricule": student.matricule,
+                "academic_class": academic_class.display_name,
+                "current_event": current_event,
+                "next_event": event_snapshot(next_class_event),
+                "presence_state": presence_state,
+            }
+        )
+
     return {
         "branch": branch,
         "academic_class": academic_class,
@@ -1565,6 +1620,7 @@ def build_teacher_class_detail_context(request, *, branch, class_id, week_start=
         "prev_week_start": normalized_week_start - timedelta(days=7),
         "next_week_start": normalized_week_start + timedelta(days=7),
         "students": students,
+        "teacher_class_student_status_rows": student_status_rows,
         "teacher_class_week_events": week_events,
         "teacher_class_weekly_slots": weekly_slots,
         "teacher_class_weekly_slot_rows": weekly_slot_rows,
@@ -1611,12 +1667,21 @@ def build_teacher_lesson_log_context(request, *, branch, event_id, toast=None):
         status=TeacherAttendance.STATUS_PRESENT,
     ).exists()
 
+    now = timezone.now()
+    if now < schedule_event.start_datetime:
+        lesson_log_session_state = {"label": "Séance à venir", "tone": "info"}
+    elif now > schedule_event.end_datetime:
+        lesson_log_session_state = {"label": "Séance terminée", "tone": "neutral"}
+    else:
+        lesson_log_session_state = {"label": "Séance en cours", "tone": "success"}
+
     return {
         "branch": branch,
         "schedule_event": schedule_event,
         "lesson_log": lesson_log,
         "toast": toast,
         "teacher_marked_present": teacher_marked_present,
+        "lesson_log_session_state": lesson_log_session_state,
         "lesson_log_status_choices": [
             (LessonLog.STATUS_DONE, "Fait"),
             (LessonLog.STATUS_CANCELLED, "Annule"),

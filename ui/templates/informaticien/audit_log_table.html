@@ -1,30 +1,7 @@
-<div class="workflow-table-shell">
-  <div class="workflow-list">
-    {% for log in logs %}
-      <article>
-        <div>
-          <strong>{{ log.get_action_type_display }}</strong>
-          <span>{{ log.created_at|date:"d/m/Y H:i" }} - {{ log.actor.get_full_name|default:log.actor.username }} - {{ log.target_label|default:"-" }}</span>
-          {% if log.details %}<span>{{ log.details }}</span>{% endif %}
-        </div>
-      </article>
-    {% empty %}
-      <section class="workflow-empty">Aucun journal pour cette annexe.</section>
-    {% endfor %}
-  </div>
-  {% if logs_page and logs_page.paginator.num_pages > 1 %}
-  <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
-    <p class="text-sm font-bold text-slate-500">
-      Page {{ logs_page.number }} / {{ logs_page.paginator.num_pages }} - {{ logs_page.paginator.count }} journaux
-    </p>
-    <div class="flex flex-wrap gap-2">
-      {% if logs_page.has_previous %}
-      <button type="button" class="workflow-btn workflow-btn-secondary" hx-get="{% url 'accounts_portal:it_audit_workspace' %}?page={{ logs_page.previous_page_number }}" hx-target="#it-workspace" hx-swap="innerHTML">Precedent</button>
-      {% endif %}
-      {% if logs_page.has_next %}
-      <button type="button" class="workflow-btn workflow-btn-secondary" hx-get="{% url 'accounts_portal:it_audit_workspace' %}?page={{ logs_page.next_page_number }}" hx-target="#it-workspace" hx-swap="innerHTML">Suivant</button>
-      {% endif %}
-    </div>
-  </div>
-  {% endif %}
-</div>
+{% load component_tags %}
+{% component "ui_core.panel" title="Journal d'audit" subtitle="Historique des actions sensibles de l'annexe." %}
+  {% fill "default" %}
+    <div class="divide-y divide-ui-border">{% for log in logs %}<article class="flex min-w-0 gap-3 py-4 first:pt-0 last:pb-0"><span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button bg-ui-surface-muted text-ui-text-muted"><i data-lucide="history" class="h-4 w-4" aria-hidden="true"></i></span><div class="min-w-0"><p class="text-sm font-semibold text-ui-text">{{ log.get_action_type_display }}</p><p class="mt-0.5 text-xs text-ui-text-muted">{{ log.created_at|date:"d/m/Y H:i" }} · {{ log.actor.get_full_name|default:log.actor.username }} · {{ log.target_label|default:"-" }}</p>{% if log.details %}<p class="mt-1 text-sm text-ui-text-muted">{{ log.details }}</p>{% endif %}</div></article>{% empty %}<p class="py-7 text-center text-sm text-ui-text-muted">Aucun journal pour cette annexe.</p>{% endfor %}</div>
+    {% if logs_page and logs_page.paginator.num_pages > 1 %}<div class="mt-4 flex justify-end gap-2 border-t border-ui-border pt-4">{% if logs_page.has_previous %}<button type="button" class="inline-flex h-9 items-center rounded-ui-button border border-ui-border px-3 text-xs font-semibold" hx-get="{% url 'accounts_portal:it_audit_workspace' %}?page={{ logs_page.previous_page_number }}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">Précédent</button>{% endif %}{% if logs_page.has_next %}<button type="button" class="inline-flex h-9 items-center rounded-ui-button border border-ui-border px-3 text-xs font-semibold" hx-get="{% url 'accounts_portal:it_audit_workspace' %}?page={{ logs_page.next_page_number }}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">Suivant</button>{% endif %}</div>{% endif %}
+  {% endfill %}
+{% endcomponent %}

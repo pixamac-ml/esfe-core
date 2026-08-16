@@ -9,6 +9,7 @@ from academics.imports.import_service import import_grades
 from academics.imports.template_service import generate_import_template
 from academics.models import AcademicClass, Semester
 from academics.permissions import can_import_grades_for_class
+from academics.services.workflow import get_semester_permissions
 
 
 def _forbid_if_unauthorized_import(request, academic_class):
@@ -31,6 +32,11 @@ def download_template(request, class_id: int, semester_id: int):
         return HttpResponse("Semestre hors classe.", status=400)
 
     session_type = (request.GET.get("session_type") or "normal").strip().lower()
+    if session_type not in {"normal", "retake"}:
+        return HttpResponse("Type de session de notes invalide.", status=400)
+    permissions = get_semester_permissions(semester)
+    if not permissions[f"can_enter_{session_type}"]:
+        return HttpResponse("La session de saisie demandee est verrouillee pour ce semestre.", status=403)
     try:
         output = generate_import_template(
             academic_class=academic_class,
@@ -94,18 +100,36 @@ def upload_grades(request):
     except Exception as exc:
         return JsonResponse({"ok": False, "error": str(exc)}, status=400)
 
-    return JsonResponse(
-        {
-            "ok": True,
-            "result": {
-                "updated": result.updated,
-                "skipped_empty": result.skipped_empty,
-                "skipped_unknown_columns": result.skipped_unknown_columns,
-                "skipped_unknown_students": result.skipped_unknown_students,
-                "skipped_invalid_scores": result.skipped_invalid_scores,
-                "unknown_columns": result.unknown_columns,
-                "student_issues": result.student_issues,
+    result_payload = {
+        "updated": result.updated,
+        "skipped_empty": result.skipped_empty,
+        "skipped_unknown_columns": result.skipped_unknown_columns,
+        "skipped_unknown_students": result.skipped_unknown_students,
+        "skipped_invalid_scores": result.skipped_invalid_scores,
+        "unknown_columns": result.unknown_columns,
+        "student_issues": result.student_issues,
+    }
+    if result.skipped_invalid_scores or result.skipped_unknown_students:
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": (
+                    "Import refuse : le fichier contient des notes ou des etudiants invalides. "
+                    "Aucune note n'a ete enregistree."
+                ),
+                "result": result_payload,
             },
-        }
-    )
+            status=400,
+        )
+    if not result.updated:
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": "Import refuse : aucune note exploitable n'a ete trouvee dans le fichier.",
+                "result": result_payload,
+            },
+            status=400,
+        )
+
+    return JsonResponse({"ok": True, "result": result_payload})
 

@@ -179,6 +179,29 @@ def build_director_deliberation_context(*, branch, academic_year, selected_class
             categories.append("repechage")
         row["case_categories"] = categories
     cases = [row for row in student_rows if row["requires_review"] and not row["jury_processed"]]
+    ordinary_rows = [row for row in student_rows if not row["requires_review"]]
+    review_rows = [row for row in student_rows if row["requires_review"]]
+    blocking_anomalies = [
+        anomaly for row in student_rows for anomaly in row["anomalies"]
+    ]
+    deliberation_session_metrics.update(
+        {
+            "ordinary_total": len(ordinary_rows),
+            "review_total": len(review_rows),
+            "review_processed": sum(row["jury_processed"] for row in review_rows),
+            "review_remaining": len(cases),
+            "blocking_anomalies": len(blocking_anomalies),
+            "closable": bool(
+                deliberation_session
+                and deliberation_session.status in {
+                    ClassDeliberationSession.STATUS_IN_SESSION,
+                    ClassDeliberationSession.STATUS_READY,
+                }
+                and not cases
+                and not blocking_anomalies
+            ),
+        }
+    )
     semester_rules = []
     if student_rows:
         for semester in student_rows[0]["semesters"]:
@@ -232,7 +255,8 @@ def build_director_deliberation_context(*, branch, academic_year, selected_class
         session = item["session"]
         item["session_status"] = session.status if session else ClassDeliberationSession.STATUS_PREPARATION
         item["session_status_label"] = session.get_status_display() if session else "Prête à ouvrir"
-        item["progression"] = f"{session_metrics(item['academic_class'])['processed']}/{item['student_count']}"
+        item_metrics = session_metrics(item["academic_class"])
+        item["progression"] = f"{item_metrics['processed']}/{item['student_count']}"
     overview_metrics = {
         "total_classes": len(class_options),
         "ready_classes": sum(item["session_status"] == ClassDeliberationSession.STATUS_PREPARATION for item in class_options),

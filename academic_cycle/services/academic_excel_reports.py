@@ -122,7 +122,7 @@ def build_academic_report_xlsx(*, branch):
     return wb
 
 
-def build_annual_deliberation_xlsx(*, academic_class):
+def build_annual_deliberation_xlsx(*, academic_class, snapshot=None):
     """Feuille administrative fondée sur les propositions annuelles figées."""
     wb = Workbook()
     ws = wb.active
@@ -135,7 +135,8 @@ def build_annual_deliberation_xlsx(*, academic_class):
     for column, header in enumerate(headers, 1):
         _write_cell(ws, 4, column, header, font=BOLD_FONT)
     _style_header_row(ws, 4, len(headers))
-    for index, row in enumerate(get_class_deliberation_rows(academic_class=academic_class), 1):
+    rows = snapshot.get("rows", []) if snapshot and snapshot.get("rows") else get_class_deliberation_rows(academic_class=academic_class)
+    for index, row in enumerate(rows, 1):
         semesters = row.get("semesters", [])
         first = semesters[0] if len(semesters) > 0 else {}
         second = semesters[1] if len(semesters) > 1 else {}

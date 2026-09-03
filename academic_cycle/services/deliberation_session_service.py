@@ -220,6 +220,7 @@ def _closed_snapshot(*, academic_class, session, decisions):
                 "automatic_label": decision.get_decision_display(),
                 "jury_decision": decision.jury_decision,
                 "jury_label": decision.get_jury_decision_display(),
+                "cycle_decision": decision.get_jury_decision_display(),
                 "jury_reason": decision.jury_reason,
                 "jury_justification": decision.jury_justification,
                 "requires_review": requires_jury_review(decision),

@@ -3061,7 +3061,10 @@ def director_deliberation_export_xlsx(request):
         academic_class = _get_director_deliberation_class(request)
     except ValidationError as exc:
         return HttpResponseBadRequest(" ".join(exc.messages))
-    workbook = build_annual_deliberation_xlsx(academic_class=academic_class)
+    from academic_cycle.models import ClassDeliberationSession
+    session = ClassDeliberationSession.objects.filter(academic_class=academic_class).first()
+    snapshot = session.transmission_snapshot if session and session.status in {session.STATUS_CLOSED, session.STATUS_TRANSMITTED, session.STATUS_OFFICIAL} else None
+    workbook = build_annual_deliberation_xlsx(academic_class=academic_class, snapshot=snapshot)
     return xlsx_response(workbook, f"deliberation_annuelle_{academic_class.id}_{academic_class.academic_year.name}.xlsx")
 
 
@@ -3071,6 +3074,7 @@ def director_deliberation_export_pdf(request):
         academic_class = _get_director_deliberation_class(request)
     except ValidationError as exc:
         return HttpResponseBadRequest(" ".join(exc.messages))
+    from academic_cycle.models import ClassDeliberationSession
     from academics.services.annual_deliberation import get_class_deliberation_rows
     try:
         from weasyprint import HTML
@@ -3080,12 +3084,15 @@ def director_deliberation_export_pdf(request):
     director = Profile.objects.filter(
         branch=academic_class.branch, position="director_of_studies", user__is_active=True
     ).select_related("user").first()
+    session = ClassDeliberationSession.objects.filter(academic_class=academic_class).first()
+    snapshot = session.transmission_snapshot if session and session.status in {session.STATUS_CLOSED, session.STATUS_TRANSMITTED, session.STATUS_OFFICIAL} else None
     html = render_to_string(
         "academics/reports/annual_deliberation_sheet.html",
         {
             "institution": institution,
             "academic_class": academic_class,
-            "rows": get_class_deliberation_rows(academic_class=academic_class),
+            "rows": snapshot.get("rows", []) if snapshot else get_class_deliberation_rows(academic_class=academic_class),
+            "deliberation_snapshot": snapshot,
             "director": director,
             "generated_at": timezone.localtime(),
         },
@@ -3131,7 +3138,7 @@ def director_deliberation_action(request):
                     "level": "success",
                     "message": "La délibération est ouverte et l'action a été tracée.",
                 }
-            elif action in {"prepare_class", "open_class_session", "confirm_ordinary", "simulate_repechage", "apply_repechage", "request_finalisation", "finalise_class"}:
+            elif action in {"prepare_class", "open_class_session", "confirm_ordinary", "simulate_repechage", "apply_repechage", "close_class_session", "request_finalisation"}:
                 class_id = (request.POST.get("class_id") or "").strip()
                 academic_class = (
                     AcademicClass.objects.select_related("branch", "academic_year")
@@ -3182,6 +3189,13 @@ def director_deliberation_action(request):
                         simulation = apply_session_threshold(academic_class=academic_class, actor=request.user, threshold=threshold, reason=request.POST.get("session_rule_reason", ""))
                         extra = {"deliberation_simulation": simulation}
                         toast = {"level": "success", "message": "Règle de séance enregistrée. Les notes restent inchangées ; le jury décide ensuite dossier par dossier."}
+                elif action == "close_class_session":
+                    from academic_cycle.services.deliberation_session_service import close_session
+                    result = close_session(academic_class=academic_class, actor=request.user)
+                    toast = {
+                        "level": "success",
+                        "message": "Délibération clôturée et synthèse annuelle figée. Vous pouvez relire les documents avant la soumission au DG.",
+                    }
                 elif action == "request_finalisation":
                     if cycle.status != constants.BRANCH_CYCLE_DELIBERATION:
                         raise ValidationError("La délibération de l'annexe doit être ouverte avant la demande DG/DGA.")
@@ -3198,12 +3212,9 @@ def director_deliberation_action(request):
                     if not expected or prepared != expected:
                         raise ValidationError("Préparez et contrôlez la synthèse annuelle complète avant de solliciter le DG/DGA.")
                     from academic_cycle.services.deliberation_session_service import get_session, session_metrics
-                    session_metrics_data = session_metrics(academic_class)
-                    if session_metrics_data["remaining"]:
-                        raise ValidationError(f"Finalisation impossible : {session_metrics_data['remaining']} dossier(s) restent à traiter par le jury.")
                     session = get_session(academic_class)
-                    if session.status != session.STATUS_READY:
-                        raise ValidationError("La séance doit être prête avant transmission au DG/DGA.")
+                    if session.status != session.STATUS_CLOSED or not session.transmission_snapshot:
+                        raise ValidationError("Clôturez d'abord la délibération afin de figer sa synthèse avant transmission au DG/DGA.")
                     pending = SensitiveActionRequest.objects.filter(
                         branch=academic_class.branch,
                         action_type=SensitiveActionRequest.ACTION_ANNUAL_DELIBERATION_PUBLISH,
@@ -3226,13 +3237,18 @@ def director_deliberation_action(request):
                                 "class_id": academic_class.id,
                                 "class_name": academic_class.display_name,
                                 "operation": "annual_deliberation_publish",
+                                "deliberation_snapshot": session.transmission_snapshot,
+                                "closed_at": session.closed_at.isoformat() if session.closed_at else "",
+                                "closed_by_id": session.closed_by_id,
                             },
                             requested_by=request.user,
                             reason="Publication définitive de la délibération annuelle après contrôle de la synthèse.",
                         )
+                    from academic_cycle.services.deliberation_session_service import submit_closed_session
+                    submit_closed_session(academic_class=academic_class)
                     toast = {
                         "level": "success",
-                        "message": "Demande envoyée au DG/DGA avec la synthèse de classe et un OTP temporaire.",
+                        "message": "Synthèse clôturée transmise au DG/DGA pour contrôle et approbation OTP.",
                     }
                 else:
                     raise ValidationError("La validation directe est désactivée : demandez l'autorisation DG/DGA.")
@@ -3242,14 +3258,22 @@ def director_deliberation_action(request):
             message = " ".join(getattr(exc, "messages", [])) or str(exc)
             toast = {"level": "error", "message": message}
 
-    response = _render_director_subview(
-        request,
-        section="evaluations",
-        subview="deliberation",
-        template_name=_EVAL_SUBVIEW_TEMPLATES["deliberation"],
-        toast=toast,
-        extra=extra,
-    )
+    original_get = request.GET
+    params = request.GET.copy()
+    params["deliberation_tab"] = request.POST.get("deliberation_tab") or params.get("deliberation_tab") or "overview"
+    params["deliberation_class_id"] = request.POST.get("class_id") or params.get("deliberation_class_id") or ""
+    request.GET = params
+    try:
+        response = _render_director_subview(
+            request,
+            section="evaluations",
+            subview="deliberation",
+            template_name=_EVAL_SUBVIEW_TEMPLATES["deliberation"],
+            toast=toast,
+            extra=extra,
+        )
+    finally:
+        request.GET = original_get
     response["HX-Trigger"] = "directorResultsChanged"
     return response
 
@@ -3732,6 +3756,7 @@ def _render_director_annual_bulletins_drawer(request):
 
 def _render_director_deliberation_student_drawer(request, *, academic_class=None, student_id=None, jury_error=None):
     from academic_cycle.models import StudentYearDecision
+    from academic_cycle.services.deliberation_session_service import get_session
     from academics.services.annual_deliberation import get_deliberation_student_detail
 
     raw_class_id = str(academic_class.id) if academic_class is not None else (request.GET.get("class_id") or "").strip()
@@ -3753,7 +3778,7 @@ def _render_director_deliberation_student_drawer(request, *, academic_class=None
     return render(
         request,
         "portal/staff/director/partials/drawers/deliberation_student_drawer.html",
-        {"deliberation_class": academic_class, "jury_error": jury_error, "jury_decision_choices": [(value, label) for value, label in StudentYearDecision._meta.get_field("jury_decision").choices if value != "pending"], **detail},
+        {"deliberation_class": academic_class, "jury_error": jury_error, "jury_actions_allowed": get_session(academic_class).status == "in_session", "jury_decision_choices": [(value, label) for value, label in StudentYearDecision._meta.get_field("jury_decision").choices if value != "pending"], **detail},
     )
 
 

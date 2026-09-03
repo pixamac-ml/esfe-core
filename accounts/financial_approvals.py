@@ -43,6 +43,12 @@ def _apply_sensitive_action(action: SensitiveActionRequest):
             actor=action.requested_by,
             branch_cycle=cycle,
         )
+        from academic_cycle.models import ClassDeliberationSession
+        ClassDeliberationSession.objects.filter(
+            academic_class=academic_class,
+            branch=action.branch,
+            academic_year=academic_class.academic_year,
+        ).update(status=ClassDeliberationSession.STATUS_OFFICIAL)
         return {
             "class_id": academic_class.id,
             "academic_year_id": academic_class.academic_year_id,
@@ -99,6 +105,7 @@ def financial_approval_detail(request: HttpRequest, pk: int) -> HttpResponse:
     annual_rows = []
     if action.action_type == SensitiveActionRequest.ACTION_ANNUAL_DELIBERATION_PUBLISH:
         from academics.models import AcademicClass
+        from academic_cycle.models import ClassDeliberationSession
         from academics.services.annual_deliberation import get_class_deliberation_rows
 
         academic_class = (
@@ -112,7 +119,12 @@ def financial_approval_detail(request: HttpRequest, pk: int) -> HttpResponse:
         )
         if academic_class is None:
             raise PermissionDenied("La classe concernee par cette demande est introuvable.")
-        annual_rows = get_class_deliberation_rows(academic_class=academic_class)
+        session = ClassDeliberationSession.objects.filter(academic_class=academic_class).first()
+        annual_rows = (
+            (session.transmission_snapshot or {}).get("rows", [])
+            if session and session.transmission_snapshot
+            else get_class_deliberation_rows(academic_class=academic_class)
+        )
     return render(request, "accounts/financial_approval.html", {"action": action, "annual_rows": annual_rows})
 
 

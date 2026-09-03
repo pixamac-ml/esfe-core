@@ -1,0 +1,148 @@
+VERSION PRODUIT FINALE — CALENDRIER ACADEMIQUE / DASHBOARD DE
+
+VERDICT
+
+L'ajout est juste et complete notre conception : le calendrier est construit localement par chaque DE pour son annexe, mais une fois publie il devient la reference temporelle officielle de cette annexe pour les utilisateurs et les modules concernes. Le DG dispose d'une vue consolidee de toutes les annexes, sans remplacer leurs calendriers locaux.
+
+Principe a conserver : LE CALENDRIER DIT QUAND UNE OPERATION ACADEMIQUE A LIEU ; LES MODULES METIER DISENT COMMENT ELLE EST EXECUTEE.
+
+Exemples : le calendrier ouvre une periode de saisie ; le module Notes gere les notes. Le calendrier positionne une periode de stage ; la maquette definit l'EC Stage et le module specialise suit l'etudiant, le moniteur et l'evaluation. Le calendrier annonce une deliberation ; les modules Resultats et Deliberation controlent les notes, decisions et PV.
+
+1. MODELE FONCTIONNEL
+
+Un calendrier officiel est rattache a une annee academique existante, une annexe unique, une version, un statut et des auteurs traces. L'annexe vient automatiquement du profil du DE : elle ne doit jamais etre selectionnee librement. Le DE ne peut donc ni lire ni modifier le calendrier d'une autre annexe.
+
+Chaque evenement a une portee precise : toute l'annexe, une formation, une classe/niveau ou un semestre. Les utilisateurs concernes sont calcules depuis les inscriptions, classes, formations et semestres du systeme ; ils ne sont jamais saisis manuellement.
+
+2. ACCUEIL DE LA SECTION CALENDRIER
+
+Le DE ne doit pas arriver sur un gros formulaire. Il arrive sur un poste de pilotage qui montre : annee active, statut du calendrier, version officielle, progression de construction, prochain jalon, alertes et bouton d'action principal.
+
+Au centre : une frise annuelle filtrable par formation, niveau/classe et semestre. Elle montre : Rentree -> Semestre -> Evaluations -> Resultats -> Rattrapage -> Semestre -> Stages/Evaluations -> Resultats -> Deliberation -> Cloture. Les evenements globaux de l'annexe, comme les vacances, restent visibles apres filtrage.
+
+En bas : prochaines actions du DE, erreurs a corriger, dernieres revisions et raccourcis vers Sessions, Notes, Deliberations, Emploi du temps et Documents.
+
+3. CINQ SOUS-SECTIONS, PAS DAVANTAGE
+
+1) Pilotage : frise, alertes et prochaines actions.
+2) Construire : wizard de preparation du brouillon avec sauvegarde automatique.
+3) Echeances academiques : detail par semestre/formation/classe et liens vers les modules responsables.
+4) Verification et publication : controles, apercu de la note officielle, soumission et decision.
+5) Versions et archives : historique, comparaison, documents generes et lecture seule des anciennes annees.
+
+4. CONSTRUCTION GUIDEE
+
+Etape 1 — Cadre officiel : annee academique issue du referentiel, annexe automatique, intitule, rentree, cloture, reference administrative facultative et observation generale.
+
+Etape 2 — Perimetres : le DE choisit parmi les formations, classes et semestres reels de son annexe. Aucune ressaisie manuelle de « S1 », « niveau 1 » ou formation si ces objets existent deja dans les maquettes.
+
+Etape 3 — Trames semestrielles : le DE cree par exemple « Trame S1/S3 2026-2027 » et l'applique aux classes qui ont le meme rythme. La trame contient debut/fin des enseignements, revisions, session normale, echeance de correction/saisie, publication, rattrapage et deliberation si necessaire. Une classe decalee recoit une exception. La regle est : TRAME GENERALE + EXCEPTIONS LOCALES, jamais vingt saisies identiques.
+
+Etape 4 — Evenements institutionnels : inscriptions, reinscriptions, vacances, jours feries, reunions pedagogiques, soutenances, ceremonies et cloture. Chaque evenement porte Type, Intitule, Debut, Fin, Portee, Description, Importance et caractere bloquant ou informatif.
+
+Etape 5 — Activites de maquette : si une maquette contient EC Stage ou une soutenance, le calendrier propose seulement le jalon temporel. Maquette academique = ce qu'est l'activite. Calendrier = quand elle se tient. Module specialise = comment elle est suivie et evaluee.
+
+5. MOTEUR DE VERIFICATION
+
+Avant soumission, les controles sont classes ainsi : Information (conseil), Avertissement (cas possible a confirmer) et Erreur (publication impossible).
+
+Erreurs : date hors annee academique ; fin avant debut ; fin de semestre avant debut ; resultats avant la fin de session ; session/rattrapage sans semestre ; evenement hors annexe du DE.
+
+Avertissements : S2 avant publication S1 ; deux evaluations majeures le meme jour pour la meme classe ; EC Stage dans la maquette sans periode prevue ; deliberation avant resultats attendus.
+
+Un chevauchement ne doit jamais etre bloque sans contexte. Le moteur compare d'abord la portee et l'audience : une collision peut etre normale entre deux formations differentes, mais pas pour la meme classe sur deux activites bloquantes.
+
+6. STATUTS, VALIDATION ET REVISION
+
+Statuts recommandes : BROUILLON -> SOUMIS POUR VALIDATION -> VALIDE -> PUBLIE -> ARCHIVE. Etat complementaire : REJETE / A CORRIGER avec motif de retour au DE.
+
+« A controler » ne doit pas etre un statut durable : c'est le resultat du moteur de verification dans un brouillon. Le vrai statut humain est « Soumis pour validation ».
+
+Workflow : le DE cree/modifie le brouillon ; le moteur controle ; le DE soumet ; le DG valide ou rejette avec motif ; apres validation le calendrier est publie selon le circuit de l'ecole ; la version publiee est immuable ; toute correction cree v2, v3... par clonage de la derniere version officielle ; l'ancienne version reste intacte et consultable ; la fin d'annee archive la version officielle.
+
+Le circuit est parametrique : l'ecole pourra autoriser plus tard le DE a publier apres controle. Par defaut le plus securise est : DE prepare et soumet ; DG valide puis publie.
+
+7. CE QUE SIGNIFIE PUBLIER
+
+Publier ne signifie pas seulement changer un statut. La publication doit : figer la version ; tracer auteur, valideur, publieur, date et reference ; rendre les evenements visibles a leur audience ; alimenter alertes et rappels ; activer les liens temporels vers les modules ; enregistrer l'audit ; generer l'instantane de la note officielle.
+
+La mise a jour de version, statut, visibilite et audit doit etre atomique. En revanche, un souci de rendu PDF ne doit pas annuler une publication correcte : la note est produite depuis l'instantane fige et son rendu peut etre relance sans changer le contenu publie.
+
+8. NOTE OFFICIELLE
+
+La publication produit deux sorties :
+
+A. Sortie systeme : les jalons publies sont visibles dans les espaces DE, enseignants, secretariat, etudiants et gestionnaire lorsque pertinent.
+
+B. Sortie administrative : une note officielle est generee sans ressaisie Word. Elle contient ecole/annexe, annee academique, objet, reference, communication institutionnelle, tableau chronologique, observations, date d'emission, autorite/signature, numero de version et identifiant de verification.
+
+La note est un instantane de la version publiee. Une revision produit une nouvelle note ; elle ne modifie jamais silencieusement le document precedent.
+
+9. NOTIFICATIONS ET NOUVEAUX INSCRITS
+
+Il ne faut pas creer une notification individuelle pour chaque etudiant a la publication. Le calendrier publie conserve plutot son audience : annexe + formation + classe + semestre. Lorsqu'un etudiant est inscrit ou se connecte, le systeme determine les calendriers publies qui le concernent et les affiche. Les rappels a l'approche d'un jalon sont ensuite envoyes a l'audience existante a ce moment-la.
+
+10. VUE DG CONSOLIDEE
+
+Le DG voit : Annexe | Annee | Etat | Version officielle | Date de publication | Prochain jalon. Il peut ouvrir le calendrier local, valider/rejeter selon ses droits, suivre les calendriers non publies, comparer les principales echeances et generer une synthese institutionnelle. Cette synthese rassemble les calendriers ; elle ne les ecrase jamais.
+
+11. DROITS
+
+DE : creer, modifier les brouillons, verifier, soumettre et consulter les versions de sa seule annexe.
+DG : lecture consolidee, validation/rejet/publication selon le circuit et aucune modification silencieuse d'une version publiee.
+Secretariat : lecture du calendrier publie de son annexe et actions qui le concernent.
+Enseignant : lecture des evenements publies lies a ses classes ou evaluations.
+Etudiant : lecture des evenements publies lies a son inscription active.
+
+12. INVARIANTS A NE JAMAIS CASSER
+
+1. Une seule source de verite pour annee, formation, classe, semestre et maquette.
+2. Aucun evenement ne traverse les annexes sans droit explicite.
+3. Aucune modification silencieuse d'une version publiee.
+4. Le calendrier orchestre ; il ne duplique pas Notes, Stages, Deliberations ou Emploi du temps.
+5. Toute publication est auditable et reproductible sous forme de note officielle versionnee.
+6. Les conflits sont controles selon la portee reelle, pas seulement les dates.
+
+13. ORDRE D'IMPLEMENTATION
+
+PHASE 1 — Refaire l'ecran : cinq sous-sections, frise, filtres, alertes, soumission/rejet et filtrage strict par annexe.
+
+PHASE 2 — Metier : trames semestrielles, exceptions, controles par audience, liaisons vers semestres/sessions/maquettes/deliberations et revision versionnee.
+
+PHASE 3 — Institutionnel : note officielle versionnee, visibilite par audience, rappels et vue DG consolidee.
+
+14. PERTURBATIONS, AJUSTEMENTS ET EXECUTION REELLE
+
+La nouvelle precision est essentielle : il faut distinguer le calendrier de reference publie de l'execution reelle de l'annee academique.
+
+Le calendrier officiel V1 ne doit jamais etre detruit. Lorsqu'une greve, une fermeture, une suspension administrative, une situation securitaire ou un autre incident apparait, le DE ne recree pas un calendrier complet. Il declare une perturbation rattachee au calendrier et a son perimetre.
+
+Une perturbation contient : motif/type, debut, fin previsionnelle ou « inconnue », portee (annexe/formation/classe/semestre), justificatif eventuel, statut, commentaire, et impacts pedagogiques distincts : presentiel, enseignement en ligne, evaluations et stages.
+
+Les impacts possibles sont : aucun impact, maintenu, partiellement maintenu, suspendu ou reporte. Une suspension du presentiel ne doit donc jamais etre interpretee automatiquement comme un arret complet des enseignements si les cours en ligne restent accessibles.
+
+Le cycle recommande est :
+
+CALENDRIER OFFICIEL V1 -> EXECUTION NORMALE -> PERTURBATION EVENTUELLE -> ANALYSE D'IMPACT -> DECISION DU DE -> AVENANT OU REVISION SI NECESSAIRE -> CALENDRIER APPLICABLE -> HISTORIQUE CONSERVE.
+
+Le formulaire « Signaler une perturbation » doit rester rapide : motif, debut, fin connue ou inconnue, perimetre, activites affectees, etat du presentiel, etat de l'enseignement en ligne, impact sur evaluations/stages et commentaire. Une perturbation peut rester EN COURS tant que sa date de fin est inconnue, puis etre cloturee lors de la reprise.
+
+Le systeme analyse les evenements potentiellement touches et les presente au DE. Il peut lui proposer une liste : evaluations pendant l'incident, cours concernes, stages qui chevauchent, deadlines de resultats. Mais il ne doit JAMAIS decaler automatiquement toutes les dates suivantes. Pour chaque evenement touche, le DE decide explicitement : maintenir, passer en continuite en ligne, reporter, modifier, annuler exceptionnellement ou ne rien faire.
+
+Trois niveaux de changement doivent etre distingues :
+
+- Incident simple : fermeture ou interruption courte ; l'incident est trace, sans modifier le calendrier officiel si aucune date ne change.
+- Ajustement academique / avenant : certaines dates ou modalites changent. Un avenant publie conserve ancienne date, nouvelle date, motif, perimetre, autorite, date d'effet et decisions de continuite.
+- Revision majeure : plusieurs periodes sont impactees. Une nouvelle version complete V2 est creee a partir de V1, soumise, validee et publiee. V1 devient « remplacee », pas « supprimee ».
+
+Il faut donc ajouter « REMPLACE » aux etats historiques d'un calendrier. ARCHIVE correspond a la fin de l'annee ; REMPLACE signifie qu'une version plus recente est actuellement applicable. Pour les ajustements, les etats sont : brouillon, soumis, valide, publie, clos ou annule.
+
+Le calendrier applicable a une date donnee est une projection : calendrier officiel de base + avenants publies dans leur ordre d'effet. La version initiale reste visible pour l'historique. Les informations « reellement realise » viennent ensuite des modules d'execution (emploi du temps, sessions, notes, stages), et non d'une modification silencieuse du calendrier.
+
+Lorsqu'un avenant est publie, le systeme genere une note de service de reamenagement avec reference au calendrier initial, motif, annexe/public cible, anciennes et nouvelles dates, dispositions de continuite, date d'effet et autorite. Les utilisateurs concernes voient la derniere disposition applicable ; l'historique des communications reste consultable.
+
+Le DG peut alors comparer le previsionnel et le reel par annexe : par exemple une fin de semestre initialement prevue le 15 fevrier, effectivement terminee le 27 fevrier, avec les perturbations et decisions qui expliquent l'ecart. Cela donne une vraie information de pilotage sans contaminer les annexes qui ont continue normalement.
+
+CONCLUSION
+
+La meilleure version est un calendrier par annexe et par annee, construit avec des trames semestrielles reutilisables, ajuste par exceptions, verifie avant soumission, valide institutionnellement et publie comme reference officielle immuable. Il reste toutefois flexible face a la realite : les perturbations sont tracees, leurs impacts sont decides par le DE, les avenants rendent les nouvelles dispositions officielles et le previsionnel reste comparable au reel. Il synchronise le temps de l'ecole sans voler les responsabilites des autres modules.

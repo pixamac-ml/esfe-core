@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from django.db import transaction
-from django.db.models import Count, Prefetch, Sum
+from django.core.exceptions import ValidationError
+from django.db.models import Count, Prefetch, Q, Sum
 from django.utils import timezone
 
 from branches.models import Branch
@@ -20,9 +21,16 @@ COUPON_RECIPIENT_ROLE_TOKENS = [
 ]
 
 
-def list_coupons():
+def _scoped_coupons(*, branch_ids=None):
+    queryset = Coupon.objects.all()
+    if branch_ids is not None:
+        queryset = queryset.filter(Q(branches__id__in=branch_ids) | Q(branches__isnull=True)).distinct()
+    return queryset
+
+
+def list_coupons(*, branch_ids=None):
     return (
-        Coupon.objects.all()
+        _scoped_coupons(branch_ids=branch_ids)
         .annotate(
             usage_count=Count("redemptions", distinct=True),
             discount_total=Sum("redemptions__discount_amount"),
@@ -32,14 +40,14 @@ def list_coupons():
     )
 
 
-def get_coupon_detail(coupon_id):
+def get_coupon_detail(coupon_id, *, branch_ids=None):
     redemptions = CouponRedemption.objects.select_related(
         "applied_by",
         "inscription__candidature__branch",
         "inscription__candidature__programme",
     ).order_by("-applied_at")
     return (
-        Coupon.objects
+        _scoped_coupons(branch_ids=branch_ids)
         .select_related("created_by")
         .prefetch_related("branches", "programmes", Prefetch("redemptions", queryset=redemptions))
         .filter(pk=coupon_id)
@@ -48,8 +56,15 @@ def get_coupon_detail(coupon_id):
 
 
 @transaction.atomic
-def create_coupon(*, actor, form):
+def create_coupon(*, actor, form, allowed_branch_ids=None):
     data = form.cleaned_data
+    requested_branch_ids = set((data.get("branches") or []).values_list("id", flat=True))
+    if allowed_branch_ids is not None:
+        allowed_branch_ids = set(allowed_branch_ids)
+        if not requested_branch_ids:
+            requested_branch_ids = allowed_branch_ids
+        if not requested_branch_ids.issubset(allowed_branch_ids):
+            raise ValidationError("Une annexe du coupon est hors du contexte DG actif.")
     coupon = Coupon(
         code=data["code"],
         label=data["label"],
@@ -61,7 +76,7 @@ def create_coupon(*, actor, form):
         created_by=actor,
     )
     coupon.save()
-    coupon.branches.set(data.get("branches") or [])
+    coupon.branches.set(requested_branch_ids)
     coupon.programmes.set(data.get("programmes") or [])
 
     _notify_coupon_created(actor=actor, coupon=coupon)
@@ -70,8 +85,8 @@ def create_coupon(*, actor, form):
 
 
 @transaction.atomic
-def toggle_coupon(*, actor, coupon_id):
-    coupon = Coupon.objects.select_for_update().filter(pk=coupon_id).first()
+def toggle_coupon(*, actor, coupon_id, allowed_branch_ids=None):
+    coupon = _scoped_coupons(branch_ids=allowed_branch_ids).select_for_update().filter(pk=coupon_id).first()
     if coupon is None:
         return None
     coupon.is_active = not coupon.is_active

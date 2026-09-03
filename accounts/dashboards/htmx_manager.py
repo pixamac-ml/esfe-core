@@ -4,6 +4,7 @@ from accounts.dashboards.htmx_paiements import *
 from accounts.dashboards.htmx_caisse import *
 from accounts.dashboards.htmx_salaires import *
 from accounts.dashboards.htmx_honoraires import *
+from accounts.dashboards.htmx_payment_signatures import *
 from accounts.dashboards.htmx_depenses import *
 from accounts.dashboards.htmx_global import *
 from accounts.dashboards.htmx_widgets import *

@@ -10,7 +10,11 @@
               <button type="button"
                       title="Ajouter un cours le {{ day.label }}"
                       aria-label="Ajouter un cours le {{ day.label }}"
+                      {% if timetable_display_mode == "week" %}
+                      hx-get="{% url 'accounts_portal:director_timetable_event_drawer' %}?class_id={{ timetable_selected_class.id }}&date={{ day.date|date:'Y-m-d' }}&week_start={{ timetable_week_start|date:'Y-m-d' }}"
+                      {% else %}
                       hx-get="{% url 'accounts_portal:director_timetable_slot_drawer' %}?class_id={{ timetable_selected_class.id }}&weekday={{ day.value }}&week_start={{ timetable_week_start|date:'Y-m-d' }}"
+                      {% endif %}
                       hx-target="#director-drawer-content"
                       hx-swap="innerHTML"
                       class="ui-focus-ring grid h-8 w-8 shrink-0 place-items-center rounded-ui-button text-ui-primary hover:bg-ui-primary-soft">
@@ -31,13 +35,18 @@
         {% for cell in row.cells %}
           <div class="min-h-32 border-r border-ui-border p-2 last:border-r-0">
             {% for slot in cell.slots %}
-              <article class="h-full min-h-28 rounded-ui-card border border-ui-primary/20 bg-ui-primary-soft p-3">
+              <article class="h-full min-h-28 rounded-ui-card border p-3 {% if slot.is_week_event %}cursor-pointer transition hover:border-ui-primary/50 hover:shadow-ui-sm{% endif %} {% if slot.is_active %}border-ui-primary/20 bg-ui-primary-soft{% else %}border-dashed border-ui-warning/50 bg-ui-warning-soft/40{% endif %}"
+                       {% if editable and slot.is_week_event %}
+                       role="button" tabindex="0" aria-label="Gérer la séance {{ slot.ec_title }}"
+                       hx-get="{% url 'accounts_portal:director_timetable_event_drawer' %}?class_id={{ timetable_selected_class.id }}&event_id={{ slot.id }}&week_start={{ timetable_week_start|date:'Y-m-d' }}"
+                       hx-trigger="click, keyup[key=='Enter']" hx-target="#director-drawer-content" hx-swap="innerHTML"
+                       {% endif %}>
                 <div class="flex items-start gap-2">
                   <div class="min-w-0 flex-1">
-                    <p class="line-clamp-2 text-xs font-bold text-ui-text">{{ slot.ec_title }}</p>
+                    <p class="line-clamp-2 text-xs font-bold text-ui-text">{{ slot.ec_title }}{% if not slot.is_active %} <span class="font-normal text-ui-warning">(désactivé)</span>{% endif %}</p>
                     <p class="mt-1 truncate text-[11px] font-semibold text-ui-primary">{{ slot.ec_code }}</p>
                   </div>
-                  {% if editable %}
+                  {% if editable and not slot.is_week_event %}
                     <button type="button"
                             title="Modifier ce cours"
                             aria-label="Modifier {{ slot.ec_title }}"
@@ -53,7 +62,7 @@
                   <p class="flex min-w-0 items-center gap-1.5"><i data-lucide="user-round" class="h-3.5 w-3.5 shrink-0" aria-hidden="true"></i><span class="truncate">{{ slot.teacher_name }}</span></p>
                   <p class="flex min-w-0 items-center gap-1.5"><i data-lucide="map-pin" class="h-3.5 w-3.5 shrink-0" aria-hidden="true"></i><span class="truncate">{{ slot.room|default:"Salle à définir" }}</span></p>
                 </div>
-                {% if editable %}
+                {% if editable and slot.is_active and not slot.is_week_event %}
                   <form method="post"
                         hx-post="{% url 'accounts_portal:director_timetable_action' %}"
                         hx-target="#director-timetable-subcontent"
@@ -72,7 +81,9 @@
                 {% endif %}
               </article>
             {% empty %}
-              {% if editable %}
+              {% if editable and timetable_display_mode == "week" %}
+                <button type="button" title="Ajouter une séance à cette date" hx-get="{% url 'accounts_portal:director_timetable_event_drawer' %}?class_id={{ timetable_selected_class.id }}&date={{ cell.date|date:'Y-m-d' }}&start_time={{ row.start_time }}&end_time={{ row.end_time }}&week_start={{ timetable_week_start|date:'Y-m-d' }}" hx-target="#director-drawer-content" hx-swap="innerHTML" class="ui-focus-ring flex h-full min-h-28 w-full items-center justify-center rounded-ui-card border border-dashed border-ui-border text-ui-text-muted hover:border-ui-primary/50 hover:bg-ui-primary-soft hover:text-ui-primary"><i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i></button>
+              {% elif editable %}
                 <button type="button"
                         title="Ajouter un cours sur ce créneau"
                         aria-label="Ajouter un cours le {{ cell.weekday_label }} de {{ row.start_time }} à {{ row.end_time }}"

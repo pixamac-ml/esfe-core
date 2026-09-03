@@ -1,0 +1,738 @@
+PROPOSITION — BOUTIQUE OPÉRATIONNELLE DANS LE DASHBOARD GESTIONNAIRE
+=======================================================================
+
+1. DÉCISION DE STRUCTURE
+------------------------
+
+La Boutique reste une section du dashboard Gestionnaire.
+
+La Gestionnaire est responsable de la vente des tenues, blouses, badges,
+kits et autres articles de l’école. Il ne faut donc pas créer un dashboard
+séparé qui fragmenterait son travail.
+
+L’objectif est de transformer cette section en un poste de vente rapide,
+avec un moteur fiable derrière : stock, caisse, reçu et historique.
+
+
+2. PRINCIPE SIMPLE POUR LA GESTIONNAIRE
+---------------------------------------
+
+La page Boutique doit répondre à trois besoins immédiats :
+
+  A. Vendre rapidement au comptoir.
+  B. Savoir immédiatement ce qui doit être préparé ou remis.
+  C. Garder un stock et une caisse justes sans calcul manuel.
+
+La gestionnaire ne doit pas ouvrir plusieurs sections du dashboard pour une
+vente normale. Elle travaille depuis Boutique ; les écritures nécessaires
+apparaissent automatiquement dans Caisse et Rapports.
+
+
+3. ÉCRAN PRINCIPAL PROPOSÉ
+--------------------------
+
+En haut : une barre très courte de pilotage.
+
+  - Ventes du jour
+  - À encaisser
+  - À préparer
+  - Prêtes à remettre
+  - Alertes de stock
+
+Puis deux actions visibles et prioritaires :
+
+  [ Nouvelle vente ]   [ Entrée / ajustement de stock ]
+
+Sous ces actions : des onglets de travail, sans changer de dashboard.
+
+  1. Vendre
+  2. Commandes à traiter
+  3. Catalogue et stock
+  4. Journal et contrôle
+
+La Gestionnaire arrive par défaut sur « Vendre » ou sur « Commandes à
+traiter » si une action urgente existe.
+
+
+4. ONGLET « VENDRE » — LE VRAI POSTE COMPTOIR
+----------------------------------------------
+
+Ce doit être la zone la plus rapide.
+
+Colonne gauche : catalogue/recherche.
+
+  - Recherche par nom : blouse, tenue, badge, kit, etc.
+  - Catégories rapides.
+  - Stock visible avant ajout.
+  - Prix visible.
+  - Ajout au panier en un clic.
+
+Colonne droite : panier.
+
+  - Articles, quantités + / -, suppression.
+  - Total toujours visible.
+  - Client : étudiant recherché par matricule/nom, ou client libre.
+  - Moyen de règlement : espèces, Orange Money, virement.
+  - Bouton unique : « Encaisser et générer le reçu ».
+
+Après validation :
+
+  - paiement validé ;
+  - entrée caisse créée ;
+  - stock diminué ;
+  - reçu généré ;
+  - commande envoyée dans « À préparer » ;
+  - panier vidé, prêt pour le client suivant.
+
+Le navigateur ne décide jamais le montant réel : le serveur recalcule chaque
+ligne à partir du catalogue et contrôle le stock au dernier moment.
+
+
+5. ONGLET « COMMANDES À TRAITER »
+---------------------------------
+
+Trois files distinctes, dans cet ordre :
+
+  - À encaisser : commande créée mais règlement à constater.
+  - À préparer : paiement validé, articles à rassembler.
+  - À remettre : articles prêts, remise au client à confirmer.
+
+Chaque ligne affiche seulement ce qui est nécessaire :
+
+  référence, client/étudiant, articles, total, heure, état, action suivante.
+
+Actions :
+
+  Valider paiement -> Préparer -> Remettre
+
+Le reçu reste téléchargeable depuis la commande.
+
+Les ventes déjà remises passent dans l’historique et ne polluent plus le
+travail quotidien.
+
+
+6. ONGLET « CATALOGUE ET STOCK »
+--------------------------------
+
+Le catalogue est une table de gestion, pas une galerie décorative.
+
+Pour chaque article :
+
+  - nom et catégorie ;
+  - prix de vente ;
+  - stock disponible ;
+  - seuil d’alerte ;
+  - actif / archivé ;
+  - obligatoire / libre.
+
+Actions sécurisées :
+
+  - Créer un article.
+  - Modifier prix, nom, seuil ou visibilité.
+  - Entrée de stock.
+  - Ajustement après inventaire, avec motif obligatoire.
+  - Archiver / réactiver.
+
+Un article ayant déjà été vendu ne doit jamais être supprimé physiquement.
+
+
+7. ONGLET « JOURNAL ET CONTRÔLE »
+---------------------------------
+
+Cette zone sert à contrôler, pas à travailler chaque vente.
+
+Elle contient :
+
+  - ventes du jour, hier, période personnalisée ;
+  - mouvements de stock (entrée, vente, ajustement) ;
+  - total encaissé par moyen de paiement ;
+  - reçus et références ;
+  - alertes : stock faible, commande ancienne non remise, anomalie.
+
+Un clic doit permettre d’ouvrir le détail d’une vente sans modifier une vente
+déjà validée.
+
+
+8. AUTOMATISMES À PRÉSERVER
+---------------------------
+
+Lors d’un paiement validé, le système doit automatiquement :
+
+  1. générer une référence de paiement ;
+  2. générer le reçu ;
+  3. créer l’écriture d’entrée dans la caisse de l’annexe ;
+  4. créer les sorties de stock ;
+  5. mettre à jour l’état de commande ;
+  6. journaliser l’auteur, la date et l’annexe.
+
+Il ne faut ni double validation, ni double sortie de stock, ni modification
+d’un paiement déjà validé.
+
+
+9. RÈGLES DE SÉCURITÉ
+---------------------
+
+  - Toutes les lectures et actions restent limitées à l’annexe de la
+    Gestionnaire.
+  - Une vente valide le stock à nouveau côté serveur ; l’interface seule ne
+    peut pas créer une sortie.
+  - Le stock est verrouillé pendant la validation pour éviter deux ventes du
+    dernier article au même instant.
+  - Les corrections de stock ont un motif et un auteur.
+  - Les remboursements ne doivent pas être confondus avec un ajustement de
+    stock : ils nécessitent un workflow financier séparé, à définir avec la
+    direction.
+
+
+10. CE QUI EXISTE DÉJÀ ET CE QUI RESTE À FAIRE
+----------------------------------------------
+
+Déjà présent / en cours de consolidation :
+
+  - panier de vente comptoir multi-articles ;
+  - validation de paiement ;
+  - reçu ;
+  - écriture caisse ;
+  - sortie de stock ;
+  - préparation et remise ;
+  - entrée et ajustement tracé de stock ;
+  - archivage réversible des articles.
+
+À réaliser dans l’ordre :
+
+  Étape 1. Réorganiser la page en quatre onglets de travail ci-dessus.
+  Étape 2. Faire de « Vendre » le premier poste comptoir, avec recherche et
+           ajout immédiat au panier.
+  Étape 3. Séparer clairement les trois files de commandes.
+  Étape 4. Ajouter le journal filtrable et le détail de vente en drawer.
+  Étape 5. Ajouter l’édition contrôlée des articles et des prix.
+  Étape 6. Définir avec la direction le workflow de retour/remboursement.
+
+
+11. DÉCISION À PRENDRE AVANT LE REMBOURSEMENT
+----------------------------------------------
+
+La règle suivante doit être validée avant tout développement de remboursement :
+
+  - qui peut autoriser un remboursement ;
+  - remboursement espèces, mobile money ou avoir ;
+  - délai autorisé ;
+  - retour physique obligatoire ou non ;
+  - besoin d’une validation Gestionnaire + DG/DGA.
+
+Sans cette règle, aucune action de remboursement ne doit retirer ou annuler
+une recette déjà validée.
+
+
+
+# BOUTIQUE — FLUIDIFIER ET FIABILISER LE CIRCUIT DE VENTE
+
+La Boutique doit être pensée comme un **poste de vente rapide intégré à la trésorerie de l’annexe**, et non comme un module isolé.
+
+L’objectif n’est pas de reconstruire ce qui existe déjà. Il faut auditer les fonctionnalités actuelles, les conserver lorsqu’elles sont correctes et réorganiser l’expérience afin qu’une Gestionnaire puisse effectuer une vente complète en quelques actions.
+
+## 1. Principe financier à respecter
+
+Une vente Boutique payée constitue une **recette de l’annexe**.
+
+Il ne faut donc pas créer une comptabilité Boutique indépendante de la trésorerie générale.
+
+Lorsqu’une vente est encaissée :
+
+**Vente Boutique → Paiement → Entrée de trésorerie de l’annexe**
+
+L’écriture financière doit cependant conserver obligatoirement son origine :
+
+* type : recette ;
+* source : Boutique ;
+* référence de la vente ;
+* référence du paiement ;
+* client/étudiant si connu ;
+* montant ;
+* moyen de paiement ;
+* Gestionnaire ayant encaissé ;
+* date/heure ;
+* annexe.
+
+Ainsi, la trésorerie générale connaît le montant réellement disponible, tandis que les rapports peuvent isoler automatiquement :
+
+**Recettes inscriptions / Recettes Boutique / Autres recettes.**
+
+Aucune double écriture manuelle ne doit être nécessaire.
+
+---
+
+## 2. V1 : privilégier réellement l'espèce
+
+Le moyen opérationnel actuel étant l'espèce, **optimiser d'abord complètement ce workflow avant d'ajouter les autres moyens de paiement**.
+
+Orange Money, virement ou autres moyens peuvent rester prévus dans l'architecture mais ne doivent pas compliquer l'expérience V1.
+
+Pour une vente comptoir en espèces :
+
+1. rechercher l'article ;
+2. ajouter au panier ;
+3. identifier l'étudiant/client si nécessaire ;
+4. afficher le total ;
+5. cliquer sur **« Encaisser »** ;
+6. confirmer le montant reçu ;
+7. le serveur valide la transaction ;
+8. le reçu est généré ;
+9. l'entrée de caisse est créée ;
+10. le stock est décrémenté ;
+11. la vente passe dans le workflow de préparation/remise.
+
+La Gestionnaire ne doit jamais devoir aller ensuite dans « Caisse » pour enregistrer manuellement cette recette.
+
+---
+
+## 3. Architecture interne de Boutique
+
+Conserver **Boutique comme une seule section principale** du dashboard Gestionnaire.
+
+À l'intérieur, utiliser des sous-sections HTMX rapides :
+
+### VENDRE
+
+Poste comptoir principal.
+
+* recherche instantanée ;
+* catégories ;
+* articles disponibles ;
+* prix ;
+* stock ;
+* panier ;
+* étudiant/client ;
+* total ;
+* encaissement.
+
+L'objectif est qu'une vente simple puisse être réalisée sans quitter cet écran.
+
+### COMMANDES
+
+Organiser le travail par état :
+
+**À encaisser → À préparer → À remettre → Terminées**
+
+Les commandes terminées ne doivent plus encombrer les opérations courantes.
+
+Afficher directement les compteurs dans les sous-onglets.
+
+### STOCK & ARTICLES
+
+Gestion opérationnelle :
+
+* articles ;
+* catégories ;
+* prix ;
+* disponibilité ;
+* stock actuel ;
+* seuil d'alerte ;
+* entrées de stock ;
+* ajustements ;
+* archivage.
+
+Toute correction de stock doit avoir un motif.
+
+### JOURNAL
+
+Historique et contrôle :
+
+* ventes ;
+* paiements ;
+* mouvements de stock ;
+* reçus ;
+* annulations/corrections autorisées ;
+* auteur ;
+* date ;
+* références.
+
+Filtres : aujourd'hui, période, article, client, moyen de paiement, statut.
+
+---
+
+## 4. Automatisation complète d'une vente
+
+Une validation réussie doit être **atomique**.
+
+Une seule action serveur doit permettre de :
+
+1. recalculer les prix depuis le catalogue ;
+2. revérifier le stock ;
+3. verrouiller les quantités nécessaires ;
+4. créer la vente ;
+5. enregistrer le paiement ;
+6. créer l'entrée de trésorerie avec source `Boutique` ;
+7. créer les mouvements de sortie de stock ;
+8. générer le reçu ;
+9. enregistrer l'auteur et l'annexe ;
+10. positionner la commande dans son nouvel état.
+
+Si une étape critique échoue, la transaction complète doit être annulée.
+
+Il ne doit jamais être possible d'obtenir :
+
+* paiement sans vente ;
+* vente payée sans écriture de caisse ;
+* double encaissement ;
+* double sortie de stock ;
+* stock négatif à cause de deux ventes simultanées ;
+* reçu sans transaction financière correspondante.
+
+---
+
+## 5. Différencier « paiement » et « remise de l'article »
+
+Ne pas confondre les deux événements.
+
+Une commande peut être :
+
+**Créée → En attente de paiement → Payée → À préparer → Prête → Remise**
+
+Le paiement constate l'argent.
+
+La remise constate que le client a effectivement reçu les articles.
+
+Une vente payée doit donc apparaître immédiatement dans la trésorerie même si la blouse ou la tenue n'a pas encore été remise.
+
+Cela permet aussi de retrouver facilement :
+
+> « Cette personne a payé mais n'a pas encore récupéré sa tenue. »
+
+---
+
+## 6. Client étudiant ou client libre
+
+Prévoir deux cas.
+
+### Étudiant
+
+Recherche par :
+
+* matricule ;
+* nom ;
+* téléphone si disponible.
+
+La vente est alors rattachée à son dossier.
+
+### Client libre
+
+Permettre une vente sans dossier étudiant lorsque l'activité l'autorise.
+
+Conserver au minimum les informations nécessaires à la traçabilité et au reçu.
+
+Ne jamais créer artificiellement un compte étudiant pour effectuer une vente Boutique.
+
+---
+
+## 7. Pilotage rapide
+
+Ne pas surcharger Boutique avec un deuxième dashboard.
+
+Afficher seulement quelques informations actionnables :
+
+**Aujourd'hui**
+
+* montant vendu ;
+* nombre de ventes ;
+* commandes à préparer ;
+* commandes prêtes à remettre ;
+* articles en stock faible.
+
+Chaque indicateur doit ouvrir directement la liste correspondante.
+
+Exemple :
+
+**5 à remettre → clic → Commandes > À remettre**
+
+---
+
+## 8. Lien avec la clôture mensuelle
+
+La Boutique doit automatiquement alimenter le reporting financier.
+
+À la clôture du mois, la Gestionnaire doit pouvoir retrouver :
+
+* chiffre d'affaires Boutique ;
+* ventes par catégorie/article ;
+* espèces réellement encaissées ;
+* autres moyens de paiement lorsqu'ils seront activés ;
+* mouvements de stock ;
+* stock restant ;
+* ajustements ;
+* éventuelles anomalies.
+
+Ces montants doivent provenir des transactions réelles.
+
+**Ne jamais demander à la Gestionnaire de ressaisir le chiffre Boutique dans le rapport mensuel.**
+
+---
+
+## 9. UX attendue
+
+Le principe doit être :
+
+**moins de navigation, moins de clics, plus d'automatisation.**
+
+Utiliser les composants existants du dashboard :
+
+* navigation HTMX ;
+* tables ;
+* drawers ;
+* recherche ;
+* filtres ;
+* confirmations ;
+* composants UI certifiés.
+
+Ne pas créer de nouvelles pages ou modales lorsqu'un composant existant répond déjà au besoin.
+
+Les actions normales doivent rester instantanées et naturelles. Les confirmations fortes sont réservées aux opérations financières sensibles, corrections et annulations.
+
+---
+
+## 10. Travail demandé
+
+Ne pas reconstruire Boutique.
+
+Faire d'abord un audit du code actuel et classer chaque élément en :
+
+**CONSERVER / CORRIGER / CONNECTER / MANQUANT**
+
+Puis peaufiner progressivement :
+
+1. navigation et sous-sections ;
+2. poste `Vendre` ;
+3. workflow de paiement espèces ;
+4. liaison automatique Boutique → Trésorerie ;
+5. workflow préparation/remise ;
+6. stock ;
+7. journal et contrôle ;
+8. intégration au rapport/clôture mensuelle.
+
+Priorité absolue : **une vente en espèces doit pouvoir être réalisée rapidement, une seule fois, et produire automatiquement toutes les conséquences financières, commerciales et de stock nécessaires.**
+
+
+
+# COMPLÉMENT BOUTIQUE — COMMANDE À DISTANCE ET OTP E-MAIL
+
+Le fonctionnement actuel commence à être correct. **Ne pas reconstruire le workflow Boutique existant.** Il faut maintenant ajouter un parcours parallèle permettant à un étudiant de commander depuis son dashboard même lorsque la Gestionnaire n'est pas disponible.
+
+## Objectif
+
+Actuellement, le système de validation dépend d'un code associé à la Gestionnaire. C'est acceptable au comptoir, mais bloquant pour un étudiant qui commande depuis chez lui, notamment le soir ou la nuit.
+
+Pour la **Boutique uniquement**, ajouter un second mécanisme OTP envoyé automatiquement à l'adresse e-mail du compte étudiant.
+
+Ce nouveau mécanisme ne remplace pas le système existant et ne doit surtout pas modifier le workflow des inscriptions.
+
+---
+
+## 1. Parcours étudiant à distance
+
+Depuis la vitrine Boutique :
+
+1. l'étudiant sélectionne l'article ;
+2. choisit la quantité ;
+3. le serveur recalcule le montant réel ;
+4. sélectionne le paiement en espèces ;
+5. renseigne/sélectionne l'agent ou la Gestionnaire concernée si le workflow actuel l'exige ;
+6. le système récupère automatiquement l'adresse e-mail vérifiée de l'étudiant connecté ;
+7. un OTP Boutique temporaire est généré ;
+8. l'OTP est envoyé automatiquement par e-mail ;
+9. l'étudiant saisit l'OTP ;
+10. après validation, la commande est créée.
+
+**Ne plus demander à l'étudiant de saisir lui-même le montant à payer.**
+
+Le montant provient exclusivement de :
+
+`prix serveur × quantité`
+
+L'interface affiche simplement le total.
+
+---
+
+## 2. Attention : OTP ≠ paiement
+
+C'est une règle métier importante.
+
+La validation de l'OTP signifie :
+
+> « Cette commande a bien été initiée/confirmée par cet étudiant. »
+
+Elle ne signifie PAS :
+
+> « L'argent a été encaissé. »
+
+Après OTP valide :
+
+**COMMANDE CONFIRMÉE — EN ATTENTE DE PAIEMENT**
+
+À ce stade :
+
+* aucune entrée définitive en caisse ;
+* aucun paiement marqué comme encaissé ;
+* aucun reçu définitif de paiement ;
+* aucun chiffre d'affaires encaissé.
+
+Le système génère plutôt une **référence unique de commande**.
+
+---
+
+## 3. Confirmation envoyée à l'étudiant
+
+Après création, envoyer automatiquement un e-mail contenant :
+
+* référence de commande ;
+* articles ;
+* quantités ;
+* montant à payer ;
+* annexe concernée ;
+* statut : `En attente de paiement` ;
+* instructions pour venir régler/récupérer la commande.
+
+Cette confirmation constitue une **preuve de commande**, pas un reçu de paiement.
+
+La référence doit également rester visible dans le dashboard étudiant.
+
+---
+
+## 4. Arrivée de la commande chez la Gestionnaire
+
+La commande apparaît automatiquement dans :
+
+**Boutique > Commandes > À encaisser**
+
+La Gestionnaire doit immédiatement voir :
+
+* référence ;
+* étudiant ;
+* articles ;
+* montant ;
+* date/heure ;
+* statut ;
+* ancienneté de la commande.
+
+Elle peut rechercher directement une commande par :
+
+* référence ;
+* matricule ;
+* nom de l'étudiant.
+
+Ainsi, lorsque l'étudiant arrive avec sa référence, la Gestionnaire retrouve immédiatement la transaction.
+
+---
+
+## 5. Encaissement physique
+
+Lorsque l'étudiant remet réellement les espèces :
+
+La Gestionnaire ouvre la commande et clique sur :
+
+**« Confirmer l'encaissement »**
+
+C'est seulement à cet instant que le workflow financier doit être exécuté.
+
+Le serveur doit alors, dans une transaction atomique :
+
+1. revérifier la commande ;
+2. revérifier le prix applicable ;
+3. contrôler l'état du stock ;
+4. empêcher un double paiement ;
+5. créer le paiement espèces ;
+6. enregistrer la Gestionnaire ayant reçu l'argent ;
+7. créer l'entrée dans la trésorerie de l'annexe avec source `Boutique` ;
+8. créer les mouvements de stock nécessaires ;
+9. générer le reçu définitif ;
+10. faire évoluer la commande vers `PAYÉ / À PRÉPARER`.
+
+Ensuite :
+
+**À préparer → Prête → Remise**
+
+---
+
+## 6. Gestion du stock pendant l'attente
+
+Attention aux commandes passées la nuit.
+
+Une commande non payée ne doit pas provoquer une sortie définitive de stock.
+
+Analyser le système existant et choisir proprement entre :
+
+* absence de réservation avant paiement ;
+* ou réservation temporaire avec expiration.
+
+Pour la V1, privilégier la solution la plus simple et fiable compatible avec l'architecture actuelle.
+
+Dans tous les cas, **la sortie comptable définitive du stock intervient lors de la validation réelle de la vente**, pas simplement après l'OTP.
+
+---
+
+## 7. Expiration OTP et commandes abandonnées
+
+L'OTP doit :
+
+* avoir une durée de validité limitée ;
+* être utilisable une seule fois ;
+* être lié à l'étudiant et à la tentative de commande ;
+* avoir une limitation de tentatives ;
+* pouvoir être renvoyé avec rate limiting.
+
+Une commande non payée depuis longtemps doit pouvoir passer dans un état :
+
+`EXPIRÉE` ou `ANNULÉE`
+
+Ne pas supprimer physiquement son historique.
+
+La Gestionnaire peut annuler une commande non payée lorsque cela est autorisé, mais une vente déjà encaissée ne doit jamais être « supprimée » de cette manière.
+
+---
+
+## 8. Notifications Gestionnaire
+
+Les commandes créées à distance doivent alimenter le compteur existant de la Boutique :
+
+**X commandes à encaisser**
+
+Pas besoin de créer un deuxième système de notifications si le dashboard possède déjà le mécanisme nécessaire.
+
+Une action peut également permettre à la Gestionnaire de rappeler à l'étudiant qu'une commande est disponible/en attente, en réutilisant la messagerie ou le système de notification existant.
+
+---
+
+## 9. Important : ne pas toucher aux inscriptions
+
+Ce mécanisme est **strictement Boutique**.
+
+Ne pas modifier :
+
+* OTP des inscriptions ;
+* validation Gestionnaire existante ;
+* workflow Admissions ;
+* paiements d'inscription ;
+* autorisations financières déjà sécurisées.
+
+Créer un service OTP Boutique distinct ou réutiliser proprement l'infrastructure OTP existante avec un `purpose` explicite du type :
+
+`SHOP_ORDER_CONFIRMATION`
+
+afin qu'un OTP Boutique ne puisse jamais être accepté pour une inscription ou une autre opération sensible.
+
+---
+
+## 10. Résultat attendu
+
+Il doit finalement exister deux scénarios simples :
+
+### Achat au comptoir
+
+Étudiant présent → commande → espèces reçues → Gestionnaire confirme → caisse + stock + reçu → préparation/remise.
+
+### Achat à distance
+
+Étudiant connecté → commande → OTP reçu par e-mail → OTP validé → référence générée → `À encaisser` → étudiant vient avec sa référence → Gestionnaire reçoit les espèces → confirme l'encaissement → caisse + stock + reçu → préparation/remise.
+
+**L'objectif est de rendre la création de commande disponible 24h/24 sans permettre à un étudiant de déclarer lui-même qu'un paiement en espèces a été effectué.**
+
+Avant de coder, auditer le workflow Boutique/OTP existant et réutiliser au maximum les modèles, services d'e-mail, permissions, composants HTMX et mécanismes de validation déjà présents.

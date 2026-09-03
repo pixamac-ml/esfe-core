@@ -208,6 +208,38 @@ class ShopCashPaymentSession(models.Model):
         return f"Session cash boutique {self.order.reference or self.order_id}"
 
 
+class ShopOrderEmailConfirmation(models.Model):
+    """Temporary, email-confirmed intent. It never represents a payment."""
+
+    STATUS_PENDING = "pending"
+    STATUS_CONFIRMED = "confirmed"
+    STATUS_EXPIRED = "expired"
+    STATUS_CANCELLED = "cancelled"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "En attente de confirmation"),
+        (STATUS_CONFIRMED, "Confirmee"),
+        (STATUS_EXPIRED, "Expiree"),
+        (STATUS_CANCELLED, "Annulee"),
+    ]
+
+    branch = models.ForeignKey(Branch, on_delete=models.PROTECT, related_name="shop_order_email_confirmations")
+    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="shop_order_email_confirmations")
+    product = models.ForeignKey(ShopProduct, on_delete=models.PROTECT, related_name="email_order_confirmations")
+    quantity = models.PositiveIntegerField()
+    otp_code_hash = models.CharField(max_length=256)
+    expires_at = models.DateTimeField(db_index=True)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    resend_count = models.PositiveSmallIntegerField(default=0)
+    last_sent_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
+    order = models.OneToOneField("ShopOrder", null=True, blank=True, on_delete=models.PROTECT, related_name="email_confirmation")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["student", "status", "expires_at"], name="shop_shopor_student_535be3_idx")]
+
+
 class ShopOrderItem(models.Model):
     order = models.ForeignKey(ShopOrder, on_delete=models.CASCADE, related_name="items")
     product = models.ForeignKey(ShopProduct, on_delete=models.PROTECT, related_name="order_items")

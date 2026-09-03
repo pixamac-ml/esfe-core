@@ -2,6 +2,7 @@ import json
 from calendar import monthrange
 from datetime import date
 
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Sum
 from django.http import HttpRequest, HttpResponse
@@ -15,12 +16,18 @@ from accounts.services.accounting_documents import (
     create_cash_movement,
     ensure_expense_reference,
 )
+from accounts.services.financial_integrity import assert_financial_period_open
 from accounts.services.manager_intelligence import (
     branch_financial_orphan_report,
     get_branch_cash_balance,
     lock_branch_cash_balance,
     sync_bank_transfer_cash_movement,
     sync_donation_cash_movement,
+)
+from accounts.services.wallets import (
+    configured_wallet_for_category,
+    consume_wallet_for_cash_movement,
+    wallet_balance,
 )
 
 from accounts.dashboards.htmx_utils import (
@@ -44,6 +51,10 @@ def expense_create(request: HttpRequest) -> HttpResponse:
         response.status_code = 400
         return response
 
+    try:
+        assert_financial_period_open(request.branch, form.cleaned_data["expense_date"])
+    except ValidationError as exc:
+        return HttpResponse(" ".join(exc.messages), status=400)
     expense = form.save(commit=False)
     expense.branch = request.branch
     expense.created_by = request.user
@@ -87,6 +98,10 @@ def expense_pay(request: HttpRequest, pk: int) -> HttpResponse:
             pk=pk,
             branch=request.branch,
         )
+        try:
+            assert_financial_period_open(request.branch, expense.expense_date)
+        except ValidationError as exc:
+            return HttpResponse(" ".join(exc.messages), status=400)
         if not expense.can_be_paid:
             return HttpResponse("Cette depense doit etre approuvee avant paiement.", status=400)
         if expense.amount > available_cash:
@@ -98,12 +113,22 @@ def expense_pay(request: HttpRequest, pk: int) -> HttpResponse:
                 ),
                 status=400,
             )
+        expense_wallet = configured_wallet_for_category(request.branch, "expense")
+        if expense_wallet and expense.amount > wallet_balance(expense_wallet):
+            return HttpResponse(
+                (
+                    "<div class='rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700'>"
+                    f"La mini-caisse Dépenses est insuffisante. Disponible : {wallet_balance(expense_wallet)} FCFA."
+                    "</div>"
+                ),
+                status=400,
+            )
         expense.status = BranchExpense.STATUS_PAID
         expense.paid_by = request.user
         expense.paid_at = timezone.now()
         expense.save(update_fields=["status", "paid_by", "paid_at", "updated_at"])
         ensure_expense_reference(expense)
-        create_cash_movement(
+        cash_movement = create_cash_movement(
             branch=request.branch,
             movement_type=BranchCashMovement.TYPE_OUT,
             source=BranchCashMovement.SOURCE_EXPENSE,
@@ -115,6 +140,14 @@ def expense_pay(request: HttpRequest, pk: int) -> HttpResponse:
             notes=expense.notes,
             created_by=request.user,
         )
+        if expense_wallet:
+            consume_wallet_for_cash_movement(
+                wallet=expense_wallet,
+                cash_movement=cash_movement,
+                actor=request.user,
+                label="Paiement de dépense",
+                notes=expense.reference,
+            )
     response = manager_section_redirect_response("depenses")
     response["HX-Trigger"] = json.dumps({"cashBalanceUpdated": True, "dashboardStatsUpdated": True})
     return response

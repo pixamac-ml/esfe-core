@@ -1,0 +1,22 @@
+{% load component_tags %}
+<div class="space-y-5">
+  {% if toast %}{% component "ui_core.alert" title="Copies et correction" message=toast.message tone=toast.level %}{% endcomponent %}{% endif %}
+  {% if not selected_evaluation_campaign %}
+    {% component "ui_core.empty_state" title="Choisissez d'abord une campagne" message="Le suivi des copies est organisé automatiquement épreuve par épreuve." icon="folder-search" %}{% endcomponent %}
+  {% else %}
+    {% component "ui_core.panel" title="Suivi des copies" subtitle="Le nombre prévu provient des inscriptions actives. Ajustez-le uniquement s'il y a une exception." tone="primary" padding=False %}
+      <div class="divide-y divide-ui-border">
+      {% for event in selected_evaluation_campaign.schedule_events.all %}
+        <form method="post" enctype="multipart/form-data" hx-post="{% url 'accounts_portal:director_exam_session_action' %}" hx-target="#director-session-subcontent" hx-swap="innerHTML" hx-encoding="multipart/form-data" class="grid gap-3 p-4 lg:grid-cols-[minmax(15rem,1fr)_8rem_8rem_minmax(11rem,1fr)_auto] lg:items-end">
+          {% csrf_token %}<input type="hidden" name="action" value="update_script_batch"><input type="hidden" name="return_view" value="copies"><input type="hidden" name="campaign_id" value="{{ selected_evaluation_campaign.id }}"><input type="hidden" name="event_id" value="{{ event.id }}">
+          <div><strong class="block text-sm text-ui-text">{{ event.academic_class.display_name }} · {{ event.ec.title }}</strong><span class="text-xs text-ui-text-muted">{{ event.start_datetime|date:"d/m/Y H:i" }} · {{ event.script_batch.get_status_display|default:"À préparer" }}</span></div>
+          <label class="text-xs font-semibold text-ui-text">Prévues<input name="expected_count" type="number" min="0" value="{{ event.script_batch.expected_count|default:0 }}" class="mt-1 h-ui-control w-full rounded-ui-input border border-ui-border px-3 text-sm"></label>
+          <label class="text-xs font-semibold text-ui-text">Reçues<input name="received_count" type="number" min="0" value="{{ event.script_batch.received_count|default:0 }}" class="mt-1 h-ui-control w-full rounded-ui-input border border-ui-border px-3 text-sm"></label>
+          <label class="text-xs font-semibold text-ui-text">Étape<select name="script_status" class="mt-1 h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm">{% for value,label in script_batch_status_choices %}<option value="{{ value }}" {% if event.script_batch.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+          <button class="ui-focus-ring h-ui-control rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary">Mettre à jour</button>
+        </form>
+      {% empty %}<div class="p-5 text-sm text-ui-text-muted">Aucune épreuve planifiée pour cette campagne.</div>{% endfor %}
+      </div>
+    {% endcomponent %}
+  {% endif %}
+</div>

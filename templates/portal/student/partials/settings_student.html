@@ -41,6 +41,9 @@
       {% endfor %}
     </div>
   {% endif %}
+  {% if is_historical_context %}
+    <div class="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-800">Vous consultez une annee historique : les informations du dossier et les documents sont en lecture seule.</div>
+  {% endif %}
 
   <section x-show="tab === 'profile'" x-cloak class="rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] p-4">
     <div class="mb-4">
@@ -49,22 +52,23 @@
     </div>
     <form hx-post="{% url 'portal_student:update_settings_profile' %}" hx-target="#settings" hx-swap="innerHTML" hx-disabled-elt="find button" class="grid gap-4">
       {% csrf_token %}
+      <input type="hidden" name="academic_year_id" value="{{ selected_academic_year_id|default_if_none:'' }}">
       <div class="grid gap-3 md:grid-cols-2">
         {% component "info_field" label="Nom complet" value=readonly_fields.full_name %}{% endcomponent %}
         {% component "info_field" label="Matricule" value=readonly_fields.matricule %}{% endcomponent %}
         <label class="grid gap-2">
           <span class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Email</span>
-          <input type="email" name="email" value="{{ editable_fields.email }}" class="h-11 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 text-sm text-[color:var(--text)] outline-none">
+          <input type="email" name="email" value="{{ editable_fields.email }}" {% if is_historical_context %}readonly{% endif %} class="h-11 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 text-sm text-[color:var(--text)] outline-none">
         </label>
         <label class="grid gap-2">
           <span class="text-[11px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Telephone</span>
-          <input type="text" name="phone" value="{{ editable_fields.phone }}" class="h-11 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 text-sm text-[color:var(--text)] outline-none">
+          <input type="text" name="phone" value="{{ editable_fields.phone }}" {% if is_historical_context %}readonly{% endif %} class="h-11 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 text-sm text-[color:var(--text)] outline-none">
         </label>
         {% component "info_field" label="Date de naissance" value=readonly_fields.birth_date %}{% endcomponent %}
         {% component "info_field" label="Lieu de naissance" value=readonly_fields.birth_place %}{% endcomponent %}
       </div>
       <div class="flex justify-end">
-        <button type="submit" class="inline-flex items-center rounded-lg bg-[color:var(--school-primary)] px-4 py-2.5 text-sm font-bold text-white">Mettre a jour</button>
+        <button type="submit" {% if is_historical_context %}disabled{% endif %} class="inline-flex items-center rounded-lg bg-[color:var(--school-primary)] px-4 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60">Mettre a jour</button>
       </div>
     </form>
   </section>
@@ -107,12 +111,13 @@
           </div>
           <form hx-post="{% url 'portal_student:upload_settings_document' %}" hx-target="#settings" hx-swap="innerHTML" hx-encoding="multipart/form-data" hx-disabled-elt="find button" class="mt-3 flex flex-wrap items-center gap-3">
             {% csrf_token %}
+            <input type="hidden" name="academic_year_id" value="{{ selected_academic_year_id|default_if_none:'' }}">
             <input type="hidden" name="document_type_id" value="{{ document.id }}">
-            <input type="file" name="file" class="block text-sm text-[color:var(--muted)]" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.ppt,.pptx">
+            <input type="file" name="file" {% if is_historical_context %}disabled{% endif %} class="block text-sm text-[color:var(--muted)]" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.ppt,.pptx">
             {% if document.file_url %}
               <a href="{{ document.file_url }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center rounded-lg border border-[color:var(--line)] bg-white px-3 py-2 text-sm font-semibold text-[color:var(--text)]">Consulter</a>
             {% endif %}
-            <button type="submit" class="inline-flex items-center rounded-lg bg-[color:var(--school-primary)] px-3 py-2 text-sm font-bold text-white">Televerser</button>
+            <button type="submit" {% if is_historical_context %}disabled{% endif %} class="inline-flex items-center rounded-lg bg-[color:var(--school-primary)] px-3 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60">Televerser</button>
           </form>
         </article>
       {% empty %}
@@ -150,6 +155,7 @@
         </div>
         <form hx-post="{% url 'portal_student:update_settings_account' %}" hx-target="#settings" hx-swap="innerHTML" hx-disabled-elt="find button" class="grid gap-4">
           {% csrf_token %}
+          <input type="hidden" name="academic_year_id" value="{{ selected_academic_year_id|default_if_none:'' }}">
           <div class="grid gap-3 md:grid-cols-2">
             {% component "info_field" label="Identite" value=account_center.full_name %}{% endcomponent %}
             {% component "info_field" label="Email compte" value=account_center.email %}{% endcomponent %}
@@ -179,6 +185,7 @@
         </div>
         <form hx-post="{% url 'portal_student:update_settings_password' %}" hx-target="#settings" hx-swap="innerHTML" hx-disabled-elt="find button" class="grid gap-3">
           {% csrf_token %}
+          <input type="hidden" name="academic_year_id" value="{{ selected_academic_year_id|default_if_none:'' }}">
           <input type="password" name="old_password" placeholder="Mot de passe actuel" autocomplete="current-password" class="h-11 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 text-sm outline-none">
           <input type="password" name="new_password" placeholder="Nouveau mot de passe" autocomplete="new-password" class="h-11 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 text-sm outline-none">
           <input type="password" name="confirm_password" placeholder="Confirmer le nouveau mot de passe" autocomplete="new-password" class="h-11 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] px-3 text-sm outline-none">
@@ -197,6 +204,7 @@
       </div>
       <form hx-post="{% url 'portal_student:update_settings_preferences' %}" hx-target="#settings" hx-swap="innerHTML" hx-disabled-elt="find button" class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {% csrf_token %}
+        <input type="hidden" name="academic_year_id" value="{{ selected_academic_year_id|default_if_none:'' }}">
         <label class="flex items-center justify-between gap-3 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3 text-sm font-bold text-[color:var(--text)]">Email <input type="checkbox" name="notify_email" {% if account_center.notify_email %}checked{% endif %}></label>
         <label class="flex items-center justify-between gap-3 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3 text-sm font-bold text-[color:var(--text)]">Plateforme <input type="checkbox" name="notify_in_app" {% if account_center.notify_in_app %}checked{% endif %}></label>
         <label class="flex items-center justify-between gap-3 rounded-lg border border-[color:var(--line)] bg-[color:var(--card-soft)] p-3 text-sm font-bold text-[color:var(--text)]">SMS <input type="checkbox" name="notify_sms" {% if account_center.notify_sms %}checked{% endif %}></label>

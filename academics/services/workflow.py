@@ -16,6 +16,11 @@ def get_semester_permissions(semester):
 
 
 def can_publish_semester(semester, enrollment_list):
+    # A complete grid is necessary but not sufficient: the IT operator must
+    # explicitly close the technical session and transmit it to the DE.
+    if semester.status != Semester.STATUS_READY_FOR_DIRECTOR:
+        return False
+
     configured_credits = sum(
         (
             Decimal(str(value or 0))

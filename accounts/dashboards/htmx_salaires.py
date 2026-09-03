@@ -8,8 +8,10 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from accounts.forms import PayrollEntryForm
-from accounts.models import BranchCashMovement, PayrollEntry, SensitiveActionRequest
+from accounts.models import BranchCashMovement, PayrollEntry, SensitiveActionRequest, PaymentSignatureSession
 from accounts.services.accounting_documents import create_cash_movement
+from accounts.services.financial_integrity import assert_financial_period_open
+from accounts.services.wallets import configured_wallet_for_category, consume_wallet_for_cash_movement, wallet_balance
 from accounts.services.manager_intelligence import (
     get_branch_cash_balance,
     lock_branch_cash_balance,
@@ -31,9 +33,20 @@ from accounts.dashboards.htmx_utils import (
     manager_salary_redirect_response,
     manager_section_notice_redirect_response,
 )
+from accounts.dashboards.htmx_payment_signatures import payment_signature_start
 
 
 PAYROLL_EDITABLE_FIELDS = ["base_salary", "allowances", "deductions", "advances", "notes"]
+
+
+def _payroll_withdrawal_documents(branch, payroll_entry):
+    if not payroll_entry:
+        return ()
+    return BranchCashMovement.objects.filter(
+        branch=branch,
+        source=BranchCashMovement.SOURCE_PAYROLL,
+        source_reference__startswith=f"PAYROLL-{payroll_entry.pk}-",
+    ).order_by("-created_at")
 
 
 @manager_required
@@ -65,6 +78,8 @@ def salary_detail(request: HttpRequest, pk: int) -> HttpResponse:
             "payroll_form": form,
             "payroll_month": payroll_month,
             "available_cash_balance": get_branch_cash_balance(request.branch),
+            "withdrawal_documents": _payroll_withdrawal_documents(request.branch, payroll_entry),
+            "payment_signature_session": _active_salary_signature(payroll_entry),
         },
     )
 
@@ -74,6 +89,10 @@ def salary_detail(request: HttpRequest, pk: int) -> HttpResponse:
 def salary_upsert(request: HttpRequest, pk: int) -> HttpResponse:
     profile = get_branch_staff_profile(request.branch, pk)
     payroll_month = get_salary_period_from_request(request)
+    try:
+        assert_financial_period_open(request.branch, payroll_month)
+    except ValidationError as exc:
+        return HttpResponse(" ".join(exc.messages), status=400)
     payroll_entry = (
         PayrollEntry.objects
         .filter(
@@ -134,9 +153,21 @@ def _payroll_modal_context(profile, payroll_entry, form, payroll_month, **extra)
         "payroll_form": form,
         "payroll_month": payroll_month,
         "available_cash_balance": get_branch_cash_balance(profile.branch),
+        "withdrawal_documents": _payroll_withdrawal_documents(profile.branch, payroll_entry),
+        "payment_signature_session": _active_salary_signature(payroll_entry),
     }
     context.update(extra)
     return context
+
+
+def _active_salary_signature(entry):
+    if not entry:
+        return None
+    return PaymentSignatureSession.objects.filter(
+        payroll_entry=entry,
+        status__in=PaymentSignatureSession.ACTIVE_STATUSES,
+        expires_at__gt=timezone.now(),
+    ).order_by("-created_at").first()
 
 
 def _salary_request_correction_otp(request, profile, payroll_entry, form, payroll_month):
@@ -188,8 +219,7 @@ def _salary_request_correction_otp(request, profile, payroll_entry, form, payrol
         "accounts/dashboard/partials/payroll_modal.html",
         _payroll_modal_context(
             profile, payroll_entry, form, payroll_month,
-            otp_request_id=otp_request.pk,
-            otp_validity_minutes=SensitiveActionRequest.OTP_VALIDITY_MINUTES,
+            approval_pending=True,
         ),
     )
     response["HX-Trigger"] = json.dumps({
@@ -266,56 +296,7 @@ def salary_correct_confirm_otp(request: HttpRequest, pk: int) -> HttpResponse:
 @manager_required
 @require_POST
 def salary_pay(request: HttpRequest, pk: int) -> HttpResponse:
-    raw_amount = (request.POST.get("payment_amount") or "").strip()
-    try:
-        payment_amount = int(raw_amount)
-    except (TypeError, ValueError):
-        payment_amount = 0
-    if payment_amount <= 0:
-        return HttpResponse(
-            "<div class='rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>Montant de paiement invalide.</div>",
-            status=400,
-        )
-    with transaction.atomic():
-        _locked_branch, available_cash = lock_branch_cash_balance(request.branch)
-        payroll_entry = get_object_or_404(
-            PayrollEntry.objects.select_for_update().select_related(
-                "employee", "employee__profile", "branch"
-            ),
-            pk=pk,
-            branch=request.branch,
-        )
-        if payment_amount > payroll_entry.remaining_salary:
-            return HttpResponse(
-                "<div class='rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>Le montant depasse le reste a payer sur cette paie.</div>",
-                status=400,
-            )
-        if payment_amount > available_cash:
-            return HttpResponse(
-                (
-                    "<div class='rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700'>"
-                    f"Caisse insuffisante pour ce paiement. Disponible: {available_cash} FCFA."
-                    "</div>"
-                ),
-                status=400,
-            )
-
-        payroll_entry.paid_amount += payment_amount
-        payroll_entry.updated_by = request.user
-        payroll_entry.save()
-        create_cash_movement(
-            branch=request.branch,
-            movement_type=BranchCashMovement.TYPE_OUT,
-            source=BranchCashMovement.SOURCE_PAYROLL,
-            amount=payment_amount,
-            label=f"Salaire - {payroll_entry.employee.get_full_name() or payroll_entry.employee.username}",
-            movement_date=timezone.localdate(),
-            source_reference=payroll_cash_reference(payroll_entry, payroll_entry.paid_amount),
-            notes=f"Paiement salaire {payroll_entry.period_month:%Y-%m}.",
-            created_by=request.user,
-        )
-
-    return manager_salary_redirect_response(payroll_entry.period_month)
+    return payment_signature_start(request, PaymentSignatureSession.TYPE_PAYROLL, pk)
 
 
 @manager_required
@@ -323,6 +304,11 @@ def salary_pay(request: HttpRequest, pk: int) -> HttpResponse:
 def salary_advance(request: HttpRequest, pk: int) -> HttpResponse:
     profile = get_branch_staff_profile(request.branch, pk)
     payroll_month = get_salary_period_from_request(request)
+    try:
+        assert_financial_period_open(request.branch, payroll_month)
+        assert_financial_period_open(request.branch, timezone.localdate())
+    except ValidationError as exc:
+        return HttpResponse(" ".join(exc.messages), status=400)
     payroll_entry = (
         PayrollEntry.objects
         .filter(
@@ -406,10 +392,15 @@ def salary_advance(request: HttpRequest, pk: int) -> HttpResponse:
 @require_POST
 def salary_prepare_all(request: HttpRequest) -> HttpResponse:
     payroll_month = get_salary_period_from_request(request)
+    try:
+        assert_financial_period_open(request.branch, payroll_month)
+    except ValidationError as exc:
+        return HttpResponse(" ".join(exc.messages), status=400)
     result = prepare_missing_payroll_entries(request.branch, payroll_month, request.user)
     return manager_section_notice_redirect_response(
         "salaires",
         f"paies_preparees_{result['created']}",
+        salary_month=payroll_month.strftime("%Y-%m"),
     )
 
 
@@ -417,8 +408,13 @@ def salary_prepare_all(request: HttpRequest) -> HttpResponse:
 @require_POST
 def salary_pay_ready_all(request: HttpRequest) -> HttpResponse:
     payroll_month = get_salary_period_from_request(request)
+    try:
+        assert_financial_period_open(request.branch, payroll_month)
+    except ValidationError as exc:
+        return HttpResponse(" ".join(exc.messages), status=400)
     result = mark_ready_payroll_entries_available(request.branch, payroll_month, request.user)
     return manager_section_notice_redirect_response(
         "salaires",
         f"salaires_disponibles_{result['notified_count']}",
+        salary_month=payroll_month.strftime("%Y-%m"),
     )

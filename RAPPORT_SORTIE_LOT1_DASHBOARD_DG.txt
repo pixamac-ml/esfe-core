@@ -1,0 +1,212 @@
+RAPPORT DE SORTIE — LOT 1
+Dashboard Direction générale ESFE
+Date : 29 août 2026
+
+A. RÉSULTAT FONCTIONNEL
+
+Le dashboard DG est désormais structuré comme un cockpit de commandement :
+
+- navigation principale par domaines métier ;
+- sous-navigation persistante dans le workspace ;
+- URLs reproductibles avec domaine, sous-section, année, annexe et filtres utiles ;
+- cockpit d’accueil hiérarchisé : contexte, quatre KPI fiables, « À votre attention »,
+  comparaison des annexes, activité récente et repères de décision ;
+- drill-down vers la section métier concernée, une annexe ou un drawer de détail ;
+- une navigation HTMX sérialisée : une réponse ancienne ne peut plus écraser une
+  navigation plus récente.
+
+B. ARCHITECTURE DE NAVIGATION
+
+La sidebar est organisée pour une lecture de DG, en trois blocs :
+
+- Commandement : Cockpit DG ;
+- Pilotage institutionnel : Annexes, Finance, Académique, Étudiants, Personnel ;
+- Gouvernance : Analyses & rapports, Activité récente.
+
+Les badges ne sont affichés que sur des actions opérationnelles réelles : alertes
+ouvertes (Annexes), paiements en attente (Finance) et décisions de passage à traiter
+(Étudiants). Les sous-sections sont persistantes dans le workspace : Annexes > Vue
+consolidée/Alertes, Finance > Synthèse/Coupons, Gouvernance > Analyses/Activité.
+
+Les sous-sections n’ayant pas encore de données ou de workflow DG réel ne sont pas
+affichées comme de faux écrans. Documents & Direction, Audit & Contrôle complet et
+Paramètres DG restent hors de ce lot ; l’Audit transverse demeure explicitement Lot 2.
+
+Le composant UI Core existant « tabs » est réemployé pour la sous-navigation. Sa
+présentation défile horizontalement à faible largeur, conserve les liens natifs pour
+le fallback sans JavaScript et reste utilisable au clavier.
+
+C. COCKPIT
+
+Le cockpit Overview contient :
+
+1. le contexte actif : année académique, portée établissement/annexe, fenêtre de
+   veille admissions (explicitement distincte des KPI annuels) et horodatage ;
+2. quatre KPI de premier niveau ;
+3. « À votre attention », limité à des signaux exécutifs avec destination métier ;
+4. une comparaison UI Core des annexes ;
+5. une activité récente synthétique ;
+6. les définitions de lecture des KPI affichés.
+
+Sources de l’activité récente : paiements validés et SupportAuditLog déjà existant,
+tous deux filtrés par annexe et, si choisie, par année académique. Ce flux est une
+lecture synthétique : il ne constitue pas une interface d’audit ou de preuve.
+
+D. KPI
+
+1. Étudiants actifs
+   - Définition : Student actif associé à une inscription du périmètre et de l’année.
+   - Source : students.Student + inscriptions.Inscription + admissions.Candidature.
+   - Formule : COUNT(Student, is_active=True), scope année/annexe.
+   - Unité : étudiants.
+
+2. Encaissements validés
+   - Définition : total des paiements validés.
+   - Source : payments.Payment.
+   - Formule : SUM(amount), status=validated, scope année/annexe.
+   - Unité : FCFA. Aucun pourcentage ni tendance non définie n’est affiché.
+
+3. Alertes ouvertes
+   - Définition : alertes d’assiduité non résolues.
+   - Source : students.AttendanceAlert.
+   - Formule : COUNT(is_resolved=False), scope année/annexe.
+   - Unité : alertes. Les cas étudiants critiques sont présentés dans « À votre attention ».
+
+4. Décisions à traiter
+   - Définition : décisions de passage non appliquées et non rejetées.
+   - Source : students.StudentYearDecision.
+   - Formule : COUNT(workflow_status non appliqué/non rejeté), scope année/annexe.
+   - Unité : dossiers.
+
+E. UI CORE
+
+Réutilisé : AppShell, Sidebar, Topbar, PageHeader, Tabs, Panel, StatCard, DataTable,
+StatusBadge, Timeline, EmptyState, LoadingOverlay, Drawer et Modal.
+
+Amélioré :
+
+- le loader du shell certifié utilise maintenant LoadingOverlay UI Core ;
+- StatCard expose un marqueur générique d’action, permettant au DG de conserver la
+  navigation AJAX sans imposer cette logique aux autres dashboards.
+
+Créé : aucun nouveau design system ni composant DG spécifique. La primitive Tabs
+existante répondait déjà au besoin de sous-navigation.
+
+F. LOADING
+
+Cause identifiée : le shell certifié affichait son loader, tandis que la page DG
+injectait un second overlay bloquant au chargement initial ; des clics rapides HTMX
+pouvaient en outre laisser une ancienne réponse remplacer la plus récente.
+
+Comportement final :
+
+- navigation de domaine ou de sous-section : seul le LoadingOverlay UI Core du
+  workspace est visible ;
+- overlay DG initial retiré ;
+- un identifiant _workspace_request sérialise les réponses HTMX ; une réponse devenue
+  obsolète est ignorée et ne cache pas le loader de la requête active ;
+- drawer et modal n’activent pas le loader du workspace ;
+- action locale : seul son bouton peut indiquer « Traitement… ».
+
+Le spinner encore présent dans le formulaire de préparation de diplôme est local à
+ce bouton : il n’est pas un loader de navigation concurrent.
+
+G. URL / SESSION
+
+Contrat livré :
+
+  /portal/dg/?domain=finance&section=coupons&academic_year_id=…&scope_branch_id=…
+
+domain et section décrivent la destination. Les anciennes URLs ne contenant que
+section restent compatibles : le domaine est déduit côté serveur. La session ne
+mémorise que le confort de contexte (année / annexe) ; elle n’est pas la vérité de
+navigation. Les liens du cockpit et des sous-sections préservent le contexte utile.
+
+H. PERFORMANCE
+
+Le cockpit utilise build_dg_overview_context(), distinct du méga-contexte historique.
+Il ne construit ni planning, ni analytics complet, ni détail RH au chargement de
+l’accueil. Il sépare : résumés d’annexes agrégés, finance légère, attention exécutive
+et activité récente.
+
+Mesure d’intégration verrouillée : 49 requêtes au maximum observé pour une requête
+cockpit complète de test, authentification/session/contexte de portail/rendu inclus ;
+le test fixe un plafond de 50. Le budget de résumés d’annexes reste plafonné à 7
+requêtes, quel que soit le nombre d’annexes.
+
+I. SÉCURITÉ
+
+- Toute section inconnue est rejetée avant la construction du contexte (HTTP 400).
+- Les sélecteurs cockpit, alertes, activité et annexes utilisent resolve_dg_context()
+  et les querysets DG filtrés côté serveur par année et annexe.
+- Le lien « Basculer » d’une annexe est généré uniquement depuis une annexe déjà
+  autorisée par le contexte serveur ; la résolution serveur valide à nouveau l’ID.
+- Les drawers et actions sensibles conservent les contrôles de scope du Lot 0.
+
+J. LEGACY
+
+Les workspaces Finance, Annexes, Planning, Alertes, RH et Activité récente comportent
+encore du markup/CSS DG legacy. Ils sont désormais enveloppés par la navigation UI
+Core commune, mais leur migration visuelle complète reste progressive. Le fichier
+templates/portal/dg/dashboard.html est une ancienne surface non rendue par la route DG
+certifiée et n’a pas été supprimé afin de ne pas introduire de régression hors périmètre.
+
+K. TESTS
+
+Commandes vertes :
+
+python manage.py test --settings=config.settings_test_local portal.test_dg_lot0 portal.test_dg_context portal.test_dg_context_unit portal.test_dg_staff_lifecycle --keepdb -v 1
+Résultat : 29 tests OK.
+
+python manage.py test --settings=config.settings_test_local portal.test_certified_management_dashboards --keepdb -v 1
+Résultat : 2 tests OK.
+
+python manage.py check --settings=config.settings_test_local
+Résultat : OK.
+
+node --check static/src/js/portal/dg_dashboard.js
+node --check static/src/js/portal/certified_dashboard_shell.js
+Résultat : OK.
+
+Les tests ajoutés couvrent domaines/sous-sections, URL, rejet de section inconnue,
+cockpit, drill-down d’annexe, budget de requêtes et sérialisation des réponses.
+
+L. RECETTE MANUELLE
+
+À réaliser dans un navigateur avant mise en production :
+
+1. ouvrir DG puis Commandement > Vue d’ensemble ; vérifier un seul loader UI Core ;
+2. naviguer Finance > Synthèse > Coupons ; vérifier shell/sidebar/topbar stables ;
+3. ouvrir Annexes, Alertes, Personnel, Académique/Planning ; vérifier un seul loader ;
+4. cliquer rapidement entre Finance, Annexes et Planning ; la dernière demande seule
+   doit s’afficher ;
+5. changer d’annexe depuis le contexte puis via « Basculer » dans la comparaison ;
+6. vérifier URL directe, refresh, retour et forward navigateur ;
+7. ouvrir un drawer pendant une navigation et provoquer une erreur réseau si possible ;
+8. vérifier les tabs à 360 px, 768 px et 1440 px, puis Tab / Shift+Tab / Enter ;
+9. soumettre une action locale ; seul le bouton doit passer en traitement.
+
+Le code garantit le contrat et les tests de routes ; la validation visuelle 360/768/1440
+doit être effectuée sur les navigateurs cibles de l’établissement.
+
+M. RISQUES
+
+P0 : aucun risque bloquant identifié dans le périmètre LOT 1.
+
+P1 : les fragments métier legacy restent à migrer progressivement vers UI Core ; leur
+cohérence détaillée doit être testée avec les données de préproduction de chaque annexe.
+
+P2 : sans JavaScript, les liens de tabs et KPI restent des liens HTTP normaux, mais
+l’expérience de swap fluide et la protection de concurrence ne sont naturellement pas
+actives.
+
+N. GIT
+
+Découpage recommandé, sans commiter les autres travaux déjà présents :
+
+1. feat(dg): navigation métier, URL domain/section et cockpit ciblé ;
+2. fix(ui): contrat de loader unique et sérialisation HTMX du workspace ;
+3. test(dg): régressions Lot 1 et rapport de sortie.
+
+STOP LOT 1 — le Lot 2 (Audit & Contrôle transverse et Finance approfondie) n’est pas
+lancé sans validation explicite.

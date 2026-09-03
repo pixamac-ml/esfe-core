@@ -1,0 +1,22 @@
+{% load component_tags humanize %}
+<section class="space-y-5" data-dashboard-section="finance_reports" data-executive-section="finance_reports">
+  {% component "ui_core.page_header" eyebrow="Finance" title="Rapports financiers" subtitle="Lecture consolidée des encaissements, dépenses et soldes dans le contexte DG actif." %}
+    {% fill "actions" %}
+      <a href="{% url 'accounts_portal:dg_export' %}?kind=finance&amp;format=xlsx" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" hx-boost="false">
+        <i data-lucide="file-spreadsheet" class="h-4 w-4" aria-hidden="true"></i> Excel
+      </a>
+      <a href="{% url 'accounts_portal:dg_export' %}?kind=finance&amp;format=csv" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-3 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" hx-boost="false">
+        <i data-lucide="download" class="h-4 w-4" aria-hidden="true"></i> CSV
+      </a>
+    {% endfill %}
+  {% endcomponent %}
+
+  <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    {% component "ui_core.stat_card" label="Revenus" value=finance.revenue|intcomma unit="FCFA" icon="wallet-cards" tone="success" description="Paiements validés" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Dépenses" value=finance.expenses|intcomma unit="FCFA" icon="receipt-text" tone="danger" description="Dépenses comptabilisées" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Solde" value=finance.balance|intcomma unit="FCFA" icon="scale" tone="primary" description="Revenus moins dépenses" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="En attente" value=finance.pending_payments|intcomma icon="clock-3" tone="warning" description="Paiements non validés" compact=True %}{% endcomponent %}
+  </div>
+
+  {% component "ui_core.data_table" id="dg-finance-reports" caption="Synthèse par annexe" headers=finance_report_headers rows=finance_report_rows result_count=finance_report_rows|length density="compact" empty_title="Aucune donnée financière" empty_message="Le contexte sélectionné ne contient aucun mouvement financier à consolider." %}{% endcomponent %}
+</section>

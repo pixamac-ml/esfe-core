@@ -518,7 +518,7 @@
       <nav class="space-y-.5">
         <button type="button" :class="activeSection === 'overview' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('overview')">{% component "icon" name="house" class_str="w-5 text-center" %}{% endcomponent %}<span>Vue globale</span></button>
         <button type="button" :class="activeSection === 'analytics' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('analytics')">{% component "icon" name="chart-no-axes-combined" class_str="w-5 text-center" %}{% endcomponent %}<span>Analytics</span></button>
-        <button type="button" :class="activeSection === 'realtime' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('realtime')">{% component "icon" name="activity" class_str="w-5 text-center" %}{% endcomponent %}<span>Temps reel</span><span class="dg-badge bg-blue-600 text-white ml-auto">LIVE</span></button>
+        <button type="button" :class="activeSection === 'realtime' ? 'dg-link active' : 'dg-link'" onclick="dgShowSection('realtime')">{% component "icon" name="activity" class_str="w-5 text-center" %}{% endcomponent %}<span>Suivi actualise</span></button>
       </nav>
       <div class="dg-hide-compact mt-2 mb-1 h-px bg-white/10"></div>
       <div class="dg-hide-compact px-2 text-[11px] font-black uppercase tracking-[.18em] text-slate-400">Operations</div>
@@ -615,9 +615,10 @@
         <div class="dg-context-bar">
           <div>
             <div class="dg-context-label">Contexte de lecture</div>
-            <div class="dg-context-hint">Les sections suivent le filtre annexe et periode. L'emploi du temps ajoute le filtre classe.</div>
+            <div class="dg-context-hint">Année académique, portée globale ou annexe et période restent actifs pendant la navigation.</div>
           </div>
           <div class="dg-context-main">
+            <span class="dg-scope-chip">{% component "icon" name="calendar-range" %}{% endcomponent %}{{ selected_academic_year.name|default:"Année non définie" }}</span>
             <span class="dg-scope-chip">{% component "icon" name="globe-2" %}{% endcomponent %}{{ dashboard_scope_label }}</span>
             <span class="dg-scope-chip">{% component "icon" name="building-2" %}{% endcomponent %}{{ total_branches|intcomma }} annexe{% if total_branches > 1 %}s{% endif %}</span>
             <span class="dg-scope-chip">{% component "icon" name="users" %}{% endcomponent %}{{ total_students|intcomma }} etudiants</span>
@@ -947,7 +948,7 @@
       const url = dgBuildScopedUrl(window.location.href, { period: period });
       url.hash = 'overview';
       const currentUrl = new URL(window.location.href);
-      const currentBranch = currentUrl.searchParams.get('branch_id') || '';
+      const currentBranch = currentUrl.searchParams.get('scope_branch_id') || '';
       if (window.location.hash === '#overview' && currentUrl.searchParams.get('period') === period && currentBranch === dgGetSelectedBranchId()) {
         return;
       }
@@ -969,9 +970,13 @@
     return branch ? branch.value : '';
   }
 
+  function dgGetSelectedAcademicYearId() {
+    const academicYear = document.getElementById('dg-academic-year-select');
+    return academicYear ? academicYear.value : '{{ selected_academic_year_id|default:"" }}';
+  }
+
   function dgBuildScopedUrl(baseUrl, params) {
     const url = new URL(baseUrl, window.location.origin);
-    const hadBranchParam = url.searchParams.has('branch_id');
     Object.entries(params || {}).forEach(function(entry) {
       const key = entry[0];
       const value = entry[1];
@@ -979,9 +984,11 @@
       else url.searchParams.set(key, value);
     });
     const branchId = dgGetSelectedBranchId();
-    if (!hadBranchParam) {
-      if (branchId) url.searchParams.set('branch_id', branchId);
-      else url.searchParams.delete('branch_id');
+    if (branchId) url.searchParams.set('scope_branch_id', branchId);
+    else url.searchParams.delete('scope_branch_id');
+    if (!url.searchParams.has('academic_year_id')) {
+      const academicYearId = dgGetSelectedAcademicYearId();
+      if (academicYearId) url.searchParams.set('academic_year_id', academicYearId);
     }
     const classId = window.dgToolbarState && window.dgToolbarState.classId;
     if (classId && dgGetCurrentSection() === 'schedule' && !url.searchParams.has('class_id')) {
@@ -1019,14 +1026,17 @@
     window.dgToolbarState.branchId = value || '';
     window.dgToolbarState.classId = '';
     const currentSection = dgGetCurrentSection();
-    if (currentSection === 'overview') {
-      const period = (window.dgToolbarState && window.dgToolbarState.period) || (document.getElementById('dg-period-select') && document.getElementById('dg-period-select').value) || 'month';
-      const url = dgBuildScopedUrl(window.location.href, { period: period });
-      url.hash = 'overview';
-      window.location.href = url.toString();
-      return;
-    }
-    dgRefreshSection(currentSection);
+    const period = (window.dgToolbarState && window.dgToolbarState.period) || (document.getElementById('dg-period-select') && document.getElementById('dg-period-select').value) || 'month';
+    const url = dgBuildScopedUrl(window.location.href, { scope_branch_id: value || null, mode: value ? 'branch' : 'global', period: period });
+    url.hash = currentSection;
+    window.location.href = url.toString();
+  }
+
+  function dgHandleAcademicYearChange(value) {
+    const currentSection = dgGetCurrentSection();
+    const url = dgBuildScopedUrl(window.location.href, { academic_year_id: value || null });
+    url.hash = currentSection;
+    window.location.href = url.toString();
   }
 
   function dgLoadScheduleWeek(weekStart) {
@@ -1036,12 +1046,7 @@
   }
 
   function dgScheduleBranchChange(value) {
-    const branch = document.getElementById('dg-branch-select');
-    if (branch) branch.value = value || '';
-    window.dgToolbarState = window.dgToolbarState || {};
-    window.dgToolbarState.branchId = value || '';
-    window.dgToolbarState.classId = '';
-    dgLoadSection('schedule', true);
+    dgHandleBranchChange(value);
   }
 
   function dgScheduleClassChange(value) {
@@ -1077,6 +1082,8 @@
     const url = new URL(window.location.href);
     url.searchParams.delete('period');
     url.searchParams.delete('branch_id');
+    url.searchParams.delete('scope_branch_id');
+    url.searchParams.delete('mode');
     url.hash = 'overview';
     window.location.href = url.toString();
   }
@@ -1125,7 +1132,7 @@
       { key: 'finance', label: 'Finance', node: document.getElementById('dg-section-finance') },
       { key: 'rh', label: 'RH / Staff', node: document.getElementById('dg-section-rh') },
       { key: 'analytics', label: 'Analytics', node: document.getElementById('dg-section-analytics') },
-      { key: 'realtime', label: 'Temps reel', node: document.getElementById('dg-section-realtime') },
+      { key: 'realtime', label: 'Suivi actualise', node: document.getElementById('dg-section-realtime') },
     ];
   }
 
@@ -1436,6 +1443,7 @@ function dgRefreshSection(section) {
       .then(({ ok, data }) => {
         if (!ok || !data.ok) throw new Error(data.message || 'Action impossible.');
         dgShowNotice(data.message || 'Action executee.');
+        if (data.close_modal) dgCloseModal();
         if (submit) {
           submit.classList.remove('cursor-wait');
           submit.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
@@ -1461,6 +1469,17 @@ function dgRefreshSection(section) {
         }
         dgShowNotice(error.message || 'Action impossible.', true);
       });
+    return false;
+  }
+
+  function dgConfirmExecutiveAction(form) {
+    const params = new URLSearchParams();
+    new FormData(form).forEach(function(value, key) {
+      if (key !== 'csrfmiddlewaretoken' && key !== 'confirmed') params.append(key, value);
+    });
+    const modalUrl = dgBuildScopedUrl('{% url "accounts_portal:dg_modal" %}', Object.fromEntries(params.entries()));
+    modalUrl.searchParams.set('modal', 'executive_action');
+    dgOpenModal(modalUrl.toString());
     return false;
   }
 
@@ -1736,7 +1755,7 @@ function dgRefreshSection(section) {
     document.head.appendChild(script);
   }
 
-  function dgStartLiveClock() {
+  function dgStartDisplayClock() {
     function pad(value) {
       return String(value).padStart(2, '0');
     }
@@ -1752,14 +1771,14 @@ function dgRefreshSection(section) {
       });
     }
     tick();
-    window.clearInterval(window.dgLiveClockTimer);
-    window.dgLiveClockTimer = window.setInterval(tick, 1000);
+    window.clearInterval(window.dgDisplayClockTimer);
+    window.dgDisplayClockTimer = window.setInterval(tick, 1000);
   }
 
   document.addEventListener('DOMContentLoaded', function() {
     dgEnsureDashboardLibs(dgBuildCharts);
     dgWireRecruitmentModal();
-    dgStartLiveClock();
+    dgStartDisplayClock();
     const initialSection = (window.location.hash || '#overview').replace('#', '');
     if (initialSection && initialSection !== 'overview') {
       dgShowSection(initialSection);

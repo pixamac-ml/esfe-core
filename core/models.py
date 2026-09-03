@@ -1,5 +1,10 @@
 # core/models.py
 
+import hashlib
+import secrets
+
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
@@ -711,6 +716,115 @@ class LegalSidebarBlock(models.Model):
 # ==========================================================
 # CONTACT MESSAGE
 # ==========================================================
+
+class SignatureRequest(models.Model):
+    """Preuve de signature manuscrite reutilisable pour les workflows ESFE.
+
+    La preuve est attachee a une version immuable (``snapshot`` +
+    ``document_digest``) d'un objet metier. Le module ne declenche aucune
+    action metier lui-meme : chaque workflow valide ensuite sa propre chaine
+    (paiement, cahier de texte, document, etc.).
+    """
+
+    PURPOSE_LESSON_LOG = "lesson_log"
+    PURPOSE_PAYMENT = "payment"
+    PURPOSE_DOCUMENT = "document"
+    PURPOSE_CHOICES = [
+        (PURPOSE_LESSON_LOG, "Cahier de texte"),
+        (PURPOSE_PAYMENT, "Paiement"),
+        (PURPOSE_DOCUMENT, "Document"),
+    ]
+
+    STATUS_AWAITING_SIGNATURE = "awaiting_signature"
+    STATUS_SIGNED = "signed"
+    STATUS_APPROVED = "approved"
+    STATUS_RETURNED = "returned"
+    STATUS_EXPIRED = "expired"
+    STATUS_CANCELLED = "cancelled"
+    STATUS_CHOICES = [
+        (STATUS_AWAITING_SIGNATURE, "En attente de signature"),
+        (STATUS_SIGNED, "Signée"),
+        (STATUS_APPROVED, "Approuvée"),
+        (STATUS_RETURNED, "Retournée"),
+        (STATUS_EXPIRED, "Expirée"),
+        (STATUS_CANCELLED, "Annulée"),
+    ]
+    ACTIVE_STATUSES = (STATUS_AWAITING_SIGNATURE, STATUS_SIGNED)
+
+    branch = models.ForeignKey(
+        "branches.Branch",
+        on_delete=models.PROTECT,
+        related_name="signature_requests",
+        db_index=True,
+    )
+    purpose = models.CharField(max_length=40, choices=PURPOSE_CHOICES, db_index=True)
+    content_type = models.ForeignKey(ContentType, on_delete=models.PROTECT)
+    object_id = models.PositiveBigIntegerField(db_index=True)
+    content_object = GenericForeignKey("content_type", "object_id")
+    signer = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.PROTECT,
+        related_name="signature_requests_to_sign",
+    )
+    requested_by = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="requested_signature_requests",
+    )
+    title = models.CharField(max_length=255)
+    snapshot = models.JSONField(default=dict, blank=True)
+    document_digest = models.CharField(max_length=64, db_index=True)
+    token_hash = models.CharField(max_length=64, unique=True, editable=False)
+    status = models.CharField(
+        max_length=30,
+        choices=STATUS_CHOICES,
+        default=STATUS_AWAITING_SIGNATURE,
+        db_index=True,
+    )
+    expires_at = models.DateTimeField(db_index=True)
+    signature_data = models.TextField(blank=True)
+    signature_sha256 = models.CharField(max_length=64, blank=True)
+    signed_at = models.DateTimeField(null=True, blank=True)
+    signed_ip = models.GenericIPAddressField(null=True, blank=True)
+    signed_user_agent = models.CharField(max_length=300, blank=True)
+    approved_by = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="approved_signature_requests",
+    )
+    approved_at = models.DateTimeField(null=True, blank=True)
+    return_reason = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["branch", "purpose", "status"]),
+            models.Index(fields=["content_type", "object_id", "status"]),
+            models.Index(fields=["signer", "status", "expires_at"]),
+        ]
+
+    @staticmethod
+    def issue_token():
+        raw_token = secrets.token_urlsafe(32)
+        return raw_token, hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def hash_token(raw_token):
+        return hashlib.sha256((raw_token or "").encode("utf-8")).hexdigest()
+
+    @property
+    def is_expired(self):
+        return timezone.now() >= self.expires_at
+
+    def __str__(self):
+        return f"Signature {self.get_purpose_display()} #{self.pk} - {self.status}"
+
 
 class ContactMessage(models.Model):
 

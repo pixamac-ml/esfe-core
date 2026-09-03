@@ -11,7 +11,7 @@ from branches.models import Branch
 from formations.models import Cycle, Diploma, Filiere, Programme
 from inscriptions.models import Inscription
 from notifier.models import NotificationMessage
-from portal.models import InternalTransfer, OutgoingTransfer, TransferHistory, TransferRequest, TransferSchool
+from portal.models import AcademicEnrollmentMovement, InternalTransfer, OutgoingTransfer, TransferHistory, TransferRequest, TransferSchool
 from students.models import Student
 
 
@@ -37,7 +37,8 @@ class DirectorOperationsHubsTests(TestCase):
             name="2032-2033", start_date=date(2032, 10, 1), end_date=date(2033, 7, 31), is_active=True
         )
         cls.source_class = cls._academic_class("L1 Centre", cls.programme, cls.branch, "L1")
-        cls.target_class = cls._academic_class("L1 Administration", cls.target_programme, cls.branch, "L1")
+        cls.target_class = cls._academic_class("L1 Centre B", cls.programme, cls.branch, "L1")
+        cls.reclassification_class = cls._academic_class("L1 Administration", cls.target_programme, cls.branch, "L1")
         cls.other_class = cls._academic_class("L1 Nord", cls.programme, cls.other_branch, "L1")
 
         User = get_user_model()
@@ -168,11 +169,28 @@ class DirectorOperationsHubsTests(TestCase):
         self.enrollment.refresh_from_db()
         self.assertEqual(transfer.status, TransferRequest.STATUS_COMPLETED)
         self.assertEqual(self.enrollment.academic_class, self.target_class)
-        self.assertEqual(self.enrollment.programme, self.target_programme)
+        self.assertEqual(self.enrollment.programme, self.programme)
         self.assertEqual(transfer.internal_details.source_level, transfer.internal_details.target_level)
         self.assertTrue(TransferHistory.objects.filter(
             transfer_request=transfer, action="academic_placement_created"
         ).exists())
+        movement = AcademicEnrollmentMovement.objects.get(transfer_request=transfer)
+        self.assertEqual(movement.source_class, self.source_class)
+        self.assertEqual(movement.target_class, self.target_class)
+        self.assertEqual(movement.enrollment, self.enrollment)
+
+    def test_internal_transfer_rejects_programme_change(self):
+        response = self.client.post(
+            reverse("accounts_portal:director_transfer_create"),
+            {
+                "enrollment_id": self.enrollment.pk,
+                "transfer_type": TransferRequest.TYPE_INTERNAL,
+                "target_class_id": self.reclassification_class.pk,
+                "reason": "Changement de filière non autorisé ici",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(TransferRequest.objects.filter(target_class=self.reclassification_class).exists())
 
     def test_outgoing_transfer_archives_only_after_handover(self):
         transfer = self._create_transfer(

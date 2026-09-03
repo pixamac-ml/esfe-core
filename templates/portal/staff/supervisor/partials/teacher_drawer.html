@@ -3,12 +3,57 @@
   <div class="space-y-5">
     <div class="flex items-center gap-3"><span class="grid h-12 w-12 place-items-center rounded-full bg-ui-primary-soft text-sm font-black text-ui-primary">{{ teacher.get_full_name|default:teacher.username|slice:":2"|upper }}</span><div class="min-w-0"><strong class="block truncate text-ui-text">{{ teacher.get_full_name|default:teacher.username }}</strong><span class="text-xs text-ui-text-muted">{{ selected_event.ec.title }} · {{ selected_event.academic_class.display_name }}</span></div></div>
     <dl class="grid gap-3 rounded-ui-card bg-ui-surface-muted p-4 text-sm sm:grid-cols-2"><div><dt class="text-xs font-bold text-ui-text-muted">Horaire</dt><dd class="mt-1 font-semibold text-ui-text">{{ selected_event.start_datetime|date:"H:i" }} – {{ selected_event.end_datetime|date:"H:i" }}</dd></div><div><dt class="text-xs font-bold text-ui-text-muted">Salle</dt><dd class="mt-1 font-semibold text-ui-text">{{ selected_event.location|default:"Salle non précisée" }}</dd></div></dl>
+    {% component "ui_core.panel" title="Pièces de contrôle" subtitle="Les cinq éléments doivent être cohérents avant la validation." padding=False %}
+      {% fill "default" %}
+        <div class="grid gap-2 p-4 text-sm sm:grid-cols-2">
+          <div class="flex items-center gap-2">{% if selected_event.status == "published" %}<i data-lucide="circle-check" class="h-4 w-4 text-ui-success"></i><span>Planning officiel publié</span>{% else %}<i data-lucide="circle-alert" class="h-4 w-4 text-ui-warning"></i><span>Planning à vérifier</span>{% endif %}</div>
+          <div class="flex items-center gap-2">{% if lesson_log and lesson_log.status == "submitted" or lesson_log.validated_by_id %}<i data-lucide="circle-check" class="h-4 w-4 text-ui-success"></i><span>Déclaration enseignant reçue</span>{% else %}<i data-lucide="clock-3" class="h-4 w-4 text-ui-warning"></i><span>Déclaration enseignant à recevoir</span>{% endif %}</div>
+          <div class="flex items-center gap-2">{% if lesson_log_signature_ready %}<i data-lucide="circle-check" class="h-4 w-4 text-ui-success"></i><span>Signature enseignant attestée</span>{% else %}<i data-lucide="clock-3" class="h-4 w-4 text-ui-warning"></i><span>Signature enseignant à recevoir</span>{% endif %}</div>
+          <div class="flex items-center gap-2">{% if teacher_attendance and teacher_attendance.status != "absent" and teacher_attendance.course_delivered %}<i data-lucide="circle-check" class="h-4 w-4 text-ui-success"></i><span>Constat terrain cohérent</span>{% else %}<i data-lucide="circle-alert" class="h-4 w-4 text-ui-warning"></i><span>Constat terrain à compléter</span>{% endif %}</div>
+          <div class="flex items-center gap-2">{% if student_attendance_ready %}<i data-lucide="circle-check" class="h-4 w-4 text-ui-success"></i><span>Appel étudiant validé</span>{% else %}<i data-lucide="clock-3" class="h-4 w-4 text-ui-warning"></i><span>Appel étudiant non validé</span>{% endif %}</div>
+        </div>
+        <div class="border-t border-ui-border px-4 py-3 text-xs text-ui-text-muted">{% if attendance_roll_sheet %}{{ student_attendance_total }} présence(s) enregistrée(s) · {{ student_attendance_counts.present }} présent(s), {{ student_attendance_counts.late }} retard(s), {{ student_attendance_counts.absent }} absent(s).{% else %}Aucune feuille d'appel n'est encore rattachée à cette séance.{% endif %}</div>
+      {% endfill %}
+    {% endcomponent %}
+    {% if review_error %}{% component "ui_core.alert" title="Contrôle à compléter" message=review_error tone="danger" %}{% endcomponent %}{% endif %}
     <form method="post" class="space-y-4" hx-post="{% url 'accounts_portal:supervisor_mark_teacher_attendance' %}" hx-target="#supervisor-drawer-content" hx-swap="innerHTML">{% csrf_token %}<input type="hidden" name="schedule_event_id" value="{{ selected_event.id }}">
       <div class="grid gap-4 sm:grid-cols-2"><label class="text-xs font-bold text-ui-text-muted">Présence<select name="status" required class="mt-2 h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text"><option value="present" {% if teacher_attendance.status == "present" %}selected{% endif %}>Présent</option><option value="absent" {% if teacher_attendance.status == "absent" %}selected{% endif %}>Absent</option><option value="late" {% if teacher_attendance.status == "late" %}selected{% endif %}>En retard</option></select></label><label class="text-xs font-bold text-ui-text-muted">Heure d'arrivée<input type="time" name="arrival_time" value="{% if teacher_attendance.arrival_time %}{{ teacher_attendance.arrival_time|time:'H:i' }}{% endif %}" class="mt-2 h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text"></label></div>
       <label class="block text-xs font-bold text-ui-text-muted">Cours assuré ?<select name="course_delivered" required class="mt-2 h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text"><option value="">Choisir le constat</option><option value="yes" {% if teacher_attendance.course_delivered == True %}selected{% endif %}>Oui, cours assuré</option><option value="no" {% if teacher_attendance.course_delivered == False %}selected{% endif %}>Non, cours non assuré</option></select></label>
       <label class="block text-xs font-bold text-ui-text-muted">Observation factuelle<textarea name="observation" rows="4" class="mt-2 w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 py-2 text-sm text-ui-text" placeholder="Décrivez uniquement ce qui a été constaté.">{{ teacher_attendance.observation }}</textarea></label>
       <button class="ui-focus-ring h-ui-control w-full rounded-ui-button bg-ui-primary px-4 text-sm font-bold text-white">Enregistrer le constat</button>
     </form>
+    {% if lesson_log %}
+      {% component "ui_core.panel" title="Cahier de texte" subtitle="Déclaration transmise par l'enseignant" %}
+        {% fill "default" %}
+          <div class="space-y-3 text-sm text-ui-text">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              {% if lesson_log.validated_by_id %}
+                {% component "ui_core.status_badge" label="Validé · heures transmises" tone="success" icon="circle-check" %}{% endcomponent %}
+              {% elif lesson_log.status == "submitted" %}
+                {% component "ui_core.status_badge" label="À contrôler" tone="warning" icon="clock-3" %}{% endcomponent %}
+              {% else %}
+                {% component "ui_core.status_badge" label=lesson_log.get_status_display tone="neutral" icon="file-text" %}{% endcomponent %}
+              {% endif %}
+              <span class="text-xs text-ui-text-muted">{{ lesson_log.updated_at|date:"d/m/Y H:i" }}</span>
+            </div>
+            <div><span class="block text-xs font-bold uppercase tracking-wide text-ui-text-muted">Contenu</span><p class="mt-1 whitespace-pre-line">{{ lesson_log.content }}</p></div>
+            {% if lesson_log.homework %}<div><span class="block text-xs font-bold uppercase tracking-wide text-ui-text-muted">Travaux / devoirs</span><p class="mt-1 whitespace-pre-line">{{ lesson_log.homework }}</p></div>{% endif %}
+            {% if lesson_log.observations %}<div><span class="block text-xs font-bold uppercase tracking-wide text-ui-text-muted">Observations</span><p class="mt-1 whitespace-pre-line">{{ lesson_log.observations }}</p></div>{% endif %}
+          </div>
+        {% endfill %}
+        {% if lesson_log.status == "returned" and lesson_log.review_comment %}
+          {% fill "footer" %}{% component "ui_core.alert" title="Retour transmis" message=lesson_log.review_comment tone="warning" %}{% endcomponent %}{% endfill %}
+        {% elif not lesson_log.validated_by_id and lesson_log.status == "submitted" and lesson_log_signature_ready and teacher_attendance and teacher_attendance.course_delivered and teacher_attendance.status != "absent" and student_attendance_ready %}
+          {% fill "footer" %}
+            <form method="post" class="space-y-3" hx-post="{% url 'accounts_portal:supervisor_validate_lesson_log' %}" hx-target="#supervisor-drawer-content" hx-swap="innerHTML">{% csrf_token %}<input type="hidden" name="schedule_event_id" value="{{ selected_event.id }}"><input type="hidden" name="lesson_log_id" value="{{ lesson_log.id }}"><label class="block text-xs font-bold text-ui-text-muted">Note de contrôle <span class="font-normal">(obligatoire en cas de retour)</span><textarea name="review_comment" rows="2" class="mt-2 w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 py-2 text-sm text-ui-text" placeholder="Précisez la correction attendue si le cahier doit être retourné."></textarea></label><div class="grid gap-2 sm:grid-cols-2"><button name="decision" value="approve" onclick="this.form.review_comment.required=false" class="ui-focus-ring h-ui-control rounded-ui-button bg-ui-success px-4 text-sm font-bold text-white">Approuver le cours fait</button><button name="decision" value="return" onclick="this.form.review_comment.required=true" class="ui-focus-ring h-ui-control rounded-ui-button border border-ui-warning px-4 text-sm font-bold text-ui-text">Retourner pour correction</button></div></form>
+          {% endfill %}
+        {% elif not lesson_log.validated_by_id and lesson_log.status == "submitted" %}
+          {% fill "footer" %}{% component "ui_core.alert" title="Validation indisponible" message="La signature de l'enseignant, le constat terrain et la feuille d'appel étudiant validée sont requis avant l'approbation." tone="warning" %}{% endcomponent %}{% endfill %}
+        {% endif %}
+      {% endcomponent %}
+    {% else %}
+      {% component "ui_core.alert" title="Cahier de texte" message="En attente de la déclaration de l'enseignant. Les heures ne peuvent pas encore être validées." tone="neutral" %}{% endcomponent %}
+    {% endif %}
     {% component "ui_core.alert" title="Transmission" message="Une absence, un retard ou un cours non assuré est automatiquement visible par le Directeur des études de cette annexe." tone="neutral" %}{% endcomponent %}
   </div>
 {% else %}

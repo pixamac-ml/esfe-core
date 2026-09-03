@@ -1,0 +1,36 @@
+{% load component_tags %}
+<section class="space-y-5" data-overlay-title="{{ staff_action_label }}">
+  <div>
+    <p class="text-xs font-bold uppercase tracking-wide text-ui-primary">Décision RH DG</p>
+    <p class="mt-1 text-sm text-ui-text-muted">{{ staff_profile.user.get_full_name|default:staff_profile.user.username }} · {{ staff_profile.get_position_display|default:"Personnel" }}</p>
+  </div>
+
+  <form method="post" action="{% url 'accounts_portal:dg_staff_action' %}" class="space-y-5" data-dg-interactive-form onsubmit="return dgSubmitAction(this)">
+    {% csrf_token %}
+    <input type="hidden" name="profile_id" value="{{ staff_profile.id }}">
+    <input type="hidden" name="action" value="{{ staff_action }}">
+    <input type="hidden" name="scope_branch_id" value="{{ dg_scope_branch_id }}">
+    <input type="hidden" name="academic_year_id" value="{{ dg_academic_year_id }}">
+
+    {% if staff_action == "update_assignment" %}
+      {% component "ui_core.django_form_field" field=form.position %}{% endcomponent %}
+    {% endif %}
+    {% if staff_action == "reassign" or staff_action == "update_assignment" %}
+      {% component "ui_core.django_form_field" field=form.branch %}{% endcomponent %}
+    {% endif %}
+    {% component "ui_core.django_form_field" field=form.reason %}{% endcomponent %}
+
+    {% if staff_action == "revoke" %}
+      {% component "ui_core.alert" title="Révocation de l’accès" message="L’accès est désactivé sans supprimer le compte ni les traces institutionnelles." tone="danger" %}{% endcomponent %}
+    {% elif staff_action == "suspend" %}
+      {% component "ui_core.alert" title="Suspension immédiate" message="Les sessions actives seront fermées. Une décision DG pourra ensuite réactiver l’accès." tone="warning" %}{% endcomponent %}
+    {% else %}
+      {% component "ui_core.alert" title="Traçabilité institutionnelle" message="La décision est journalisée avec son acteur, sa cible, son annexe et son motif." tone="info" %}{% endcomponent %}
+    {% endif %}
+
+    <div class="flex flex-wrap justify-end gap-3 border-t border-ui-border pt-5">
+      <button type="button" class="inline-flex h-ui-control items-center rounded-ui-button border border-ui-border px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" onclick="dgCloseModal()">Annuler</button>
+      <button type="submit" class="inline-flex h-ui-control items-center rounded-ui-button {% if staff_action == 'revoke' %}bg-ui-danger text-ui-on-primary hover:bg-ui-danger/90{% else %}bg-ui-primary text-ui-on-primary hover:bg-ui-primary-strong{% endif %} px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus">Confirmer la décision</button>
+    </div>
+  </form>
+</section>

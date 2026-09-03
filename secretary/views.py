@@ -34,10 +34,12 @@ from .forms import (
     MeetingForm,
     MeetingMinutesForm,
     RegistryEntryForm,
+    SecretaryCallForm,
+    SecretaryTransmissionForm,
     SecretaryTaskForm,
     VisitorLogForm,
 )
-from .models import DocumentReceipt, Meeting, MeetingMinutes, RegistryEntry, SecretaryTask
+from .models import DocumentReceipt, Meeting, MeetingMinutes, RegistryEntry, SecretaryCall, SecretaryTask, SecretaryTransmission
 from .permissions import ensure_secretary_access
 from .selectors import (
     get_active_students,
@@ -86,6 +88,7 @@ from .services import (
     transmit_daily_report_to_dg,
     get_meetings_queryset,
     get_upcoming_meetings,
+    build_secretary_week_grid,
     create_meeting,
     update_meeting,
     update_meeting_status,
@@ -227,6 +230,28 @@ def _secretary_ui_tables(context):
         }
         for meeting in context.get("meetings_rows", [])
     ]
+    call_rows = [
+        {
+            "id": f"secretary-call-{call.pk}",
+            "cells": [
+                {"value": call.interlocutor, "strong": True, "secondary": call.phone or "Telephone non renseigne"},
+                {"value": call.subject, "secondary": call.target_service or "Service a preciser"},
+                {"value": call.get_call_status_display(), "tone": "warning" if call.call_status == call.CALL_TO_RETURN else ("success" if call.call_status == call.CALL_PROCESSED else "info")},
+            ],
+        }
+        for call in context.get("calls_rows", [])
+    ]
+    transmission_rows = [
+        {
+            "id": f"secretary-transmission-{transmission.pk}",
+            "cells": [
+                {"value": transmission.subject, "strong": True, "secondary": transmission.source_service},
+                {"value": transmission.target_service, "secondary": transmission.created_at.strftime("%d/%m %H:%M")},
+                {"value": transmission.get_transmission_status_display(), "tone": "success" if transmission.transmission_status in {transmission.STATUS_PROCESSED, transmission.STATUS_CLOSED} else "warning"},
+            ],
+        }
+        for transmission in context.get("transmissions_rows", [])
+    ]
     salary_rows = [
         {
             "id": f"secretary-salary-{entry.pk}",
@@ -283,6 +308,8 @@ def _secretary_ui_tables(context):
         "documents": document_rows,
         "tasks": task_rows,
         "meetings": meeting_rows,
+        "calls": call_rows,
+        "transmissions": transmission_rows,
         "salary": salary_rows,
         "notifications": notification_rows,
         "classes": class_rows,
@@ -326,8 +353,11 @@ SECRETARY_SUBVIEW_DEFINITIONS = {
         ("visits", "Visiteurs", "user-clock"),
         ("appointments", "Rendez-vous", "calendar-days"),
         ("deposits", "Dépôts", "archive"),
+        ("calls", "Appels", "phone-call"),
+        ("transmissions", "Transmissions", "send"),
     ),
     "follow_up": (
+        ("agenda", "Agenda", "calendar-days"),
         ("tasks", "Tâches", "list-checks"),
         ("classes", "Classes", "school"),
         ("students", "Étudiants", "graduation-cap"),
@@ -455,6 +485,83 @@ def _render_create_drawer_or_page(request, drawer_template, page_template, conte
 
 
 @login_required
+def call_create(request):
+    ensure_secretary_access(request.user)
+    branch = get_user_branch(request.user)
+    form = SecretaryCallForm(request.POST or None, user=request.user, branch=branch)
+    if request.method == "POST" and form.is_valid():
+        call = form.save(commit=False)
+        call.branch = branch
+        call.created_by = request.user
+        call.save()
+        if _is_htmx(request):
+            response = _refresh_response(request, "kpis", "sidebar")
+            response["HX-Trigger"] = json.dumps(_trigger_payload("kpis", "sidebar", close_drawer=True, toasts=[{"title": "Appel enregistré", "body": "L'appel est ajouté au suivi.", "tone": "success"}]))
+            return response
+        return redirect("secretary:secretary_dashboard")
+    return render(request, "secretary/drawers/call_form.html", {"form": form})
+
+
+@login_required
+def transmission_create(request):
+    ensure_secretary_access(request.user)
+    branch = get_user_branch(request.user)
+    form = SecretaryTransmissionForm(request.POST or None, user=request.user, branch=branch)
+    if request.method == "POST" and form.is_valid():
+        transmission = form.save(commit=False)
+        transmission.branch = branch
+        transmission.created_by = request.user
+        transmission.save()
+        if _is_htmx(request):
+            response = _refresh_response(request, "kpis", "sidebar")
+            response["HX-Trigger"] = json.dumps(_trigger_payload("kpis", "sidebar", close_drawer=True, toasts=[{"title": "Transmission créée", "body": "Le service destinataire peut maintenant la prendre en charge.", "tone": "success"}]))
+            return response
+        return redirect("secretary:secretary_dashboard")
+    return render(request, "secretary/drawers/transmission_form.html", {"form": form})
+
+
+@login_required
+@require_POST
+def call_status_update(request, pk):
+    ensure_secretary_access(request.user)
+    call = get_object_or_404(SecretaryCall, pk=pk, branch=get_user_branch(request.user))
+    next_status = request.POST.get("status", "").strip()
+    allowed = {choice[0] for choice in SecretaryCall.CALL_STATUS_CHOICES}
+    if next_status not in allowed:
+        return JsonResponse({"error": "Etat d'appel invalide."}, status=400)
+    call.call_status = next_status
+    call.save(update_fields=["call_status", "updated_at"])
+    if _is_htmx(request):
+        response = _refresh_response(request, "kpis", "sidebar")
+        response["HX-Trigger"] = json.dumps(_trigger_payload("kpis", "sidebar", toasts=[{"title": "Appel mis à jour", "body": call.get_call_status_display(), "tone": "success"}]))
+        return response
+    return redirect("secretary:secretary_dashboard")
+
+
+@login_required
+@require_POST
+def transmission_status_update(request, pk):
+    ensure_secretary_access(request.user)
+    transmission = get_object_or_404(SecretaryTransmission, pk=pk, branch=get_user_branch(request.user))
+    next_status = request.POST.get("status", "").strip()
+    allowed = {choice[0] for choice in SecretaryTransmission.TRANSMISSION_STATUS_CHOICES}
+    if next_status not in allowed:
+        return JsonResponse({"error": "Etat de transmission invalide."}, status=400)
+    transmission.transmission_status = next_status
+    if next_status == SecretaryTransmission.STATUS_TAKEN and not transmission.taken_at:
+        transmission.taken_by = request.user
+        transmission.taken_at = timezone.now()
+    if next_status in {SecretaryTransmission.STATUS_PROCESSED, SecretaryTransmission.STATUS_CLOSED}:
+        transmission.processed_at = transmission.processed_at or timezone.now()
+    transmission.save(update_fields=["transmission_status", "taken_by", "taken_at", "processed_at", "updated_at"])
+    if _is_htmx(request):
+        response = _refresh_response(request, "kpis", "sidebar")
+        response["HX-Trigger"] = json.dumps(_trigger_payload("kpis", "sidebar", toasts=[{"title": "Transmission mise à jour", "body": transmission.get_transmission_status_display(), "tone": "success"}]))
+        return response
+    return redirect("secretary:secretary_dashboard")
+
+
+@login_required
 def secretary_dashboard(request):
     from django.conf import settings
 
@@ -501,13 +608,14 @@ def secretary_dashboard(request):
     # Each module owns its tabbed subnavigation in the certified workspace.
     sidebar_items = [
         {"divider": "Général"},
-        {"id": "overview", "label": "Vue d'ensemble", "icon": "layout-dashboard", "url": "?section=overview", "active": active_sec == "overview"},
+        {"id": "overview", "label": "Aujourd'hui", "icon": "sun", "url": "?section=overview", "active": active_sec == "overview"},
         {"divider": "Secrétariat"},
-        {"id": "operations", "label": "Accueil & registre", "icon": "book-open", "url": "?section=operations", "active": active_sec == "operations", "badge": context.get("pending_registry_count", 0) or None},
-        {"id": "follow_up", "label": "Suivi", "icon": "list-checks", "url": "?section=follow_up", "active": active_sec == "follow_up", "badge": context.get("pending_tasks", 0) or None},
+        {"id": "operations", "label": "Registre & accueil", "icon": "book-open", "url": "?section=operations", "active": active_sec == "operations", "badge": context.get("pending_registry_count", 0) or None},
+        {"id": "follow_up", "label": "Agenda & suivi", "icon": "calendar-check-2", "url": "?section=follow_up", "active": active_sec == "follow_up", "badge": context.get("pending_tasks", 0) or None},
         {"divider": "Pilotage"},
-        {"id": "management", "label": "Gestion", "icon": "chart-no-axes-combined", "url": "?section=management", "active": active_sec == "management", "badge": context.get("messages_count") or None},
+        {"id": "management", "label": "Rapports & outils", "icon": "chart-no-axes-combined", "url": "?section=management", "active": active_sec == "management", "badge": context.get("messages_count") or None},
         {"divider": "Compte"},
+        {"id": "messagerie", "label": "Messagerie", "icon": "mail", "url": "", "hx_get": f"{reverse('accounts_portal:staff_messaging')}?dash=sg", "hx_swap": "innerHTML"},
         {"id": "settings", "label": "Paramètres", "icon": "settings", "url": "?section=settings", "active": active_sec == "settings"},
     ]
     context["nav_items"] = sidebar_items
@@ -689,6 +797,13 @@ def secretary_dashboard(request):
     context["quick_task_form"] = SecretaryTaskForm(**_form_kwargs(request))
     context["quick_meeting_form"] = MeetingForm(**_form_kwargs(request))
     context["upcoming_meetings"] = list(get_upcoming_meetings(branch=branch, limit=5))
+    agenda_anchor = timezone.localdate()
+    if request.GET.get("agenda_date"):
+        try:
+            agenda_anchor = timezone.datetime.strptime(request.GET["agenda_date"], "%Y-%m-%d").date()
+        except ValueError:
+            pass
+    context["secretary_week_grid"] = build_secretary_week_grid(branch=branch, anchor_date=agenda_anchor)
     context["meetings_page"] = _paginate(
         request,
         get_meetings_queryset(branch=branch),
@@ -706,6 +821,8 @@ def secretary_dashboard(request):
             "visits": context["active_visits"],
             "appointments": context["appointments_today"],
             "deposits": context["pending_documents_count"],
+            "calls": context.get("calls_count", 0),
+            "transmissions": context.get("transmissions_count", 0),
             "tasks": context["pending_tasks"],
             "classes": context["classes_count"],
             "students": context["students_count"],
@@ -719,6 +836,8 @@ def secretary_dashboard(request):
             "visits_headers": ["Visiteur", "Arrivée", "État"],
             "appointments_headers": ["Rendez-vous", "Créneau", "État"],
             "documents_headers": ["Document", "Réception", "État"],
+            "calls_headers": ["Interlocuteur", "Objet", "Suivi"],
+            "transmissions_headers": ["Objet", "Destinataire", "État"],
             "tasks_headers": ["Tâche", "Échéance", "État"],
             "meetings_headers": ["Réunion", "Planification", "État"],
             "salary_headers": ["Période", "Net", "État"],
@@ -746,15 +865,16 @@ def secretary_dashboard(request):
             current_group = {"label": "Secretariat", "items": []}
             nav_groups.append(current_group)
         section_url = f"{reverse('secretary:secretary_dashboard')}{nav_item.get('url', '')}"
+        item_url = nav_item.get("hx_get") or section_url
         current_group["items"].append(
             {
                 "key": nav_item.get("id"),
                 "label": nav_item.get("label"),
                 "icon": nav_item.get("icon"),
                 "url": section_url,
-                "hx_get": section_url,
+                "hx_get": item_url,
                 "hx_target": "#secretary-workspace",
-                "hx_swap": "outerHTML",
+                "hx_swap": nav_item.get("hx_swap", "outerHTML"),
                 "hx_push_url": section_url,
                 "badge": nav_item.get("badge"),
             }
@@ -1081,6 +1201,8 @@ def appointment_list(request):
 def appointment_create(request):
     ensure_secretary_access(request.user)
     form = AppointmentForm(request.POST or None, **_form_kwargs(request))
+    if request.method == "GET" and request.GET.get("scheduled_date"):
+        form.initial["scheduled_at"] = f"{request.GET['scheduled_date']}T09:00"
     if request.method == "POST" and form.is_valid():
         try:
             create_appointment(created_by=request.user, **form.cleaned_data)
@@ -1890,6 +2012,8 @@ def meeting_create(request):
             return redirect("?section=meetings")
     else:
         form = MeetingForm(user=request.user, branch=branch)
+        if request.GET.get("scheduled_date"):
+            form.initial["scheduled_at"] = f"{request.GET['scheduled_date']}T09:00"
     return render(request, "secretary/htmx/meeting_form.html", {"form": form, "action": "Planifier une réunion"})
 
 

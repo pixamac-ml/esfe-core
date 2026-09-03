@@ -11,6 +11,7 @@ TEMPLATE_MAP = {
     "esfe_receipt": "documents/payment_receipt/payment_receipt.html",
     "esfe_shop_invoice": "documents/shop_invoice/shop_invoice.html",
     "esfe_salary_slip": "documents/salary_slip/salary_slip.html",
+    "esfe_teacher_service_sheet": "documents/teacher_service_sheet/teacher_service_sheet.html",
     "esfe_refund": "documents/refund_document/refund_document.html",
     "esfe_cash_receipt": "documents/cash_receipt/cash_receipt.html",
     "esfe_donation_receipt": "documents/donation_receipt/donation_receipt.html",

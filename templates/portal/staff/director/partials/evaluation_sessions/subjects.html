@@ -1,0 +1,29 @@
+{% load component_tags %}
+<div class="space-y-5">
+  {% if toast %}{% component "ui_core.alert" title="Sujets" message=toast.message tone=toast.level %}{% endcomponent %}{% endif %}
+  {% if not selected_evaluation_campaign %}
+    {% component "ui_core.empty_state" title="Choisissez d'abord une campagne" message="Ouvrez une campagne depuis l'onglet Sessions : le système affichera automatiquement les matières et les enseignants concernés." icon="folder-search" %}{% endcomponent %}
+  {% else %}
+    {% component "ui_core.panel" title="Sujets à recevoir" subtitle="Une ligne correspond à une matière précise pour une classe. Le DE confirme simplement le dépôt ; les échéances sont calculées par le système." tone="primary" padding=False %}
+      <div class="grid gap-3 border-b border-ui-border p-4 sm:grid-cols-3">
+        {% component "ui_core.stat_card" label="À préparer" value=campaign_requirement_counts.total icon="book-open-check" tone="info" compact=True %}{% endcomponent %}
+        {% component "ui_core.stat_card" label="Sujets reçus" value=campaign_requirement_counts.received icon="file-check-2" tone="success" compact=True %}{% endcomponent %}
+        {% component "ui_core.stat_card" label="À relancer" value=campaign_requirement_counts.missing icon="triangle-alert" tone="warning" compact=True %}{% endcomponent %}
+      </div>
+      <div class="divide-y divide-ui-border">
+      {% for requirement in campaign_requirements_page.object_list %}
+        <details class="group p-4">
+          <summary class="flex cursor-pointer list-none flex-wrap items-center gap-3"><span class="min-w-0 flex-1"><strong class="block text-sm text-ui-text">{{ requirement.academic_class.display_name }} · {{ requirement.ec.title }}</strong><span class="text-xs text-ui-text-muted">Échéance recommandée : {{ requirement.subject_due_at|date:"d/m/Y H:i" }}{% if requirement.responsible_teacher %} · {{ requirement.responsible_teacher.get_full_name|default:requirement.responsible_teacher.username }}{% endif %}</span></span>{% if requirement.subject_status == 'received' %}{% component "ui_core.status_badge" label=requirement.get_subject_status_display tone="success" %}{% endcomponent %}{% elif requirement.subject_status == 'missing' %}{% component "ui_core.status_badge" label=requirement.get_subject_status_display tone="danger" %}{% endcomponent %}{% else %}{% component "ui_core.status_badge" label=requirement.get_subject_status_display tone="warning" %}{% endcomponent %}{% endif %}<i data-lucide="chevron-down" class="h-4 w-4 group-open:rotate-180" aria-hidden="true"></i></summary>
+          <form method="post" enctype="multipart/form-data" hx-post="{% url 'accounts_portal:director_exam_session_action' %}" hx-target="#director-session-subcontent" hx-swap="innerHTML" hx-encoding="multipart/form-data" hx-indicator="#director-session-loading" class="mt-4 grid gap-3 border-t border-ui-border pt-4 md:grid-cols-2">
+            {% csrf_token %}<input type="hidden" name="action" value="record_subject"><input type="hidden" name="return_view" value="subjects"><input type="hidden" name="campaign_id" value="{{ selected_evaluation_campaign.id }}"><input type="hidden" name="requirement_id" value="{{ requirement.id }}">
+            <label class="text-xs font-semibold text-ui-text">État<select name="subject_status" class="mt-1 h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm"><option value="expected" {% if requirement.subject_status == 'expected' %}selected{% endif %}>Sujet attendu</option><option value="received" {% if requirement.subject_status == 'received' %}selected{% endif %}>Sujet reçu</option><option value="missing" {% if requirement.subject_status == 'missing' %}selected{% endif %}>Sujet manquant / à relancer</option></select></label>
+            <label class="text-xs font-semibold text-ui-text">Fichier du sujet{% if requirement.subject_file %}<a href="{{ requirement.subject_file.url }}" target="_blank" class="ml-2 text-ui-primary underline">Voir</a>{% endif %}<input type="file" name="subject_file" class="mt-1 block w-full text-xs"></label>
+            <label class="text-xs font-semibold text-ui-text md:col-span-2">Note de contrôle<textarea name="notes" rows="2" class="mt-1 w-full rounded-ui-input border border-ui-border px-3 py-2 text-sm">{{ requirement.notes }}</textarea></label>
+            <button class="ui-focus-ring h-ui-control rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary md:justify-self-start">Enregistrer</button>
+          </form>
+        </details>
+      {% empty %}<div class="p-5 text-sm text-ui-text-muted">Aucune matière à préparer dans cette campagne.</div>{% endfor %}
+      </div>
+    {% endcomponent %}
+  {% endif %}
+</div>

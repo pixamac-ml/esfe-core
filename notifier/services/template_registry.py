@@ -75,6 +75,7 @@ def build_fallback_text(*, title, body, context):
         ("Recu", "receipt_number"),
         ("Lien dossier", "public_link"),
         ("Lien recu", "receipt_url"),
+        ("Lien de signature", "signature_link"),
         ("Connexion", "login_url"),
         ("Support", "support_email"),
     ):

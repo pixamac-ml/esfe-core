@@ -10,6 +10,7 @@ import hashlib
 import secrets
 
 from django.db import transaction
+from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import FinancialAuditLog, Profile, SensitiveActionRequest
@@ -78,6 +79,7 @@ def request_sensitive_action(
         otp_code_hash=_hash_code(code),
         expires_at=expires_at,
     )
+    approval_url = reverse("accounts:financial_approval_detail", args=[request_obj.pk])
 
     action_label = dict(SensitiveActionRequest.ACTION_CHOICES).get(action_type, action_type)
     body = (
@@ -87,7 +89,8 @@ def request_sensitive_action(
         f"Etat demande : {requested_state}\n"
         f"Motif : {reason or 'non precise'}\n\n"
         f"Code de validation : {code}\n"
-        f"Ce code expire dans {SensitiveActionRequest.OTP_VALIDITY_MINUTES} minutes."
+        f"Ce code expire dans {SensitiveActionRequest.OTP_VALIDITY_MINUTES} minutes.\n"
+        f"Valider depuis votre session direction : {approval_url}"
     )
 
     for approver in approvers:
@@ -107,6 +110,7 @@ def request_sensitive_action(
                 "sensitive_action_request_id": request_obj.pk,
                 "branch_id": branch.pk,
                 "action_type": action_type,
+                "approval_url": approval_url,
             },
             legacy_source="sensitive_action_request",
             legacy_object_id=str(request_obj.pk),
@@ -145,7 +149,14 @@ def confirm_sensitive_action(*, request_id, code, approver, apply_callback, skip
             SensitiveActionRequest.objects.select_for_update().get(pk=request_id)
         )
 
-        if request_obj.status != SensitiveActionRequest.STATUS_PENDING:
+        is_direction = Profile.objects.filter(
+            user=approver,
+            user__is_active=True,
+            position__in=DG_POSITIONS,
+        ).exists()
+        if not is_direction or approver.pk == request_obj.requested_by_id:
+            error_message = "Cette correction doit etre approuvee depuis le compte du DG ou de la DGA."
+        elif request_obj.status != SensitiveActionRequest.STATUS_PENDING:
             error_message = "Cette demande n'est plus en attente de validation."
         elif timezone.now() > request_obj.expires_at:
             request_obj.status = SensitiveActionRequest.STATUS_EXPIRED

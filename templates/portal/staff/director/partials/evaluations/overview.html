@@ -8,7 +8,7 @@
   </div>
 
   {% component "ui_core.panel" title="Traitement des résultats" subtitle="La validation, la publication et les bulletins suivent le même workflow académique." padding=False %}
-    <div class="grid divide-y divide-ui-border md:grid-cols-2 md:divide-x md:divide-y-0">
+    <div class="grid divide-y divide-ui-border lg:grid-cols-3 lg:divide-x lg:divide-y-0">
       <a href="{% url 'accounts_portal:portal_dashboard' %}?section=evaluations&view=validation"
          hx-get="{% url 'accounts_portal:director_evaluations_subcontent' %}?view=validation&validation_scope=actionable"
          hx-target="#director-results-subcontent"
@@ -19,13 +19,58 @@
          data-director-subview-link="validation"
          class="ui-focus-ring flex min-w-0 items-center gap-3 p-4 hover:bg-ui-surface-hover">
         <span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button bg-ui-warning-soft text-ui-warning"><i data-lucide="badge-check" class="h-5 w-5" aria-hidden="true"></i></span>
-        <span class="min-w-0"><strong class="block text-sm text-ui-text">Validation et publication</strong><span class="mt-0.5 block text-xs text-ui-text-muted">Traiter uniquement les classes qui demandent une décision.</span></span>
+        <span class="min-w-0"><strong class="block text-sm text-ui-text">À valider</strong><span class="mt-0.5 block text-xs text-ui-text-muted">{{ ready_to_validate_count }} semestre(s) complet(s) à contrôler.</span></span>
         <i data-lucide="chevron-right" class="ml-auto h-4 w-4 shrink-0 text-ui-text-muted" aria-hidden="true"></i>
       </a>
-      <div class="flex min-w-0 items-center gap-3 p-4">
+      <a href="{% url 'accounts_portal:portal_dashboard' %}?section=evaluations&view=publication"
+         hx-get="{% url 'accounts_portal:director_evaluations_subcontent' %}?view=publication"
+         hx-target="#director-results-subcontent" hx-swap="innerHTML"
+         hx-push-url="{% url 'accounts_portal:portal_dashboard' %}?section=evaluations&view=publication"
+         hx-indicator="#director-results-loading"
+         class="ui-focus-ring flex min-w-0 items-center gap-3 p-4 hover:bg-ui-surface-hover">
+        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button bg-ui-primary-soft text-ui-primary"><i data-lucide="send" class="h-5 w-5" aria-hidden="true"></i></span>
+        <span class="min-w-0"><strong class="block text-sm text-ui-text">À publier</strong><span class="mt-0.5 block text-xs text-ui-text-muted">{{ ready_to_publish|length }} semestre(s) validé(s), avec confirmation OTP.</span></span>
+        <i data-lucide="chevron-right" class="ml-auto h-4 w-4 shrink-0 text-ui-text-muted" aria-hidden="true"></i>
+      </a>
+      <a href="{% url 'accounts_portal:portal_dashboard' %}?section=evaluations&view=bulletins"
+         hx-get="{% url 'accounts_portal:director_evaluations_subcontent' %}?view=bulletins"
+         hx-target="#director-results-subcontent" hx-swap="innerHTML"
+         hx-push-url="{% url 'accounts_portal:portal_dashboard' %}?section=evaluations&view=bulletins"
+         hx-indicator="#director-results-loading"
+         class="ui-focus-ring flex min-w-0 items-center gap-3 p-4 hover:bg-ui-surface-hover">
         <span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button bg-ui-success-soft text-ui-success"><i data-lucide="file-text" class="h-5 w-5" aria-hidden="true"></i></span>
-        <span class="min-w-0"><strong class="block text-sm text-ui-text">Bulletins</strong><span class="mt-0.5 block text-xs text-ui-text-muted">La génération reste disponible dans le drawer d'un semestre publié.</span></span>
-      </div>
+        <span class="min-w-0"><strong class="block text-sm text-ui-text">Bulletins</strong><span class="mt-0.5 block text-xs text-ui-text-muted">{{ published_count }} résultat(s) publié(s) à générer ou consulter.</span></span>
+        <i data-lucide="chevron-right" class="ml-auto h-4 w-4 shrink-0 text-ui-text-muted" aria-hidden="true"></i>
+      </a>
+    </div>
+  {% endcomponent %}
+
+  {% component "ui_core.panel" title="Suivi de la saisie" subtitle="Ces états proviennent directement des semestres et des notes saisis par l'Informaticien." padding=False %}
+    <div class="grid divide-y divide-ui-border sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+      <a href="{% url 'accounts_portal:portal_dashboard' %}?section=evaluations&view=control&validation_scope=all"
+         hx-get="{% url 'accounts_portal:director_evaluations_subcontent' %}?view=control&validation_scope=all"
+         hx-target="#director-results-subcontent" hx-swap="innerHTML"
+         hx-push-url="{% url 'accounts_portal:portal_dashboard' %}?section=evaluations&view=control&validation_scope=all"
+         class="ui-focus-ring flex items-center gap-3 p-4 hover:bg-ui-surface-hover">
+        <span class="grid h-9 w-9 place-items-center rounded-ui-button bg-ui-info-soft text-ui-info"><i data-lucide="play" class="h-4 w-4" aria-hidden="true"></i></span>
+        <span><strong class="block text-sm text-ui-text">Saisies en cours</strong><span class="mt-0.5 block text-xs text-ui-text-muted">{{ in_progress|length }} semestre(s)</span></span>
+      </a>
+      <a href="{% url 'accounts_portal:portal_dashboard' %}?section=evaluations&view=control&validation_scope=all"
+         hx-get="{% url 'accounts_portal:director_evaluations_subcontent' %}?view=control&validation_scope=all"
+         hx-target="#director-results-subcontent" hx-swap="innerHTML"
+         hx-push-url="{% url 'accounts_portal:portal_dashboard' %}?section=evaluations&view=control&validation_scope=all"
+         class="ui-focus-ring flex items-center gap-3 p-4 hover:bg-ui-surface-hover">
+        <span class="grid h-9 w-9 place-items-center rounded-ui-button bg-ui-success-soft text-ui-success"><i data-lucide="clipboard-check" class="h-4 w-4" aria-hidden="true"></i></span>
+        <span><strong class="block text-sm text-ui-text">À contrôler</strong><span class="mt-0.5 block text-xs text-ui-text-muted">{{ waiting_director_review|length }} semestre(s)</span></span>
+      </a>
+      <a href="{% url 'accounts_portal:portal_dashboard' %}?section=programme&view=maquettes"
+         hx-get="{% url 'accounts_portal:director_workspace' %}?section=programme&view=maquettes"
+         hx-target="#director-workspace" hx-swap="innerHTML"
+         hx-push-url="{% url 'accounts_portal:portal_dashboard' %}?section=programme&view=maquettes"
+         class="ui-focus-ring flex items-center gap-3 p-4 hover:bg-ui-surface-hover">
+        <span class="grid h-9 w-9 place-items-center rounded-ui-button bg-ui-surface-muted text-ui-text-muted"><i data-lucide="library-big" class="h-4 w-4" aria-hidden="true"></i></span>
+        <span><strong class="block text-sm text-ui-text">Saisies non commencées</strong><span class="mt-0.5 block text-xs text-ui-text-muted">{{ without_notes|length }} maquette(s) prête(s)</span></span>
+      </a>
     </div>
   {% endcomponent %}
 

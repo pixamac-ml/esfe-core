@@ -8,7 +8,7 @@ from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.utils import timezone
 
-from academics.models import AcademicClass, AcademicEnrollment, EC, WeeklyScheduleSlot
+from academics.models import AcademicClass, AcademicEnrollment, AcademicScheduleEvent, EC, WeeklyScheduleSlot
 from academics.services.schedule_service import serialize_weekly_slot_for_ui
 
 
@@ -51,6 +51,7 @@ def _active_classes(branch):
 
 def _slot_payload(slot):
     payload = serialize_weekly_slot_for_ui(slot)
+    payload["is_active"] = slot.is_active
     payload["duration_minutes"] = int(
         (
             slot.end_time.hour * 60
@@ -63,12 +64,55 @@ def _slot_payload(slot):
     return payload
 
 
+def _event_payload(event):
+    start = timezone.localtime(event.start_datetime)
+    end = timezone.localtime(event.end_datetime)
+    duration = max(0, int((event.end_datetime - event.start_datetime).total_seconds() // 60))
+    return {
+        "id": event.id,
+        "title": event.ec.title if event.ec_id else event.title,
+        "event_title": event.title,
+        "status": event.status,
+        "status_label": event.get_status_display(),
+        "event_type": event.event_type,
+        "ec_id": event.ec_id,
+        "teacher_id": event.teacher_id,
+        "start_datetime": event.start_datetime,
+        "end_datetime": event.end_datetime,
+        "start_time": start.strftime("%H:%M"),
+        "end_time": end.strftime("%H:%M"),
+        "_start_time_obj": start.time().replace(second=0, microsecond=0),
+        "_end_time_obj": end.time().replace(second=0, microsecond=0),
+        "time_range": f"{start:%H:%M} - {end:%H:%M}",
+        "weekday_index": start.weekday(),
+        "weekday_label": start.strftime("%A"),
+        "teacher_name": (event.teacher.get_full_name() or event.teacher.username) if event.teacher_id else "Enseignant non defini",
+        "location": event.location or "Salle non precisee",
+        "room": event.location or "",
+        "branch_name": event.branch.name,
+        "class_name": event.academic_class.display_name,
+        "ec_code": event.ec.ue.code if event.ec_id and event.ec.ue_id else "",
+        "is_online": event.is_online,
+        "slot_label": start.strftime("%H:%M"),
+        "is_standard_slot": False,
+        "duration_minutes": duration,
+        "is_today": start.date() == timezone.localdate(),
+        "is_postponed": False,
+        "is_cancelled": event.status == AcademicScheduleEvent.STATUS_CANCELLED,
+        "is_completed": False,
+        "is_active": True,
+        "is_week_event": True,
+    }
+
+
 def _normalize_week_start(week_start):
     value = week_start or timezone.localdate()
     return value - timedelta(days=value.weekday())
 
 
-def build_weekly_timetable_grid(academic_class, *, week_start=None):
+def build_weekly_timetable_grid(
+    academic_class, *, week_start=None, include_inactive=False, display_mode="week"
+):
     normalized_week = _normalize_week_start(week_start)
     if academic_class is None:
         return {
@@ -81,25 +125,50 @@ def build_weekly_timetable_grid(academic_class, *, week_start=None):
             "week_end": normalized_week + timedelta(days=5),
         }
 
+    slots_qs = WeeklyScheduleSlot.objects.select_related("ec", "ec__ue", "teacher").filter(
+        academic_class=academic_class,
+        branch=academic_class.branch,
+    )
+    if not include_inactive:
+        slots_qs = slots_qs.filter(is_active=True)
     slots = list(
-        WeeklyScheduleSlot.objects.select_related("ec", "ec__ue", "teacher")
+        slots_qs
+        .order_by("weekday", "start_time", "end_time", "id")
+    )
+    slot_payloads = [_slot_payload(slot) for slot in slots] if display_mode == "template" else []
+    week_end = normalized_week + timedelta(days=6)
+    week_events = list(
+        AcademicScheduleEvent.objects.select_related("ec", "ec__ue", "teacher", "branch", "academic_class")
         .filter(
             academic_class=academic_class,
             branch=academic_class.branch,
+            event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
             is_active=True,
+            start_datetime__date__gte=normalized_week,
+            start_datetime__date__lte=week_end,
         )
-        .order_by("weekday", "start_time", "end_time", "id")
+        .exclude(status=AcademicScheduleEvent.STATUS_CANCELLED)
+        .order_by("start_datetime", "id")
     )
-    slot_payloads = [_slot_payload(slot) for slot in slots]
+    show_week_events = display_mode == "week"
+    if show_week_events:
+        slot_payloads = [_event_payload(event) for event in week_events]
     periods = set(DEFAULT_PERIODS)
-    periods.update((slot.start_time, slot.end_time) for slot in slots if slot.weekday < 6)
+    if show_week_events and week_events:
+        periods.update((payload["_start_time_obj"], payload["_end_time_obj"]) for payload in slot_payloads)
+    elif display_mode == "template":
+        periods.update((slot.start_time, slot.end_time) for slot in slots if slot.weekday < 6)
     ordered_periods = sorted(periods, key=lambda value: (value[0], value[1]))
 
     by_cell = {}
-    for slot, payload in zip(slots, slot_payloads):
-        if slot.weekday >= 6:
+    source_items = week_events if show_week_events else slots
+    for source, payload in zip(source_items, slot_payloads):
+        weekday = payload["weekday_index"] if "weekday_index" in payload else source.weekday
+        if weekday >= 6:
             continue
-        by_cell.setdefault((slot.weekday, slot.start_time, slot.end_time), []).append(payload)
+        start_value = payload.get("_start_time_obj") or source.start_time
+        end_value = payload.get("_end_time_obj") or source.end_time
+        by_cell.setdefault((weekday, start_value, end_value), []).append(payload)
 
     weekdays = [
         {
@@ -117,6 +186,7 @@ def build_weekly_timetable_grid(academic_class, *, week_start=None):
                 {
                     "weekday": weekday["value"],
                     "weekday_label": weekday["label"],
+                    "date": weekday["date"],
                     "slots": by_cell.get(
                         (weekday["value"], start_time, end_time), []
                     ),
@@ -139,15 +209,19 @@ def build_weekly_timetable_grid(academic_class, *, week_start=None):
         "total_hours": round(total_minutes / 60, 1),
         "missing_room_count": sum(1 for item in slot_payloads if not item["room"]),
         "sunday_slot_count": sum(1 for slot in slots if slot.weekday == 6),
+        "uses_week_events": bool(week_events),
+        "week_event_count": len(week_events),
+        "recurring_slot_count": len([slot for slot in slots if slot.is_active]),
         "week_start": normalized_week,
         "week_end": normalized_week + timedelta(days=5),
     }
 
 
 def build_director_timetable_context(
-    *, branch, subview="overview", selected_class_id=None, week_start=None, page_number=1
+    *, branch, subview="overview", selected_class_id=None, week_start=None, page_number=1, display_mode="week"
 ):
     subview = subview if subview in TIMETABLE_SUBVIEWS else "overview"
+    display_mode = display_mode if display_mode in {"week", "template"} else "week"
     classes = list(_active_classes(branch))
 
     selected_class = None
@@ -162,7 +236,12 @@ def build_director_timetable_context(
         )
 
     normalized_week = _normalize_week_start(week_start)
-    grid = build_weekly_timetable_grid(selected_class, week_start=normalized_week)
+    grid = build_weekly_timetable_grid(
+        selected_class,
+        week_start=normalized_week,
+        include_inactive=subview == "builder" and display_mode == "template",
+        display_mode=display_mode,
+    )
     slot_count = sum(item.timetable_slot_count for item in classes)
     configured_count = sum(1 for item in classes if item.timetable_slot_count)
     class_cards = [
@@ -180,9 +259,11 @@ def build_director_timetable_context(
     if selected_class is not None:
         query_params["class_id"] = selected_class.id
     query_params["week_start"] = normalized_week.isoformat()
+    query_params["mode"] = display_mode
 
     return {
         "timetable_subview": subview,
+        "timetable_display_mode": display_mode,
         "timetable_classes": classes,
         "timetable_class_cards": class_cards_page.object_list,
         "timetable_class_cards_page": class_cards_page,

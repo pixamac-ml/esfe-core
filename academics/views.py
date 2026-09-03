@@ -4,7 +4,7 @@ import zipfile
 from datetime import date, time
 
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.http import FileResponse, HttpResponse, JsonResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.template.loader import render_to_string
 from django.contrib.auth import get_user_model
@@ -47,7 +47,6 @@ from academics.services.reporting import (
     build_student_semester_report,
 )
 from academics.services.workflow import get_semester_permissions
-from academics.services.year import compute_year_result
 
 try:
     from weasyprint import HTML
@@ -56,6 +55,17 @@ except Exception:  # pragma: no cover
 
 
 User = get_user_model()
+
+
+def _can_validate_lesson_log(user):
+    """Validation is a supervisory act, never a teacher self-declaration."""
+    if user.is_superuser:
+        return True
+    profile = getattr(user, "profile", None)
+    return getattr(profile, "position", None) in {
+        "academic_supervisor",
+        "director_of_studies",
+    }
 
 
 def _ensure_pdf_backend():
@@ -92,11 +102,26 @@ def _build_semester_report_context(request, student_id, semester_id):
         Semester.objects.select_related("academic_class__branch"),
         id=semester_id,
     )
-    _ensure_can_view_semester_report(request, student_id, semester)
+    student = _ensure_can_view_semester_report(request, student_id, semester)
     permissions = get_semester_permissions(semester)
     if not permissions["can_generate_reports"]:
         raise PermissionDenied("Les releves ne sont disponibles qu'apres publication.")
-    return build_student_semester_report(student_id, semester_id)
+    bulletin = AcademicBulletin.objects.select_related(
+        "student__user",
+        "enrollment",
+        "academic_year",
+        "academic_class__branch",
+        "branch",
+        "semester",
+    ).filter(
+        student=student,
+        semester=semester,
+        bulletin_type=AcademicBulletin.TYPE_SEMESTER,
+        status=AcademicBulletin.STATUS_PUBLISHED,
+    ).first()
+    if bulletin is None:
+        raise Http404("Le relevé officiel est en cours de génération.")
+    return build_bulletin_context(bulletin)
 
 
 def _build_semester_report_filename(context):
@@ -112,20 +137,24 @@ def _render_pdf_from_template(request, template_name, context):
 
 
 def _render_semester_report_pdf(request, student_id, semester_id):
-    backend_error = _ensure_pdf_backend()
-    if backend_error is not None:
-        return None, None, backend_error
-
     context = _build_semester_report_context(request, student_id, semester_id)
-    html = render_to_string(
-        "academics/reports/semester_report.html",
-        context,
-        request=request,
-    )
-    pdf_bytes = HTML(
-        string=html,
-        base_url=request.build_absolute_uri(),
-    ).write_pdf()
+    bulletin = context["bulletin"]
+    if bulletin.pdf_file:
+        with bulletin.pdf_file.open("rb") as pdf_file:
+            pdf_bytes = pdf_file.read()
+    else:
+        backend_error = _ensure_pdf_backend()
+        if backend_error is not None:
+            return None, None, backend_error
+        html = render_to_string(
+            "academics/reports/bulletin_esfe.html",
+            context,
+            request=request,
+        )
+        pdf_bytes = HTML(
+            string=html,
+            base_url=request.build_absolute_uri(),
+        ).write_pdf()
     return pdf_bytes, context, None
 
 
@@ -159,7 +188,7 @@ def _get_class_student_ids(semester):
 @login_required
 def student_semester_report_view(request, student_id, semester_id):
     context = _build_semester_report_context(request, student_id, semester_id)
-    return render(request, "academics/reports/semester_report.html", context)
+    return render(request, "academics/reports/bulletin_esfe.html", context)
 
 
 @login_required
@@ -240,7 +269,7 @@ def class_reports_overview_view(request, semester_id):
     )
     _ensure_can_view_class_reports(request, semester.academic_class)
     published_bulletins = {
-        bulletin.student_id: bulletin
+        bulletin.enrollment_id: bulletin
         for bulletin in AcademicBulletin.objects.filter(
             academic_class=semester.academic_class,
             semester=semester,
@@ -249,13 +278,20 @@ def class_reports_overview_view(request, semester_id):
         )
     }
     rows = []
-    for student_id in _get_class_student_ids(semester):
-        context = _build_semester_report_context(request, student_id, semester.id)
+    enrollments = AcademicEnrollment.objects.select_related(
+        "student__student_profile",
+    ).filter(
+        academic_class=semester.academic_class,
+        academic_year=semester.academic_class.academic_year,
+        is_active=True,
+    ).order_by("student__student_profile__matricule", "id")
+    for enrollment in enrollments:
+        student = enrollment.student.student_profile
         rows.append({
-            "student_id": student_id,
-            "student_name": context["student_full_name"],
-            "student_matricule": context["student_matricule"],
-            "bulletin": published_bulletins.get(student_id),
+            "student_id": student.id,
+            "student_name": student.full_name,
+            "student_matricule": student.matricule,
+            "bulletin": published_bulletins.get(enrollment.id),
         })
 
     return render(
@@ -284,9 +320,20 @@ def annual_class_report_view(request, class_id):
 @login_required
 def student_annual_report_view(request, student_id):
     student = _resolve_report_student(student_id)
-    if not can_view_student_academic_report(request.user, student):
+    academic_year_id = (request.GET.get("academic_year_id") or "").strip()
+    if academic_year_id and not academic_year_id.isdigit():
+        raise Http404("Annee academique invalide.")
+    academic_year = (
+        get_object_or_404(AcademicYear, pk=int(academic_year_id))
+        if academic_year_id
+        else None
+    )
+    if not can_view_student_academic_report(request.user, student, academic_year=academic_year):
         raise PermissionDenied("Acces refuse a ce rapport academique.")
-    data = build_student_annual_report(student_id)
+    data = build_student_annual_report(
+        student_id,
+        academic_year_id=academic_year.id if academic_year else None,
+    )
     return render(
         request,
         "academics/reports/student_annual_report.html",
@@ -300,7 +347,7 @@ def student_year_report_view(request, student_id, academic_year_id):
     academic_year = get_object_or_404(AcademicYear, pk=academic_year_id)
     if not can_view_student_academic_report(request.user, student, academic_year=academic_year):
         raise PermissionDenied("Acces refuse a ce rapport academique.")
-    context = compute_year_result(student_id, academic_year_id)
+    context = build_student_annual_report(student_id, academic_year_id=academic_year_id)
     return render(request, "academics/reports/year_report.html", context)
 
 
@@ -522,6 +569,8 @@ def _serialize_lesson_log(lesson_log):
 def lesson_log_create_view(request):
     try:
         payload = _parse_json_body(request)
+        if payload.get("validated") and not _can_validate_lesson_log(request.user):
+            return JsonResponse({"ok": False, "errors": ["Validation réservée au contrôle académique."]}, status=403)
         branch = _resolve_branch(request, payload)
         academic_class = get_object_or_404(AcademicClass.objects.select_related("branch"), pk=payload.get("academic_class_id"))
         ec = get_object_or_404(EC.objects.select_related("ue__semester__academic_class"), pk=payload.get("ec_id"))
@@ -557,6 +606,8 @@ def lesson_log_create_view(request):
 def lesson_log_update_view(request, lesson_log_id):
     try:
         payload = _parse_json_body(request)
+        if payload.get("validated") and not _can_validate_lesson_log(request.user):
+            return JsonResponse({"ok": False, "errors": ["Validation réservée au contrôle académique."]}, status=403)
         lesson_log = get_object_or_404(
             LessonLog.objects.select_related("academic_class__branch", "ec", "teacher", "branch", "schedule_event"),
             pk=lesson_log_id,

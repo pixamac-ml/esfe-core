@@ -1,0 +1,526 @@
+PLAN DE CADRAGE — DASHBOARD ENSEIGNANT ESFE
+=============================================
+
+But de ce document
+-------------------
+Ce document sert de base de décision avant toute nouvelle refonte de l'espace
+enseignant. Il distingue clairement :
+
+1. ce qui existe réellement aujourd'hui ;
+2. ce qui fonctionne déjà et doit être conservé ;
+3. ce qui est incomplet, confus ou à revoir ;
+4. le dashboard cible ;
+5. les étapes à valider avant développement.
+
+Règle de travail
+----------------
+Le dashboard enseignant ne doit pas être un tableau de bord administratif.
+Il doit aider un enseignant à accomplir son travail pédagogique quotidien :
+
+    préparer un cours
+    -> donner le cours
+    -> déclarer ce qui a été fait
+    -> signer la déclaration
+    -> déposer les ressources pour les étudiants
+    -> suivre le contrôle et les honoraires
+
+Tout écran, bouton ou indicateur qui ne facilite pas directement cette chaîne
+doit être secondaire ou retiré du premier niveau de navigation.
+
+
+1. CE QUI EXISTE AUJOURD'HUI
+=============================
+
+1.1 Accès et périmètre
+----------------------
+- L'enseignant accède à son portail depuis /portal/teacher/.
+- L'accès est réservé au rôle/à la position "teacher".
+- Les lectures sont filtrées par annexe (branch). Un enseignant ne doit voir
+  que ses classes, ses séances, ses matières, ses cahiers et ses ressources.
+- Le dashboard utilise le shell certifié partagé avec les autres dashboards de
+  gestion ; il ne faut pas créer un nouveau shell isolé.
+
+1.2 Sections actuellement présentes
+-----------------------------------
+- Accueil / Aujourd'hui
+- Classes et matières
+- Planning / emploi du temps
+- Cahiers de texte
+- Supports ou ressources de cours
+- Évaluations : dépôt des sujets confiés par le Directeur des études
+- Honoraires
+- Notifications
+- Messagerie
+- Paramètres du compte
+
+1.3 Classes et matières
+-----------------------
+Le système détermine les classes et matières de l'enseignant à partir de :
+
+- séances planifiées qui lui sont affectées ;
+- créneaux hebdomadaires qui lui sont affectés ;
+- affectations établies par le Directeur des études.
+
+Pour chaque classe, le système peut déjà afficher :
+
+- programme et niveau ;
+- effectif étudiant ;
+- matières concernées ;
+- nombre de séances/créneaux ;
+- prochaine séance ;
+- accès au détail de la classe.
+
+1.4 Planning des cours
+----------------------
+- Les séances proviennent de l'emploi du temps académique publié.
+- Une séance annulée ou brouillon ne doit pas être utilisable comme cours réel.
+- L'enseignant peut consulter son planning par semaine.
+- Depuis une séance, il peut ouvrir le cahier de texte correspondant.
+
+1.5 Cahier de texte et déclaration du cours
+--------------------------------------------
+Le mécanisme maintenant disponible est le suivant :
+
+1. L'enseignant ouvre une séance publiée qui a commencé.
+2. Il décrit le contenu traité, les devoirs et ses observations.
+3. Il peut enregistrer un brouillon.
+4. Il choisit "Signer et soumettre".
+5. Sa signature manuscrite est capturée.
+6. Le cahier est transmis au surveillant académique.
+7. Le surveillant constate la présence et le cours assuré.
+8. Le surveillant valide l'appel des étudiants.
+9. Le surveillant approuve ou retourne le cahier.
+10. Une fois approuvé, le cahier est verrouillé et devient éligible aux
+    honoraires selon les règles existantes.
+
+Protections déjà en place :
+
+- impossibilité de déclarer ou signer avant le début de la séance ;
+- impossibilité de déclarer une séance brouillon ou annulée ;
+- impossibilité de modifier un cahier déjà validé ;
+- une signature est liée au contenu exact du cahier ;
+- toute modification invalide la signature précédente ;
+- le surveillant ne peut pas approuver sans signature cohérente, constat
+  enseignant et appel étudiant validé.
+
+1.6 Signature électronique manuscrite
+--------------------------------------
+Un socle réutilisable de signature a été introduit dans core :
+
+- demande de signature liée à une annexe, un objet métier et un signataire ;
+- jeton unique et temporaire ;
+- image de signature, empreinte SHA-256, date, IP et navigateur ;
+- copie figée (snapshot) du document signé ;
+- statuts : attente, signée, approuvée, expirée, annulée ;
+- approbation distincte par le responsable métier.
+
+Utilisation actuelle : cahier de texte enseignant.
+
+IMPORTANT : le dashboard gestionnaire possède encore son propre mécanisme de
+signature pour les paiements (salaires/honoraires). Il ne faut pas le remplacer
+à la hâte : les règles de paiement, caisse, reçus et approbation sont sensibles.
+La convergence vers le socle générique devra être un chantier séparé, documenté
+et testé financièrement.
+
+1.7 Ressources et supports de cours
+-----------------------------------
+L'enseignant peut déjà :
+
+- choisir une classe ;
+- choisir une matière ;
+- choisir ou créer un chapitre ;
+- ajouter un support ;
+- modifier un support ;
+- désactiver/supprimer un support ;
+- consulter un support existant.
+
+Types possibles :
+
+- PDF ;
+- document Word ;
+- tableur ;
+- présentation ;
+- image ;
+- audio ;
+- vidéo téléversée ou URL vidéo ;
+- contenu texte.
+
+Contrôles existants :
+
+- l'enseignant ne peut agir que sur ses matières/classe de son annexe ;
+- le format et le type MIME du fichier sont vérifiés ;
+- un texte ne prend pas de fichier ;
+- une vidéo doit avoir un fichier ou une URL ;
+- un fichier doit correspondre au type de ressource déclaré.
+
+Les étudiants utilisent les mêmes contenus ECContent depuis leur portail.
+
+1.8 Évaluations
+---------------
+- Le Directeur des études peut confier un sujet à déposer à l'enseignant.
+- L'enseignant peut joindre le fichier du sujet et une note.
+- Le système montre les dépôts reçus et ceux qui restent à transmettre.
+
+1.9 Honoraires et suivi personnel
+---------------------------------
+- Les honoraires restent séparés des salaires du personnel.
+- Ils dépendent des heures validées et du tarif enseignant.
+- L'enseignant peut consulter ses heures et l'état de ses fiches.
+- Ce module doit rester informatif pour l'enseignant : il ne doit pas lui
+  donner de pouvoir de validation financière.
+
+
+2. CE QUI EST CONFUS OU À CORRIGER
+===================================
+
+2.1 Navigation trop administrative
+-----------------------------------
+Le dashboard a été construit comme une succession de rubriques techniques.
+Pour un enseignant, les termes "dashboard", "logs", "supports", "planning"
+et "honoraires" au même niveau ne racontent pas une journée de travail.
+
+Conséquence : l'enseignant ne sait pas immédiatement :
+
+- quel cours il doit traiter maintenant ;
+- quoi faire après le cours ;
+- si son cahier est seulement en brouillon, signé, retourné ou validé ;
+- où déposer rapidement une ressource pour une matière précise.
+
+2.2 Accueil surchargé ou peu priorisé
+--------------------------------------
+Un accueil ne doit pas afficher d'abord des statistiques. Il doit répondre à :
+
+- Quel est mon prochain cours ?
+- Que dois-je faire maintenant ?
+- Quel cahier doit être complété ou corrigé ?
+- Quel support dois-je préparer ou publier ?
+
+Les indicateurs doivent venir après ces réponses et rester secondaires.
+
+2.3 Parcours support trop long pour une action fréquente
+--------------------------------------------------------
+Le dépôt de support est fonctionnel mais nécessite plusieurs choix successifs.
+Cela est normal pour la sécurité du périmètre, mais l'interface doit guider
+l'enseignant clairement :
+
+    classe -> matière -> chapitre -> type -> fichier/URL/texte -> publier
+
+Chaque étape doit montrer ce qui est choisi et ce qui sera visible par les
+étudiants.
+
+2.4 Vocabulaire de cahier à rendre explicite
+---------------------------------------------
+Les statuts métier doivent toujours être exprimés avec des mots pédagogiques :
+
+- À venir : la séance n'a pas commencé.
+- Cahier à compléter : la séance a commencé ou est terminée sans déclaration.
+- Brouillon à signer : contenu enregistré, mais pas encore transmis.
+- Signé · à contrôler : l'enseignant a terminé son action.
+- Retour demandé : correction attendue du surveillant.
+- Cours validé : la chaîne est terminée.
+
+Il ne faut pas exposer les valeurs techniques : planned, submitted, done,
+returned, etc.
+
+2.5 À ne pas faire pendant la refonte
+-------------------------------------
+- Ne pas mélanger l'enseignant et le surveillant dans le même écran.
+- Ne pas permettre à l'enseignant de valider sa propre présence ou ses heures.
+- Ne pas créer un nouveau dashboard shell hors du système certifié.
+- Ne pas supprimer les contrôles d'annexe.
+- Ne pas déplacer les règles financières sans plan dédié.
+- Ne pas refaire l'interface uniquement avec des couleurs ou des cartes :
+  la priorité est la compréhension du parcours.
+
+
+3. DASHBOARD CIBLE PROPOSÉ
+===========================
+
+3.1 Navigation principale (premier niveau)
+-------------------------------------------
+
+A. MA JOURNÉE
+   - Aujourd'hui
+   - Mon planning
+
+B. MES COURS
+   - Classes et matières
+   - Ressources de cours
+   - Cahiers de texte
+
+C. SUIVI
+   - Évaluations
+   - Honoraires
+   - Notifications et messagerie
+   - Mon compte
+
+Cette organisation est volontairement courte. Les fonctions de suivi ne
+doivent pas concurrencer le travail de cours au premier regard.
+
+3.2 Écran "Aujourd'hui"
+------------------------
+Objectif : savoir quoi faire sans chercher.
+
+Contenu attendu, dans cet ordre :
+
+1. Bandeau de journée
+   - date ;
+   - nombre de cours du jour ;
+   - message simple : "Voici vos cours et actions du jour".
+
+2. Carte "Ma prochaine action"
+   - cours en cours, sinon prochain cours ;
+   - classe, matière, horaire, salle ;
+   - statut de la séance ;
+   - un bouton unique adapté au statut :
+       * Préparer les ressources
+       * Ouvrir le cahier
+       * Reprendre le brouillon
+       * Voir le cahier signé
+
+3. Liste "Mes séances d'aujourd'hui"
+   - une ligne par séance ;
+   - le statut lisible ;
+   - maximum deux actions utiles : cahier et ressources.
+
+4. Bloc "À traiter"
+   - cahiers retournés ;
+   - séances passées sans cahier ;
+   - demandes de sujets d'évaluation ;
+   - aucun message d'alerte inutile.
+
+5. Bloc "À préparer"
+   - les trois prochaines séances ;
+   - raccourci vers les ressources de la matière concernée.
+
+3.3 Écran "Mon planning"
+-------------------------
+Objectif : préparer sa semaine, pas seulement lire un tableau.
+
+Fonctionnalités attendues :
+
+- vue semaine ;
+- cartes de séances avec heure, classe, matière, salle ;
+- distinction visuelle aujourd'hui / passé / à venir ;
+- clic sur une séance : détail pédagogique ;
+- depuis une séance à venir : préparer les ressources ;
+- depuis une séance commencée/passée : ouvrir le cahier.
+
+3.4 Écran "Classes et matières"
+--------------------------------
+Objectif : comprendre son périmètre d'enseignement.
+
+Pour chaque classe :
+
+- nom de classe et programme ;
+- matières confiées ;
+- effectif ;
+- prochaine séance ;
+- accès aux ressources de chaque matière ;
+- accès aux derniers cahiers correspondants.
+
+Une carte par classe est préférable à une grande table sur mobile. La table
+peut rester disponible sur grand écran ou dans un détail.
+
+3.5 Écran "Ressources de cours"
+--------------------------------
+Objectif : publier une ressource sans se perdre.
+
+Parcours cible :
+
+1. Je choisis la classe.
+2. Je choisis la matière.
+3. Je choisis ou crée le chapitre.
+4. Je choisis le type : fichier, vidéo ou texte.
+5. Je donne un titre et j'ajoute le contenu.
+6. Je confirme la publication.
+
+L'écran doit aussi montrer :
+
+- ce qui est déjà publié ;
+- le chapitre concerné ;
+- le type de ressource ;
+- un aperçu ou bouton voir ;
+- modifier ;
+- retirer de la visibilité étudiante (préférable à une suppression définitive
+  si l'historique pédagogique doit être conservé).
+
+Question à arbitrer avant développement :
+    un support est-il visible immédiatement aux étudiants dès sa création,
+    ou doit-il passer par l'état brouillon/publier ?
+
+3.6 Écran "Cahiers de texte"
+-----------------------------
+Objectif : terminer les déclarations de séance sans ambiguïté.
+
+Organisation cible :
+
+- En priorité : "À faire maintenant" (séances passées sans cahier).
+- Ensuite : "À corriger" (cahiers retournés).
+- Puis : "En attente du surveillant" (signés et soumis).
+- Enfin : "Historique validé".
+
+Formulaire cible :
+
+- contexte non modifiable en haut : classe, matière, créneau, salle ;
+- contenu traité (obligatoire) ;
+- devoir/travail demandé (optionnel) ;
+- observation pédagogique (optionnelle) ;
+- bouton secondaire : Enregistrer le brouillon ;
+- bouton principal : Signer et soumettre ;
+- après signature : statut clair et impossibilité de modifier sans retour.
+
+3.7 Écran "Évaluations"
+-------------------------
+Objectif : répondre simplement à une demande du Directeur des études.
+
+- liste des sujets à déposer ;
+- échéance visible ;
+- matière et classe ;
+- dépôt de fichier ;
+- note facultative ;
+- statut transmis / à déposer ;
+- historique du dernier dépôt.
+
+3.8 Écran "Honoraires"
+-----------------------
+Objectif : informer, non gérer la finance.
+
+- heures validées ;
+- tarif applicable ;
+- montant estimé ou disponible ;
+- statut de la fiche ;
+- historique des paiements et documents disponibles.
+
+
+4. FONCTIONNALITÉS À PRÉVOIR OU À DÉCIDER
+===========================================
+
+4.1 Préparation de séance
+-------------------------
+Proposition : depuis une séance à venir, permettre à l'enseignant de créer une
+fiche de préparation personnelle : objectif, déroulé, ressources, exercices.
+
+Décision nécessaire :
+    cette fiche est-elle privée à l'enseignant ou consultable par le Directeur
+    des études / surveillant ?
+
+4.2 Publication des ressources
+------------------------------
+Proposition : distinguer deux états :
+
+- Brouillon : visible uniquement par l'enseignant.
+- Publié : visible par les étudiants inscrits dans la classe/matière.
+
+Décision nécessaire :
+    faut-il une validation du surveillant/DE avant publication ?
+
+4.3 Notifications utiles
+------------------------
+À conserver uniquement si elles entraînent une action :
+
+- cahier retourné ;
+- séance à compléter ;
+- sujet d'évaluation demandé ;
+- ressource publiée avec succès ;
+- honoraires disponibles.
+
+4.4 Indicateurs utiles
+----------------------
+À afficher seulement si leur sens est immédiat :
+
+- séances du jour ;
+- cahiers à compléter ;
+- cahiers retournés ;
+- ressources publiées ;
+- heures validées du mois.
+
+Ne pas afficher des statistiques décoratives sans action associée.
+
+
+5. ORDRE DE RÉALISATION RECOMMANDÉ
+===================================
+
+PHASE 0 — VALIDATION FONCTIONNELLE (à faire avant de continuer)
+----------------------------------------------------------------
+- Valider la navigation cible.
+- Valider les libellés métier.
+- Décider le comportement brouillon/publié des ressources.
+- Décider si une fiche de préparation de séance est nécessaire.
+
+PHASE 1 — PARCOURS "MA JOURNÉE"
+--------------------------------
+- Refaire l'accueil autour de la prochaine action.
+- Présenter les séances du jour avec leurs statuts métier.
+- Ajouter les raccourcis cohérents vers cahier et ressources.
+
+PHASE 2 — CAHIERS DE TEXTE
+--------------------------
+- Réorganiser l'écran par priorité : à faire, à corriger, à contrôler,
+  historique.
+- Simplifier le formulaire et les messages de signature.
+- Vérifier les cas : séance future, brouillon, retour, validation finale.
+
+PHASE 3 — RESSOURCES DE COURS
+-----------------------------
+- Transformer le dépôt en parcours guidé.
+- Clarifier ce que voient les étudiants.
+- Ajouter si validé les états brouillon/publié.
+- Tester les fichiers PDF, Word, PowerPoint, vidéo et texte.
+
+PHASE 4 — CLASSES, PLANNING ET ÉVALUATIONS
+-------------------------------------------
+- Adapter les détails de classe à la préparation de cours.
+- Rendre le planning actionnable.
+- Finaliser le dépôt de sujets d'évaluation.
+
+PHASE 5 — SUIVI ET FINITION
+---------------------------
+- Honoraires, notifications, messagerie et compte.
+- Tests d'accès, annexe, mobile et documents.
+- Relecture complète avec un enseignant pilote.
+
+
+6. TESTS À EXIGER AVANT MISE EN SERVICE
+========================================
+
+- Un enseignant ne voit pas les classes ou supports d'une autre annexe.
+- Un enseignant ne peut pas créer un cahier pour une séance future, annulée
+  ou qui ne lui appartient pas.
+- Un brouillon peut être repris.
+- Un cahier signé est transmis et ne peut plus être modifié sans retour.
+- Un cahier retourné peut être corrigé et resigné.
+- Un surveillant ne peut pas approuver sans signature, présence et appel.
+- Un support de chaque type accepté est déposable et visible au bon étudiant.
+- Un fichier interdit ou incohérent est refusé.
+- Les sections restent utilisables sur mobile.
+
+
+7. DÉCISIONS À PRENDRE AVANT LA PROCHAINE MODIFICATION
+========================================================
+
+1. Valides-tu la navigation cible en trois groupes :
+   Ma journée / Mes cours / Suivi ?
+
+2. Les ressources doivent-elles être publiées immédiatement, ou avoir un
+   brouillon puis un bouton "Publier pour les étudiants" ?
+
+3. Veux-tu une vraie fiche de préparation de séance avant le cours ?
+
+4. Le surveillant doit-il voir les ressources déposées, ou seulement les
+   cahiers et le déroulement des séances ?
+
+5. Quel est le premier parcours à réaliser après validation :
+   - Ma journée ;
+   - Cahiers de texte ;
+   - Ressources de cours ?
+
+
+Conclusion
+==========
+
+Le socle métier nécessaire existe déjà en grande partie : affectations,
+planning, cahier, signature, contrôle, ressources et honoraires. La prochaine
+étape ne doit donc pas être une nouvelle accumulation de modules. Elle doit
+être une organisation claire de ces mécanismes autour du quotidien de
+l'enseignant.

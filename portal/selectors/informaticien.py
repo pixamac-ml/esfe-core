@@ -21,10 +21,20 @@ def support_tickets_for_branch(*, branch, status=""):
     return queryset.order_by("-created_at", "-id")
 
 
-def audit_logs_for_branch(*, branch):
+def audit_logs_for_branch(*, branch, query="", action_type=""):
     queryset = SupportAuditLog.objects.select_related("actor", "target_user", "branch")
     if branch:
         queryset = queryset.filter(branch=branch)
+    if query:
+        queryset = queryset.filter(
+            Q(target_label__icontains=query)
+            | Q(details__icontains=query)
+            | Q(actor__first_name__icontains=query)
+            | Q(actor__last_name__icontains=query)
+            | Q(actor__username__icontains=query)
+        )
+    if action_type:
+        queryset = queryset.filter(action_type=action_type)
     return queryset.order_by("-created_at", "-id")
 
 

@@ -1,38 +1,1869 @@
-J'ai analysé tout le dashboard secrétaire. Voici l'état des lieux :
+# MISSION — RECENTRAGE DÉFINITIF DU DASHBOARD INFORMATICIEN
 
-CE QUI EXISTE (521 lignes de dashboard + 1067 lignes de base template)
-- 10 sections : Overview, Registry, Visits, Classes, Students,
-  Appointments, Deposits, Salary, Notifications, Settings, Reports
-- 20+ partials HTMX
-- Base template auto-conçue avec CSS inline (sg-*) + Font Awesome
-- Un seul composant UI utilisé : metric_card
+Nous devons maintenant revoir le dashboard **Informaticien d’annexe** de ESFé Core.
 
-LE PLAN DE REBUILD
-1. Créer secretary/dashboards/ (comme accounts/dashboards/)
-   - dashboard_views.py → vue principale
-   - htmx_secretary.py → endpoints HTMX (détachés de views.py)
-   - helpers.py, permissions.py, querysets.py
+Cette tâche n’est PAS une reconstruction générale du dashboard et ne doit surtout pas casser les fonctionnalités déjà stabilisées, notamment :
 
-2. Réécrire base.html → utiliser le layout partagé (Lucide au lieu de
-   FontAwesome, Tailwind via tokens CSS, Alpine + HTMX officiels)
+* le module de saisie des notes ;
+* la grille de notes ;
+* les calculs automatiques déjà réalisés ;
+* l’import/export Excel des notes ;
+* le module de cartes déjà fonctionnel ;
+* les composants UI déjà stabilisés ;
+* la navigation HTMX/Alpine existante lorsqu’elle reste pertinente.
 
-3. Réécrire dashboard.html avec uniquement {% component %} :
-   - {% component "page_header" %} pour chaque section
-   - {% component "toolbar" %} pour les listes
-   - {% component "widget_card" %} pour les KPIs
-   - {% component "data_table" %} pour les tableaux
-   - {% component "pagination" %} pour la pagination
-   - {% component "empty_state" %} pour les états vides
-   - {% component "filter_bar" %} pour les recherches
-   - {% component "loading_overlay" %} pour le feedback instantané
-
-4. Réécrire les partials HTMX avec les composants UI
-
-5. Supprimer le CSS sg-* inline (1067→~200 lignes)
+Le but est principalement de **corriger le périmètre métier de l’Informaticien** en supprimant ou transférant les responsabilités qui ne lui appartiennent finalement pas.
 
 ---
 
-Je propose de commencer par la section la plus simple (Reports ~40 lignes)
-pour valider le pattern, puis la section la plus complexe (Overview ~80 lignes).
+# 1. CONTEXTE MÉTIER IMPORTANT
 
-Tu valides le plan ? Je commence par quelle section ?
+Après clarification avec l’établissement, nous devons appliquer une séparation stricte des responsabilités.
+
+## Directeur des Études
+
+Le Directeur des Études est le **responsable académique**.
+
+C’est lui qui doit notamment :
+
+* concevoir les maquettes académiques ;
+* créer/configurer les structures pédagogiques ;
+* définir les UE ;
+* définir les EC/matières ;
+* affecter les EC aux UE ;
+* définir crédits ;
+* coefficients ;
+* seuils de validation ;
+* règles académiques configurables ;
+* préparer les maquettes utilisées pour chaque classe ;
+* paramétrer les informations académiques nécessaires ;
+* contrôler les résultats ;
+* valider les résultats ;
+* autoriser leur publication.
+
+Ces responsabilités doivent donc progressivement sortir du dashboard Informaticien et appartenir au dashboard Directeur des Études.
+
+Une prochaine tâche sera consacrée au dashboard Directeur des Études.
+
+NE PAS implémenter toute cette nouvelle interface DE pendant cette mission sauf si une petite adaptation technique est indispensable pour éviter une régression.
+
+---
+
+# 2. NOUVEAU RÔLE DE L’INFORMATICIEN
+
+L’Informaticien n’est PAS le créateur de la structure académique.
+
+Il est principalement un **opérateur technique d’annexe**.
+
+Son dashboard doit être beaucoup plus simple et ciblé.
+
+Ses grandes responsabilités sont désormais :
+
+## A. NOTES
+
+L’Informaticien saisit les notes.
+
+Il travaille sur une maquette qui a déjà été préparée/configurée par le Directeur des Études.
+
+Workflow attendu :
+
+Directeur des Études
+→ prépare la maquette
+→ définit UE/EC/crédits/coefficient/seuils/etc.
+
+Informaticien
+→ sélectionne la classe
+→ sélectionne le semestre/session concerné
+→ ouvre la maquette déjà prête
+→ saisit les notes ou importe les notes
+→ le système calcule automatiquement
+→ vérifie les éventuelles anomalies techniques
+→ termine la saisie
+
+Système
+→ calcule automatiquement les résultats
+
+Directeur des Études
+→ reçoit une notification / état prêt à contrôler
+→ vérifie
+→ valide
+→ publie selon le workflow académique.
+
+### IMPORTANT
+
+L’Informaticien ne doit plus pouvoir :
+
+* créer une UE ;
+* créer un EC depuis son workflow de notes ;
+* modifier la composition pédagogique d’une maquette ;
+* modifier les crédits ;
+* modifier les coefficients ;
+* modifier les seuils ;
+* modifier les règles de validation ;
+* construire la structure académique à la place du DE.
+
+La grille de notes existante ne doit toutefois PAS être reconstruite inutilement.
+
+Elle fonctionne déjà et a fait l’objet de nombreuses corrections.
+
+Faire seulement les adaptations métier nécessaires.
+
+---
+
+# 3. IMPORT / EXPORT
+
+Cette fonctionnalité reste chez l’Informaticien.
+
+Il doit pouvoir :
+
+* télécharger/utiliser la maquette Excel autorisée ;
+* importer les notes ;
+* prévisualiser l’import ;
+* détecter les erreurs ;
+* corriger les problèmes de données autorisés ;
+* exporter les notes ;
+* exporter les états nécessaires.
+
+Mais l’import doit fonctionner sur une **structure académique déjà existante**.
+
+Un fichier Excel ne doit pas permettre à l’Informaticien de créer silencieusement :
+
+* UE ;
+* EC ;
+* crédits ;
+* coefficients ;
+* règles académiques.
+
+Si la maquette académique n’est pas prête ou présente une incohérence structurelle, l’Informaticien doit recevoir une information claire du type :
+
+> « Cette maquette doit être complétée par le Directeur des Études avant la saisie des notes. »
+
+Ne pas lui proposer un bouton permettant de corriger lui-même la structure académique.
+
+---
+
+# 4. CARTES
+
+Conserver le module de gestion des cartes déjà réalisé.
+
+Ne pas le reconstruire.
+
+Il fait partie des responsabilités de l’Informaticien.
+
+Selon ce qui existe déjà dans le projet, conserver notamment :
+
+* consultation ;
+* sélection par classe ;
+* génération ;
+* prévisualisation ;
+* impression/PDF ;
+* carte individuelle ;
+* éventuellement QR code si déjà branché.
+
+Toute amélioration doit rester compatible avec l’existant.
+
+---
+
+# 5. COMPTES UTILISATEURS ET ASSISTANCE TECHNIQUE
+
+C’est un domaine important de l’Informaticien.
+
+Il doit continuer à pouvoir traiter les problèmes techniques liés aux comptes de **son annexe**.
+
+Conserver/organiser les fonctions utiles telles que :
+
+* rechercher un utilisateur ;
+* consulter sa fiche ;
+* voir l’état du compte ;
+* compte actif/inactif ;
+* compte bloqué ;
+* suspension lorsque le workflow existant l’autorise ;
+* réactivation ;
+* déblocage ;
+* réinitialisation du mot de passe ;
+* correction de certaines informations techniques autorisées ;
+* consultation de la dernière connexion.
+
+Toutes les actions doivent être limitées à son annexe.
+
+Les protections backend existantes du type :
+
+`_same_branch_or_forbidden()`
+
+ou équivalent doivent être conservées et renforcées si nécessaire.
+
+Ne jamais se contenter de cacher un bouton dans le template.
+
+---
+
+# 6. FICHE TECHNIQUE D’UN UTILISATEUR
+
+Nous voulons améliorer la consultation technique d’un compte.
+
+Quand l’Informaticien ouvre un étudiant/utilisateur, prévoir une fiche de détail professionnelle contenant, lorsque les données existent :
+
+## Identité
+
+* nom ;
+* prénom ;
+* matricule ;
+* classe ;
+* formation ;
+* annexe ;
+* état du compte.
+
+## Sécurité du compte
+
+* compte actif/inactif ;
+* compte bloqué ou non ;
+* dernière connexion ;
+* date de dernière réinitialisation si disponible ;
+* incidents éventuels liés au compte.
+
+## Historique des connexions
+
+L’Informaticien doit pouvoir consulter un historique technique avec idéalement :
+
+* date ;
+* heure ;
+* adresse IP ;
+* navigateur ;
+* système d’exploitation ;
+* type d’appareil ;
+* mobile/tablette/ordinateur lorsque détectable ;
+* succès/échec de connexion si cette donnée est enregistrée ;
+* localisation approximative lorsqu’elle peut être déterminée proprement.
+
+IMPORTANT :
+
+Ne jamais inventer de données.
+
+Si ESFé Core n’enregistre pas actuellement user-agent/IP/login history, auditer d’abord le système existant avant d’ajouter un mécanisme.
+
+Une véritable localisation GPS précise nécessite normalement une autorisation du navigateur et ne doit pas être simulée.
+
+Une géolocalisation approximative dérivée d’une IP peut être envisagée séparément.
+
+Tout mécanisme ajouté doit respecter les exigences de sécurité et de confidentialité du système.
+
+---
+
+# 7. JOURNAL D’AUDIT — À CONSERVER ET AMÉLIORER
+
+Contrairement au module Support/Tickets, le journal d’audit est IMPORTANT.
+
+L’Informaticien doit pouvoir consulter les opérations techniques de son annexe.
+
+Le projet possède déjà notamment :
+
+`SupportAuditLog`
+
+et :
+
+`it_audit_workspace`
+
+Auditer cette implémentation avant toute modification.
+
+Le journal doit être **READ-ONLY pour l’Informaticien**.
+
+Il ne doit jamais pouvoir :
+
+* modifier une ligne d’audit ;
+* supprimer une ligne ;
+* réécrire un événement ;
+* nettoyer son propre historique.
+
+Le journal doit pouvoir tracer autant que possible :
+
+* connexion ;
+* déconnexion si disponible ;
+* réinitialisation de mot de passe ;
+* blocage/déblocage ;
+* activation/désactivation ;
+* import de notes ;
+* export ;
+* modification de notes ;
+* génération/réimpression de cartes ;
+* autres opérations sensibles réalisées par l’Informaticien.
+
+Prévoir des filtres simples si cela améliore réellement l’utilisation :
+
+* période ;
+* utilisateur ;
+* type d’action ;
+* module ;
+* résultat/statut.
+
+Ne pas transformer cela en système SIEM complexe.
+
+---
+
+# 8. SUPPORT / TICKETS — À RETIRER DU DASHBOARD
+
+Le module actuellement nommé :
+
+`Support`
+
+avec gestion de tickets n’est finalement pas requis pour le rôle métier défini par l’établissement.
+
+Le dashboard possède actuellement des éléments tels que :
+
+* `it_support_flow_workspace`
+* `support_workspace.html`
+* `support_panel.html`
+* création de ticket ;
+* prise en charge ;
+* résolution ;
+* commentaires.
+
+Nous ne voulons plus afficher ce workflow dans le dashboard Informaticien.
+
+Retirer :
+
+`Support`
+
+de la navigation principale.
+
+ATTENTION :
+
+Ne supprime pas brutalement les modèles/services partagés si d’autres parties du projet les utilisent.
+
+Faire d’abord une recherche de références.
+
+Si un composant backend est utilisé ailleurs, le conserver.
+
+Le but immédiat est de retirer cette responsabilité du périmètre et de l’interface Informaticien sans casser le reste du projet.
+
+---
+
+# 9. PARAMÈTRES ANNEXE — À RETIRER
+
+L’Informaticien ne doit plus paramétrer l’annexe.
+
+Il existe actuellement notamment :
+
+`it_branch_settings_workspace`
+
+et :
+
+`templates/portal/informaticien/workflows/branch_settings_workspace.html`
+
+et un lien :
+
+`Paramètres annexe`
+
+dans le menu profil.
+
+Cette responsabilité doit sortir du dashboard Informaticien.
+
+Retirer l’accès fonctionnel au paramétrage de l’annexe depuis le dashboard Informaticien.
+
+Son menu Compte doit seulement concerner :
+
+* son profil ;
+* son compte ;
+* sécurité ;
+* changement de mot de passe ;
+* préférences personnelles autorisées.
+
+NE PAS supprimer les paramètres de l’annexe au niveau du système si ceux-ci sont nécessaires : ils seront repositionnés auprès du rôle compétent, principalement Directeur des Études / Direction selon leur nature.
+
+---
+
+# 10. PARAMÉTRAGE ACADÉMIQUE — À RETIRER
+
+La navigation actuelle contient :
+
+`Paramétrage académique`
+
+avec :
+
+`it_structure_workspace`
+
+ainsi que des drawers/modals permettant de gérer classes/UE/EC/etc.
+
+Cette responsabilité ne doit plus appartenir à l’Informaticien.
+
+Retirer cette entrée de sa navigation.
+
+L’Informaticien peut CONSULTER les informations dont il a besoin pour saisir les notes, mais il ne doit plus posséder le CRUD académique permettant de construire la maquette.
+
+Différence importante :
+
+LECTURE nécessaire pour travailler : OUI.
+
+MODIFICATION de la structure académique : NON.
+
+Les composants backend de structure académique ne doivent pas être supprimés à l’aveugle car nous allons probablement les réutiliser dans le dashboard Directeur des Études.
+
+Identifier clairement ce qui peut être transféré/réutilisé.
+
+---
+
+# 11. CATALOGUE — À RETIRER
+
+La navigation actuelle possède :
+
+`Catalogue`
+
+qui semble notamment gérer :
+
+* Language ;
+* Profession ;
+* référentiels.
+
+Cela ne correspond pas aux tâches quotidiennes retenues pour l’Informaticien.
+
+Retirer cette entrée du dashboard Informaticien.
+
+Ne pas supprimer les données ni leurs modèles si d’autres fonctionnalités les utilisent.
+
+---
+
+# 12. ARCHIVES — AUDITER PUIS RETIRER DE LA NAVIGATION PRINCIPALE
+
+Le dashboard contient actuellement un module `Archives`, notamment lié à l’archivage/restauration de classes.
+
+L’Informaticien ne doit plus avoir comme responsabilité de décider de l’archivage ou de la restauration de structures académiques.
+
+Auditer précisément ce module.
+
+Retirer du périmètre Informaticien les opérations de :
+
+* archivage d’une classe ;
+* restauration académique ;
+* modification des archives académiques.
+
+Si certaines archives techniques doivent simplement être consultées dans le cadre d’un historique, elles peuvent être accessibles via le journal ou une fiche utilisateur, mais pas comme outil de gouvernance académique.
+
+---
+
+# 13. SUPERVISION — RÉÉVALUER
+
+Il existe actuellement :
+
+`Supervision`
+
+avec anomalies, alertes et points bloquants.
+
+Ne pas conserver automatiquement le module simplement parce qu’il existe.
+
+Auditer son contenu.
+
+### Conserver seulement
+
+les informations réellement utiles au travail technique de l’Informaticien, par exemple :
+
+* comptes bloqués ;
+* import en erreur ;
+* anomalies techniques de saisie ;
+* problème de données empêchant une opération ;
+* problèmes nécessitant son intervention.
+
+### Retirer/transférer
+
+les alertes qui relèvent :
+
+* du paramétrage académique ;
+* de la gouvernance académique ;
+* du Directeur des Études ;
+* de l’administration.
+
+S’il reste trop peu de contenu après cet audit, supprimer l’entrée `Supervision` de la sidebar et intégrer les quelques alertes utiles directement dans l’Accueil.
+
+C’est même la solution préférée si cela simplifie le dashboard.
+
+---
+
+# 14. NOTIFICATIONS — CONSERVER
+
+Conserver le centre de notifications déjà intégré.
+
+Les notifications doivent être contextualisées au rôle.
+
+Pour l’Informaticien, elles peuvent servir notamment à recevoir :
+
+* problème de compte ;
+* opération technique ;
+* anomalie de notes/import ;
+* retour du DE ;
+* demande nécessitant une intervention technique.
+
+Le système de notifications ne doit pas être reconstruit s’il fonctionne déjà.
+
+---
+
+# 15. COMPTE — CONSERVER MAIS SIMPLIFIER
+
+Conserver :
+
+`Compte`
+
+avec :
+
+* Mon profil ;
+* sécurité ;
+* changement de mot de passe ;
+* préférences personnelles utiles.
+
+Retirer :
+
+`Paramètres annexe`
+
+du menu utilisateur de l’Informaticien.
+
+---
+
+# 16. NAVIGATION CIBLE
+
+Après refonte, nous voulons un dashboard beaucoup plus léger.
+
+La sidebar devrait idéalement tourner autour de :
+
+1. Accueil
+2. Notes & Résultats
+3. Import / Export
+4. Cartes
+5. Utilisateurs / Comptes
+6. Journal d’audit
+7. Notifications
+8. Compte
+
+Éventuellement :
+
+`Supervision technique`
+
+UNIQUEMENT si l’audit démontre qu’elle apporte suffisamment de valeur et ne fait pas doublon avec Accueil.
+
+Ne pas ajouter des modules juste pour remplir la sidebar.
+
+Nous voulons un outil simple, professionnel et directement adapté au travail réel.
+
+---
+
+# 17. ACCUEIL DU DASHBOARD
+
+L’accueil doit lui aussi être recentré.
+
+Ne plus présenter l’Informaticien comme responsable de toute la structure académique.
+
+L’accueil doit montrer principalement des informations opérationnelles telles que :
+
+* annexe courante ;
+* classes actuellement exploitables pour les notes ;
+* progression des saisies ;
+* imports récents ;
+* comptes nécessitant une intervention ;
+* cartes éventuellement à générer ;
+* anomalies techniques ;
+* dernières opérations ;
+* notifications importantes.
+
+Les CTA doivent correspondre à ses responsabilités.
+
+Exemples :
+
+* Saisir les notes
+* Importer les notes
+* Rechercher un utilisateur
+* Voir les comptes bloqués
+* Générer les cartes
+* Consulter le journal
+
+NE PAS proposer :
+
+* Créer une UE
+* Ajouter un EC
+* Configurer les crédits
+* Paramétrer l’annexe
+* Créer une maquette académique
+
+---
+
+# 18. FRONTEND
+
+Respecter l’architecture visuelle déjà unifiée dans ESFé Core.
+
+Le dashboard Informaticien utilise actuellement :
+
+* Django templates ;
+* Tailwind ;
+* Alpine.js ;
+* HTMX ;
+* composants UI partagés.
+
+Ne pas revenir à une navigation traditionnelle avec rechargement complet.
+
+Conserver la fluidité HTMX existante.
+
+Réutiliser les composants de la librairie UI du projet lorsque disponibles.
+
+Éviter :
+
+* duplication de composants ;
+* HTML monolithique inutile ;
+* nouvelles palettes ;
+* nouvelles conventions visuelles spécifiques au seul Informaticien ;
+* modales/drawers incompatibles avec le reste des dashboards.
+
+---
+
+# 19. BACKEND ET PERMISSIONS
+
+Cette partie est CRITIQUE.
+
+Retirer un bouton du frontend n’est pas une permission.
+
+Après le changement de périmètre, vérifier les endpoints correspondants.
+
+Un utilisateur `position="it_support"` ne doit pas pouvoir envoyer directement une requête HTTP permettant de :
+
+* créer UE ;
+* créer EC ;
+* modifier crédits ;
+* modifier coefficient ;
+* modifier seuils ;
+* archiver/restaurer une classe académique si ce droit lui est retiré ;
+* modifier les paramètres de l’annexe ;
+* modifier les règles académiques.
+
+Analyser les permissions existantes avant modification.
+
+Réutiliser les helpers d’autorisation existants lorsque possible.
+
+Continuer également d’imposer le scope :
+
+`annexe de l’utilisateur connecté`
+
+sur les opérations autorisées.
+
+---
+
+# 20. ATTENTION AU WORKFLOW DE VALIDATION DES NOTES
+
+Le code actuel possède probablement encore des actions de workflow permettant à l’Informaticien d’aller trop loin dans le cycle académique.
+
+Auditer notamment :
+
+* `portal/services/notes_workflow.py`
+* `get_available_actions()`
+* `apply_notes_workflow_action()`
+* `it_notes_workflow_action`
+* les états `READY_TO_PUBLISH`
+* verrouillage ;
+* publication normale ;
+* publication finale ;
+* validation ;
+* décisions.
+
+Nous devons appliquer la nouvelle règle :
+
+### Informaticien
+
+* saisit ;
+* importe ;
+* corrige la saisie tant qu’elle est ouverte ;
+* termine/transmet la saisie.
+
+### Directeur des Études
+
+* contrôle ;
+* valide ;
+* verrouille académiquement lorsque nécessaire ;
+* publie ;
+* traite les décisions académiques.
+
+IMPORTANT :
+
+Ne casse pas la machine à états existante.
+
+Fais d’abord un audit pour identifier les actions actuellement attribuées à l’Informaticien qui devraient être transférées au DE.
+
+Puis adapte proprement les permissions et états.
+
+Si un changement profond risque de déstabiliser le système de notes déjà fonctionnel, documente-le séparément avant refactor massif.
+
+---
+
+# 21. TRANSFERT VERS LE DIRECTEUR DES ÉTUDES
+
+Nous allons ensuite créer/améliorer deux grandes zones dans le dashboard du Directeur des Études :
+
+## Paramètres de l’annexe
+
+pour les paramètres pertinents qui doivent être gérés à ce niveau.
+
+## Maquettes académiques
+
+avec un workflow du type :
+
+Formation
+→ Niveau
+→ Classe
+→ Année académique
+→ Semestre
+→ Maquette
+→ UE
+→ EC
+→ crédits
+→ coefficients
+→ seuils
+→ validation de la maquette.
+
+Donc :
+
+NE PAS supprimer définitivement les briques académiques utiles qui existent actuellement dans le dashboard Informaticien.
+
+Isoler celles qui peuvent être réutilisées ou déplacées.
+
+Éviter la duplication.
+
+---
+
+# 22. AUDIT AVANT MODIFICATION
+
+Avant de coder, rechercher précisément les références de :
+
+* `it_structure_workspace`
+* `it_structure_drawer`
+* `it_structure_modal`
+* `it_structure_action`
+* `it_branch_settings_workspace`
+* `it_support_flow_workspace`
+* `it_support_workspace`
+* `it_archives_workspace`
+* `it_archives_action`
+* `it_archive_detail`
+* `it_catalog_workspace`
+* `it_supervision_workspace`
+* `it_audit_workspace`
+* `SupportAuditLog`
+* `AccountSupportState`
+* toutes les routes `it_*`
+* les tests associés.
+
+Vérifier également :
+
+`templates/portal/informaticien/dashboard.html`
+
+où la navigation actuelle contient notamment :
+
+* Accueil
+* Notes & Résultats
+* Paramétrage académique
+* Import / export
+* Archives
+* Cartes étudiants
+* Utilisateurs
+* Support
+* Supervision
+* Journal d’audit
+* Catalogue
+* Notifications
+* Compte
+
+Cette liste doit être nettoyée conformément aux nouvelles règles.
+
+---
+
+# 23. NE PAS FAIRE DE SUPPRESSION DESTRUCTIVE AVEUGLE
+
+Nous sommes en phase de stabilisation avant production.
+
+Donc :
+
+1. identifier ;
+2. chercher les dépendances ;
+3. retirer les accès Informaticien ;
+4. transférer/réutiliser les composants lorsque nécessaire ;
+5. supprimer uniquement le code réellement mort et sans dépendance.
+
+Ne supprime jamais un modèle, service, route ou composant partagé simplement parce qu’il disparaît de la sidebar.
+
+---
+
+# 24. TESTS OBLIGATOIRES
+
+Ajouter ou adapter des tests qui prouvent au minimum que :
+
+* Informaticien peut ouvrir son dashboard ;
+* Informaticien peut ouvrir Notes ;
+* Informaticien peut saisir une note autorisée ;
+* Informaticien peut importer les notes ;
+* Informaticien peut exporter ;
+* Informaticien peut accéder aux cartes ;
+* Informaticien peut gérer les comptes autorisés de son annexe ;
+* accès cross-annexe reste interdit ;
+* Informaticien peut consulter le journal ;
+* Informaticien ne peut pas modifier/supprimer le journal ;
+* Informaticien ne peut plus paramétrer l’annexe ;
+* Informaticien ne peut plus créer/modifier UE/EC ;
+* Informaticien ne peut plus modifier crédits/coefficient/seuil ;
+* Informaticien ne peut plus archiver/restaurer une structure académique si cette responsabilité est retirée ;
+* routes retirées ne permettent pas de contourner l’UI ;
+* les modules Notes/Import/Cartes existants ne régressent pas.
+
+Exécuter les tests ciblés avant de considérer la tâche terminée.
+
+---
+
+# 25. LIVRABLE FINAL ATTENDU
+
+À la fin, donne-moi un rapport précis contenant :
+
+## A. Éléments retirés du dashboard Informaticien
+
+Avec fichiers/routes concernés.
+
+## B. Éléments conservés
+
+Et justification.
+
+## C. Éléments transférables au Directeur des Études
+
+Notamment les composants de structure académique et paramètres.
+
+## D. Permissions backend modifiées
+
+Liste précise.
+
+## E. Nouveau menu Informaticien
+
+Liste finale des sections.
+
+## F. Workflow Notes final
+
+Qui fait quoi entre :
+
+Informaticien → Système → Directeur des Études.
+
+## G. Audit utilisateur / connexions
+
+Indiquer ce qui existait déjà et ce qui a été ajouté.
+
+## H. Tests
+
+Commandes lancées + résultats.
+
+## I. Code mort restant
+
+Lister ce qui n’a volontairement pas été supprimé car il sera réutilisé pour le Directeur des Études.
+
+---
+
+# RÉSULTAT MÉTIER RECHERCHÉ
+
+À la fin de cette tâche, le dashboard Informaticien ne doit plus donner l’impression qu’il dirige le système académique.
+
+Il doit représenter très clairement le métier réel :
+
+> **L’Informaticien d’annexe exploite techniquement le système. Il saisit/import/exporte les notes sur des maquettes préparées par le Directeur des Études, gère les problèmes techniques des comptes, produit les cartes et dispose d’un journal de traçabilité. Il ne définit ni la structure pédagogique ni les règles académiques de l’établissement.**
+
+Le dashboard doit donc être :
+
+* plus léger ;
+* plus compréhensible ;
+* moins chargé ;
+* plus sécurisé ;
+* plus rapide à utiliser ;
+* cohérent avec la séparation réelle des responsabilités dans l’école.
+
+Commence par AUDITER l’existant avant de modifier quoi que ce soit, puis effectue les changements progressivement en protégeant les fonctionnalités déjà stabilisées.
+
+
+# OBJECTIF
+
+Nous ne voulons PAS refaire le dashboard du Directeur des Études.
+
+Nous voulons uniquement effectuer un raccordement métier ciblé entre le dashboard Directeur des Études et le dashboard Informaticien à la suite du recentrage du rôle Informaticien.
+
+Les fonctionnalités retirées du dashboard Informaticien doivent maintenant être rattachées au Directeur des Études lorsqu’elles relèvent de sa responsabilité.
+
+Ne modifier aucune autre section du dashboard DE sans nécessité directe.
+
+---
+
+# 1. RÈGLE MÉTIER PRINCIPALE
+
+Le workflow académique doit désormais être :
+
+**Directeur des Études**
+→ prépare/configure la maquette académique
+
+**Informaticien**
+→ utilise cette maquette pour saisir/importer les notes
+
+**Système**
+→ effectue les calculs automatiques
+
+**Directeur des Études**
+→ contrôle
+→ valide
+→ publie
+
+Il doit donc exister une dépendance réelle entre les deux dashboards.
+
+Le dashboard Informaticien ne doit plus posséder une structure académique indépendante.
+
+---
+
+# 2. AUDIT DU DASHBOARD DE
+
+Avant toute création :
+
+Identifier si le dashboard Directeur des Études possède déjà une section ou des fonctionnalités permettant de gérer :
+
+* UE ;
+* EC ;
+* matières ;
+* crédits ;
+* coefficients ;
+* seuils ;
+* classes ;
+* maquettes académiques ;
+* paramètres d’annexe.
+
+Si ces fonctionnalités existent déjà :
+
+**NE PAS les reconstruire.**
+
+Analyser leur fonctionnement et les adapter pour devenir la source officielle utilisée par le dashboard Informaticien.
+
+Réutiliser les modèles, services, vues, composants et endpoints existants.
+
+---
+
+# 3. SECTION 1 — PARAMÉTRAGE DE L’ANNEXE
+
+Le Directeur des Études doit disposer d’une section distincte :
+
+**Paramètres de l’annexe**
+
+Cette section est différente du paramétrage des maquettes.
+
+Elle concerne les informations/configurations applicables au fonctionnement de l’annexe.
+
+Faire d’abord un audit des données déjà disponibles dans les modèles existants.
+
+Ne pas créer de nouveaux champs en doublon.
+
+Le but est que les informations configurées ici puissent être utilisées dans les différents dashboards et modules de la même annexe.
+
+Respecter strictement le scope de l’annexe du Directeur des Études.
+
+Un DE ne doit jamais modifier une autre annexe.
+
+---
+
+# 4. SECTION 2 — PARAMÉTRAGE DES MAQUETTES
+
+Créer ou adapter une section distincte :
+
+**Maquettes académiques**
+
+Cette section doit permettre au Directeur des Études de préparer la structure utilisée ensuite pour les notes.
+
+Workflow minimum :
+
+Formation
+→ Niveau / Classe
+→ Année académique
+→ Semestre / Session
+→ Maquette
+→ UE
+→ EC / Matières
+→ Crédits
+→ Coefficients
+→ Seuils nécessaires
+→ Enregistrement / validation de la maquette.
+
+Ne pas mélanger cette section avec les paramètres généraux de l’annexe.
+
+---
+
+# 5. LIAISON AVEC LE DASHBOARD INFORMATICIEN
+
+Cette partie est CRITIQUE.
+
+Le dashboard Informaticien doit lire la maquette créée par le Directeur des Études.
+
+Il ne doit plus créer lui-même :
+
+* UE ;
+* EC ;
+* crédits ;
+* coefficients ;
+* seuils ;
+* composition académique.
+
+Lorsqu’il sélectionne :
+
+* formation ;
+* classe ;
+* année académique ;
+* semestre/session ;
+
+le système doit charger la maquette correspondante préparée par le DE.
+
+La grille de saisie des notes doit se construire à partir de cette source.
+
+Ne pas dupliquer les données de structure académique dans un autre système propre à l’Informaticien.
+
+Une seule source de vérité.
+
+---
+
+# 6. CAS : MAQUETTE ABSENTE
+
+Si aucune maquette exploitable n’existe pour la classe/période choisie :
+
+ne pas permettre une saisie normale des notes.
+
+Afficher clairement :
+
+> « Maquette académique non disponible. Le Directeur des Études doit d’abord préparer la maquette de cette classe. »
+
+Ne pas proposer à l’Informaticien :
+
+* créer une UE ;
+* ajouter un EC ;
+* définir un coefficient ;
+* corriger la structure.
+
+---
+
+# 7. RETOUR INFORMATICIEN → DIRECTEUR DES ÉTUDES
+
+La liaison doit fonctionner dans les deux sens.
+
+Lorsque l’Informaticien commence une saisie :
+
+le DE doit pouvoir connaître son état.
+
+États métier souhaités :
+
+* Maquette prête
+* Saisie non commencée
+* Saisie en cours
+* Saisie terminée
+* En attente de contrôle DE
+* Validée
+* Publiée
+
+Ne créer une nouvelle machine à états que si nécessaire.
+
+Auditer d’abord le workflow Notes existant et réutiliser les états/services déjà présents.
+
+---
+
+# 8. VALIDATION ET PUBLICATION
+
+L’Informaticien :
+
+* saisit ;
+* importe ;
+* corrige les notes autorisées ;
+* termine la saisie ;
+* transmet au DE.
+
+Le Directeur des Études :
+
+* contrôle ;
+* traite les anomalies académiques ;
+* valide ;
+* décide de la publication.
+
+La publication finale des résultats appartient au DE.
+
+Respecter les mécanismes de validation/OTP déjà présents dans le projet lorsqu’ils existent.
+
+---
+
+# 9. CANAUX DE PUBLICATION
+
+Ne pas reconstruire immédiatement toute la communication.
+
+Lorsqu’un résultat est publié par le DE, le système doit continuer à alimenter les mécanismes de publication existants.
+
+Cela peut notamment concerner selon les fonctionnalités déjà présentes :
+
+* dashboard étudiant ;
+* bulletins/relevés ;
+* affichage destiné à l’établissement ;
+* email ;
+* notifications.
+
+Auditer ce qui existe déjà.
+
+Ne pas ajouter de nouveaux canaux sans besoin.
+
+---
+
+# 10. ARCHIVAGE — HORS PÉRIMÈTRE
+
+Ne pas travailler sur une section Archives dans cette mission.
+
+Ne pas transférer automatiquement l’ancien module Archives de l’Informaticien au DE.
+
+Ce sujet sera traité séparément plus tard.
+
+Ne supprimer aucun modèle critique sans audit de dépendances.
+
+Retirer simplement l’archivage de ce chantier.
+
+---
+
+# 11. NE PAS REFAIRE LE DASHBOARD DE
+
+IMPORTANT :
+
+Ne pas :
+
+* refaire l’accueil du DE ;
+* refaire toute sa sidebar ;
+* modifier ses autres modules ;
+* refaire planning ;
+* refaire enseignants ;
+* refaire bulletins ;
+* refaire évaluations ;
+* restructurer tout le dashboard.
+
+Nous faisons uniquement :
+
+1. audit des fonctionnalités déjà présentes relatives aux maquettes et paramètres ;
+2. ajout/adaptation de `Paramètres de l’annexe` ;
+3. ajout/adaptation de `Maquettes académiques` ;
+4. raccordement avec la saisie Informaticien ;
+5. raccordement retour Informaticien → DE ;
+6. permissions et tests.
+
+---
+
+# 12. SOURCE UNIQUE DE VÉRITÉ
+
+Éviter absolument une architecture où :
+
+* le DE possède ses UE/EC ;
+* l’Informaticien possède une autre copie ;
+* le moteur de calcul utilise encore une troisième structure.
+
+Nous voulons :
+
+**une structure académique unique**.
+
+Le DE la prépare.
+
+L’Informaticien la consomme.
+
+Le moteur de notes l’utilise pour calculer.
+
+Le DE utilise les résultats produits pour valider.
+
+---
+
+# 13. PERMISSIONS BACKEND
+
+Vérifier les permissions côté serveur.
+
+Le rôle Informaticien ne doit plus pouvoir appeler directement les endpoints permettant de :
+
+* créer UE ;
+* créer EC ;
+* modifier crédits ;
+* modifier coefficients ;
+* modifier seuils ;
+* modifier une maquette académique.
+
+Le Directeur des Études de l’annexe doit avoir les droits nécessaires.
+
+Toutes les opérations doivent respecter le scope annexe.
+
+Ne jamais baser cette sécurité uniquement sur la sidebar ou les boutons.
+
+---
+
+# 14. TESTS MINIMUM
+
+Vérifier au minimum :
+
+* DE peut accéder au paramétrage de son annexe ;
+* DE ne peut pas paramétrer une autre annexe ;
+* DE peut créer/configurer une maquette ;
+* Informaticien voit cette maquette ;
+* Informaticien ne peut pas modifier sa structure ;
+* absence de maquette bloque correctement la saisie ;
+* saisie de notes reste fonctionnelle ;
+* calcul automatique reste fonctionnel ;
+* fin de saisie est visible côté DE ;
+* DE peut contrôler/valider ;
+* publication reste réservée au workflow prévu ;
+* aucune régression sur le module Notes déjà stabilisé.
+
+---
+
+# LIVRABLE
+
+À la fin, fournir :
+
+* fonctionnalités DE déjà existantes réutilisées ;
+* nouvelles adaptations réalisées ;
+* modèles/services utilisés comme source de vérité ;
+* routes DE ajoutées/modifiées ;
+* routes Informaticien modifiées ;
+* permissions modifiées ;
+* workflow final DE ↔ Informaticien ;
+* tests exécutés et résultats ;
+* éléments volontairement laissés hors périmètre.
+
+---
+
+# RÉSULTAT FINAL ATTENDU
+
+Nous voulons obtenir cette chaîne :
+
+**DE**
+prépare l’annexe et la maquette
+
+↓
+
+**Informaticien**
+récupère automatiquement cette maquette et saisit/import les notes
+
+↓
+
+**Système**
+effectue les calculs
+
+↓
+
+**DE**
+voit la saisie terminée, contrôle, valide et publie
+
+Il ne doit plus exister deux systèmes académiques indépendants entre le DE et l’Informaticien.
+
+
+
+# MISSION CIBLÉE — DASHBOARD INFORMATICIEN
+
+Nous continuons le peaufinage du dashboard **Informaticien** de ESFé Core.
+
+IMPORTANT : cette mission doit rester PETITE, LOCALISÉE et RAPIDE.
+
+Le raccordement **Directeur des Études ↔ Informaticien** concernant les maquettes et les notes vient d’être terminé et validé.
+
+NE PAS TOUCHER à :
+
+* Notes & Résultats ;
+* Maquettes académiques ;
+* calculs ;
+* workflow DE ↔ Informaticien ;
+* cartes ;
+* dashboard Directeur des Études ;
+* autres dashboards ;
+* architecture générale.
+
+Travaille uniquement sur :
+
+1. Utilisateurs / comptes ;
+2. Journal d’audit ;
+3. historique des connexions ;
+4. réinitialisation des mots de passe temporaires.
+
+Réutilise au maximum l’existant.
+
+---
+
+# 1. RÈGLE ABSOLUE : SCOPE ANNEXE
+
+Un Informaticien ne doit voir QUE les données de son annexe.
+
+Cela concerne :
+
+* utilisateurs ;
+* étudiants ;
+* enseignants ;
+* personnel ;
+* connexions ;
+* activités ;
+* audits ;
+* réinitialisations ;
+* sessions éventuellement visibles.
+
+Exemple :
+
+Un Informaticien de l’annexe A ne doit JAMAIS pouvoir consulter :
+
+* l’audit de l’annexe B ;
+* les connexions d’un étudiant de l’annexe B ;
+* la fiche technique d’un utilisateur de l’annexe B.
+
+Cette protection doit être BACKEND.
+
+Ne pas se contenter de filtrer le template.
+
+Même en modifiant manuellement une URL ou un identifiant, l’accès cross-annexe doit être refusé.
+
+Réutiliser les helpers existants de scope annexe lorsque possible.
+
+---
+
+# 2. NE PAS CONFONDRE AUDIT ET LOGS SERVEUR
+
+Nous voulons ici un **journal d’audit métier/technique**, pas les logs bruts du serveur.
+
+Le Journal d’audit doit permettre de répondre à :
+
+> Qui a fait quoi, quand, dans cette annexe ?
+
+Exemples d’actions intéressantes :
+
+* connexion ;
+* déconnexion si disponible ;
+* connexion échouée si disponible ;
+* réinitialisation de mot de passe ;
+* activation/désactivation d’un compte ;
+* blocage/déblocage ;
+* import ;
+* export ;
+* modification importante ;
+* publication de résultats ;
+* modification d’une maquette ;
+* suppression importante ;
+* autres actions sensibles déjà journalisées.
+
+NE PAS exposer dans ce dashboard :
+
+* logs Django bruts ;
+* stack traces ;
+* logs PostgreSQL ;
+* logs Redis ;
+* secrets ;
+* variables d’environnement ;
+* informations serveur sensibles.
+
+---
+
+# 3. AUDITER L’EXISTANT AVANT DE CODER
+
+Commence par identifier rapidement ce qui existe déjà concernant :
+
+* `SupportAuditLog` ;
+* `it_audit_workspace` ;
+* authentification ;
+* sessions ;
+* historique de connexion ;
+* IP ;
+* User-Agent ;
+* reset password ;
+* activation/désactivation de compte ;
+* éventuels modèles/services d’audit.
+
+Ne crée pas une deuxième architecture si une structure existe déjà.
+
+Cette mission doit rester légère.
+
+---
+
+# 4. JOURNAL D’AUDIT INFORMATICIEN
+
+Conserver/améliorer la section existante `Journal d’audit`.
+
+Elle doit être strictement :
+
+**READ ONLY**
+
+pour l’Informaticien.
+
+Il peut :
+
+* consulter ;
+* rechercher ;
+* filtrer ;
+* paginer ;
+* ouvrir le détail.
+
+Il ne peut PAS :
+
+* modifier ;
+* supprimer ;
+* réécrire ;
+* nettoyer ;
+* masquer un événement.
+
+Supprimer/neutraliser tout endpoint de modification/suppression accessible à ce rôle si nécessaire.
+
+---
+
+# 5. CONTENU DU JOURNAL
+
+Afficher, selon les données réellement disponibles :
+
+* date/heure ;
+* utilisateur ;
+* rôle ;
+* action ;
+* module ;
+* objet concerné ;
+* résultat/statut ;
+* adresse IP si enregistrée.
+
+Exemple :
+
+`17/08/2026 09:15 | Directeur des Études | Publication résultats | Notes | Succès`
+
+Ne jamais inventer une donnée qui n’est pas enregistrée.
+
+---
+
+# 6. FILTRES ET PAGINATION
+
+Le journal ne doit pas devenir une liste gigantesque.
+
+Ajouter/réutiliser une pagination serveur.
+
+Prévoir des filtres simples lorsque les données le permettent :
+
+* recherche utilisateur ;
+* période ;
+* rôle ;
+* type d’action ;
+* module ;
+* statut.
+
+Utiliser HTMX si l’architecture actuelle le permet afin d’éviter les rechargements complets.
+
+Ne pas surcharger l’interface.
+
+---
+
+# 7. LISTE UTILISATEURS — PAGINATION
+
+La section Utilisateurs doit également être paginée.
+
+Ne jamais charger tous les utilisateurs de l’annexe dans le DOM.
+
+Prévoir idéalement :
+
+* recherche ;
+* rôle ;
+* état du compte ;
+* classe lorsque pertinent ;
+* pagination.
+
+Réutiliser le système de filtres/composants existant.
+
+---
+
+# 8. NOM UTILISATEUR CLIQUABLE
+
+Dans la liste Utilisateurs, rendre le nom de l’utilisateur cliquable.
+
+IMPORTANT :
+
+Ne pas utiliser un petit dropdown si les informations deviennent trop importantes.
+
+Utiliser de préférence le **drawer latéral partagé du UI Core** déjà utilisé dans le projet.
+
+Le clic doit charger une fiche technique de l’utilisateur.
+
+Idéalement via HTMX.
+
+---
+
+# 9. FICHE TECHNIQUE UTILISATEUR
+
+Le drawer doit afficher uniquement les informations réellement disponibles.
+
+## Identité
+
+* nom complet ;
+* matricule si applicable ;
+* rôle ;
+* classe si étudiant ;
+* formation si applicable ;
+* annexe ;
+* état du compte.
+
+## Compte
+
+* actif/inactif ;
+* bloqué ou non si disponible ;
+* date de création ;
+* dernière connexion ;
+* dernière réinitialisation de mot de passe si disponible.
+
+## Connexions récentes
+
+Lorsque ces informations existent :
+
+* date ;
+* heure ;
+* IP ;
+* navigateur ;
+* système d’exploitation ;
+* type d’appareil ;
+* succès/échec si disponible.
+
+Exemple :
+
+`17 août 2026 · 08:21`
+`Windows · Edge · Ordinateur`
+`IP : xxx.xxx.xxx.xxx`
+
+---
+
+# 10. HISTORIQUE DES CONNEXIONS
+
+Nous voulons progressivement disposer d’un véritable historique de connexion par utilisateur.
+
+Avant de créer quoi que ce soit, vérifier si ESFé Core enregistre déjà suffisamment ces informations.
+
+Si OUI :
+
+réutiliser l’existant.
+
+Si NON :
+
+ajouter uniquement le mécanisme minimal nécessaire pour commencer à enregistrer correctement les NOUVELLES connexions.
+
+Ne pas inventer rétroactivement des connexions anciennes.
+
+Les données intéressantes sont :
+
+* utilisateur ;
+* annexe ;
+* timestamp ;
+* IP ;
+* User-Agent ;
+* navigateur si facilement détectable ;
+* OS si facilement détectable ;
+* type d’appareil si facilement détectable ;
+* succès/échec si compatible avec l’architecture actuelle.
+
+Éviter une dépendance lourde si ce n’est pas nécessaire.
+
+---
+
+# 11. HISTORIQUE COMPLET DANS LE DRAWER
+
+Dans la fiche utilisateur :
+
+afficher seulement quelques connexions récentes au départ.
+
+Ajouter :
+
+`Voir tout l’historique`
+
+Le détail complet doit être paginé.
+
+Si le composant drawer permet une sous-vue HTMX propre, l’utiliser.
+
+Ne pas charger des centaines de connexions dès l’ouverture du drawer.
+
+---
+
+# 12. LOCALISATION
+
+IMPORTANT :
+
+Ne pas implémenter de GPS forcé.
+
+Une adresse IP n’est PAS une position GPS.
+
+Si une localisation approximative existe déjà ou peut être obtenue proprement sans complexifier cette tâche, elle peut être affichée comme :
+
+`Localisation estimée`
+
+Mais ne pas créer maintenant un système externe complexe de géolocalisation.
+
+Ne jamais afficher une localisation approximative comme une position GPS exacte.
+
+---
+
+# 13. UTILISATEURS ACTIFS
+
+Si l’architecture actuelle permet facilement de déterminer les sessions ou activités récentes, on peut afficher une information du type :
+
+`Utilisateurs actifs récemment`
+
+Mais NE PAS développer maintenant un système WebSocket/temps réel complexe uniquement pour cela.
+
+Ne pas écrire `En ligne actuellement` si la donnée n’est pas réellement fiable.
+
+Cette fonctionnalité est secondaire par rapport au journal et à la fiche utilisateur.
+
+---
+
+# 14. RESET MOT DE PASSE — PROBLÈME ACTUEL
+
+Actuellement, lorsqu’un mot de passe temporaire est généré, son affichage disparaît trop rapidement.
+
+Cela rend l’utilisation peu pratique.
+
+Corriger uniquement l’UX de cette opération.
+
+Après génération du mot de passe temporaire :
+
+ouvrir une modal/drawer clair et persistant contenant :
+
+### Mot de passe temporaire
+
+`XXXXXXXX`
+
+avec un bouton :
+
+`Copier`
+
+et éventuellement :
+
+`Fermer`
+
+Afficher clairement :
+
+> Ce mot de passe temporaire ne sera plus affiché après fermeture.
+
+Ne plus utiliser uniquement un toast fugitif pour afficher le mot de passe.
+
+---
+
+# 15. SÉCURITÉ DES MOTS DE PASSE TEMPORAIRES
+
+RÈGLE ABSOLUE :
+
+**NE JAMAIS enregistrer le mot de passe temporaire en clair dans l’historique ou le journal d’audit.**
+
+Le mot de passe peut être affiché au moment précis de sa génération.
+
+Ensuite, il ne doit plus être récupérable en clair depuis le dashboard.
+
+Dans l’historique, enregistrer seulement les métadonnées disponibles :
+
+* utilisateur concerné ;
+* informaticien ayant effectué le reset ;
+* date/heure ;
+* expiration si disponible ;
+* statut ;
+* utilisé/non utilisé si le système permet de le déterminer.
+
+Exemple :
+
+`Reset #3`
+`17/08/2026 09:31`
+`Effectué par : Informaticien X`
+`Statut : en attente`
+
+Pas :
+
+`Mot de passe : ABC123`
+
+---
+
+# 16. NOUVELLE RÉINITIALISATION
+
+Si l’utilisateur perd le mot de passe temporaire :
+
+ne jamais récupérer l’ancien mot de passe.
+
+L’Informaticien effectue une nouvelle réinitialisation.
+
+Le précédent temporaire doit être invalidé selon le mécanisme d’authentification existant.
+
+Le journal garde uniquement la trace qu’une nouvelle réinitialisation a eu lieu.
+
+---
+
+# 17. LIMITATION DES RESETS — PAS MAINTENANT
+
+Nous prévoyons plus tard :
+
+* nombre maximum de resets ;
+* délai entre deux resets ;
+* alertes de comportement anormal ;
+* éventuellement autorisation supplémentaire.
+
+NE PAS implémenter cela maintenant.
+
+Cette mission doit rester courte.
+
+---
+
+# 18. ACTIONS IMPORTANTES À AUDITER
+
+Sans instrumenter chaque clic de l’utilisateur, vérifier que les actions sensibles déjà disponibles peuvent être tracées.
+
+Priorité :
+
+* connexion ;
+* reset password ;
+* activation ;
+* désactivation ;
+* blocage/déblocage ;
+* import/export ;
+* modification sensible ;
+* validation/publication ;
+* suppression importante.
+
+Nous ne voulons PAS enregistrer :
+
+* chaque changement d’onglet ;
+* chaque ouverture de modal ;
+* chaque clic UI ;
+* chaque requête HTMX sans valeur métier.
+
+Le journal doit rester exploitable.
+
+---
+
+# 19. PERFORMANCE
+
+Toutes les grosses collections doivent être paginées côté serveur :
+
+* utilisateurs ;
+* audit ;
+* connexions.
+
+Éviter les N+1 queries.
+
+Utiliser lorsque pertinent :
+
+* `select_related`
+* `prefetch_related`
+
+Ne pas faire de requêtes individuelles pour récupérer le profil de chaque ligne.
+
+---
+
+# 20. FRONTEND
+
+Respecter l’UI Core existant.
+
+Réutiliser :
+
+* tables ;
+* badges ;
+* drawers ;
+* pagination ;
+* filtres ;
+* skeleton/loading ;
+* composants HTMX existants.
+
+Ne pas créer une nouvelle charte graphique.
+
+L’expérience doit rester cohérente avec les autres sections du dashboard Informaticien.
+
+---
+
+# 21. TESTS MINIMUM
+
+Ajouter/adapter uniquement les tests nécessaires.
+
+Vérifier au minimum :
+
+### Scope
+
+* Informaticien voit les utilisateurs de son annexe ;
+* Informaticien ne voit pas ceux d’une autre annexe ;
+* accès direct cross-annexe à une fiche utilisateur = refusé ;
+* journal limité à son annexe.
+
+### Audit
+
+* journal consultable ;
+* pagination fonctionne ;
+* Informaticien ne peut pas modifier/supprimer un audit.
+
+### Utilisateur
+
+* drawer accessible ;
+* informations principales correctes ;
+* historique connexion limité au bon utilisateur et à la bonne annexe.
+
+### Password reset
+
+* reset fonctionne toujours ;
+* mot de passe temporaire est affiché correctement une seule fois dans l’UX ;
+* aucun mot de passe temporaire en clair n’est stocké dans l’audit ;
+* événement de reset est journalisé.
+
+Exécuter les tests ciblés uniquement, puis :
+
+`python manage.py check`
+
+Éviter une suite de tests énorme si elle n’est pas nécessaire pour cette petite mission.
+
+---
+
+# 22. HORS PÉRIMÈTRE
+
+NE PAS TOUCHER :
+
+* Notes ;
+* Maquettes ;
+* cartes ;
+* DE ;
+* Gestionnaire ;
+* Surveillant ;
+* DG ;
+* planning ;
+* archivage ;
+* sauvegardes ;
+* monitoring serveur ;
+* WebSockets ;
+* géolocalisation GPS ;
+* limitation du nombre de resets ;
+* infrastructure Hostinger/Wasabi.
+
+---
+
+# 23. LIVRABLE COURT
+
+À la fin, donne simplement :
+
+1. fichiers modifiés ;
+2. comportement avant/après ;
+3. mécanisme utilisé pour le scope annexe ;
+4. données de connexion réellement disponibles ;
+5. modifications du reset password ;
+6. tests exécutés et résultats ;
+7. éventuels éléments non implémentés faute de données existantes.
+
+Pas besoin de produire une documentation massive.
+
+---
+
+# RÉSULTAT ATTENDU
+
+À la fin, l’Informaticien doit pouvoir :
+
+**Utilisateur**
+→ ouvrir sa fiche
+
+**Fiche**
+→ voir l’état du compte
+→ dernière connexion
+→ connexions récentes
+→ informations appareil/IP disponibles
+→ historique paginé
+
+et :
+
+**Journal d’audit**
+→ voir les actions importantes réalisées dans SON annexe
+→ filtrer/rechercher
+→ ouvrir un détail
+→ sans jamais pouvoir modifier les preuves
+
+et :
+
+**Reset password**
+→ générer le temporaire
+→ le voir clairement
+→ le copier
+→ fermer
+→ ne jamais pouvoir récupérer ensuite sa valeur en clair.
+
+Le principe métier final est :
+
+> **L’Informaticien peut investiguer et assister techniquement les utilisateurs de son annexe, mais il ne peut ni falsifier la traçabilité ni consulter les données d’une autre annexe.**
+
+Commence par un audit RAPIDE de l’existant, puis implémente directement les adaptations nécessaires sans élargir le chantier.

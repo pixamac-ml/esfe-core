@@ -5,6 +5,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from academics.models import AcademicYear
+from students.models import StudentYearDecision as PortalStudentYearDecision
 from .forms import TransferRequestForm
 from .models import AcademicCorrectionRequest, AcademicReEnrollment, BranchAcademicCycle
 from .permissions import can_handle_correction, can_manage_reenrollment
@@ -51,8 +52,11 @@ def generate_report(request, pk):
 @require_POST
 def start_deliberation_view(request, pk):
     cycle = get_object_or_404(BranchAcademicCycle, pk=pk)
-    start_deliberation(cycle, request.user)
-    messages.success(request, "Deliberation demarree pour cette annexe.")
+    try:
+        start_deliberation(cycle, request.user)
+        messages.success(request, "Deliberation demarree pour cette annexe.")
+    except ValidationError as exc:
+        messages.error(request, "; ".join(exc.messages))
     return redirect("academic_cycle:branch_overview", pk=cycle.pk)
 
 
@@ -103,6 +107,21 @@ def student_reenrollment(request, token):
     if request.user != reenrollment.student.user and not can_manage_reenrollment(request.user, reenrollment.branch):
         raise PermissionDenied
     if request.method == "POST":
+        # A manager-driven portal decision is the authoritative workflow for
+        # this tracker.  This legacy pre-rentree form must not advance only
+        # the projection while leaving its target inscription/payment absent.
+        portal_decision = PortalStudentYearDecision.objects.filter(
+            student=reenrollment.student,
+            source_academic_year=reenrollment.source_academic_year,
+            target_academic_year=reenrollment.target_academic_year,
+        ).first()
+        if portal_decision is not None:
+            messages.info(
+                request,
+                "Cette reinscription est geree par le workflow institutionnel. "
+                "Son statut sera mis a jour apres validation et paiement.",
+            )
+            return redirect("academic_cycle:student_pre_rentree")
         if reenrollment.status == AcademicReEnrollment.STATUS_PREPARED:
             start_reenrollment(reenrollment, request.user)
         submit_reenrollment(reenrollment, request.POST.dict(), request.user)

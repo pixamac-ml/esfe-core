@@ -18,6 +18,7 @@ STATUS_TO_STEP = {
     "ready_to_publish_normal": "CALCUL",
     "normal_published": "REVIEW",
     "retake_in_progress": "CORRECT",
+    "ready_for_director": "REVIEW",
     "ready_to_publish_final": "FINAL",
     "final_published": "PUBLISHED",
 }

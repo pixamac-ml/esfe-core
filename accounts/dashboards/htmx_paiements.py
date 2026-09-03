@@ -11,6 +11,7 @@ from accounts.models import BranchCashMovement, SensitiveActionRequest
 from payments.models import FinancialLog, Payment
 
 from accounts.services.accounting_documents import create_cash_movement
+from accounts.services.financial_integrity import assert_financial_period_open
 from accounts.services.manager_dashboard_presentation import build_payment_table_row
 from accounts.services.manager_intelligence import payment_cash_reference
 from accounts.services.sensitive_actions import (
@@ -124,10 +125,7 @@ def payment_correct(request: HttpRequest, pk: int) -> HttpResponse:
         _payment_modal_context(
             request,
             payment,
-            otp_request_id=otp_request.pk,
-            otp_new_amount=new_amount,
-            otp_reason=reason,
-            otp_validity_minutes=SensitiveActionRequest.OTP_VALIDITY_MINUTES,
+            approval_pending=True,
         ),
     )
     response["HX-Trigger"] = json.dumps({
@@ -209,6 +207,10 @@ def payment_correct_confirm_otp(request: HttpRequest, pk: int) -> HttpResponse:
 @manager_finance_required("validate_payment")
 @require_POST
 def payment_validate(request: HttpRequest, pk: int) -> HttpResponse:
+    try:
+        assert_financial_period_open(request.branch, timezone.localdate())
+    except ValidationError as exc:
+        return HttpResponse(" ".join(exc.messages), status=400)
     with transaction.atomic():
         payment = get_object_or_404(
             Payment.objects.select_for_update().select_related(

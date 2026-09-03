@@ -7,12 +7,22 @@ from django.shortcuts import redirect
 from django.urls import reverse
 
 from accounts.access import (
+    get_user_annexe,
     get_user_groups,
     get_user_position,
     get_user_profile_role,
     get_user_role as get_canonical_user_role,
 )
 from accounts.position_registry import get_position_definition, normalize_position
+
+
+def user_requires_branch_assignment(user):
+    """Return whether a SYSTEM user has a branch-scoped role but no branch."""
+
+    definition = get_position_definition(get_user_position(user))
+    return bool(definition and definition.branch_required and get_user_annexe(user) is None)
+
+
 def get_user_role(user):
     if not getattr(user, "is_authenticated", False):
         return None
@@ -83,6 +93,11 @@ def get_post_login_portal_url(user):
     support_state = getattr(user, "support_state", None)
     if support_state and support_state.must_change_password:
         return reverse("accounts:password_change")
+
+    # This guard applies to both routing policies. It prevents legacy routing
+    # from opening an unscoped dashboard while an affectation is pending.
+    if user_requires_branch_assignment(user):
+        return reverse("accounts_portal:access_regularization")
 
     from django.conf import settings
     if settings.AUTH_PORTAL_ROUTING_V2_ENABLED:

@@ -184,6 +184,7 @@ def _serialize_event(event: AcademicScheduleEvent, *, highlight_today: date | No
         "status_label": status_labels.get(event.status, "Planifie"),
         "status_theme": status_theme.get(event.status, "sky"),
         "event_type": event.event_type,
+        "academic_class_id": event.academic_class_id,
         "ec_id": event.ec_id,
         "teacher_id": event.teacher_id,
         "start_datetime": event.start_datetime,
@@ -224,6 +225,7 @@ def _serialize_weekly_slot(slot: WeeklyScheduleSlot, week_start: date, *, highli
         "status_label": "Planifie",
         "status_theme": "sky",
         "event_type": AcademicScheduleEvent.EVENT_TYPE_COURSE,
+        "academic_class_id": slot.academic_class_id,
         "ec_id": slot.ec_id,
         "teacher_id": slot.teacher_id,
         "start_datetime": start_dt,
@@ -467,6 +469,14 @@ def get_schedule_conflicts(*, academic_class=None, teacher=None, branch=None, ac
 
 
 def _ensure_no_conflicts(*, event, exclude_event=None):
+    if event.evaluation_campaign_id:
+        from academics.services.evaluation_campaign_service import assert_event_in_campaign_window
+
+        assert_event_in_campaign_window(
+            campaign=event.evaluation_campaign,
+            start_datetime=event.start_datetime,
+            end_datetime=event.end_datetime,
+        )
     _validate_assignment_guardrails(
         academic_class=event.academic_class,
         teacher=event.teacher,
@@ -802,11 +812,11 @@ def _nearest_available_schedule_week(academic_class: AcademicClass, requested_we
     return None
 
 
-def get_student_week_schedule(student, week_start):
+def get_student_week_schedule(student, week_start, *, academic_year_id=None):
     from portal.models import DirectorTeacherAssignment
 
     user = getattr(student, "user", student)
-    snapshot = get_student_academic_snapshot(user)
+    snapshot = get_student_academic_snapshot(user, academic_year_id=academic_year_id)
     academic_class = snapshot["academic_class"]
     if academic_class is None:
         normalized = _normalize_week_start(week_start)
@@ -845,7 +855,12 @@ def get_student_week_schedule(student, week_start):
 
 def get_teacher_week_schedule(user, week_start, *, branch=None):
     teacher_user = getattr(user, "user", user)
-    teacher_events = AcademicScheduleEvent.objects.filter(teacher=teacher_user)
+    teacher_events = AcademicScheduleEvent.objects.filter(teacher=teacher_user).exclude(
+        status__in=[
+            AcademicScheduleEvent.STATUS_DRAFT,
+            AcademicScheduleEvent.STATUS_CANCELLED,
+        ]
+    )
     if branch is not None:
         teacher_events = teacher_events.filter(branch=branch)
     queryset, normalized = _week_queryset(
@@ -914,7 +929,7 @@ def _schedule_alerts_from_events(events, stats, branch, normalized):
         for log in (
             AcademicScheduleChangeLog.objects
             .filter(event_id__in=postponed_ids, action_type=AcademicScheduleChangeLog.ACTION_POSTPONED)
-            .order_by("event_id", "-created_at")
+            .order_by("event_id", "-changed_at")
         ):
             if log.event_id not in postponed_logs:
                 postponed_logs[log.event_id] = log
@@ -1096,7 +1111,10 @@ def get_teacher_next_events(user, limit=5, *, branch=None):
     if branch is not None:
         queryset = queryset.filter(branch=branch)
     queryset = queryset.exclude(
-        status=AcademicScheduleEvent.STATUS_CANCELLED,
+        status__in=[
+            AcademicScheduleEvent.STATUS_DRAFT,
+            AcademicScheduleEvent.STATUS_CANCELLED,
+        ],
     ).select_related("academic_class", "teacher", "branch", "ec", "ec__ue", "academic_year").order_by("start_datetime", "id")[:limit]
     return [_serialize_event(event) for event in queryset]
 
@@ -1205,6 +1223,19 @@ def detect_weekly_schedule_conflicts(
 
 @transaction.atomic
 def create_weekly_schedule_slot(*, user=None, **fields):
+    existing_slot = WeeklyScheduleSlot.objects.filter(
+        academic_class=fields.get("academic_class"),
+        weekday=fields.get("weekday"),
+        start_time=fields.get("start_time"),
+    ).first()
+    if existing_slot is not None:
+        weekday_label = existing_slot.get_weekday_display()
+        state = "actif" if existing_slot.is_active else "désactivé"
+        raise ValidationError(
+            f"Ce créneau existe déjà le {weekday_label} à "
+            f"{existing_slot.start_time.strftime('%H:%M')} ({state}). "
+            "Modifiez ou réactivez le créneau existant au lieu d'en créer un autre."
+        )
     slot = WeeklyScheduleSlot(**fields)
     if user is not None:
         slot.created_by = user

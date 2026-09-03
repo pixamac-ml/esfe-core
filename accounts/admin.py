@@ -4,15 +4,26 @@ from accounts.models import (
     AccountingDocumentSequence,
     BranchBankTransfer,
     BranchCashMovement,
+    BranchCashRegisterSession,
     BranchExpense,
     BranchMonthlyClosure,
     Donation,
     FinancialAuditLog,
     PayrollEntry,
+    PaymentSignatureSession,
     Profile,
     SensitiveActionRequest,
     TeacherHonorariumEntry,
 )
+
+
+@admin.register(PaymentSignatureSession)
+class PaymentSignatureSessionAdmin(admin.ModelAdmin):
+    list_display = ("id", "payment_type", "beneficiary", "branch", "amount", "status", "expires_at", "signed_at", "completed_at")
+    list_filter = ("branch", "payment_type", "status")
+    search_fields = ("beneficiary__username", "beneficiary__email", "token_hash")
+    readonly_fields = ("token_hash", "signature_sha256", "signature_data", "created_at", "updated_at")
+    autocomplete_fields = ("branch", "beneficiary", "payroll_entry", "honorarium_entry", "created_by", "approved_by", "cash_movement")
 
 
 @admin.register(Profile)
@@ -45,6 +56,42 @@ class BranchCashMovementAdmin(admin.ModelAdmin):
     list_filter = ("branch", "movement_type", "source", "movement_date")
     search_fields = ("label", "reference", "source_reference", "receipt_number", "notes")
     autocomplete_fields = ("branch", "expense", "created_by")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        # The ledger is append-only. Corrections are done by a counter-entry
+        # through the financial workflows, never by editing the source row.
+        if obj is not None:
+            return False
+        return super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(BranchCashRegisterSession)
+class BranchCashRegisterSessionAdmin(admin.ModelAdmin):
+    list_display = (
+        "branch", "session_date", "status", "system_opening_balance",
+        "expected_amount", "counted_amount", "difference_amount", "closed_at",
+    )
+    list_filter = ("branch", "status", "session_date")
+    search_fields = ("branch__name", "branch__code", "opening_notes", "closing_notes")
+    autocomplete_fields = ("branch", "opened_by", "closed_by")
+    readonly_fields = (
+        "branch", "session_date", "opening_amount", "system_opening_balance",
+        "expected_amount", "counted_amount", "difference_amount", "status",
+        "opening_notes", "closing_notes", "opened_by", "closed_by", "opened_at",
+        "closed_at", "created_at", "updated_at",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(AccountingDocumentSequence)

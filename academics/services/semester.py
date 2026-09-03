@@ -11,7 +11,7 @@ from .ue import compute_ue_result
 TWO_PLACES = Decimal("0.01")
 
 
-def compute_semester_result(semester, enrollment):
+def compute_semester_result(semester, enrollment, *, grades_by_ec_id=None):
     """
     Calcule le résultat global d'un semestre.
 
@@ -32,7 +32,11 @@ def compute_semester_result(semester, enrollment):
     failed_subjects = []
 
     for ue in ues:
-        ue_result = compute_ue_result(ue, enrollment)
+        ue_result = compute_ue_result(
+            ue,
+            enrollment,
+            grades_by_ec_id=grades_by_ec_id,
+        )
         ue_results.append(ue_result)
 
         total_ue_coefficients += Decimal(str(ue.coefficient))

@@ -1,0 +1,22 @@
+{% load component_tags %}
+<section class="space-y-5" data-dashboard-section="alerts" data-executive-section="alerts">
+  {% component "ui_core.page_header" eyebrow="Pilotage institutionnel" title="Alertes et risques" subtitle="Signaux réellement ouverts dans l’annexe et l’année académique sélectionnées." %}
+    {% fill "actions" %}
+      <button type="button" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" onclick="dgShowSection('students')">
+        <i data-lucide="users-round" class="h-4 w-4" aria-hidden="true"></i> Étudiants
+      </button>
+      <button type="button" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-3 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" onclick="dgShowSection('finance')">
+        <i data-lucide="wallet-cards" class="h-4 w-4" aria-hidden="true"></i> Finance
+      </button>
+    {% endfill %}
+  {% endcomponent %}
+
+  <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    {% component "ui_core.stat_card" label="Alertes ouvertes" value=open_alerts icon="triangle-alert" tone="warning" description="Périmètre actif" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Critiques" value=critical_alerts icon="octagon-alert" tone="danger" description="Traitement prioritaire" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Cas étudiants" value=analytics.risk_breakdown.1.value|default:0 icon="shield-alert" tone="info" description="Suivi à consulter" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Assiduité" value=analytics.risk_breakdown.2.value|default:0 icon="calendar-x-2" tone="warning" description="Alertes d’absence" compact=True %}{% endcomponent %}
+  </div>
+
+  {% component "ui_core.data_table" id="dg-alerts-table" caption="Alertes prioritaires" headers=alert_table_headers rows=alert_table_rows result_count=alert_table_rows|length density="compact" empty_title="Aucune alerte dans ce contexte" empty_message="Aucun signal ouvert ne correspond à l’annexe et à l’année sélectionnées." %}{% endcomponent %}
+</section>

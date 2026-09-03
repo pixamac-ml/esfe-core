@@ -1,0 +1,184 @@
+RAPPORT DE CLOTURE — LOT 0 DG
+Date : 27 août 2026
+
+Objet
+-----
+Stabilisation du socle Back-Office du Directeur Général : contexte année/annexe,
+isolement des objets, actions exécutives, audit, confirmations, RH, exports,
+analytics, suivi actualisé et tests.
+
+A. CORRECTIONS EFFECTUEES
+--------------------------
+
+portal/dg/context.py
+- Formalisation du contexte canonique DgDashboardContext : année académique,
+  annexe sélectionnée, mode global/annexe.
+- Paramètre canonique scope_branch_id ; branch_id reste accepté uniquement pour
+  les anciennes URL du dashboard et n'est jamais interprété comme contexte par
+  les drawers.
+- Les paramètres année/annexe transmis en POST sont relus côté serveur pour
+  lier les actions au contexte courant.
+
+portal/dg/selectors.py et portal/dg/services.py
+- Filtrage année + annexes appliqué aux classes, inscriptions, candidatures,
+  paiements, dépenses, alertes, cas, décisions, clôtures, personnel, planning.
+- _build_schedule() filtre les événements, présences, journaux de cours et
+  créneaux par année et annexe ; les semaines hors année ne fusionnent plus de
+  données historiques.
+- Analytics historiques calculées sur les mois de l'année sélectionnée, non
+  sur une fenêtre calendaire glissante de douze mois.
+- Bornes datetime timezone-aware pour les périodes académiques et la journée
+  courante.
+
+portal/views/views.py
+- Sections workflows/diplômes filtrées par année et annexe.
+- Drawers, modales de clôture, affectation manager, staff et exports refusent
+  les objets hors contexte (403 ou objet non divulgué).
+- Exports étudiants/paiements/audit alignés sur année, annexe et période.
+- Actions POST DG reliées au contexte canonique et confirmation explicite
+  obligatoire pour les actions exécutives.
+- Prévisualisation de confirmation avec cible, annexe, année, conséquence et
+  motif ; l'objet est revalidé dans le scope avant affichage.
+- Activation DG du paramètre publish sur la préparation de diplôme bloquée : la
+  délivrance passe par l'action confirmée et auditée dédiée.
+
+portal/dg/executive_actions.py et portal/dg/audit_service.py
+- Couche commune record_executive_action réutilisant SupportAuditLog,
+  AcademicAuditLog et FinancialAuditLog selon le domaine.
+- Nomination de gestionnaire, délivrance individuelle ou groupée de diplômes,
+  validation de clôture, arbitrage de décision et transition de cycle sont
+  transactionnels, scopés et auditables.
+- Les motifs et les états avant/après sont conservés ; une exception annule la
+  transaction et ne crée pas de fausse trace de réussite.
+- Actions idempotentes pour nomination déjà en place et classe sans diplôme
+  prêt.
+
+portal/models.py + portal/migrations/0021_*.py
+- Ajout du type d'audit manager_nominated.
+
+portal/dg/rh_service.py, portal/dg/forms.py, portal/urls.py
+- generate_access=false crée le dossier RH avec compte désactivé et mot de
+  passe inutilisable.
+- generate_access=true exige un email et envoie uniquement un lien sécurisé
+  d'activation à usage unique basé sur le token Django ; aucun mot de passe en
+  clair n'est envoyé ou affiché.
+- Tout échec d'envoi annule la création et remonte explicitement l'échec au DG.
+- Nouvelle route d'activation publique protégée par token et SetPasswordForm,
+  avec audit de première connexion.
+- Réaffectations RH et recrutement respectent les annexes du contexte actif.
+
+portal/dg/actions_service.py et portal/dg/coupons_service.py
+- Actions alertes/cas/suivi finance et coupons filtrées par scope année/annexe.
+- Création et bascule de coupons ne peuvent plus viser une annexe étrangère ;
+  en mode annexe, un coupon sans annexe explicite est limité à l'annexe active.
+
+templates/portal/dg/
+- Ajout du bouton responsive « Contexte » sous xl et de la modale année,
+  portée et période.
+- Actions exécutives branchées sur une modale Core de confirmation, sans
+  window.confirm(). Motif obligatoire pour un rejet.
+- Libellés faux ou ambigus supprimés : « Live », « Pause », « Nouvelle alerte »,
+  sélecteurs 6m/12m et statuts système codés en dur.
+- « Suivi actualisé » et heure de dernière actualisation affichés.
+
+B. TESTS
+--------
+
+Commandes exécutées avec settings_test_local et base SQLite existante :
+
+- python manage.py check --settings=config.settings_test_local
+  Résultat : System check identified no issues (0 silenced).
+
+- python manage.py test --settings=config.settings_test_local portal.test_dg_lot0 --keepdb
+  Résultat : 7 tests, OK.
+
+- python manage.py test --settings=config.settings_test_local portal.test_dg_context_unit portal.test_dg_context portal.test_dg_staff_lifecycle --keepdb
+  Résultat : 10 tests, OK.
+
+- python manage.py test --settings=config.settings_test_local coupons.tests --keepdb
+  Résultat : 24 tests, OK.
+
+Couverture ajoutée dans portal/test_dg_lot0.py :
+- isolation A/X, A/Y, B/X et mode global ; KPI/classes ;
+- drawer et export hors contexte ; routes non-DG en 403 ;
+- confirmation obligatoire et absence d'audit en cas d'échec ;
+- audit financier de clôture réussi ; transaction et idempotence ;
+- nomination manager scopée et auditée ;
+- recrutement avec et sans accès ; lien sécurisé sans mot de passe clair ;
+- réaffectation RH hors annexe refusée ;
+- prévisualisation de modale de confirmation hors scope refusée.
+
+La suite complète du projet n'a pas été relancée dans ce lot ; les tests ciblés
+ci-dessus et les tests coupons/régressions DG sont verts.
+
+C. SCOPE DG — ROUTES COUVERTES
+------------------------------
+
+Le contrat année + annexe + mode est appliqué sur :
+- /portal/dg/ ;
+- /portal/dg/section/<section>/ ;
+- /portal/dg/drawer/ et les objets branchés par ID ;
+- /portal/dg/modal/ (contexte, détails, staff, clôture, confirmation) ;
+- /portal/dg/export/ ;
+- /portal/dg/action/ ;
+- /portal/dg/exec-action/ ;
+- /portal/dg/diplomas/action/ ;
+- /portal/dg/staff/action/ ;
+- /portal/dg/recruit-staff/ ;
+- /portal/dg/coupons/*.
+
+Le mode global utilise toutes les annexes actives mais reste limité à l'année
+académique sélectionnée. La route /portal/dg/activation/... est volontairement
+hors session DG : elle ne donne aucun accès au dashboard et sert uniquement à
+la première connexion sécurisée du staff recruté.
+
+D. AUDIT DG
+-----------
+
+Désormais journalisés transactionnellement :
+- manager_nominated dans SupportAuditLog ;
+- diploma_delivered et diplomas_delivered dans AcademicAuditLog ;
+- monthly_closure_validated dans FinancialAuditLog ;
+- student_year_decision_arbitrated dans AcademicAuditLog ;
+- branch_cycle_transitioned dans AcademicAuditLog ;
+- création/remise d'accès RH et lifecycle (suspension, réactivation,
+  révocation, réaffectation) dans SupportAuditLog.
+
+E. ACTIONS RESTANTES NON COUVERTES COMPLETEMENT
+------------------------------------------------
+
+- dg_action (résolution/escalade alertes et cas, suivi finance) utilise déjà
+  SupportAuditLog et le scope, mais n'a pas encore la modale uniforme de motif
+  pour chaque opération.
+- La préparation de diplôme (avant délivrance) est scopée mais ne produit pas
+  encore une trace académique dédiée de préparation.
+- La bascule activation/désactivation des coupons est scopée mais n'est pas
+  encore reliée à l'audit exécutif commun.
+- Les autres domaines métier (admissions, structures, communication, CRUD
+  institutionnels) restent à consolider dans des lots ultérieurs.
+
+F. DETTE RESTANTE
+-----------------
+
+P0
+- Aucune anomalie bloquante détectée sur le périmètre Lot 0 ciblé.
+
+P1
+- Uniformiser la confirmation et le motif sur dg_action et le toggle coupon.
+- Ajouter un audit explicite de préparation de diplôme.
+- Relancer la suite complète avant mise en production et tester l'envoi Brevo
+  avec un environnement SMTP de recette.
+
+P2
+- Exploiter Channels/Redis pour une vraie diffusion temps réel si nécessaire.
+- Remplacer progressivement les textes d'interface historiques encore sans
+  accents par les libellés du Design System.
+- Étendre les exports à de nouveaux domaines après validation métier.
+
+G. PROPOSITION DU PROCHAIN LOT
+------------------------------
+
+Arrêter ici le développement fonctionnel comme demandé. Après validation du
+présent socle, choisir une seule catégorie métier prioritaire (RH complet,
+finance, admissions ou académique) et l'étendre par objets, permissions,
+confirmation, audit et tests sans contourner DGScope.

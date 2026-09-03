@@ -5,24 +5,20 @@
       <div class="dg-section-hero-title">
         <i class="fa-solid fa-chart-line" style="color:#2563eb; margin-right:8px;"></i>Analytics institutionnelles
       </div>
-      <div class="dg-section-hero-sub">Indicateurs de performance et tendances · 12 derniers mois</div>
+      <div class="dg-section-hero-sub">Indicateurs de performance et tendances de l'année académique sélectionnée</div>
     </div>
     <div class="dg-section-actions">
-      <button type="button" class="dg-btn dg-btn-outline" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=analytics')">
+      <button type="button" class="dg-btn dg-btn-outline" onclick="window.location.href = dgBuildScopedUrl('{% url 'accounts_portal:dg_export' %}?kind=branches&amp;format=xlsx', {}).toString()">
         <i class="fa-solid fa-download"></i>Exporter
       </button>
-      <select class="dg-filter" style="height:36px; font-size:.75rem;" onchange="dgRefreshSection('analytics')">
-        <option value="6m" {% if dashboard_period == '6m' %}selected{% endif %}>6 derniers mois</option>
-        <option value="12m" {% if dashboard_period == '12m' or not dashboard_period %}selected{% endif %}>12 derniers mois</option>
-        <option value="this_year" {% if dashboard_period == 'this_year' %}selected{% endif %}>Cette annee</option>
-      </select>
+      <span class="dg-badge dg-badge-blue">{{ selected_academic_year.name|default:"Annee courante" }}</span>
     </div>
   </div>
 
   <div class="dg-context-bar">
     <div>
       <div class="dg-context-label">Analyse consolidee</div>
-      <div class="dg-context-hint">Les indicateurs se lisent avec le filtre annexe actif et la periode courante.</div>
+      <div class="dg-context-hint">Les indicateurs se lisent avec l'annexe active et l'année académique sélectionnée.</div>
     </div>
     <div class="dg-context-main">
       <span class="dg-scope-chip">{{ dashboard_scope_label|default:"Toutes les annexes" }}</span>
@@ -72,7 +68,13 @@
         </div>
       </div>
       <div style="height:220px; background:#f8fafc; border-radius:8px; padding:12px; margin-bottom:12px;">
-        <canvas id="dgMonthlyChart"></canvas>
+        <canvas
+          id="dgMonthlyChart"
+          data-dg-chart="monthly"
+          data-ui-chart='{"type":"bar","data":{"labels":{{ analytics.monthly_labels_json|safe }},"datasets":[{"label":"Candidatures","data":{{ analytics.monthly_candidatures_json|safe }},"backgroundColor":"ui-primary"},{"label":"Paiements valides","data":{{ analytics.monthly_payments_json|safe }},"backgroundColor":"#16a34a"}]},"options":{"plugins":{"legend":{"position":"bottom"}}}}'
+          role="img"
+          aria-label="Evolution mensuelle des candidatures et paiements valides"
+        ></canvas>
       </div>
       <div style="font-size:.65rem; font-weight:700; color:#64748b; margin-top:6px;">
         Total candidatures: {{ analytics.total_candidatures|default:0|intcomma }} · Total inscriptions: {{ analytics.active_inscriptions|default:0|intcomma }}
@@ -82,7 +84,13 @@
       <div class="dg-panel-title">Taux de conversion admissions</div>
       <!-- CSS bar representation of admission rates -->
       <div style="height:120px; background:#f8fafc; border-radius:8px; display:flex; align-items:center; justify-content:center; gap:16px; padding:16px; margin-bottom:12px;">
-        <canvas id="dgAdmissionChart"></canvas>
+        <canvas
+          id="dgAdmissionChart"
+          data-dg-chart="admissions"
+          data-ui-chart='{"type":"doughnut","data":{"labels":["Acceptees","A completer","Refusees"],"datasets":[{"data":[{{ analytics.accepted_candidatures|default:0 }},{{ analytics.to_complete_candidatures|default:0 }},{{ analytics.rejected_candidatures|default:0 }}],"backgroundColor":["#16a34a","#f59e0b","#ef4444"]}]},"options":{"plugins":{"legend":{"position":"bottom"}}}}'
+          role="img"
+          aria-label="Repartition des candidatures par statut"
+        ></canvas>
       </div>
       <div class="dg-bar-item">
         <div class="dg-bar-label"><span>Taux acceptation</span><span>{{ analytics.admission_conversion_rate|default:0 }}%</span></div>

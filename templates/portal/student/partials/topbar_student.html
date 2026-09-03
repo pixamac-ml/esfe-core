@@ -42,6 +42,21 @@
       </div>
     </div>
     <div class="hidden lg:flex items-center gap-2">
+      {% if available_academic_years|length > 1 %}
+      <form method="get" class="inline-flex">
+        <label class="sr-only" for="student-academic-year">Année académique</label>
+        <select
+          id="student-academic-year"
+          name="academic_year_id"
+          onchange="this.form.submit()"
+          class="h-9 max-w-36 rounded-xl border border-[color:var(--line)] bg-[color:var(--card)] px-2 text-xs font-bold text-[color:var(--text)]"
+        >
+          {% for year in available_academic_years %}
+          <option value="{{ year.id }}" {% if year.id == selected_academic_year_id %}selected{% endif %}>{{ year.name }}</option>
+          {% endfor %}
+        </select>
+      </form>
+      {% endif %}
       <span class="student-meta-chip">
         <i data-lucide="graduation-cap" style="width:13px;height:13px;"></i>
         {% if academic_class %}{{ academic_class.display_name|default:academic_class.level }}{% else %}Affectation en attente{% endif %}

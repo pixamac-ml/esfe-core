@@ -1,0 +1,544 @@
+AUDIT ARCHITECTURAL FINAL - DASHBOARD DIRECTION GENERALE (DG)
+ESFE Core - 28 aout 2026
+Statut : AUDIT UNIQUEMENT. Aucune refonte, suppression ou nouvelle dependance UI n'a ete lancee.
+
+================================================================
+A. RESUME EXECUTIF
+================================================================
+
+Verdict actuel : NO-GO pour une mise en production de niveau "plateforme mature"
+tant que le Lot 0 de stabilisation n'est pas valide.
+
+Le dashboard DG a avance de maniere tangible : il utilise maintenant le shell
+certifie commun, un espace de travail charge dynamiquement et une premiere
+migration vers le Design System UI Core. L'aperçu est la section la plus
+aboutie ; les RH disposent aussi d'elements UI Core utiles.
+
+Cependant, la migration est partielle. Le dashboard actif est un systeme hybride :
+shell moderne + UI Core partiel + nombreuses vues et styles historiques. Des
+defauts fonctionnels significatifs ont ete identifies (semaine/planning,
+graphiques, coherence des periodes), ainsi que des manques de gouvernance,
+d'audit transverse et de performance.
+
+La DG doit etre un espace de gouvernance metier : visibilite large,
+compréhension, decision tracee et verification. Elle ne doit pas devenir un
+super-admin technique universel ni un outil de destruction directe.
+
+Decision recommandee : figer les nouvelles fonctionnalites DG, executer le Lot 0,
+realiser une recette metier et technique ciblee, puis seulement engager la
+standardisation UI et les evolutions de gouvernance.
+
+
+================================================================
+B. ARCHITECTURE EXISTANTE
+================================================================
+
+1. Entrees et roles
+
+- Route principale : /dg/ (vue portal_dg).
+- Route de sections : /dg/section/<section>/.
+- Routes additionnelles : drawer, modal, actions RH, coupons, actions
+  executives, affectation gestionnaire, clotures, diplomes et exports.
+- Roles autorises : executive_director et deputy_executive_director.
+- Le contexte DG conserve dans la session l'annee academique et l'annexe
+  selectionnee.
+- Le filtrage des donnees est applique par annexe et annee academique dans les
+  selecteurs. Cette base est saine et doit rester non negociable.
+
+2. Shell et chargement
+
+- Shell canonique : templates/portal/staff/director_dashboard.html.
+- Construction : portal.services.certified_dashboard_shell.
+- Page DG active : templates/portal/dg/dashboard_ui_core.html.
+- Au chargement, le workspace affiche un indicateur puis JavaScript charge la
+  section demandee via la route de sections.
+- La page historique templates/portal/dg/dashboard.html n'est plus le rendu
+  actif, mais elle reste dans le depot et dans certains tests.
+
+3. Principe architectural recommande
+
+  DG Dashboard
+      -> contexte securise (role, annexe, annee, periode)
+      -> sections de gouvernance
+      -> services de lecture optimises
+      -> actions sensibles tracees et confirmees
+      -> audit transverse et verifiable
+
+
+================================================================
+C. CARTOGRAPHIE FONCTIONNELLE
+================================================================
+
+Section        Etat actuel                       Niveau de maturite
+-------------- --------------------------------- -----------------
+Vue d'ensemble UI Core partiel, KPI, alertes     Intermediaire
+Alertes        Listes, actions rapides           Intermediaire
+Workflows      Reinscriptions et suivi           Partiel
+Planning       Vue semaine et classes            Bloque par defaut P1
+Annexes        Syntheses comparatives            Intermediaire
+Finance        Recettes/depenses, details        Partiel
+Coupons        Pilotage et actions               Intermediaire
+RH             Table, recherche, filtres         Intermediaire
+Analytique     Cartes et canvases graphiques     Defaut P1 probable
+Temps reel     Vue de suivi, pas vrai temps reel Partiel
+Audit/Controle Donnees dispersees seulement      Insuffisant
+
+La structure Observe -> Comprendre -> Decider -> Verifier est seulement
+partiellement couverte :
+
+- Observer : KPI, listes et alertes existent.
+- Comprendre : drill-down limite, tendances et comparaisons insuffisantes.
+- Decider : plusieurs actions existent, mais la politique de confirmation et de
+  justification n'est pas uniforme.
+- Verifier : pas de tableau transverse d'audit, ni de preuve consolidee de
+  l'execution ou de l'impact des decisions.
+
+
+================================================================
+D. MATRICE UI CORE
+================================================================
+
+Composant UI Core                       Utilisation DG    Etat
+-------------------------------------- ----------------- -----------------------
+Application shell / sidebar / topbar    Oui               Conforme
+Page header                              Apercu, RH        Partiel
+Stat cards                               Apercu            Partiel
+Panels / content grid                    Apercu            Partiel
+Data table                               Apercu, RH        Partiel
+Empty states                             Apercu            Partiel
+Status badges                            Apercu            Partiel
+Filter bar                               RH                Partiel
+Chart panel                              Non reellement    A integrer
+Loading overlay / skeleton               Non unifie        A integrer
+Toast UI Core                            Non               A integrer
+Confirm dialog UI Core                   Non uniforme      A integrer
+Pagination UI Core                       Incomplete        A faire evoluer
+Timeline / audit event                   Non               A integrer
+
+La regle cible : les nouveaux ecrans et toutes les retouches de migration
+doivent reutiliser UI Core. Il ne faut pas creer un second design system DG.
+
+
+================================================================
+E. INVENTAIRE DES LOADERS, SKELETONS ET ETATS D'ATTENTE
+================================================================
+
+Constat :
+
+- Le shell affiche un spinner de chargement initial.
+- dashboard_ui_core.html affiche un spinner de workspace.
+- Certaines vues historiques utilisent leur propre spinner ou skeleton.
+- UI Core possede deja des composants de chargement, mais ils ne sont pas la
+  norme active du dashboard DG.
+- Aucun indicateur HTMX commun et coherent n'est applique a toutes les sections.
+
+Risque UX :
+
+L'utilisateur ne sait pas toujours si une action, un filtre ou une section est
+en cours, termine ou echoue. Les doubles clics et l'impression de lenteur sont
+possibles.
+
+Cible :
+
+- Un seul contrat de chargement UI Core pour sections, tableaux, formulaires et
+  actions.
+- Skeleton pour les contenus previsibles ; overlay pour les actions bloquantes.
+- Etat vide, erreur, reessai et succes visibles et accessibles.
+- Boutons desactives pendant une soumission non idempotente.
+
+
+================================================================
+F. INVENTAIRE LEGACY ET FRONTEND
+================================================================
+
+- Le fichier dashboard historique est volumineux et contient encore navigation,
+  styles et logique JavaScript propre.
+- Le dashboard actif charge encore dg_legacy.css et dg_dashboard.js.
+- De nombreuses partials DG reposent sur classes, styles inline et conventions
+  anciennes.
+- Un scan a releve 329 occurrences de style inline dans les templates DG.
+- Font Awesome et Lucide coexistent.
+- La pagination reste majoritairement une implementation historique.
+
+Decision :
+
+Ne pas supprimer le legacy maintenant. Le classifier en :
+
+1. actif et critique ;
+2. actif mais a migrer ;
+3. obsolete et a retirer seulement apres couverture de tests + recette.
+
+
+================================================================
+G. SECURITE, AUTORISATIONS ET AUDIT
+================================================================
+
+Points positifs :
+
+- Controle explicite des roles DG.
+- Filtrage serveur par annexe et annee academique dans les lectures.
+- Plusieurs actions executives utilisent transaction et verrouillage select_for_update.
+- Les actions sensibles existantes ont deja des traces dans certains domaines.
+- Les routes d'actions verifient globalement la methode HTTP.
+
+Ecarts :
+
+1. Audit transverse incomplet
+   La DG ne consolide pas aujourd'hui les audits SupportAuditLog, FinancialAuditLog,
+   AcademicAuditLog, sessions et evenements de securite dans une meme experience.
+
+2. Justification et confirmation heterogenes
+   Certaines actions sont tracees, mais le motif, la confirmation renforcee,
+   l'approbation et la restitution ne sont pas systematiques.
+
+3. Pouvoir de suppression academique
+   Une action DG peut conduire a la suppression d'une annee academique, sous
+   conditions. Cela contredit l'objectif de DG comme console de gouvernance
+   non destructive. Cette capacite doit etre revue par politique explicite :
+   archivage, approbation a deux personnes ou bascule vers une fonction
+   technique strictement encadree.
+
+4. Personnel central
+   Le perimetre inclut volontairement le personnel sans annexe. Cette regle est
+   recevable seulement si elle est documentee, testee et affichée comme telle.
+
+Cible securite :
+
+- Toute action a impact financier, academique, RH ou d'acces : permission
+  explicite, raison, confirmation adaptee au risque, audit complet, retour
+  utilisateur et possibilite de verification.
+- Les donnees restent scapees cote serveur, jamais seulement dans le navigateur.
+
+
+================================================================
+H. PERFORMANCE ET FIABILITE
+================================================================
+
+Problemes observes :
+
+1. Double construction du contexte
+   La page initiale calcule un contexte DG complet avant de retourner un
+   workspace avec spinner ; la section apercu le recalcule ensuite.
+
+2. Contexte trop large par section
+   Plusieurs sections reconstruisent des donnees finance, annexes, analytique,
+   planning et RH meme lorsque seule une vue ciblee est demandee.
+
+3. Risque N+1 par annexe
+   Les resumes par annexe enchainent plusieurs agregations et comptes. Le cout
+   augmente avec le nombre d'annexes.
+
+4. Exports charges en memoire
+   Les exports eleves peuvent construire toutes les lignes avant generation du
+   fichier.
+
+5. Temps reel nominal
+   La section dite temps reel est un snapshot/rafraichissement manuel. Le
+   dashboard actif ne consomme pas de flux temps reel DG.
+
+6. Ecouteur JavaScript global
+   Dans certified_dashboard_shell.js, un listener de fermeture de modale est
+   enregistre a l'interieur d'un listener de clic ; il peut etre duplique a
+   chaque clic.
+
+Cible :
+
+- Construire uniquement le contexte necessaire a la route.
+- Mesurer le nombre de requetes et le temps des sections critiques.
+- Paginer cote serveur toutes les grandes listes.
+- Exporter par flux ou tache asynchrone au-dela d'un seuil decide.
+- Mettre en cache de tres courte duree uniquement les KPI non sensibles et
+  invalider explicitement.
+
+
+================================================================
+I. RESPONSIVE, ACCESSIBILITE ET QUALITE D'INTERACTION
+================================================================
+
+Constats :
+
+- Les breakpoints existants sont limites et ne couvrent pas uniformement les
+  vues legacy.
+- Certaines grilles analytiques utilisent des styles inline qui imposent cinq
+  colonnes, avec risque de debordement sur mobile.
+- Certains elements cliquables sont des div ou lignes de tableau avec onclick,
+  sans semantique de bouton ni comportement clavier garanti.
+- Les modales du shell apportent une base solide, mais les modales legacy
+  doivent etre alignees.
+- Les graphiques doivent fournir une alternative textuelle et des libelles.
+
+Definition de qualite attendue :
+
+- Desktop, tablette et mobile testes sur les parcours DG essentiels.
+- Navigation clavier complete ; focus visible et restaure apres modale.
+- Contraste, etats disabled/loading/error et messages lecteurs d'ecran.
+- Tables transformables en cartes ou avec scroll horizontal clairement annonce
+  sur petit ecran.
+
+
+================================================================
+J. ECARTS FONCTIONNELS ET DEFECTS A CONFIRMER EN RECETTE
+================================================================
+
+P1. Planning semaine et filtre classe
+
+Les fonctions JavaScript dgLoadScheduleWeek(...) et dgScheduleClassChange(...)
+ignorent les arguments recus. Pourtant le backend attend week_start et class_id
+dans la requete. Les commandes precedent/suivant, semaine courante et selection
+de classe risquent donc de ne pas fonctionner comme l'interface l'indique.
+
+P1. Graphiques potentiellement absents
+
+Les partials DG contiennent des canvas graphiques, mais le JavaScript actif DG
+ne les initialise pas. UI Core n'initialise que les canvases utilisant son
+contrat data-ui-chart. Chart.js est charge globalement, sans garantir que les
+graphiques historiques sont rendus dans le dashboard actif.
+
+P1. Periode affichee non coherente avec les chiffres
+
+Le filtre de periode est lu et affiche. Mais la plupart des aggregats sont
+limites par annee academique/annexe, sans filtre hebdomadaire ou mensuel
+correspondant. Une etiquette "ce mois" peut donc accompagner des totaux annuels.
+
+P1. Finance executive incomplete
+
+Le dashboard ne consolide pas clairement les versements bancaires, sessions de
+caisse, portefeuille/solde et donations dans une lecture DG complete. Le sens
+de "depenses" melange aussi potentiellement engagement et decaissement reel.
+
+P1. Detail d'alerte a verifier
+
+Le lien modal=alert utilise la route modale generique, laquelle construit par
+defaut un contexte overview. Le detail individuel d'alerte doit etre confirme
+par test fonctionnel cible.
+
+P2. Etat de contexte dans l'URL
+
+La navigation conserve le contexte en session mais l'URL de section ne porte
+pas necessairement annexe, annee, periode et filtres. Les favoris, partages et
+retours navigateur sont donc peu reproductibles.
+
+P2. Faux temps reel
+
+Le nom de la section promet plus que le comportement actuel. Il faut choisir :
+polling borne, websocket avec droits et invalidation, ou libelle "dernier
+rafraichissement".
+
+P2. Tests de contrat obsoletes
+
+Un test de contrat pointe encore les roles DG vers dashboard.html historique au
+lieu du dashboard_ui_core.html actif. Il ne protege pas la cible reelle.
+
+
+================================================================
+K. DETTE TECHNIQUE
+================================================================
+
+- Deux architectures de presentation coexistent.
+- Styles inline nombreux, difficilement testables et coherents.
+- Logique JavaScript DG centralisee dans un fichier legacy.
+- Etat client, URL et session non formalises par contrat.
+- Graphiques et feedback utilisateur sans standard unifie.
+- Couverture de tests principalement serveur ; peu de tests de parcours,
+  d'accessibilite, de rendu responsif ou de budget de requetes.
+- Audit et observabilite metier fragmentes selon les applications.
+
+
+================================================================
+L. REGISTRE DES RISQUES ET PRIORITES
+================================================================
+
+Priorite  Sujet                                      Effort   Risque regression  Dependances
+---------  -----------------------------------------  -------  -----------------  --------------------------
+P0         Regle DG non destructive / suppression     M        Eleve              Direction, Academique, Secu
+P0         Validation isolation annexe sur actions    M        Eleve              Tests de permissions
+P1         Corriger planning (semaine/classe)         S        Moyen              Tests HTMX/JS
+P1         Rendre ou migrer graphiques actifs         M        Moyen              Contrat UI Core / donnees
+P1         Rendre les periodes metier coherentes      M        Eleve              Direction/Finance metier
+P1         Completer vision finance executive         L        Eleve              Finance, Caisse, Banque
+P1         Audit & controle transverse                L        Moyen              Apps audit existantes
+P1         Eliminer double calcul / N+1               M        Moyen              Mesures de performance
+P2         Unifier loaders, toasts, confirmations     M        Faible             UI Core
+P2         Synchroniser URL, session et filtres       M        Moyen              Contrat navigation
+P2         Corriger listener modal du shell           S        Moyen global       Toutes consoles certifiees
+P2         Standardiser pagination et tables          M        Moyen              UI Core
+P2         Accessibilite et mobile                    M        Faible a moyen     Recette visuelle
+P3         Retirer legacy apres migration             L        Eleve              Couverture + recette
+
+S = petit ; M = moyen ; L = important.
+
+
+================================================================
+M. ARCHITECTURE CIBLE
+================================================================
+
+1. Modele de navigation
+
+Garder le shell certifie unique et repartir le dashboard en domaines :
+
+- Pilotage : resume, alertes, workflow, tendances.
+- Academique : effectifs, classes, progression, diplomes, calendrier.
+- Finance : encaissements, decaissements, caisse, banque, ecarts, clotures.
+- RH : effectif, paie, honoraires, anomalies, affectations.
+- Annexes : comparaison, risques, capacite, responsables.
+- Gouvernance : decisions, audit, exceptions, controles.
+
+2. Contrat de contexte
+
+Un objet unique, valide cote serveur :
+
+- academic_year_id
+- branch_id ou vue consolidee autorisee
+- period_type et bornes date_debut/date_fin
+- filtres propres a la section
+- provenance (URL/session) et libelle visible
+
+L'URL doit pouvoir representer un etat partageable. La session ne doit etre
+qu'un confort, pas la seule source de verite.
+
+3. Contrat des sections
+
+Chaque section declare :
+
+- permissions ;
+- contexte accepte ;
+- donnees chargees ;
+- indicateur de chargement ;
+- etat vide/erreur ;
+- pagination ;
+- actions possibles ;
+- journalisation ;
+- tests de securite et de rendu.
+
+4. Couche de donnees
+
+- Selecteurs fins par domaine, pas un mega-contexte commun.
+- Agregations SQL explicites et prefetch/select_related mesures.
+- Requetes paginees et limites.
+- Cache court, scape et invalide pour les KPI si necessaire.
+
+5. Actions de gouvernance
+
+Les actions irreversibles ou a impact fort doivent passer par :
+
+demande -> justification -> confirmation adaptee -> eventuelle approbation ->
+execution transactionnelle -> audit -> ecran de preuve -> notification.
+
+
+================================================================
+N. FEUILLE DE ROUTE DEFINITIVE AVANT PRODUCTION
+================================================================
+
+LOT 0 - SECURISER ET RENDRE VRAI CE QUI EST DEJA AFFICHE
+Objectif : aucune promesse UI trompeuse, aucune action sensible ambiguë.
+
+- Corriger et tester le changement de semaine et de classe du planning.
+- Verifier les canvas et soit connecter les graphiques, soit les masquer
+  honnetement jusqu'a leur migration UI Core.
+- Definir la semantique metier de chaque periode et appliquer les bornes aux
+  indicateurs concernes.
+- Verifier le detail d'alerte, les actions rapides et les confirmations.
+- Revoir l'autorisation de suppression d'annee academique : interdire,
+  archiver ou mettre une double approbation explicite.
+- Corriger le listener modal global du shell avec une recette de non-regression
+  sur les autres dashboards certifies.
+- Mettre a jour les tests de contrat pour viser dashboard_ui_core.html.
+- Ajouter tests de permissions annexe pour toutes les actions DG sensibles.
+
+Sortie obligatoire :
+
+- tests cibles verts ;
+- recette DG des parcours critiques ;
+- aucun P0/P1 ouvert dans cette liste.
+
+LOT 1 - FONDER L'EXPERIENCE DE GOUVERNANCE
+Objectif : une DG capable d'observer, comprendre, decider et verifier.
+
+- Construire Audit & Controle transverse a partir des journaux existants.
+- Ajouter timeline de decisions, filtres, details de preuve et exports bornes.
+- Formaliser les actions sensibles (motif, confirmation, audit, retour).
+- Completer la lecture finance : banque, caisse, donations, closures et
+  definition visible de la tresorerie/engagement.
+- Mettre en place URL/context contractuel et filtres reproductibles.
+- Remplacer les feedbacks DG par toast, confirm dialog, loading et error states
+  UI Core.
+
+Sortie obligatoire :
+
+- atelier de validation DG/Finance/Academique ;
+- mapping de chaque action a sa permission et son audit ;
+- recette multi-annexes.
+
+LOT 2 - STANDARDISER UI CORE ET PERFORMANCES
+Objectif : experience professionnelle coherente et temps de reponse mesurable.
+
+- Migrer section par section, en commencant par Finance, Alertes, Annexes,
+  Planning, Workflows et Analytique.
+- Sortir styles inline et composants historiques seulement apres equivalence.
+- Completer data tables, pagination, filtres de dates et chart panel UI Core.
+- Eviter les recalculs globaux ; ajouter mesures de requetes et de temps.
+- Traiter les exports lourds et les caches scapes.
+- Livrer la responsive/accessibilite avec matrice de tests.
+
+Sortie obligatoire :
+
+- budget de performance valide ;
+- tests visuels desktop/tablette/mobile ;
+- navigation clavier et lecteurs d'ecran verifiees.
+
+LOT 3 - CONSOLIDER ET RETIRER LE LEGACY
+Objectif : supprimer sans revenir en arriere.
+
+- Identifier chaque dependance de dashboard.html, dg_legacy.css et
+  dg_dashboard.js.
+- Supprimer seulement une fois la fonctionnalite migree, testee et recettee.
+- Retirer les anciens tests, scripts et CSS devenus orphelins.
+- Mettre en place une surveillance des erreurs front et des actions DG.
+
+Sortie obligatoire :
+
+- aucune route DG active ne depend du legacy ;
+- bilan de regression signe ;
+- procedure de rollback applicative documentee avant deploiement.
+
+
+================================================================
+METHODOLOGIE ET ELEMENTS DE PREUVE
+================================================================
+
+Inspection realisee sur les routes, vues, contextes, selecteurs, services,
+templates, JavaScript, composants UI Core et tests du depot.
+
+Verification executee :
+
+- python manage.py check --settings=config.settings_test_local
+  Resultat : aucune erreur de configuration Django.
+
+- Tests cibles DG et contrats portail :
+  python manage.py test --settings=config.settings_test_local
+  portal.test_dg_lot0 portal.test_dg_context portal.test_dg_context_unit
+  portal.test_dg_staff_lifecycle notification_center.tests.test_portal_phase1
+  --keepdb -v 1
+
+  Resultat : les 19 tests DG cibles passent. La commande complete echoue sur
+  3 assertions non-DG (secretariat, marketing, superadmin) dans le test de
+  contrat notification_center. Ces echecs ne bloquent pas l'audit DG, mais le
+  test de contrat doit etre corrige et execute dans le cadre de la stabilisation.
+
+
+================================================================
+CONCLUSION ET DECISION ATTENDUE
+================================================================
+
+Le travail DG a bien avance, mais il n'est pas encore au niveau de finition et
+de gouvernance attendu pour une production sans retour en arriere.
+
+La prochaine action recommandee est la validation directionnelle du Lot 0 :
+
+- confirmation de la politique des actions destructives ;
+- definition finance/periodes ;
+- priorisation Audit & Controle ;
+- autorisation de corriger les P1 sans lancer encore la refonte globale.
+
+Apres validation, l'implementation doit avancer lot par lot, avec tests,
+recette metier et seuil de sortie avant chaque deploiement.

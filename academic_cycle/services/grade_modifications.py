@@ -35,6 +35,24 @@ def _generate_code():
 APPROVER_POSITIONS = ["director_of_studies", "executive_director", "deputy_executive_director"]
 
 
+def _ensure_approval_authority(approver, branch):
+    """Enforce approval authority and branch scope outside the HTMX UI."""
+    from accounts.access import get_user_position, get_user_scope
+
+    if not approver or not getattr(approver, "is_authenticated", False):
+        raise GradeModificationError("Authentification requise pour valider cette correction.")
+    position = get_user_position(approver)
+    if not approver.is_superuser and position not in APPROVER_POSITIONS:
+        raise GradeModificationError(
+            "Seul le Directeur des etudes ou la direction executive peut valider cette correction."
+        )
+    scope = get_user_scope(approver)
+    scoped_branch = scope.get("branch")
+    branch_id = getattr(branch, "pk", branch)
+    if not scope.get("is_global") and (scoped_branch is None or scoped_branch.pk != branch_id):
+        raise GradeModificationError("Validation refusee hors de votre annexe.")
+
+
 def _approvers_for_branch(branch):
     """Directeur des etudes de l'annexe en priorite, sinon direction executive (toute annexe)."""
     director_ids = list(
@@ -139,10 +157,19 @@ def confirm_grade_modification(*, request_id, code, approver, apply_callback):
     """
     error_message = None
 
+    # Read the branch first, then apply the same server-side authorization to
+    # direct service callers and the OTP endpoint.
+    request_branch = GradeModificationRequest.objects.filter(pk=request_id).values_list("branch", flat=True).first()
+    if request_branch is None:
+        raise GradeModificationRequest.DoesNotExist
+    _ensure_approval_authority(approver, request_branch)
+
     with transaction.atomic():
         request_obj = GradeModificationRequest.objects.select_for_update().get(pk=request_id)
 
-        if request_obj.status != GradeModificationRequest.STATUS_PENDING:
+        if approver.pk == request_obj.requested_by_id:
+            error_message = "L'auteur de la demande ne peut pas approuver sa propre correction."
+        elif request_obj.status != GradeModificationRequest.STATUS_PENDING:
             error_message = "Cette demande n'est plus en attente de validation."
         elif timezone.now() > request_obj.expires_at:
             request_obj.status = GradeModificationRequest.STATUS_EXPIRED
@@ -155,6 +182,15 @@ def confirm_grade_modification(*, request_id, code, approver, apply_callback):
                 request_obj.save(update_fields=["attempts"])
                 error_message = "Code de validation incorrect."
             else:
+                # Lock the grade itself too: an OTP correction and a live
+                # grade entry must not overwrite one another concurrently.
+                from academics.models import ECGrade
+
+                request_obj.ec_grade = (
+                    ECGrade.objects.select_for_update()
+                    .select_related("ec__ue__semester", "enrollment")
+                    .get(pk=request_obj.ec_grade_id)
+                )
                 new_state = apply_callback(request_obj)
 
                 request_obj.status = GradeModificationRequest.STATUS_APPROVED

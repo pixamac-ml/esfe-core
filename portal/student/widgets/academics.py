@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from academics.models import AcademicBulletin, AcademicEnrollment, EC, ECGrade, Semester
+from academics.models import AcademicBulletin, AcademicEnrollment, AcademicYear, EC, ECGrade, Semester
 
 
 def _format_decimal(value):
@@ -11,9 +11,22 @@ def _format_decimal(value):
     return str(value)
 
 
-def get_student_academic_snapshot(user):
+def get_student_academic_snapshot(user, academic_year_id=None):
+    """Return the student's real annual context.
+
+    By default this preserves the existing active-year behavior.  A selected
+    year is always constrained to the requesting student's own enrollments,
+    including archived historical enrollments.
+    """
+    requested_year_id = int(academic_year_id) if str(academic_year_id or "").isdigit() else None
+    base_context = {
+        "available_academic_years": [],
+        "selected_academic_year_id": None,
+        "is_historical_context": False,
+    }
     if not getattr(user, "is_authenticated", False):
         return {
+            **base_context,
             "student": None,
             "academic_enrollment": None,
             "academic_class": None,
@@ -28,6 +41,7 @@ def get_student_academic_snapshot(user):
     student = getattr(user, "student_profile", None)
     if student is None:
         return {
+            **base_context,
             "student": None,
             "academic_enrollment": None,
             "academic_class": None,
@@ -39,20 +53,33 @@ def get_student_academic_snapshot(user):
             "academic_status_message": "Votre compte etudiant est en cours de finalisation.",
         }
 
-    enrollment = (
+    enrollment_queryset = (
         AcademicEnrollment.objects.select_related(
             "academic_class",
             "academic_year",
             "programme",
             "branch",
         )
-        .filter(student=user, is_active=True)
-        .order_by("-created_at", "-id")
-        .first()
+        .filter(student=user)
     )
+    available_academic_years = list(
+        AcademicYear.objects.filter(academic_enrollments__student=user)
+        .distinct()
+        .order_by("-start_date", "-id")
+    )
+    base_context["available_academic_years"] = available_academic_years
+    if requested_year_id is not None:
+        enrollment = enrollment_queryset.filter(academic_year_id=requested_year_id).order_by("-created_at", "-id").first()
+    else:
+        enrollment = enrollment_queryset.filter(
+            status=AcademicEnrollment.STATUS_ACTIVE,
+            is_active=True,
+            is_archived=False,
+        ).order_by("-created_at", "-id").first()
 
     if enrollment is None:
         return {
+            **base_context,
             "student": student,
             "academic_enrollment": None,
             "academic_class": None,
@@ -76,6 +103,7 @@ def get_student_academic_snapshot(user):
 
     if academic_class is None or enrollment.programme is None or enrollment.academic_year is None:
         return {
+            **base_context,
             "student": student,
             "academic_enrollment": enrollment,
             "academic_class": academic_class,
@@ -85,9 +113,12 @@ def get_student_academic_snapshot(user):
             "academic_ecs": ecs,
             "academic_status": "error",
             "academic_status_message": "Vos donnees academiques sont incompletes ou incoherentes.",
+            "selected_academic_year_id": enrollment.academic_year_id,
+            "is_historical_context": not enrollment.is_active,
         }
 
     return {
+        **base_context,
         "student": student,
         "academic_enrollment": enrollment,
         "academic_class": academic_class,
@@ -97,11 +128,13 @@ def get_student_academic_snapshot(user):
         "academic_ecs": ecs,
         "academic_status": "assigned",
         "academic_status_message": "Votre affectation academique est active.",
+        "selected_academic_year_id": enrollment.academic_year_id,
+        "is_historical_context": not enrollment.is_active,
     }
 
 
-def get_academics_widget(user):
-    snapshot = get_student_academic_snapshot(user)
+def get_academics_widget(user, academic_year_id=None):
+    snapshot = get_student_academic_snapshot(user, academic_year_id=academic_year_id)
     academic_class = snapshot["academic_class"]
     ecs = snapshot["academic_ecs"]
     total_credits = sum((ec.credit_required or 0) for ec in ecs)
@@ -175,12 +208,69 @@ def get_academics_widget(user):
         AcademicBulletin.objects.filter(
             enrollment=enrollment,
             student=snapshot["student"],
+            bulletin_type=AcademicBulletin.TYPE_SEMESTER,
             status=AcademicBulletin.STATUS_PUBLISHED,
         ).select_related("semester", "academic_year").order_by("semester__number", "bulletin_type")
     ) if enrollment and snapshot["student"] else []
+    published_annual_bulletin = (
+        AcademicBulletin.objects.filter(
+            enrollment=enrollment,
+            student=snapshot["student"],
+            bulletin_type=AcademicBulletin.TYPE_ANNUAL,
+            status=AcademicBulletin.STATUS_PUBLISHED,
+        )
+        .select_related("academic_year")
+        .order_by("-published_at", "-id")
+        .first()
+        if enrollment and snapshot["student"] else None
+    )
+
+    published_transcripts = []
+    published_by_semester_number = {}
+    for bulletin in published_bulletins:
+        result_snapshot = (bulletin.snapshot or {}).get("result", {})
+        session_labels = {
+            ec.get("session")
+            for ue in result_snapshot.get("ues", [])
+            for ec in ue.get("ecs", [])
+            if ec.get("session")
+        }
+        session_label = "Rattrapage" if session_labels == {"Rattrapage"} else (
+            "Normale / rattrapage" if "Rattrapage" in session_labels else "Normale"
+        )
+        row = {
+            "bulletin": bulletin,
+            "semester": bulletin.semester,
+            "average": f"{_format_decimal(bulletin.average)}/20",
+            "credits": f"{_format_decimal(bulletin.credits_obtained)}/{_format_decimal(bulletin.total_credits)}",
+            "decision": (bulletin.snapshot or {}).get("document", {}).get("decision") or bulletin.decision,
+            "session": session_label,
+        }
+        published_transcripts.append(row)
+        published_by_semester_number[bulletin.semester.number] = row
+
+    semester_rows = []
+    for number in semester_numbers:
+        official_row = published_by_semester_number.get(number)
+        if official_row:
+            semester_rows.append({
+                "label": f"S{number}",
+                "average": official_row["average"],
+                "validated": f"{official_row['decision']} · {official_row['credits']} crédits",
+                "progress": 100,
+            })
+        else:
+            semester_rows.append({
+                "label": f"S{number}",
+                "average": "Résultats non publiés",
+                "validated": "Consultation indisponible avant publication officielle",
+                "progress": 0,
+            })
 
     return {
-        "average": f"{average:.2f}/20" if average is not None else "Non disponible",
+        "selected_academic_year_id": snapshot["selected_academic_year_id"],
+        "is_historical_context": snapshot["is_historical_context"],
+        "average": published_transcripts[-1]["average"] if published_transcripts else "Non disponible",
         "credits": f"{_format_decimal(credits_obtained)}/{_format_decimal(total_credits)}",
         "credits_obtained": _format_decimal(credits_obtained),
         "credits_required": _format_decimal(total_credits),
@@ -201,5 +291,7 @@ def get_academics_widget(user):
         "progress": 100 if snapshot["academic_status"] == "assigned" else 25,
         "status_message": snapshot["academic_status_message"],
         "published_bulletins": published_bulletins,
+        "published_transcripts": published_transcripts,
+        "published_annual_bulletin": published_annual_bulletin,
     }
 

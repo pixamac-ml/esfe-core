@@ -1,0 +1,522 @@
+ETAT ACTUEL DE LA SECTION « EVALUATIONS »
+==========================================
+
+Document de travail pour relecture et réponse du Directeur des études.
+
+1. CE QUI A ETE MIS EN PLACE
+-----------------------------
+
+La section est actuellement rattachée au calendrier académique. Une évaluation ne devrait donc plus être créée en dehors d'une période officielle du calendrier.
+
+Le système possède maintenant la notion de « campagne d'évaluation ». Une campagne représente une période d'examens ou de rattrapage pour une annexe. Elle est liée à :
+
+- l'année académique ;
+- l'annexe ;
+- un jalon officiel du calendrier ;
+- un type de session : normale ou rattrapage ;
+- un semestre réellement configuré dans la structure de l'école ;
+- les classes incluses dans la période ;
+- les EC/matières à préparer.
+
+Le système peut donc préparer une campagne pour plusieurs classes. La campagne n'est pas censée représenter une seule classe.
+
+2. PARCOURS ACTUEL DU DE
+-------------------------
+
+La navigation de la rubrique contient actuellement quatre repères :
+
+- À faire : indicateurs généraux et accès rapides ;
+- Sessions : ouverture ou reprise d'une session officielle ;
+- Préparation : suivi des sujets, des enseignants, des surveillants et des copies ;
+- Planning & suivi : création et suivi des épreuves programmées.
+
+L'ancien onglet séparé « Épreuves » a été retiré de la navigation afin d'éviter les doublons. La création d'une épreuve se fait maintenant dans une modale depuis le planning.
+
+3. OUVERTURE D'UNE CAMPAGNE
+----------------------------
+
+Depuis « Sessions », le DE ouvre une modale « Préparer une session ».
+
+Il choisit :
+
+- la période officielle du calendrier ;
+- le semestre concerné, si nécessaire ;
+- éventuellement un titre personnalisé.
+
+Après validation, le système crée le dossier de préparation et génère les lignes de travail pour les classes et les EC concernés.
+
+Le système refuse notamment :
+
+- une période qui n'appartient pas à l'annexe ;
+- une période hors calendrier validé ou publié ;
+- une période qui ne correspond pas à une session d'examen ou de rattrapage ;
+- une campagne active en double pour le même jalon ;
+- un semestre qui n'existe pas dans la structure de l'école.
+
+4. DOSSIER DE PREPARATION
+--------------------------
+
+Le dossier affiche d'abord des indicateurs :
+
+- nombre de classes incluses ;
+- nombre total d'EC à préparer ;
+- nombre de sujets reçus ;
+- nombre de sujets attendus ou manquants ;
+- progression de réception des sujets ;
+- nombre d'épreuves programmées ;
+- couverture des surveillants.
+
+Les détails ne sont pas tous affichés directement dans la page. Ils sont placés dans des drawers UI Core :
+
+- drawer « Sujets de la session » ;
+- drawer « Surveillants de la session » ;
+- drawer « Épreuves et copies ».
+
+5. SUJETS DES ENSEIGNANTS
+-------------------------
+
+Le DE peut confier un EC à un enseignant responsable.
+
+L'enseignant voit ensuite le sujet qui lui est attribué dans son propre espace « Sujets d'examen » et peut déposer un fichier.
+
+Le sujet possède un état :
+
+- sujet attendu ;
+- sujet reçu ;
+- sujet manquant.
+
+Le fichier, la date de réception et l'utilisateur ayant reçu le document sont conservés.
+
+Le DE peut également ajouter une note de contrôle.
+
+6. PLANIFICATION DES EPREUVES
+-----------------------------
+
+Une épreuve est liée à :
+
+- une campagne ;
+- une classe ;
+- un EC ;
+- un enseignant ;
+- une date et une heure ;
+- une salle ;
+- l'année académique ;
+- le jalon officiel du calendrier.
+
+Le système empêche une épreuve de sortir de la période officielle de la campagne, sauf dérogation motivée.
+
+La classe sélectionnée doit obligatoirement appartenir à la campagne. L'EC doit appartenir à cette classe et l'enseignant doit appartenir à la même annexe.
+
+7. SURVEILLANTS
+---------------
+
+Le DE peut constituer un vivier de surveillants pour son annexe :
+
+- personnel interne ;
+- surveillant externe.
+
+Il peut ensuite affecter un ou plusieurs surveillants à chaque épreuve.
+
+Les affectations sont contrôlées par annexe et par campagne. Le système peut conserver le rôle du surveillant, sa présence, sa signature et une éventuelle preuve.
+
+8. COPIES ET SUIVI APRES EPREUVE
+--------------------------------
+
+Chaque épreuve peut avoir un suivi de copies :
+
+- copies disponibles ;
+- copies retirées ;
+- correction en cours ;
+- notes retournées.
+
+Le DE peut saisir le nombre de copies attendues, le nombre reçu, une note et éventuellement un justificatif.
+
+9. FICHE DE PRESENCE
+---------------------
+
+Depuis chaque épreuve, une fiche de présence PDF peut être générée automatiquement.
+
+La fiche utilise les inscriptions académiques actives de la classe et reprend le modèle officiel trouvé dans :
+
+SITE/EPSFé/Fiche de presence à l'evaluation epsfe.docx
+
+Elle contient maintenant :
+
+- Fiche de présence / Évaluation ;
+- semestre ;
+- session ;
+- discipline ;
+- date ;
+- case matin ou après-midi ;
+- tableau N°, NOM / PRÉNOM, FILIÈRE, SIGNATURE, OBSERVATION ;
+- contrôle de surveillance ;
+- salle et épreuve ;
+- surveillants affectés ;
+- effectif attendu, présents, absents et incidents ;
+- visa du surveillant principal et du Directeur des études.
+
+La fiche est disponible depuis le planning et depuis le drawer des épreuves.
+
+10. UTILISATION DES COMPOSANTS UI CORE
+---------------------------------------
+
+Les éléments suivants sont actuellement utilisés :
+
+- cartes statistiques pour les indicateurs ;
+- barres de progression pour les sujets, le planning et la surveillance ;
+- panneaux UI Core pour les regroupements ;
+- modale pour préparer une session ;
+- modale pour ajouter une épreuve ;
+- drawers pour les sujets, les surveillants, les filtres et les copies ;
+- badges d'état ;
+- overlay de chargement HTMX.
+
+11. CONTROLES DE SECURITE DEJA PRESENTS
+----------------------------------------
+
+Les lectures et écritures sont filtrées par annexe. Le DE ne doit pas pouvoir lire ou modifier les campagnes, épreuves, sujets ou surveillants d'une autre annexe.
+
+Les campagnes, les calendriers, les classes, les EC et les enseignants sont vérifiés avant l'enregistrement.
+
+Les épreuves sont également contrôlées par rapport aux dates du calendrier.
+
+12. CE QUI RESTE A VALIDER AVANT LA PRODUCTION
+-----------------------------------------------
+
+La section est fonctionnelle, mais elle doit encore être validée métier avant d'être considérée comme définitive.
+
+Les points à décider sont notamment :
+
+- faut-il affecter automatiquement les enseignants à partir des affectations pédagogiques existantes ? ;
+- faut-il générer toutes les épreuves automatiquement ou laisser le DE choisir les horaires et les salles ? ;
+- faut-il créer une fiche par classe, par EC, ou une fiche globale par session ? ;
+- faut-il générer toutes les fiches en une seule fois, par exemple dans une archive PDF ? ;
+- faut-il imposer un nombre minimum de surveillants selon l'effectif de la classe ? ;
+- qui valide définitivement une fiche de présence après l'épreuve ? ;
+- faut-il empêcher l'impression si aucun surveillant n'est affecté ? ;
+- faut-il gérer les absences et les incidents dans une fiche séparée ? ;
+- quelles personnes peuvent corriger ou modifier un dépôt après validation ? ;
+- quelles notifications doivent être envoyées automatiquement aux enseignants et aux surveillants ?
+
+13. AVIS GLOBAL
+---------------
+
+La base métier est maintenant présente : campagne, classes, EC, sujets, enseignants, épreuves, surveillants, copies et présence.
+
+Cependant, le point le plus important pour la production reste l'arbitrage du workflow réel de l'EPSFé. Le système ne doit pas inventer les horaires, les salles, les responsables ou les règles de surveillance. Ces éléments doivent être confirmés par le DE avant de verrouiller l'automatisation.
+
+Le prochain travail recommandé est donc une revue écran par écran avec les règles réelles de l'école, puis une simplification finale des actions visibles pour que le DE ne voie que les décisions qu'il doit réellement prendre.
+
+
+
+Le retour est validé dans son principe.
+
+Ne reconstruis pas le module Évaluations et ne crée pas de nouvelle architecture parallèle. La base actuelle doit être conservée :
+
+**Calendrier → Campagne → Classes/EC → Sujets → Épreuves → Surveillance → Copies**
+
+Nous allons maintenant stabiliser le workflow métier autour de cette architecture.
+
+## 1. Enseignants responsables
+
+Lors de la préparation d'une campagne, utilise les affectations pédagogiques existantes pour **proposer automatiquement** l'enseignant responsable de chaque EC lorsque l'information est disponible.
+
+Important :
+
+* il s'agit d'une proposition automatique ;
+* le DE doit pouvoir remplacer l'enseignant ;
+* ne duplique pas les affectations pédagogiques ;
+* conserve la traçabilité si l'enseignant proposé est remplacé.
+
+## 2. Génération des épreuves
+
+Ne génère jamais arbitrairement :
+
+* les horaires ;
+* les salles ;
+* les surveillants.
+
+En revanche, la campagne doit pouvoir déterminer automatiquement les EC qui nécessitent une épreuve.
+
+Le système peut donc préparer une liste :
+
+* EC à planifier ;
+* enseignant responsable ;
+* sujet reçu ou non ;
+* épreuve programmée ou non.
+
+Le DE prend ensuite les décisions d'organisation.
+
+## 3. Fiche de présence
+
+La granularité principale doit être **une fiche par épreuve** :
+
+**campagne + classe + EC + créneau**
+
+Conserve l'impression unitaire.
+
+Prévois également une génération groupée pour permettre au DE de préparer toutes les fiches d'une session sans ouvrir chaque épreuve individuellement.
+
+Ne supprime pas l'impression individuelle.
+
+## 4. Surveillance
+
+Ne code pas en dur un nombre minimum de surveillants tant que la règle officielle n'est pas confirmée.
+
+L'architecture doit néanmoins permettre ultérieurement une règle paramétrable du genre :
+
+effectif de classe → nombre recommandé/minimum de surveillants.
+
+Concernant l'impression d'une fiche sans surveillant, préfère pour le moment une **alerte bloquante visuellement mais contournable par le DE**, plutôt qu'une interdiction technique absolue.
+
+## 5. Workflow de campagne
+
+Analyse l'état actuel de `EvaluationCampaign` et propose la manière la moins destructive de lui donner un véritable cycle métier.
+
+Cycle cible pour une session normale :
+
+**Brouillon**
+→ **Préparation**
+→ **Prête**
+→ **En cours**
+→ **Correction**
+→ **Contrôle des résultats**
+→ **Publiée**
+→ **Clôturée**
+
+Le passage entre états doit dépendre autant que possible de faits métier réels.
+
+Exemples :
+
+Une campagne ne devrait pas être considérée « prête » si des éléments indispensables restent manquants.
+
+Une campagne ne devrait pas passer directement de « en cours » à « publiée ».
+
+Ne code pas des règles arbitraires : identifie d'abord ce que les modèles actuels permettent de vérifier.
+
+## 6. Échéances opérationnelles
+
+Le calendrier doit devenir également une source d'échéances.
+
+Pour les sujets :
+
+* dépôt recommandé : environ J-7 par défaut ;
+* zone normale possible : environ 1 à 2 semaines avant ;
+* seuil critique : J-3.
+
+Ces valeurs ne doivent idéalement pas être dispersées en constantes dans les vues. Prévois une architecture permettant leur paramétrage ultérieur.
+
+Le DE doit pouvoir voir :
+
+* sujets reçus ;
+* sujets attendus ;
+* sujets en retard ;
+* sujets en situation critique.
+
+Après les examens, exploite également le jalon/période de publication des résultats lorsqu'il existe.
+
+Le système doit pouvoir signaler :
+
+* corrections encore attendues ;
+* notes manquantes ;
+* échéance de publication ;
+* risque de retard.
+
+## 7. Versionnement / correction des sujets
+
+Après qu'un sujet a été reçu ou validé, une modification ne doit pas écraser silencieusement l'ancien document.
+
+Analyse la solution la plus légère permettant :
+
+* conservation de l'ancien fichier ou de son historique ;
+* auteur de la modification ;
+* date ;
+* motif éventuel ;
+* nouvelle version.
+
+Ne construis pas un système documentaire disproportionné si un mécanisme simple suffit.
+
+## 8. Préparer le pont vers les résultats
+
+Ne recrée pas le moteur de notes.
+
+Inspecte les modèles existants de notes, validation, publication et rattrapage afin de préparer la liaison :
+
+**EvaluationCampaign**
+→ **Exam/Épreuves**
+→ **Notes existantes**
+→ **Résultats**
+→ **Rattrapage**
+
+La campagne d'évaluation doit orchestrer le processus, mais le système académique existant reste la source de vérité pour les notes et validations.
+
+## 9. Session de rattrapage
+
+C'est un point essentiel.
+
+Une campagne de rattrapage ne doit pas être créée comme une campagne normale totalement vide si les résultats de session normale existent déjà.
+
+Après publication/validation des résultats normaux, le système doit pouvoir déterminer :
+
+* étudiants nécessitant un rattrapage ;
+* EC concernés ;
+* classes concernées.
+
+Il doit ensuite rechercher la période officielle de rattrapage correspondante dans le calendrier et préparer une **proposition de campagne de rattrapage**.
+
+Le DE doit conserver la décision finale.
+
+Workflow cible :
+
+**Session normale publiée**
+→ analyse des résultats
+→ étudiants/EC concernés identifiés
+→ période de rattrapage trouvée
+→ proposition au DE
+→ DE vérifie/ajuste
+→ campagne de rattrapage créée/préparée
+→ sujets
+→ planning
+→ surveillance
+→ épreuves
+→ copies
+→ notes
+→ résultats définitifs.
+
+Ne déclenche pas automatiquement une session de rattrapage sans validation du DE.
+
+## 10. Interface
+
+Ne multiplie pas les nouvelles pages.
+
+Conserve pour le moment les quatre repères existants :
+
+* À faire
+* Sessions
+* Préparation
+* Planning & suivi
+
+Avant toute refonte supplémentaire de navigation, améliore leur contenu pour qu'ils représentent réellement le workflow.
+
+`À faire` doit progressivement devenir le poste de pilotage :
+
+* prochaine session ;
+* sujets urgents ;
+* planning incomplet ;
+* surveillance incomplète ;
+* corrections attendues ;
+* publication proche ;
+* rattrapage à préparer.
+
+Le DE doit voir des **actions métier**, pas simplement des compteurs.
+
+## 11. Avant implémentation lourde
+
+Commence par inspecter précisément les modèles actuels correspondant :
+
+* `EvaluationCampaign`;
+* sujets ;
+* épreuves ;
+* copies ;
+* surveillants ;
+* notes ;
+* résultats ;
+* validation/publication ;
+* rattrapage ;
+* calendrier.
+
+Puis implémente uniquement les évolutions compatibles avec l'architecture existante.
+
+Si une modification nécessite une restructuration importante des modèles de notes ou du moteur académique, arrête-toi et documente le problème avant de modifier cette partie.
+
+Priorité immédiate :
+
+1. stabiliser la campagne ;
+2. compléter préparation/sujets ;
+3. fiabiliser planning/surveillance ;
+4. suivre l'après-épreuve ;
+5. connecter proprement les résultats existants ;
+6. seulement ensuite automatiser la proposition de rattrapage.
+
+Ajoute ou adapte les tests à chaque évolution et conserve strictement l'isolation par annexe.
+
+
+14. ANALYSE DE LA PROPOSITION AJOUTEE
+--------------------------------------
+
+La proposition ajoutée est validée dans son principe. Elle donne une direction claire : conserver l'architecture existante et renforcer progressivement le workflow au lieu de reconstruire toute la section.
+
+Le flux de référence doit rester :
+
+Calendrier → Campagne → Classes/EC → Sujets → Épreuves → Surveillance → Copies → Résultats.
+
+Cette chaîne est logique et correspond à la manière dont le DE travaille réellement. Chaque étape doit produire les informations utiles à l'étape suivante.
+
+15. POINT IMPORTANT SUR LES AFFECTATIONS ENSEIGNANTS
+-----------------------------------------------------
+
+Le projet possède déjà un modèle d'affectation pédagogique côté portail : DirectorTeacherAssignment. Il ne faut donc pas créer une deuxième table d'affectation uniquement pour les évaluations.
+
+La bonne solution est de rechercher l'affectation active de l'EC, de l'UE, du semestre ou de la classe, puis de proposer l'enseignant trouvé comme responsable du sujet. Le DE doit pouvoir remplacer cette proposition, et le système doit conserver l'enseignant proposé, l'enseignant retenu, l'auteur et la date du remplacement.
+
+La proposition automatique ne doit jamais devenir une affectation silencieuse.
+
+16. ETAT DE CAMPAGNE
+--------------------
+
+Le modèle actuel possède déjà une base d'états : préparation, collecte des sujets, planifiée, en cours, corrections, contrôle, résultats publiés, clôturée et annulée.
+
+Il ne faut pas ajouter immédiatement un nouveau moteur d'états. La première évolution raisonnable consiste à conserver ces valeurs et à contrôler les transitions par des faits métier réels.
+
+Correspondance recommandée : preparation = dossier ouvert ; subjects = collecte en cours ; planned = campagne prête ; in_progress = épreuves en cours ; corrections = corrections attendues ; review = résultats à contrôler ; results_published = résultats publiés ; closed = campagne clôturée.
+
+L'état « Prête » demandé dans la proposition peut d'abord être représenté par planned. Il ne faut pas ajouter une nouvelle valeur tant que les conditions exactes ne sont pas confirmées.
+
+17. COMPATIBILITE ET MANQUES
+----------------------------
+
+Déjà compatible : campagne liée au calendrier, portée par annexe/classe/semestre, EC attendus, états des sujets, épreuves, surveillants, copies, fiche de présence individuelle et isolation par annexe.
+
+À compléter avant la production : proposition automatique de l'enseignant depuis DirectorTeacherAssignment, traçabilité des changements, historique des versions de sujets, alertes d'échéances, suivi des corrections et notes manquantes, génération groupée des fiches et proposition de rattrapage.
+
+18. ECHEANCES OPERATIONNELLES
+-----------------------------
+
+Le service actuel calcule J-7 pour le dépôt recommandé et J-3 pour le seuil critique. Ces valeurs doivent rester les valeurs par défaut, mais être centralisées dans une configuration métier afin de pouvoir être paramétrées plus tard par annexe ou par type de campagne.
+
+La priorité est d'abord d'afficher correctement les sujets attendus, en retard et critiques dans « À faire ».
+
+19. VERSIONNEMENT DES SUJETS
+----------------------------
+
+Le champ subject_file actuel permet le dépôt, mais un nouveau dépôt peut remplacer le fichier précédent. Ce n'est pas suffisant pour un sujet officiellement reçu.
+
+La solution légère est un historique de versions lié à EvaluationRequirement : fichier, numéro de version, auteur, date, motif de remplacement et version active. Il ne faut pas créer un système documentaire général.
+
+20. FICHES DE PRESENCE
+----------------------
+
+La fiche par épreuve est le bon niveau : campagne + classe + EC + créneau. L'impression unitaire doit rester disponible. La génération groupée doit ensuite sélectionner les épreuves planifiées et produire une archive PDF ou ZIP.
+
+Une fiche sans surveillant ne devrait pas être interdite techniquement pour le moment. Elle doit afficher une alerte claire et demander une confirmation explicite du DE avant génération.
+
+21. SESSION DE RATTRAPAGE
+-------------------------
+
+Une campagne de rattrapage ne doit pas recopier toute la campagne normale. Elle doit partir des résultats normaux validés, repérer les étudiants et EC non validés, regrouper les besoins par classe et EC, retrouver le jalon officiel de rattrapage, puis présenter une proposition au DE.
+
+Le DE doit pouvoir confirmer, exclure ou ajouter des étudiants avant la création de la campagne. EvaluationCampaign orchestre la préparation, tandis que le moteur académique existant reste la source de vérité pour les notes et validations.
+
+22. PRIORITE D'IMPLEMENTATION RETENUE
+--------------------------------------
+
+L'ordre le plus sûr est :
+
+1. améliorer la campagne et les propositions d'enseignants ;
+2. fiabiliser les sujets et leur historique ;
+3. rendre les échéances visibles dans « À faire » ;
+4. compléter le planning, les surveillants et les fiches groupées ;
+5. connecter le suivi des corrections et les résultats existants ;
+6. construire seulement après cela la proposition de rattrapage.
+
+Cet ordre limite les risques et évite de toucher prématurément au moteur de notes, aux résultats ou aux validations académiques.

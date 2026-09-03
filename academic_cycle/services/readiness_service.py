@@ -14,13 +14,24 @@ def check_class_readiness(academic_class, actor=None, branch_cycle=None):
     if branch_cycle is None:
         branch_cycle = academic_class.academic_year.branch_cycles.get(branch=academic_class.branch)
 
-    semesters = list(academic_class.semesters.all())
+    # A programme can legitimately contain more than S1 and S2.  The old
+    # implementation made a class ready as soon as those two semesters were
+    # finalised, which could open a deliberation while S3--S5 were unfinished.
+    semesters = list(academic_class.semesters.all().order_by("number", "id"))
     semester_map = {semester.number: semester for semester in semesters}
     semester_1_done = semester_map.get(1) is not None and semester_map[1].status in FINAL_SEMESTER_STATUSES
     semester_2_done = semester_map.get(2) is not None and semester_map[2].status in FINAL_SEMESTER_STATUSES
+    all_semesters_finalized = bool(semesters) and all(
+        semester.status in FINAL_SEMESTER_STATUSES for semester in semesters
+    )
 
-    expected_ec_ids = list(academic_class.semesters.values_list("ues__ecs", flat=True).exclude(ues__ecs__isnull=True))
+    expected_ec_ids = list(
+        academic_class.semesters.values_list("ues__ecs", flat=True)
+        .exclude(ues__ecs__isnull=True)
+        .distinct()
+    )
     enrollments = academic_class.enrollments.filter(is_active=True)
+    has_active_enrollments = enrollments.exists()
     expected_grade_count = len(expected_ec_ids) * enrollments.count()
     completed_grade_count = ECGrade.objects.filter(
         enrollment__in=enrollments,
@@ -29,10 +40,40 @@ def check_class_readiness(academic_class, actor=None, branch_cycle=None):
     ).count()
     missing_grades_count = max(expected_grade_count - completed_grade_count, 0)
     grades_done = missing_grades_count == 0
-    bulletins_done = grades_done and semester_1_done and semester_2_done
-    has_blocking_anomaly = not (semester_1_done and semester_2_done and grades_done)
+    # A class with no active students has no bulletin to issue.  Otherwise a
+    # bulletin is required for every active enrollment and every published
+    # semester before the annual deliberation can be considered complete.
+    expected_bulletin_count = len(semesters) * enrollments.count()
+    generated_bulletin_count = 0
+    if expected_bulletin_count:
+        from academics.models import AcademicBulletin
 
-    score_parts = [semester_1_done, semester_2_done, grades_done, bulletins_done]
+        generated_bulletin_count = AcademicBulletin.objects.filter(
+            academic_class=academic_class,
+            semester__in=semesters,
+            bulletin_type=AcademicBulletin.TYPE_SEMESTER,
+            status=AcademicBulletin.STATUS_PUBLISHED,
+        ).count()
+    # Une classe de maquette sans aucun étudiant actif (par exemple le niveau
+    # suivant préparé à l'avance) n'a ni notes ni relevés à clôturer. Elle ne
+    # doit pas empêcher la délibération des promotions effectivement inscrites.
+    if not has_active_enrollments:
+        all_semesters_finalized = True
+        grades_done = True
+        bulletins_done = True
+    else:
+        bulletins_done = (
+            all_semesters_finalized
+            and grades_done
+            and generated_bulletin_count >= expected_bulletin_count
+        )
+    has_blocking_anomaly = not (all_semesters_finalized and grades_done and bulletins_done)
+
+    score_parts = [
+        *(semester.status in FINAL_SEMESTER_STATUSES for semester in semesters),
+        grades_done,
+        bulletins_done,
+    ]
     readiness_score = int(sum(1 for part in score_parts if part) / len(score_parts) * 100)
     if has_blocking_anomaly:
         status = constants.CLASS_GRADES_COMPLETED if grades_done else constants.CLASS_TEACHING
@@ -59,8 +100,12 @@ def check_class_readiness(academic_class, actor=None, branch_cycle=None):
         "missing_grades_count": missing_grades_count,
         "semester_1_done": semester_1_done,
         "semester_2_done": semester_2_done,
+        "all_semesters_finalized": all_semesters_finalized,
+        "semester_count": len(semesters),
         "grades_done": grades_done,
         "bulletins_done": bulletins_done,
+        "expected_bulletin_count": expected_bulletin_count,
+        "generated_bulletin_count": generated_bulletin_count,
         "has_blocking_anomaly": has_blocking_anomaly,
         "readiness_score": readiness_score,
     }

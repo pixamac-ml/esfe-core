@@ -34,13 +34,9 @@ class GallerySpotlight(component.Component):
                 "category": item.event.event_type.name if item.event.event_type else "Galerie",
             })
 
-        modal_images = gallery_images[:20]
-
         return {
             "images": gallery_images,
-            "modal_images": modal_images,
             "images_json": json.dumps(gallery_images),
-            "modal_images_json": json.dumps(modal_images),
             "section_title": kwargs.get('title', "Instants Capturés"),
             "section_subtitle": kwargs.get('subtitle', "Revivez les moments forts de notre communauté"),
             "gallery_url": kwargs.get('gallery_url', "/galerie/"),

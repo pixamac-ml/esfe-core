@@ -14,6 +14,7 @@ class Modal(component.Component):
         open=False,
         content_url="",
         size="md",
+        has_form=False,
         **kwargs,
     ):
         size_map = {
@@ -29,5 +30,6 @@ class Modal(component.Component):
             "open": bool(open),
             "content_url": content_url,
             "size_class": size_map.get(size, "max-w-xl"),
+            "has_form": bool(has_form),
             **kwargs,
         }

@@ -1,28 +1,59 @@
 {% load component_tags %}
-<a
-  href="{% url 'accounts_portal:system_profile' %}"
-  class="inline-flex h-9 items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover"
->
-  <i data-lucide="user-round" class="h-4 w-4" aria-hidden="true"></i>
-  <span class="hidden sm:inline">Mon compte</span>
-</a>
-<button
-  type="button"
-  class="grid h-9 w-9 place-items-center rounded-ui-button border border-ui-border bg-ui-surface text-ui-text hover:bg-ui-surface-hover"
-  onclick="window.location.reload()"
-  title="Actualiser"
-  aria-label="Actualiser le dashboard"
->
-  <i data-lucide="refresh-cw" class="h-4 w-4" aria-hidden="true"></i>
-</button>
-<form method="post" action="{% url 'accounts:logout' %}">
-  {% csrf_token %}
+{% with staff_dash_key=dashboard_shell.key %}
+{% url 'accounts_portal:staff_account_panel' as staff_panel_url %}
+{% url 'accounts_portal:staff_notifications_preview' as staff_preview_url %}
+{% url 'accounts_portal:staff_messaging' as staff_messaging_url %}
+{% url 'accounts_portal:dg_section' section='messaging' as executive_messaging_url %}
+{% url 'accounts:logout' as staff_logout_url %}
+<div class="flex items-center gap-2">
+  {% component "account.profile_dropdown"
+    user=request.user
+    role=dashboard_shell.subtitle
+    profile_url=staff_panel_url|add:"?dash="|add:staff_dash_key|add:"&view=profile"
+    edit_url=staff_panel_url|add:"?dash="|add:staff_dash_key|add:"&view=edit"
+    security_url=staff_panel_url|add:"?dash="|add:staff_dash_key|add:"&view=security"
+    preferences_url=staff_panel_url|add:"?dash="|add:staff_dash_key|add:"&view=preferences"
+    logout_url=staff_logout_url
+    drawer_id=dashboard_shell.drawer_id
+  %}{% endcomponent %}
+
+  {% if staff_dash_key == "executive" %}
+    {% component "notifications.bell"
+      unread_count=notification_count|default:0
+      preview_url=staff_preview_url|add:"?dash="|add:staff_dash_key
+      preview_target="#notification-dropdown-content"
+      center_url=executive_messaging_url|add:"?domain=mon_espace"
+      center_target="#executive-workspace"
+    %}{% endcomponent %}
+  {% else %}
+    {% component "notifications.bell"
+      unread_count=notification_count|default:0
+      preview_url=staff_preview_url|add:"?dash="|add:staff_dash_key
+      preview_target="#notification-dropdown-content"
+      center_url=staff_messaging_url|add:"?dash="|add:staff_dash_key
+      center_target="#"|add:staff_dash_key|add:"-workspace"
+    %}{% endcomponent %}
+  {% endif %}
+
   <button
-    type="submit"
-    class="grid h-9 w-9 place-items-center rounded-ui-button border border-ui-danger/20 bg-ui-danger/5 text-ui-danger hover:bg-ui-danger/10"
-    title="Deconnexion"
-    aria-label="Se deconnecter"
+    type="button"
+    class="grid h-9 w-9 place-items-center rounded-ui-button border border-ui-border bg-ui-surface text-ui-text hover:bg-ui-surface-hover"
+    onclick="window.location.reload()"
+    title="Actualiser"
+    aria-label="Actualiser le dashboard"
   >
-    <i data-lucide="log-out" class="h-4 w-4" aria-hidden="true"></i>
+    <i data-lucide="refresh-cw" class="h-4 w-4" aria-hidden="true"></i>
   </button>
-</form>
+  <form method="post" action="{{ staff_logout_url }}">
+    {% csrf_token %}
+    <button
+      type="submit"
+      class="grid h-9 w-9 place-items-center rounded-ui-button border border-ui-danger/20 bg-ui-danger/5 text-ui-danger hover:bg-ui-danger/10"
+      title="Deconnexion"
+      aria-label="Se deconnecter"
+    >
+      <i data-lucide="log-out" class="h-4 w-4" aria-hidden="true"></i>
+    </button>
+  </form>
+</div>
+{% endwith %}

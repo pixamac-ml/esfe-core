@@ -8,17 +8,13 @@ from django.db import transaction
 from django.template.loader import render_to_string
 from django.utils import timezone
 
-from academics.models import AcademicBulletin, AcademicDebt, AcademicDecisionLog, AcademicDiplomaAward, AcademicEnrollment, Semester
+from academic_cycle.models import StudentYearDecision
+from academics.models import AcademicBulletin, AcademicDebt, AcademicDiplomaAward, AcademicEnrollment, Semester
+from academics.services.annual_deliberation import get_annual_semesters, get_final_annual_decision
 from academics.services.reporting import format_decimal
 from academics.services.semester import compute_semester_result
 from academics.services.workflow import get_semester_permissions
-from academics.services.year import (
-    DECISION_ADMISSIBLE,
-    DECISION_NON_ADMIS,
-    DECISION_VALIDE,
-    compute_annual_decision,
-    create_academic_debts,
-)
+from academics.services.year import DECISION_VALIDE
 
 
 def _mention(average):
@@ -52,7 +48,20 @@ def _reference(prefix, enrollment, suffix=""):
     return "-".join(parts)
 
 
-def _serialize_semester_result(result):
+def _official_session_label(grade):
+    """Expose la session qui a effectivement fourni la note finale figée."""
+    if grade is None or grade.retake_score is None:
+        return "Normale"
+    if grade.normal_score is None or grade.retake_score > grade.normal_score:
+        return "Rattrapage"
+    return "Normale"
+
+
+def _serialize_semester_result(result, enrollment):
+    grade_by_ec_id = {
+        grade.ec_id: grade
+        for grade in enrollment.ec_grades.all()
+    }
     return {
         "semester_number": getattr(result.get("semester"), "number", None),
         "average": str(result.get("average")) if result.get("average") is not None else None,
@@ -83,6 +92,7 @@ def _serialize_semester_result(result):
                         "credit_required": str(row.get("credit_required") or "0"),
                         "credit_obtained": str(row.get("credit_obtained") or "0"),
                         "is_validated": bool(row.get("is_validated")),
+                        "session": _official_session_label(grade_by_ec_id.get(row["ec"].id)),
                     }
                     for row in ue_result.get("rows", [])
                 ],
@@ -126,7 +136,7 @@ def _build_semester_bulletin_snapshot(enrollment, result):
     snapshot = {
         "version": 2,
         **_identity_snapshot(enrollment),
-        "result": _serialize_semester_result(result),
+        "result": _serialize_semester_result(result, enrollment),
     }
     snapshot["document"] = {
         "decision": "Valide" if result.get("is_validated") else "Non valide",
@@ -135,21 +145,21 @@ def _build_semester_bulletin_snapshot(enrollment, result):
     return snapshot
 
 
-def _build_annual_bulletin_snapshot(enrollment, decision, semester_results):
+def _build_annual_bulletin_snapshot(enrollment, synthesis):
     return {
         "version": 2,
         **_identity_snapshot(enrollment),
         "document": {
-            "decision": decision.get("decision", ""),
+            "decision": synthesis.get("academic_decision", ""),
             "mention": "",
         },
         "decision": {
-            "code": decision.get("decision"),
-            "rule_code": decision.get("rule_code"),
-            "rule_label": decision.get("rule_label"),
-            "threshold": str(decision.get("threshold") or ""),
-            "admissibility_gap": str(decision.get("admissibility_gap") or ""),
-            "requires_academic_debt": decision.get("requires_academic_debt"),
+            "code": synthesis.get("academic_decision"),
+            "rule_code": synthesis.get("rule_code"),
+            "rule_label": synthesis.get("rule_label"),
+            "threshold": str(synthesis.get("threshold") or ""),
+            "admissibility_gap": str(synthesis.get("admissibility_gap") or ""),
+            "requires_academic_debt": synthesis.get("requires_academic_debt"),
             "debt_subjects": [
                 {
                     "semester": item.get("semester"),
@@ -157,11 +167,11 @@ def _build_annual_bulletin_snapshot(enrollment, decision, semester_results):
                     "ec": item.get("ec"),
                     "score": item.get("score"),
                 }
-                for item in decision.get("debt_subjects", [])
+                for item in synthesis.get("debt_subjects", [])
             ],
-            "reasons": decision.get("reasons", []),
+            "reasons": synthesis.get("reasons", []),
         },
-        "semesters": semester_results,
+        "semesters": synthesis.get("semesters", []),
     }
 
 
@@ -204,6 +214,7 @@ def _semester_result_from_snapshot(snapshot, bulletin):
                 "credit_obtained_display": format_decimal(credit_obtained),
                 "ec_coefficient_display": _display_optional(coefficient),
                 "is_validated": bool(ec_data.get("is_validated")),
+                "session": ec_data.get("session") or "Normale",
             })
         ue_average = _optional_decimal(ue_data.get("average"))
         ue_coefficient = _optional_decimal(ue_data.get("coefficient")) or Decimal("0")
@@ -320,6 +331,8 @@ def generate_semester_bulletin(*, enrollment, semester, actor=None, publish=Fals
         .first()
     )
     if published_bulletin is not None:
+        if publish and not published_bulletin.pdf_file:
+            _persist_bulletin_pdf(published_bulletin)
         return published_bulletin
     status = AcademicBulletin.STATUS_PUBLISHED if publish else AcademicBulletin.STATUS_GENERATED
     now = timezone.now()
@@ -351,7 +364,9 @@ def generate_semester_bulletin(*, enrollment, semester, actor=None, publish=Fals
     return bulletin
 
 
+@transaction.atomic
 def generate_semester_bulletins_for_class(*, academic_class, semester, actor=None, publish=False):
+    semester = Semester.objects.select_for_update().get(pk=semester.pk)
     if semester.academic_class_id != academic_class.id:
         raise ValidationError("Le semestre ne correspond pas a la classe.")
     created = []
@@ -373,16 +388,13 @@ def generate_semester_bulletins_for_class(*, academic_class, semester, actor=Non
 
 @transaction.atomic
 def generate_annual_bulletin(*, enrollment, actor=None, publish=False):
-    semesters = list(enrollment.academic_class.semesters.all().order_by("number"))
-    if {semester.number for semester in semesters} != {1, 2} or len(semesters) != 2:
-        raise ValidationError("Le bulletin annuel exige exactement les semestres S1 et S2.")
+    semesters = get_annual_semesters(enrollment.academic_class)
     for semester in semesters:
         if not get_semester_permissions(semester)["can_generate_reports"]:
             raise ValidationError("Le bulletin annuel est disponible apres publication de tous les semestres.")
 
-    decision = compute_annual_decision(enrollment)
-    if not decision.get("annual_result", {}).get("is_complete"):
-        raise ValidationError("Le bulletin annuel exige des notes completes pour S1 et S2.")
+    official_decision = get_final_annual_decision(enrollment=enrollment)
+    synthesis = official_decision.synthesis_snapshot
     student = _student_for_enrollment(enrollment)
     published_bulletin = (
         AcademicBulletin.objects.select_for_update()
@@ -399,10 +411,6 @@ def generate_annual_bulletin(*, enrollment, actor=None, publish=False):
         return published_bulletin
     status = AcademicBulletin.STATUS_PUBLISHED if publish else AcademicBulletin.STATUS_GENERATED
     now = timezone.now()
-    semester_results = [
-        _serialize_semester_result(sr)
-        for sr in decision.get("semester_results", [])
-    ]
     bulletin, _ = AcademicBulletin.objects.update_or_create(
         student=student,
         enrollment=enrollment,
@@ -415,11 +423,11 @@ def generate_annual_bulletin(*, enrollment, actor=None, publish=False):
             "reference": _reference("BUL-A", enrollment),
             "status": status,
             "average": None,
-            "total_credits": decision.get("annual_result", {}).get("credit_required") or Decimal("0.00"),
-            "credits_obtained": decision.get("annual_result", {}).get("credit_obtained") or Decimal("0.00"),
-            "decision": decision.get("decision", ""),
+            "total_credits": Decimal(str(synthesis.get("credits", {}).get("required") or "0")),
+            "credits_obtained": Decimal(str(synthesis.get("credits", {}).get("obtained") or "0")),
+            "decision": synthesis.get("academic_decision", ""),
             "mention": "",
-            "snapshot": _build_annual_bulletin_snapshot(enrollment, decision, semester_results),
+            "snapshot": _build_annual_bulletin_snapshot(enrollment, synthesis),
             "generated_by": actor if getattr(actor, "is_authenticated", False) else None,
             "generated_at": now,
             "published_by": actor if publish and getattr(actor, "is_authenticated", False) else None,
@@ -427,10 +435,6 @@ def generate_annual_bulletin(*, enrollment, actor=None, publish=False):
         },
     )
     if publish:
-        if decision.get("requires_academic_debt"):
-            for semester_result in decision.get("semester_results", []):
-                if not semester_result.get("is_validated"):
-                    create_academic_debts(enrollment, semester_result)
         _persist_bulletin_pdf(bulletin)
     return bulletin
 
@@ -468,7 +472,7 @@ def backfill_published_bulletin(bulletin):
             if not bulletin.semester_id:
                 raise ValidationError("Bulletin semestriel sans semestre.")
             result = compute_semester_result(bulletin.semester, bulletin.enrollment)
-            serialized = _serialize_semester_result(result)
+            serialized = _serialize_semester_result(result, bulletin.enrollment)
             old_result = old_snapshot.get("result", old_snapshot)
             if not result.get("is_complete") or not _is_snapshot_subset(old_result, serialized):
                 raise ValidationError("Les donnees actuelles divergent du snapshot historique.")
@@ -480,26 +484,14 @@ def backfill_published_bulletin(bulletin):
                 raise ValidationError("Les totaux actuels divergent du bulletin publie.")
             bulletin.snapshot = _build_semester_bulletin_snapshot(bulletin.enrollment, result)
         else:
-            decision = compute_annual_decision(bulletin.enrollment)
-            semester_results = [
-                _serialize_semester_result(result)
-                for result in decision.get("semester_results", [])
-            ]
-            if not decision.get("annual_result", {}).get("is_complete"):
-                raise ValidationError("Le resultat annuel actuel est incomplet.")
-            if not _is_snapshot_subset(old_snapshot.get("semesters", []), semester_results):
-                raise ValidationError("Les semestres actuels divergent du snapshot historique.")
-            old_decision = old_snapshot.get("decision", {})
-            current_decision = _build_annual_bulletin_snapshot(
+            official_decision = get_final_annual_decision(enrollment=bulletin.enrollment)
+            current_snapshot = _build_annual_bulletin_snapshot(
                 bulletin.enrollment,
-                decision,
-                semester_results,
+                official_decision.synthesis_snapshot,
             )
-            if not _is_snapshot_subset(old_decision, current_decision["decision"]):
-                raise ValidationError("La decision actuelle diverge du snapshot historique.")
-            if bulletin.decision != decision.get("decision"):
-                raise ValidationError("La decision actuelle diverge du bulletin publie.")
-            bulletin.snapshot = current_decision
+            if bulletin.decision != official_decision.synthesis_snapshot.get("academic_decision"):
+                raise ValidationError("La decision officielle diverge du bulletin publie.")
+            bulletin.snapshot = current_snapshot
 
         bulletin.save(
             update_fields=["snapshot", "updated_at"],
@@ -515,71 +507,39 @@ def backfill_published_bulletin(bulletin):
     return bulletin, snapshot_updated, pdf_created
 
 
-def _create_decision_log(*, academic_class, actor, enrollment_decisions, publish=False):
-    """
-    Cree un AcademicDecisionLog a partir des decisions de tous les etudiants d'une classe.
-    """
-    threshold = None
-    gap = None
-    rule_codes = set()
-    validated = admissible = non_admis = 0
-
-    for d in enrollment_decisions:
-        code = d.get("decision", "")
-        if code == DECISION_VALIDE:
-            validated += 1
-        elif code == DECISION_ADMISSIBLE:
-            admissible += 1
-        elif code == DECISION_NON_ADMIS:
-            non_admis += 1
-        rule_code = d.get("rule_code")
-        if rule_code:
-            rule_codes.add(rule_code)
-        if threshold is None:
-            threshold = d.get("threshold")
-            gap = d.get("admissibility_gap")
-
-    total = validated + admissible + non_admis
-    if total == 0:
-        return None
-
-    return AcademicDecisionLog.objects.create(
+@transaction.atomic
+def generate_annual_bulletins_for_class(*, academic_class, actor=None, publish=False):
+    semesters = get_annual_semesters(academic_class)
+    if any(not get_semester_permissions(semester)["can_generate_reports"] for semester in semesters):
+        raise ValidationError(
+            "Les bulletins annuels sont disponibles après publication de tous les semestres de la maquette."
+        )
+    created = []
+    enrollment_ids = list(StudentYearDecision.objects.filter(
+        current_class=academic_class,
+        academic_year=academic_class.academic_year,
+        is_final=True,
+        source_enrollment__isnull=False,
+    ).exclude(synthesis_snapshot={}).values_list("source_enrollment_id", flat=True))
+    active_enrollment_count = AcademicEnrollment.objects.filter(
         academic_class=academic_class,
         academic_year=academic_class.academic_year,
-        actor=actor if getattr(actor, "is_authenticated", False) else None,
-        threshold=threshold or Decimal("0"),
-        admissibility_gap=gap or Decimal("0"),
-        total_students=total,
-        validated_count=validated,
-        admissible_count=admissible,
-        non_admis_count=non_admis,
-        rule_codes_used=sorted(rule_codes),
-        details={
-            "publish": bool(publish),
-        },
-    )
-
-
-def generate_annual_bulletins_for_class(*, academic_class, actor=None, publish=False):
-    created = []
-    enrollment_decisions = []
+        is_active=True,
+    ).count()
+    if not enrollment_ids or len(enrollment_ids) != active_enrollment_count:
+        raise ValidationError(
+            "Les bulletins annuels sont disponibles après la délibération annuelle officielle de toute la classe."
+        )
     enrollments = AcademicEnrollment.objects.select_related(
         "student__student_profile",
         "academic_class",
         "academic_year",
         "programme",
         "branch",
-    ).filter(
-        academic_class=academic_class,
-        academic_year=academic_class.academic_year,
-        is_active=True,
-    )
+    ).filter(pk__in=enrollment_ids)
     for enrollment in enrollments:
         bulletin = generate_annual_bulletin(enrollment=enrollment, actor=actor, publish=publish)
         created.append(bulletin)
-        decision = compute_annual_decision(enrollment)
-        enrollment_decisions.append(decision)
-    _create_decision_log(academic_class=academic_class, actor=actor, enrollment_decisions=enrollment_decisions, publish=publish)
     return created
 
 
@@ -618,6 +578,7 @@ def build_bulletin_context(bulletin):
             "programme_name": academic.get("programme_name") or getattr(programme, "title", ""),
             "department_name": academic.get("department_name") or getattr(getattr(programme, "filiere", None), "name", ""),
             "domain_name": academic.get("domain_name") or getattr(getattr(programme, "cycle", None), "name", ""),
+            "branch_name": academic.get("branch_name") or getattr(bulletin.branch, "name", ""),
             "decision_display": document.get("decision") or bulletin.decision,
             "mention_display": document.get("mention") or bulletin.mention,
             "total_credits_display": format_decimal(bulletin.total_credits),
@@ -629,8 +590,9 @@ def build_bulletin_context(bulletin):
 
 @transaction.atomic
 def prepare_diploma_award(*, enrollment, actor=None, publish=False):
-    decision = compute_annual_decision(enrollment)
-    if decision.get("decision") != DECISION_VALIDE:
+    official_decision = get_final_annual_decision(enrollment=enrollment)
+    synthesis = official_decision.synthesis_snapshot
+    if synthesis.get("academic_decision") != DECISION_VALIDE:
         raise ValidationError("Le diplome ne peut etre prepare que pour un cycle termine (decision VALIDE).")
 
     pending_debts = AcademicDebt.objects.filter(
@@ -651,7 +613,7 @@ def prepare_diploma_award(*, enrollment, actor=None, publish=False):
     status = AcademicDiplomaAward.STATUS_DELIVERED if publish else AcademicDiplomaAward.STATUS_READY
     now = timezone.now()
     final_average = None
-    semester_results = decision.get("semester_results", [])
+    semester_results = synthesis.get("semesters", [])
     if semester_results:
         averages = [
             Decimal(str(sr.get("average")))
@@ -673,17 +635,17 @@ def prepare_diploma_award(*, enrollment, actor=None, publish=False):
             "status": status,
             "final_average": final_average,
             "mention": _mention(final_average),
-            "decision": decision.get("decision", ""),
+            "decision": synthesis.get("academic_decision", ""),
             "awarded_at": timezone.localdate() if publish else None,
             "prepared_by": actor if getattr(actor, "is_authenticated", False) else None,
             "delivered_by": actor if publish and getattr(actor, "is_authenticated", False) else None,
             "delivered_at": now if publish else None,
             "snapshot": {
-                "decision": decision.get("decision"),
-                "rule_code": decision.get("rule_code"),
+                "decision": synthesis.get("academic_decision"),
+                "rule_code": synthesis.get("rule_code"),
                 "final_average": str(final_average) if final_average is not None else None,
-                "credit_required": str(decision.get("annual_result", {}).get("credit_required") or "0"),
-                "credit_obtained": str(decision.get("annual_result", {}).get("credit_obtained") or "0"),
+                "credit_required": str(synthesis.get("credits", {}).get("required") or "0"),
+                "credit_obtained": str(synthesis.get("credits", {}).get("obtained") or "0"),
             },
         },
     )
@@ -693,17 +655,19 @@ def prepare_diploma_award(*, enrollment, actor=None, publish=False):
 def prepare_diploma_awards_for_class(*, academic_class, actor=None, publish=False):
     awards = []
     skipped = []
+    enrollment_ids = StudentYearDecision.objects.filter(
+        current_class=academic_class,
+        academic_year=academic_class.academic_year,
+        is_final=True,
+        source_enrollment__isnull=False,
+    ).exclude(synthesis_snapshot={}).values_list("source_enrollment_id", flat=True)
     enrollments = AcademicEnrollment.objects.select_related(
         "student__student_profile",
         "academic_class",
         "academic_year",
         "programme__diploma_awarded",
         "branch",
-    ).filter(
-        academic_class=academic_class,
-        academic_year=academic_class.academic_year,
-        is_active=True,
-    )
+    ).filter(pk__in=enrollment_ids)
     for enrollment in enrollments:
         try:
             awards.append(prepare_diploma_award(enrollment=enrollment, actor=actor, publish=publish))

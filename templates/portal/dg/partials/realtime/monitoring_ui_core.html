@@ -1,0 +1,19 @@
+{% load component_tags humanize %}
+<section class="space-y-5" data-dashboard-section="realtime" data-executive-section="realtime">
+  {% component "ui_core.page_header" eyebrow="Gouvernance" title="Activité récente" subtitle="Instantané des dernières opérations institutionnelles dans le contexte actif." %}
+    {% fill "actions" %}
+      <button type="button" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" onclick="dgRefreshSection('realtime')">
+        <i data-lucide="refresh-cw" class="h-4 w-4" aria-hidden="true"></i> Actualiser
+      </button>
+    {% endfill %}
+  {% endcomponent %}
+
+  <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    {% component "ui_core.stat_card" label="Inscriptions du jour" value=realtime.today_inscriptions|intcomma icon="file-check-2" tone="success" description="Candidatures soumises aujourd’hui" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Paiements du jour" value=realtime.today_payments|intcomma icon="circle-dollar-sign" tone="info" description="Paiements validés aujourd’hui" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Cours prévus" value=realtime.today_courses|intcomma icon="calendar-days" tone="primary" description="Aujourd’hui dans le périmètre actif" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Alertes ouvertes" value=open_alerts|intcomma icon="triangle-alert" tone="warning" description="À traiter dans le périmètre actif" compact=True %}{% endcomponent %}
+  </div>
+
+  {% component "ui_core.data_table" id="dg-realtime-activity" caption="Dernières opérations" headers=realtime_activity_headers rows=realtime_activity_rows result_count=realtime_activity_rows|length density="compact" empty_title="Aucune activité récente" empty_message="Aucune opération institutionnelle ne correspond au contexte sélectionné." %}{% endcomponent %}
+</section>

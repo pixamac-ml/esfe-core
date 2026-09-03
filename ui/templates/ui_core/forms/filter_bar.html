@@ -21,7 +21,7 @@
           </select>
         {% else %}
           <span class="relative block">
-            <input type="{{ filter.type|default:'text' }}" name="{{ filter.name }}" value="{{ filter.value|default:'' }}" placeholder="{{ filter.placeholder }}" class="w-full rounded-ui-input border-ui-border pr-9 text-sm focus:border-ui-focus focus:ring-ui-focus {% if density == 'compact' %}h-9{% else %}h-ui-control{% endif %}">
+            <input type="{{ filter.type|default:'text' }}" name="{{ filter.name }}" value="{{ filter.value|default:'' }}" placeholder="{{ filter.placeholder }}" class="w-full rounded-ui-input border-ui-border pr-9 text-sm focus:border-ui-focus focus:ring-ui-focus {% if density == 'compact' %}h-9{% else %}h-ui-control{% endif %}"{% if filter.name == live_search_name and target %} hx-get="{{ action }}" hx-trigger="input changed delay:{{ live_search_delay }}ms, search" hx-target="{{ target }}" hx-swap="{{ swap }}" hx-include="closest form" hx-sync="closest form:replace"{% endif %}>
             {% if filter.clearable %}<button type="button" data-ui-clear-input class="absolute right-1 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-ui-button text-ui-text-muted hover:bg-ui-surface-hover" aria-label="Effacer {{ filter.label }}"><i data-lucide="x" class="h-4 w-4"></i></button>{% endif %}
           </span>
         {% endif %}

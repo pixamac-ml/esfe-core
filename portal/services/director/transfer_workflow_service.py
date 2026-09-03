@@ -9,6 +9,7 @@ from academics.models import AcademicClass, AcademicEnrollment
 from accounts.dashboards.helpers import get_user_branch
 from admissions.models import Candidature
 from portal.models import (
+    AcademicEnrollmentMovement,
     IncomingTransfer,
     InternalTransfer,
     OutgoingTransfer,
@@ -52,6 +53,17 @@ def _source_snapshot(enrollment):
         "academic_year": str(enrollment.academic_year),
         "branch_id": enrollment.branch_id,
     }
+
+
+def _validate_internal_target(*, enrollment, target, branch):
+    if target is None or not target.is_active or target.is_archived:
+        raise ValidationError("La classe de destination doit être active.")
+    if target.branch_id != branch.id or target.academic_year_id != enrollment.academic_year_id:
+        raise ValidationError("Le transfert interclasse doit rester dans la même annexe et la même année académique.")
+    if target.level.strip().upper() != enrollment.academic_class.level.strip().upper():
+        raise ValidationError("Le niveau ne peut pas être modifié par un transfert interclasse.")
+    if target.programme_id != enrollment.programme_id:
+        raise ValidationError("La filière ne peut pas être modifiée par un transfert interclasse.")
 
 
 def _log(transfer, *, actor, action, from_status="", to_status="", note="", snapshot=None):
@@ -201,12 +213,7 @@ def create_transfer_request(
             raise ValidationError("La classe de destination est obligatoire.")
         if target_class.pk == enrollment.academic_class_id:
             raise ValidationError("La classe de destination doit être différente.")
-        if target_class.academic_year_id != enrollment.academic_year_id:
-            raise ValidationError("Le transfert interne doit rester dans la même année académique.")
-        if target_class.level.strip().upper() != enrollment.academic_class.level.strip().upper():
-            raise ValidationError(
-                "Un transfert interne ne peut pas changer le niveau acquis. Utilisez le passage d'année."
-            )
+        _validate_internal_target(enrollment=enrollment, target=target_class, branch=branch)
         target_school_name = ""
     elif transfer_type == TransferRequest.TYPE_OUTGOING:
         if not (target_school_name or "").strip():
@@ -239,6 +246,7 @@ def create_transfer_request(
             source_level=enrollment.academic_class.level,
             target_level=target_class.level,
             academic_decision_reference=(transfer_data.get("academic_decision_reference") or "").strip(),
+            effective_date=transfer_data.get("effective_date") or timezone.localdate(),
         )
     elif transfer_type == TransferRequest.TYPE_OUTGOING:
         school = _get_or_create_school(
@@ -279,7 +287,13 @@ def create_transfer_request(
             requested_programme=target_class.programme,
             requested_class=target_class,
             requested_level=target_class.level,
+            previous_academic_year=(transfer_data.get("previous_academic_year") or "").strip(),
+            last_validated_semester=(transfer_data.get("last_validated_semester") or "").strip(),
+            external_student_number=(transfer_data.get("external_student_number") or "").strip(),
             equivalence_notes=(transfer_data.get("equivalence_notes") or "").strip(),
+            recognised_equivalences=(transfer_data.get("recognised_equivalences") or "").strip(),
+            subjects_to_retake=(transfer_data.get("subjects_to_retake") or "").strip(),
+            academic_reservations=(transfer_data.get("academic_reservations") or "").strip(),
         )
 
     if transfer.attachment:
@@ -316,7 +330,7 @@ def get_transfer_request_for_director(*, user, transfer_id):
         "enrollment", "enrollment__student", "source_class", "target_class",
         "internal_details", "outgoing_details", "outgoing_details__destination_school",
         "incoming_details", "incoming_details__origin_school", "incoming_details__requested_class",
-        "incoming_details__candidature", "decision", "reviewed_by", "created_by",
+        "incoming_details__candidature", "decision", "reviewed_by", "created_by", "academic_movement",
     ).prefetch_related("documents__uploaded_by", "documents__verified_by", "history__actor").filter(
         pk=transfer_id, branch=branch
     ).first()
@@ -359,9 +373,12 @@ def review_transfer_document(*, user, document_id, action):
     if normalized == "verify":
         document.status = TransferDocument.STATUS_VERIFIED
         action_label = "document_verified"
-    elif normalized == "reject":
+    elif normalized in {"reject", "replace"}:
         document.status = TransferDocument.STATUS_REJECTED
         action_label = "document_rejected"
+        if normalized == "replace":
+            document.status = TransferDocument.STATUS_REPLACE
+            action_label = "document_replacement_requested"
     else:
         raise ValidationError("Action documentaire inconnue.")
     document.verified_by = user
@@ -387,10 +404,7 @@ def _apply_internal_transfer(transfer, *, user):
     target = details.target_class
     if enrollment.academic_class_id != transfer.source_class_id:
         raise ValidationError("La classe actuelle ne correspond plus au dossier d'origine.")
-    if target.branch_id != transfer.branch_id or target.academic_year_id != enrollment.academic_year_id:
-        raise ValidationError("La classe cible n'appartient plus au périmètre autorisé.")
-    if target.level.strip().upper() != enrollment.academic_class.level.strip().upper():
-        raise ValidationError("Le niveau ne peut pas être modifié par un transfert interne.")
+    _validate_internal_target(enrollment=enrollment, target=target, branch=transfer.branch)
 
     inscription = enrollment.inscription
     candidature = inscription.candidature
@@ -410,6 +424,25 @@ def _apply_internal_transfer(transfer, *, user):
     )
     details.applied_at = timezone.now()
     details.save(update_fields=["applied_at"])
+    AcademicEnrollmentMovement.objects.create(
+        enrollment=enrollment,
+        transfer_request=transfer,
+        movement_type=AcademicEnrollmentMovement.TYPE_CLASS_CHANGE,
+        effective_date=details.effective_date,
+        source_class=transfer.source_class,
+        target_class=target,
+        source_branch=transfer.branch,
+        target_branch=target.branch,
+        source_programme=enrollment.programme,
+        target_programme=target.programme,
+        source_level=transfer.source_class.level,
+        target_level=target.level,
+        reason=transfer.reason,
+        observation=transfer.decision_note,
+        initiated_by=transfer.created_by or user,
+        approved_by=user,
+        snapshot={"source": transfer.source_snapshot, "transfer_reference": str(transfer.reference)},
+    )
     _log(
         transfer,
         actor=user,

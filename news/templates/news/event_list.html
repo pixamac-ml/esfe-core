@@ -19,27 +19,31 @@
         </nav>
 
         <div class="max-w-3xl">
-            <h1 class="text-4xl md:text-5xl font-poppins font-bold text-white mb-4">
-                Nos Galeries
+            <span class="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/90 backdrop-blur-sm">
+                <i data-lucide="camera" class="h-4 w-4"></i>
+                Photos et événements
+            </span>
+            <h1 class="mt-5 text-4xl md:text-5xl font-poppins font-bold text-white mb-4">
+                La vie à l'ESFE
             </h1>
             <p class="text-xl text-primary-100">
-                Découvrez les moments forts de la vie à l'ESFE à travers nos photos et vidéos.
+                Découvrez les apprentissages, les rencontres et les temps forts qui rythment la vie de l'établissement.
             </p>
         </div>
 
         <!-- Boutons de bascule : Événements / Photos -->
-        <div class="flex gap-4 mt-10">
+        <div class="mt-10 inline-flex gap-2 rounded-2xl border border-white/15 bg-black/10 p-2 backdrop-blur-sm">
             <a href="{% url 'news:event_list' %}?mode=events{% if current_type %}&type={{ current_type }}{% endif %}"
-               class="flex items-center gap-2 px-6 py-3 rounded-full font-medium transition
-                      {% if view_mode == 'events' %}bg-white text-primary-600{% else %}bg-white/20 text-white hover:bg-white/30{% endif %}">
+               class="flex items-center gap-2 rounded-xl px-5 py-3 font-medium transition
+                      {% if view_mode == 'events' %}bg-white text-primary-600 shadow-sm{% else %}text-white hover:bg-white/15{% endif %}">
                 <i data-lucide="calendar" class="w-5 h-5"></i>
-                événements
+                Événements
             </a>
             <a href="{% url 'news:event_list' %}?mode=photos{% if current_type %}&type={{ current_type }}{% endif %}"
-               class="flex items-center gap-2 px-6 py-3 rounded-full font-medium transition
-                      {% if view_mode == 'photos' %}bg-white text-primary-600{% else %}bg-white/20 text-white hover:bg-white/30{% endif %}">
+               class="flex items-center gap-2 rounded-xl px-5 py-3 font-medium transition
+                      {% if view_mode == 'photos' %}bg-white text-primary-600 shadow-sm{% else %}text-white hover:bg-white/15{% endif %}">
                 <i data-lucide="camera" class="w-5 h-5"></i>
-                photos
+                Photos
             </a>
         </div>
 
@@ -48,6 +52,7 @@
 
 
 <!-- ================= FILTRES PAR TYPE ================= -->
+{% if event_types %}
 <section class="bg-white border-b border-gray-100 sticky top-16 z-30">
     <div class="container mx-auto px-6">
         <div class="flex items-center gap-3 py-4 overflow-x-auto scrollbar-thin">
@@ -69,10 +74,11 @@
         </div>
     </div>
 </section>
+{% endif %}
 
 
 <!-- ================= CONTENU PRINCIPAL ================= -->
-<section class="bg-soft py-16">
+<section class="bg-gradient-to-b from-soft via-white to-soft py-16">
     <div class="container mx-auto px-6">
 
         {% if view_mode == 'events' %}
@@ -191,26 +197,38 @@
         <!-- ==================== MODE PHOTOS ==================== -->
 
         {% if photos %}
-        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        <div class="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+                <p class="text-sm font-semibold uppercase tracking-[0.16em] text-secondary">Galerie photos</p>
+                <h2 class="mt-2 text-2xl font-bold text-primary-700 sm:text-3xl">Les moments qui font vivre l'ESFE</h2>
+            </div>
+            <p class="text-sm text-gray-500">{{ photos.paginator.count }} photo{{ photos.paginator.count|pluralize }} à découvrir</p>
+        </div>
+
+        <div class="grid auto-rows-[150px] grid-cols-2 gap-4 sm:auto-rows-[175px] md:grid-cols-4 md:auto-rows-[185px]">
 
             {% for photo in photos %}
-            <div class="group relative aspect-square rounded-xl overflow-hidden cursor-pointer shadow-sm hover:shadow-xl transition-shadow"
-                 onclick="openLightbox({{ forloop.counter0 }})">
+            <button type="button"
+                    class="group relative overflow-hidden rounded-2xl border border-white/60 text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-secondary focus:ring-offset-2 {% if forloop.first %}col-span-2 row-span-2{% elif forloop.counter|divisibleby:7 %}col-span-2{% endif %}"
+                    onclick="openLightbox({{ forloop.counter0 }})">
 
                 <img src="{{ photo.thumbnail.url }}"
                      alt="{{ photo.caption|default:photo.event.title }}"
                      class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
 
-                <!-- Overlay hover -->
-                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                    <i data-lucide="zoom-in" class="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent"></div>
+
+                <div class="absolute inset-x-0 bottom-0 p-4">
+                    <p class="font-semibold text-white {% if forloop.first %}text-lg sm:text-xl{% else %}text-sm{% endif %} line-clamp-2">
+                        {{ photo.caption|default:photo.event.title }}
+                    </p>
+                    <p class="mt-1 text-xs text-white/75">{{ photo.event.event_date|date:"d F Y" }}</p>
                 </div>
 
-                <!-- Badge événement -->
-                <div class="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                    <p class="text-white text-xs line-clamp-1">{{ photo.event.title }}</p>
-                </div>
-            </div>
+                <span class="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-white/15 text-white opacity-0 backdrop-blur-sm transition group-hover:opacity-100">
+                    <i data-lucide="maximize-2" class="h-4 w-4"></i>
+                </span>
+            </button>
             {% endfor %}
 
         </div>
@@ -265,16 +283,29 @@
     </div>
 </section>
 
+<section class="bg-primary-800 py-16 text-white">
+    <div class="mx-auto max-w-3xl px-6 text-center">
+        <h2 class="text-3xl font-bold">Vous souhaitez découvrir l'ESFE de plus près ?</h2>
+        <p class="mt-4 text-primary-100">Explorez les formations proposées et préparez votre candidature à votre rythme.</p>
+        <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+            <a href="{% url 'formations:list' %}" class="inline-flex items-center justify-center rounded-xl bg-white px-6 py-3 font-semibold text-primary-800 transition hover:bg-primary-50">Découvrir les formations</a>
+            <a href="{% url 'admissions:admission_tunnel' %}" class="inline-flex items-center justify-center rounded-xl border border-white/60 px-6 py-3 font-semibold text-white transition hover:bg-white/10">Déposer une candidature</a>
+        </div>
+    </div>
+</section>
+
 
 {% if view_mode == 'photos' and photos %}
 <!-- ================= LIGHTBOX PHOTOS ================= -->
 <div id="lightbox"
-     class="fixed inset-0 z-50 bg-black/95 hidden"
+     class="fixed inset-0 z-[100] bg-black/95 hidden"
      onclick="closeLightbox()">
 
     <!-- Bouton fermer -->
-    <button onclick="closeLightbox()"
-            class="absolute top-6 right-6 w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition z-10">
+    <button type="button"
+            onclick="event.stopPropagation(); closeLightbox()"
+            aria-label="Fermer l'image"
+            class="absolute top-6 right-6 z-20 flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20">
         <i data-lucide="x" class="w-6 h-6"></i>
     </button>
 
@@ -294,16 +325,25 @@
         <img id="lightbox-img" src="" alt="" class="max-w-full max-h-full object-contain">
     </div>
 
-    <!-- Counter -->
-    <div class="absolute bottom-6 left-1/2 -translate-x-1/2 text-white/70 text-sm">
-        <span id="lightbox-counter"></span>
+    <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-6 pb-7 pt-24">
+        <div class="mx-auto flex max-w-3xl flex-col gap-2 text-center sm:flex-row sm:items-end sm:justify-between sm:text-left">
+            <div>
+                <p id="lightbox-caption" class="text-lg font-semibold text-white"></p>
+                <p id="lightbox-date" class="mt-1 text-sm text-white/70"></p>
+            </div>
+            <span id="lightbox-counter" class="text-sm font-medium text-white/70"></span>
+        </div>
     </div>
 </div>
 
 <script>
 const photos = [
     {% for photo in photos %}
-    { src: "{{ photo.image.url }}", caption: "{{ photo.caption|escapejs }}" },
+    {
+        src: "{{ photo.image.url }}",
+        caption: "{{ photo.caption|default:photo.event.title|escapejs }}",
+        date: "{{ photo.event.event_date|date:'d F Y'|escapejs }}"
+    },
     {% endfor %}
 ];
 
@@ -324,6 +364,8 @@ function closeLightbox() {
 function updateLightbox() {
     document.getElementById('lightbox-img').src = photos[currentIndex].src;
     document.getElementById('lightbox-counter').textContent = `${currentIndex + 1} / ${photos.length}`;
+    document.getElementById('lightbox-caption').textContent = photos[currentIndex].caption;
+    document.getElementById('lightbox-date').textContent = photos[currentIndex].date;
 }
 
 function nextImage() {

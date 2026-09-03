@@ -1,101 +1,57 @@
-<div class="space-y-4">
-  <div class="grid gap-3 md:grid-cols-3">
-    <div class="director-kpi-card">
-      <p class="director-kpi-label">Semestre</p>
-      <p class="director-kpi-value text-base">{{ selected_semester.number }}</p>
+<section class="overflow-hidden rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm">
+  <div class="flex flex-col gap-4 border-b border-[color:var(--line)] bg-[color:var(--surface)] px-5 py-5 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
+    <div class="min-w-0">
+      <p class="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--school-primary)]">Validation académique</p>
+      <h3 class="mt-1 truncate text-xl font-black text-slate-900">{{ selected_class.display_name }}</h3>
+      <p class="mt-1 text-sm font-semibold text-[color:var(--muted)]">Semestre {{ selected_semester.number }} · {{ selected_class.academic_year }}</p>
     </div>
-    <div class="director-kpi-card">
-      <p class="director-kpi-label">Notes saisies</p>
-      <p class="director-kpi-value text-base">{{ selected_semester_row.entered }}/{{ selected_semester_row.expected }}</p>
-    </div>
-    <div class="director-kpi-card">
-      <p class="director-kpi-label">Etat</p>
-      <p class="director-kpi-value text-base">{{ selected_semester.get_status_display }}</p>
+    <div class="flex flex-wrap items-center gap-2 lg:justify-end">
+      <span class="inline-flex items-center rounded-full px-3 py-1.5 text-xs font-black {% if selected_semester_row.tone == 'emerald' or selected_semester_row.tone == 'blue' %}bg-[color:var(--success-soft)] text-[color:var(--success)]{% elif selected_semester_row.tone == 'amber' %}bg-[color:var(--warning-soft)] text-[color:var(--warning)]{% else %}bg-[color:var(--danger-soft)] text-[color:var(--danger)]{% endif %}">{{ selected_semester_row.state_label }}</span>
+      <span class="inline-flex items-center rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-1.5 text-xs font-bold text-[color:var(--text)]">{{ selected_semester_row.entered }} / {{ selected_semester_row.expected }} notes saisies</span>
     </div>
   </div>
 
-  <div class="director-workflow-card">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <p class="portal-section-kicker">Decision directe</p>
-        <h4 class="mt-1 text-lg font-black text-slate-900">{{ result_panel_title }}</h4>
-        <p class="mt-1 text-sm font-semibold text-slate-500">{{ result_panel_subtitle }}</p>
-      </div>
-      <div class="flex flex-wrap gap-2">
-        <form hx-post="{% url 'accounts_portal:director_results_action' %}" hx-target="#director-workspace" hx-on::after-request="window.deCloseDrawer && window.deCloseDrawer()">
-          {% csrf_token %}
-          <input type="hidden" name="class_id" value="{{ selected_class.id }}">
-          <input type="hidden" name="semester_id" value="{{ selected_semester.id }}">
-          <input type="hidden" name="action" value="validate">
-          <button type="submit" class="director-btn director-btn-primary {% if not selected_semester_row.can_validate %}opacity-40{% endif %}" {% if not selected_semester_row.can_validate %}disabled{% endif %}>Valider</button>
-        </form>
-        <form hx-post="{% url 'accounts_portal:director_results_action' %}" hx-target="#director-workspace" hx-on::after-request="window.deCloseDrawer && window.deCloseDrawer()">
-          {% csrf_token %}
-          <input type="hidden" name="class_id" value="{{ selected_class.id }}">
-          <input type="hidden" name="semester_id" value="{{ selected_semester.id }}">
-          <input type="hidden" name="action" value="reject">
-          <button type="submit" class="director-btn director-btn-secondary border-[color:var(--danger-soft)] bg-[color:var(--danger-soft)] text-[color:var(--danger)]">Rejeter</button>
-        </form>
-        <form hx-post="{% url 'accounts_portal:director_results_action' %}" hx-target="#director-workspace" hx-on::after-request="window.deCloseDrawer && window.deCloseDrawer()">
-          {% csrf_token %}
-          <input type="hidden" name="class_id" value="{{ selected_class.id }}">
-          <input type="hidden" name="semester_id" value="{{ selected_semester.id }}">
-          <input type="hidden" name="action" value="publish">
-          <button type="submit" class="director-btn director-btn-secondary {% if not selected_semester_row.can_publish %}opacity-40{% endif %}" {% if not selected_semester_row.can_publish %}disabled{% endif %}>Publier</button>
-        </form>
-      </div>
-    </div>
+  <div class="grid gap-px bg-[color:var(--line)] sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+    <div class="bg-[color:var(--card)] px-4 py-3"><p class="text-[10px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Étudiants</p><p class="mt-1 text-xl font-black text-slate-900">{{ result_summary.student_count }}</p></div>
+    <div class="bg-[color:var(--card)] px-4 py-3"><p class="text-[10px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Dossiers complets</p><p class="mt-1 text-xl font-black text-[color:var(--success)]">{{ result_summary.completed_students }}</p></div>
+    <div class="bg-[color:var(--card)] px-4 py-3"><p class="text-[10px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Bloqués</p><p class="mt-1 text-xl font-black {% if result_summary.blocked_students %}text-[color:var(--danger)]{% else %}text-slate-900{% endif %}">{{ result_summary.blocked_students }}</p></div>
+    <div class="bg-[color:var(--card)] px-4 py-3"><p class="text-[10px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Notes saisies</p><p class="mt-1 text-xl font-black text-slate-900">{{ selected_semester_row.entered }} / {{ selected_semester_row.expected }}</p></div>
+    <div class="bg-[color:var(--card)] px-4 py-3"><p class="text-[10px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Moyenne de classe</p><p class="mt-1 text-xl font-black text-[color:var(--school-primary)]">{{ result_summary.class_average }} <span class="text-sm">/ 20</span></p></div>
+    <div class="bg-[color:var(--card)] px-4 py-3"><p class="text-[10px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Progression</p><p class="mt-1 text-xl font-black text-slate-900">{{ selected_semester_row.progress }} %</p></div>
   </div>
+</section>
 
-  {% if selected_class_rows %}
-    <div class="director-workflow-card">
-      <p class="portal-section-kicker">Autres semestres de la classe</p>
-      <div class="mt-4 flex flex-wrap gap-2">
-        {% for row in selected_class_rows %}
-          <button type="button" class="rounded-full border px-3 py-2 text-xs font-bold transition {% if selected_semester_row and row.semester.id == selected_semester_row.semester.id %}border-[color:var(--school-primary)] bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]{% else %}border-[color:var(--line)] bg-[color:var(--card)] text-[color:var(--text)] hover:bg-[color:var(--surface)]{% endif %}" hx-get="{% url 'accounts_portal:director_drawer' %}?panel=result&class_id={{ selected_class.id }}&semester_id={{ row.semester.id }}" hx-target="#director-drawer-content" hx-swap="innerHTML">
-            S{{ row.semester.number }} - {{ row.state }}
-          </button>
-        {% endfor %}
-      </div>
-    </div>
-  {% endif %}
+<div class="grid gap-5 xl:grid-cols-5">
+  <section class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 shadow-sm xl:col-span-3">
+    <div class="flex items-start justify-between gap-4"><div><p class="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--school-primary)]">État du workflow</p><h4 class="mt-1 text-base font-black text-slate-900">Contrôle du semestre</h4></div><span class="text-sm font-black text-[color:var(--school-primary)]">{{ selected_semester_row.progress }} %</span></div>
+    <div class="mt-4 h-2.5 overflow-hidden rounded-full bg-[color:var(--line)]"><div class="h-full rounded-full {% if selected_semester_row.progress >= 80 %}bg-[color:var(--success)]{% elif selected_semester_row.progress >= 40 %}bg-[color:var(--warning)]{% else %}bg-[color:var(--danger)]{% endif %}" style="width: {{ selected_semester_row.progress }}%"></div></div>
+    <dl class="mt-5 grid gap-4 sm:grid-cols-2"><div><dt class="text-xs font-semibold text-[color:var(--muted)]">État actuel</dt><dd class="mt-1 text-sm font-black text-slate-900">{{ selected_semester_row.state_label }}</dd></div><div><dt class="text-xs font-semibold text-[color:var(--muted)]">Notes attendues</dt><dd class="mt-1 text-sm font-black text-slate-900">{{ selected_semester_row.expected }}</dd></div></dl>
+  </section>
 
-  {% if result_summary %}
-    <div class="grid gap-3 md:grid-cols-4">
-      <div class="director-kpi-card">
-        <p class="director-kpi-label">Etudiants</p>
-        <p class="director-kpi-value">{{ result_summary.student_count }}</p>
-      </div>
-      <div class="director-kpi-card">
-        <p class="director-kpi-label">Complets</p>
-        <p class="director-kpi-value">{{ result_summary.completed_students }}</p>
-      </div>
-      <div class="director-kpi-card">
-        <p class="director-kpi-label">Bloques</p>
-        <p class="director-kpi-value">{{ result_summary.blocked_students }}</p>
-      </div>
-      <div class="director-kpi-card">
-        <p class="director-kpi-label">Moyenne classe</p>
-        <p class="director-kpi-value">{{ result_summary.class_average }}</p>
-      </div>
-    </div>
-  {% endif %}
-
-  <div class="director-workflow-card">
-    <p class="portal-section-kicker">Signaux</p>
-    <h4 class="mt-1 text-lg font-black text-slate-900">Points a traiter</h4>
-    <div class="mt-4 director-workflow-list">
-      {% for anomaly in result_anomalies %}
-        <article>
-          <div>
-            <strong>{{ anomaly.student }}</strong>
-            <span>{{ anomaly.message }}</span>
-          </div>
-          <span class="rounded-full px-3 py-1 text-xs font-bold {% if anomaly.level == 'blocking' %}bg-rose-50 text-rose-700{% else %}bg-amber-50 text-amber-700{% endif %}">{{ anomaly.level }}</span>
-        </article>
-      {% empty %}
-        <div class="director-empty">Aucune anomalie detectee sur ce semestre.</div>
+  <section class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 shadow-sm xl:col-span-2">
+    <p class="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--school-primary)]">Autres semestres</p><h4 class="mt-1 text-base font-black text-slate-900">Même classe</h4>
+    <div class="mt-4 flex flex-wrap gap-2">
+      {% for row in selected_class_rows %}
+        <button type="button" hx-get="{% url 'accounts_portal:director_drawer' %}?panel=result&class_id={{ selected_class.id }}&semester_id={{ row.semester.id }}" hx-target="#director-drawer-content" hx-swap="innerHTML" hx-disabled-elt="this" class="rounded-ui-button border px-3 py-2 text-left text-xs font-bold transition {% if row.semester.id == selected_semester.id %}border-[color:var(--school-primary)] bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]{% else %}border-[color:var(--line)] bg-[color:var(--surface)] text-[color:var(--text)] hover:bg-[color:var(--card)]{% endif %}"><span class="block">Semestre {{ row.semester.number }}</span><span class="mt-0.5 block font-medium opacity-75">{{ row.state_label }}</span></button>
       {% endfor %}
     </div>
+  </section>
+</div>
+
+<section class="overflow-hidden rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm">
+  <div class="flex items-center justify-between gap-4 border-b border-[color:var(--line)] px-5 py-4 sm:px-6"><div><p class="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--school-primary)]">Signaux de contrôle</p><h4 class="mt-1 text-base font-black text-slate-900">Points à traiter</h4></div><span class="inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-black {% if result_anomalies %}bg-[color:var(--warning-soft)] text-[color:var(--warning)]{% else %}bg-[color:var(--success-soft)] text-[color:var(--success)]{% endif %}">{{ result_anomalies|length }}</span></div>
+  {% if result_anomalies %}
+    <div class="overflow-x-auto"><table class="min-w-full divide-y divide-[color:var(--line)] text-sm"><thead class="bg-[color:var(--surface)] text-left text-[10px] font-black uppercase tracking-wide text-[color:var(--muted)]"><tr><th class="px-5 py-3 sm:px-6">Étudiant</th><th class="px-5 py-3">Type de signal</th><th class="px-5 py-3">Constat</th><th class="px-5 py-3 sm:px-6">État</th></tr></thead><tbody class="divide-y divide-[color:var(--line)]">{% for anomaly in result_anomalies %}<tr class="align-top"><td class="whitespace-nowrap px-5 py-3.5 font-bold text-slate-900 sm:px-6">{{ anomaly.student }}</td><td class="px-5 py-3.5 text-[color:var(--text)]">{% if anomaly.level == 'blocking' %}Notes manquantes{% else %}Moyenne sous le seuil{% endif %}</td><td class="min-w-[16rem] px-5 py-3.5 text-[color:var(--muted)]">{{ anomaly.message }}</td><td class="px-5 py-3.5 sm:px-6"><span class="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold {% if anomaly.level == 'blocking' %}bg-[color:var(--danger-soft)] text-[color:var(--danger)]{% else %}bg-[color:var(--warning-soft)] text-[color:var(--warning)]{% endif %}">{% if anomaly.level == 'blocking' %}Bloquant{% else %}À surveiller{% endif %}</span></td></tr>{% endfor %}</tbody></table></div>
+  {% else %}
+    <div class="flex items-center gap-3 px-5 py-5 sm:px-6"><span class="grid h-9 w-9 place-items-center rounded-full bg-[color:var(--success-soft)] text-[color:var(--success)]"><i data-lucide="circle-check" class="h-4 w-4"></i></span><p class="text-sm font-semibold text-[color:var(--text)]">Aucun point bloquant ou signal à traiter pour ce semestre.</p></div>
+  {% endif %}
+</section>
+
+<div class="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 border border-[color:var(--line)] bg-[color:var(--card)] px-5 py-4 shadow-[0_-8px_20px_rgba(15,23,42,0.08)] sm:px-6">
+  <div><p class="text-xs font-black text-slate-900">Actions de décision</p><p class="mt-0.5 text-xs text-[color:var(--muted)]">Seules les actions autorisées par le workflow sont proposées.</p></div>
+  <div class="flex flex-wrap gap-2">
+    <form hx-post="{% url 'accounts_portal:director_results_action' %}" hx-target="#director-workspace" hx-on::after-request="window.deCloseDrawer && window.deCloseDrawer()">{% csrf_token %}<input type="hidden" name="class_id" value="{{ selected_class.id }}"><input type="hidden" name="semester_id" value="{{ selected_semester.id }}"><input type="hidden" name="action" value="reject"><button type="submit" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-[color:var(--danger-soft)] bg-[color:var(--danger-soft)] px-4 text-sm font-semibold text-[color:var(--danger)] hover:opacity-90"><i data-lucide="rotate-ccw" class="h-4 w-4"></i>Rejeter</button></form>
+    <form hx-post="{% url 'accounts_portal:director_results_action' %}" hx-target="#director-workspace" hx-on::after-request="window.deCloseDrawer && window.deCloseDrawer()">{% csrf_token %}<input type="hidden" name="class_id" value="{{ selected_class.id }}"><input type="hidden" name="semester_id" value="{{ selected_semester.id }}"><input type="hidden" name="action" value="validate"><button type="submit" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-[color:var(--school-primary)] px-4 text-sm font-black text-white hover:opacity-90 disabled:opacity-60" {% if not selected_semester_row.can_validate %}disabled{% endif %}><i data-lucide="check-circle" class="h-4 w-4"></i>Valider</button></form>
+    <form hx-post="{% url 'accounts_portal:director_results_action' %}" hx-target="#director-workspace" hx-on::after-request="window.deCloseDrawer && window.deCloseDrawer()">{% csrf_token %}<input type="hidden" name="class_id" value="{{ selected_class.id }}"><input type="hidden" name="semester_id" value="{{ selected_semester.id }}"><input type="hidden" name="action" value="publish"><button type="submit" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-[color:var(--line)] bg-[color:var(--surface)] px-4 text-sm font-semibold text-[color:var(--text)] hover:bg-[color:var(--card)] disabled:opacity-60" {% if not selected_semester_row.can_publish %}disabled{% endif %}><i data-lucide="send" class="h-4 w-4"></i>Publier</button></form>
   </div>
 </div>

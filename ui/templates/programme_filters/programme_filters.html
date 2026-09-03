@@ -1,11 +1,15 @@
 <div class="bg-white rounded-3xl border border-primary/10 shadow-sm p-5 sm:p-6 md:p-8 space-y-8 sticky top-28"
      x-data="{ currentCycle: '{{ current_cycle|default:'' }}' }">
 
+    <div>
+        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-secondary">Rechercher</p>
+        <h2 class="mt-2 text-xl font-bold text-primary">Trouvez un parcours</h2>
+        <p class="mt-2 text-sm leading-relaxed text-gray-500">Recherchez par nom ou filtrez les formations par cycle.</p>
+    </div>
+
     <!-- RECHERCHE -->
     <div class="space-y-4">
-        <h3 class="text-sm font-semibold text-primary uppercase tracking-wide">
-            Recherche
-        </h3>
+        <h3 class="text-sm font-semibold text-primary uppercase tracking-wide">Nom de la formation</h3>
 
         <form hx-get="{% url 'formations:list' %}"
               hx-target="#programme-container"
@@ -34,6 +38,7 @@
 
     <!-- FILTRE CYCLE -->
     <div class="space-y-3">
+        <h3 class="text-sm font-semibold text-primary uppercase tracking-wide">Cycle de formation</h3>
 
         <!-- Bouton Toutes -->
         <a href="?{% if search_query %}q={{ search_query }}{% endif %}"
@@ -44,7 +49,7 @@
            @click="currentCycle = ''"
            :class="currentCycle === '' ? 'bg-primary text-white shadow-md border border-primary' : 'bg-white text-primary border border-primary/20 hover:bg-primary hover:text-white hover:border-primary hover:shadow'"
            class="block w-full px-5 py-4 rounded-xl text-sm font-medium text-center transition-all duration-200">
-            Toutes les formations
+            Voir toutes les formations
         </a>
 
         <!-- Boutons Cycles -->
@@ -66,7 +71,7 @@
     <!-- STATS -->
     <div class="pt-4 border-t border-primary/10">
         <p class="text-sm text-gray-500">
-            <span class="font-semibold text-primary">{{ total_programmes }}</span> formation(s) disponible(s)
+            <span class="font-semibold text-primary">{{ total_programmes }}</span> formation{{ total_programmes|pluralize }} affichée{{ total_programmes|pluralize }}
         </p>
     </div>
 

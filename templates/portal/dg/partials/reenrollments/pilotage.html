@@ -1,0 +1,16 @@
+{% load component_tags %}
+<section class="space-y-5" data-dashboard-section="reenrollments" data-executive-section="reenrollments">
+  {% component "ui_core.page_header" eyebrow="Pilotage uniquement" title="Campagne de réinscriptions" subtitle="Lecture du moteur partagé, filtrée par le contexte DG. Aucune mutation n’est disponible ici." %}{% endcomponent %}
+
+  {% component "ui_core.filter_bar" filters=reenrollment_filters action=reenrollment_filter_action method="get" submit_label="Appliquer" reset_url=reenrollment_filter_reset_url target="#executive-workspace" swap="innerHTML" trigger="submit" live_search_name="q" live_search_delay=350 density="compact" hidden_fields=reenrollment_filter_hidden_fields %}{% endcomponent %}
+
+  <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    {% component "ui_core.stat_card" label="Éligibles" value=reenrollment_metrics.eligible icon="users-round" tone="primary" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Non démarrés" value=reenrollment_metrics.not_started icon="circle-dot-dashed" tone="neutral" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Paiement attendu" value=reenrollment_metrics.awaiting_payment icon="wallet-cards" tone="warning" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Cas bloqués" value=reenrollment_metrics.blocked icon="octagon-alert" tone="danger" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Actifs" value=reenrollment_metrics.active icon="circle-check" tone="success" description=reenrollment_metrics.rate|add:" % de la campagne" compact=True %}{% endcomponent %}
+  </div>
+
+  {% component "ui_core.data_table" id="dg-reenrollment-table" caption="Dossiers de la campagne" headers=reenrollment_table_headers rows=reenrollment_table_rows result_count=reenrollment_table_rows|length density="compact" empty_title="Aucun dossier dans ce contexte" empty_message="Aucune décision annuelle ne correspond aux filtres sélectionnés." %}{% endcomponent %}
+</section>

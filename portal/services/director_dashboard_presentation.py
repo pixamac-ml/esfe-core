@@ -9,12 +9,120 @@ from portal.models import TransferRequest
 from ui.services.navigation import build_director_navigation
 
 
-def _dashboard_url(section):
-    return f"{reverse('accounts_portal:portal_dashboard')}?{urlencode({'section': section})}"
+def _dashboard_url(section, view=None):
+    params = {"section": section}
+    if view:
+        params["view"] = view
+    return f"{reverse('accounts_portal:portal_dashboard')}?{urlencode(params)}"
 
 
-def _workspace_url(section):
-    return f"{reverse('accounts_portal:director_workspace')}?{urlencode({'section': section})}"
+def _workspace_url(section, view=None):
+    params = {"section": section}
+    if view:
+        params["view"] = view
+    return f"{reverse('accounts_portal:director_workspace')}?{urlencode(params)}"
+
+
+def _task_cards(tasks):
+    labels = {
+        "grades_entry_in_progress": "Saisie des notes",
+        "teachers_unassigned": "Affectations",
+        "semesters_ready_to_validate": "Validation académique",
+        "documents_pending": "Dossiers enseignants",
+        "transfers_pending": "Transferts",
+        "result_anomalies": "Contrôle des notes",
+    }
+    icons = {
+        "grades_entry_in_progress": "list-checks",
+        "teachers_unassigned": "user-round-search",
+        "semesters_ready_to_validate": "badge-check",
+        "documents_pending": "folder-check",
+        "transfers_pending": "arrow-left-right",
+        "result_anomalies": "triangle-alert",
+    }
+    tone_by_level = {"critical": "danger", "warning": "warning", "info": "info"}
+    level_labels = {"critical": "Priorité haute", "warning": "À traiter", "info": "À surveiller"}
+    cards = []
+    for task in tasks:
+        section = task.get("target") or "home"
+        view = task.get("subview") or "overview"
+        cards.append(
+            {
+                **task,
+                "label": labels.get(task.get("category"), "Action académique"),
+                "icon": icons.get(task.get("category"), "circle-alert"),
+                "tone": tone_by_level.get(task.get("level"), "neutral"),
+                "level_label": level_labels.get(task.get("level"), "À traiter"),
+                "url": _dashboard_url(section, view),
+                "hx_get": _workspace_url(section, view),
+            }
+        )
+    return cards
+
+
+def _academic_journey(workspace):
+    ready_count = len(workspace.get("ready_to_validate") or [])
+    publish_count = len(workspace.get("ready_to_publish") or [])
+    steps = [
+        {
+            "number": "01",
+            "label": "Structurer",
+            "summary": "Classes, semestres, UE et maquettes pédagogiques.",
+            "metric": f"{workspace.get('total_classes') or 0} classe(s)",
+            "section": "programme",
+            "view": "maquettes",
+            "icon": "library-big",
+        },
+        {
+            "number": "02",
+            "label": "Planifier",
+            "summary": "Calendrier académique et emplois du temps.",
+            "metric": f"{workspace.get('total_semesters') or 0} semestre(s)",
+            "section": "planification",
+            "view": "overview",
+            "icon": "calendar-range",
+        },
+        {
+            "number": "03",
+            "label": "Affecter",
+            "summary": "Enseignants, charges et dossiers pédagogiques.",
+            "metric": f"{workspace.get('teacher_unassigned_count') or 0} à affecter",
+            "section": "enseignants",
+            "view": "assignments",
+            "icon": "users-round",
+        },
+        {
+            "number": "04",
+            "label": "Organiser",
+            "summary": "Sessions, examens et évaluations des classes.",
+            "metric": "Sessions et présences",
+            "section": "evaluations_calendar",
+            "view": "sessions",
+            "icon": "clipboard-check",
+        },
+        {
+            "number": "05",
+            "label": "Contrôler et valider",
+            "summary": "Notes, anomalies, délibération et publication.",
+            "metric": f"{ready_count + publish_count} décision(s)",
+            "section": "evaluations",
+            "view": "validation",
+            "icon": "badge-check",
+        },
+        {
+            "number": "06",
+            "label": "Documenter",
+            "summary": "Documents académiques et archives de l'annexe.",
+            "metric": f"{workspace.get('admin_doc_published_count') or 0} publié(s)",
+            "section": "correspondances",
+            "view": "archives",
+            "icon": "files",
+        },
+    ]
+    for step in steps:
+        step["url"] = _dashboard_url(step["section"], step["view"])
+        step["hx_get"] = _workspace_url(step["section"], step["view"])
+    return steps
 
 
 def _class_table_rows(class_cards):
@@ -59,9 +167,15 @@ def build_director_dashboard_presentation(request, workspace):
         ).count()
         if branch else 0
     )
+    task_cards = _task_cards(tasks)
     badges = {
-        "evaluations": len(workspace.get("ready_to_publish") or []),
+        "home": len(task_cards) or None,
+        "evaluations": (
+            len(workspace.get("ready_to_validate") or [])
+            + len(workspace.get("ready_to_publish") or [])
+        ) or None,
         "enseignants": workspace.get("teacher_unassigned_count") or None,
+        "correspondances": workspace.get("admin_doc_draft_count") or None,
         "transferts": pending_transfers or None,
         "messagerie": get_user_unread_count(request.user) or None,
     }
@@ -71,27 +185,27 @@ def build_director_dashboard_presentation(request, workspace):
             "value": workspace.get("total_classes") or 0,
             "icon": "school",
             "tone": "primary",
-            "description": "Dans votre périmètre",
-            "href": _dashboard_url("programme"),
-            "hx_get": _workspace_url("programme"),
+            "description": "Structure de l'année",
+            "href": _dashboard_url("programme", "classes"),
+            "hx_get": _workspace_url("programme", "classes"),
         },
         {
             "label": "Enseignants",
             "value": workspace.get("teachers_total") or 0,
             "icon": "users",
             "tone": "info",
-            "description": "Affectés à l'annexe",
-            "href": _dashboard_url("enseignants"),
-            "hx_get": _workspace_url("enseignants"),
+            "description": "Équipe de l'annexe",
+            "href": _dashboard_url("enseignants", "directory"),
+            "hx_get": _workspace_url("enseignants", "directory"),
         },
         {
             "label": "Semestres suivis",
             "value": workspace.get("total_semesters") or 0,
             "icon": "calendar-range",
             "tone": "neutral",
-            "description": "Périodes académiques",
-            "href": _dashboard_url("programme"),
-            "hx_get": _workspace_url("programme"),
+            "description": "Progression académique",
+            "href": _dashboard_url("programme", "maquettes"),
+            "hx_get": _workspace_url("programme", "maquettes"),
         },
         {
             "label": "Résultats à publier",
@@ -99,8 +213,8 @@ def build_director_dashboard_presentation(request, workspace):
             "icon": "send",
             "tone": "success",
             "description": "Semestres finalisés",
-            "href": _dashboard_url("evaluations"),
-            "hx_get": _workspace_url("evaluations"),
+            "href": _dashboard_url("evaluations", "validation"),
+            "hx_get": _workspace_url("evaluations", "validation"),
         },
         {
             "label": "Affectations à revoir",
@@ -108,17 +222,17 @@ def build_director_dashboard_presentation(request, workspace):
             "icon": "triangle-alert",
             "tone": "warning",
             "description": "Enseignants non affectés",
-            "href": _dashboard_url("enseignants"),
-            "hx_get": _workspace_url("enseignants"),
+            "href": _dashboard_url("enseignants", "assignments"),
+            "hx_get": _workspace_url("enseignants", "assignments"),
         },
         {
             "label": "Documents publiés",
             "value": workspace.get("admin_doc_published_count") or 0,
             "icon": "file-check-2",
             "tone": "accent",
-            "description": "Correspondances disponibles",
-            "href": _dashboard_url("correspondances"),
-            "hx_get": _workspace_url("correspondances"),
+            "description": "Archives de l'annexe",
+            "href": _dashboard_url("correspondances", "archives"),
+            "hx_get": _workspace_url("correspondances", "archives"),
         },
     ]
     quick_actions = [
@@ -148,6 +262,8 @@ def build_director_dashboard_presentation(request, workspace):
             badges=badges,
         ),
         "director_kpis": kpis,
+        "director_tasks": task_cards,
+        "director_academic_journey": _academic_journey(workspace),
         "director_quick_actions": quick_actions,
         "director_class_headers": [
             {"label": "Classe"},
@@ -165,8 +281,8 @@ def build_director_dashboard_presentation(request, workspace):
             if value
         ),
         "director_active_academic_year": academic_year,
-        "director_task_summary": tasks[0]["message"] if tasks else "",
-        "director_task_count": len(tasks),
+        "director_task_summary": task_cards[0]["message"] if task_cards else "",
+        "director_task_count": len(task_cards),
         "director_active_section": active_section,
         "notification_count": get_user_unread_count(request.user),
         "notifications_url": reverse("notification_center:notifications"),

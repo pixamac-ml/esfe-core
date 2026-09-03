@@ -1,0 +1,41 @@
+{% load component_tags %}
+<section class="space-y-5" data-overlay-title="Contexte de pilotage">
+  <div>
+    <p class="text-xs font-bold uppercase tracking-wide text-ui-primary">Direction générale</p>
+    <p class="mt-1 text-sm text-ui-text-muted">Ces choix sont la source de vérité pour toutes les sections du cockpit.</p>
+  </div>
+
+  <div class="space-y-4">
+    <div class="space-y-1.5" data-ui-core="form-field">
+      <label for="dg-context-year" class="block text-sm font-semibold text-ui-text">Année académique</label>
+      <select id="dg-context-year" class="h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text focus:border-ui-focus focus:ring-ui-focus" onchange="dgHandleAcademicYearChange(this.value); dgCloseModal()">
+        {% for academic_year in academic_years %}
+          <option value="{{ academic_year.id }}" {% if selected_academic_year_id == academic_year.id|stringformat:"s" %}selected{% endif %}>{{ academic_year.name }}</option>
+        {% empty %}
+          <option value="">Aucune année disponible</option>
+        {% endfor %}
+      </select>
+      <p class="text-xs text-ui-text-muted">Les données académiques, étudiants et finances restent séparées par année.</p>
+    </div>
+    <div class="space-y-1.5" data-ui-core="form-field">
+      <label for="dg-context-branch" class="block text-sm font-semibold text-ui-text">Annexe</label>
+      <select id="dg-context-branch" class="h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text focus:border-ui-focus focus:ring-ui-focus" onchange="dgHandleBranchChange(this.value); dgCloseModal()">
+        <option value="">Mode global — toutes les annexes</option>
+        {% for branch in all_branches %}
+          <option value="{{ branch.id }}" {% if selected_branch_id == branch.id|stringformat:"s" %}selected{% endif %}>{{ branch.name }}</option>
+        {% endfor %}
+      </select>
+      <p class="text-xs text-ui-text-muted">Le mode global consolide uniquement les annexes autorisées.</p>
+    </div>
+    <div class="space-y-1.5" data-ui-core="form-field">
+      <label for="dg-context-period" class="block text-sm font-semibold text-ui-text">Fenêtre de veille admissions</label>
+      <select id="dg-context-period" class="h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text focus:border-ui-focus focus:ring-ui-focus" onchange="dgHandlePeriodChange(this.value)">
+        <option value="today" {% if dashboard_period == "today" %}selected{% endif %}>Aujourd’hui</option>
+        <option value="week" {% if dashboard_period == "week" %}selected{% endif %}>Cette semaine</option>
+        <option value="month" {% if dashboard_period == "month" %}selected{% endif %}>Ce mois</option>
+        <option value="quarter" {% if dashboard_period == "quarter" %}selected{% endif %}>Ce trimestre</option>
+        <option value="year" {% if dashboard_period == "year" %}selected{% endif %}>12 derniers mois</option>
+      </select>
+    </div>
+  </div>
+</section>

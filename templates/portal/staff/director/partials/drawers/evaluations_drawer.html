@@ -1,170 +1,67 @@
-<div class="space-y-4">
-
+<div class="space-y-5" data-director-result-control>
   {% include "portal/staff/director/partials/_drawer_toast.html" %}
 
-  <!-- En-tete classe -->
-  <div class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] px-5 py-4 shadow-sm">
-    <p class="text-[10px] font-black uppercase tracking-widest text-[color:var(--school-primary)]">Evaluations &amp; Resultats</p>
-    <h3 class="mt-1 text-lg font-black text-slate-900">{{ selected_class.display_name }}</h3>
-    <p class="text-xs font-semibold text-[color:var(--muted)]">{{ result_panel_subtitle }}</p>
-    {% if result_summary %}
-    <div class="mt-3 grid grid-cols-3 gap-2">
-      <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--surface)] p-2.5 text-center">
-        <p class="text-[10px] font-black uppercase tracking-wide text-[color:var(--muted)]">Etudiants</p>
-        <p class="mt-0.5 text-base font-black text-slate-900">{{ result_summary.student_count }}</p>
-      </div>
-      <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--surface)] p-2.5 text-center">
-        <p class="text-[10px] font-black uppercase tracking-wide text-[color:var(--muted)]">Moy. classe</p>
-        <p class="mt-0.5 text-base font-black text-[color:var(--school-primary)]">{{ result_summary.class_average }}</p>
-      </div>
-      <div class="rounded-xl border border-[color:var(--line)] bg-[color:var(--surface)] p-2.5 text-center">
-        <p class="text-[10px] font-black uppercase tracking-wide text-[color:var(--muted)]">Complets</p>
-        <p class="mt-0.5 text-base font-black text-[color:var(--success)]">{{ result_summary.completed_students }}</p>
-      </div>
-    </div>
-    {% endif %}
-  </div>
-
-  <!-- Semestres et actions -->
-  {% for row in selected_class_rows %}
-  <div x-data="{ loading: false }" class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm overflow-hidden">
-
-    <!-- Header semestre -->
-    <div class="flex items-center justify-between border-b border-[color:var(--line)] bg-[color:var(--surface)] px-5 py-3">
-      <div class="flex items-center gap-2">
-        <span class="flex h-6 w-6 items-center justify-center rounded-full bg-[color:var(--school-primary)] text-[10px] font-black text-white">{{ row.semester.number }}</span>
-        <div>
-          <p class="text-sm font-black text-slate-900">Semestre {{ row.semester.number }}</p>
-          <p class="text-[10px] text-[color:var(--muted)]">{{ row.entered }}/{{ row.expected }} notes</p>
+  {% if selected_class and selected_semester_row %}
+    <section class="overflow-hidden rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm">
+      <div class="flex flex-col gap-4 border-b border-[color:var(--line)] bg-[color:var(--surface)] px-5 py-5 sm:px-6 lg:flex-row lg:items-start lg:justify-between">
+        <div class="min-w-0">
+          <p class="text-[10px] font-black uppercase tracking-[0.16em] text-[color:var(--school-primary)]">Validation académique</p>
+          <h3 class="mt-1 truncate text-xl font-black text-slate-900">{{ selected_class.display_name }}</h3>
+          <p class="mt-1 text-sm font-semibold text-[color:var(--muted)]">Semestre {{ selected_semester.number }} · {{ selected_class.academic_year }}</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 lg:justify-end">
+          <span class="inline-flex items-center rounded-full px-3 py-1.5 text-xs font-black {% if selected_semester_row.tone == 'emerald' or selected_semester_row.tone == 'blue' %}bg-[color:var(--success-soft)] text-[color:var(--success)]{% elif selected_semester_row.tone == 'amber' %}bg-[color:var(--warning-soft)] text-[color:var(--warning)]{% else %}bg-[color:var(--danger-soft)] text-[color:var(--danger)]{% endif %}">{{ selected_semester_row.state_label }}</span>
+          <span class="inline-flex items-center rounded-full border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-1.5 text-xs font-bold text-[color:var(--text)]">{{ selected_semester_row.entered }} / {{ selected_semester_row.expected }} notes saisies</span>
         </div>
       </div>
-      <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold
-        {% if row.tone == 'emerald' or row.tone == 'blue' %}bg-[color:var(--success-soft)] text-[color:var(--success)]
-        {% elif row.tone == 'amber' %}bg-[color:var(--warning-soft)] text-[color:var(--warning)]
-        {% else %}bg-[color:var(--danger-soft)] text-[color:var(--danger)]{% endif %}">
-        {{ row.state }}
-      </span>
-    </div>
 
-    <!-- Barre de progression animée -->
-    <div class="px-5 pt-3 pb-2 bg-[color:var(--card)]">
-      <div class="flex items-center justify-between mb-1">
-        <span class="text-[10px] font-bold text-[color:var(--muted)] uppercase tracking-wide">Progression</span>
-        <span class="text-[10px] font-black
-          {% if row.progress >= 80 %}text-[color:var(--success)]{% elif row.progress >= 40 %}text-[color:var(--warning)]{% else %}text-[color:var(--danger)]{% endif %}">
-          {{ row.progress }}%
-        </span>
+      <div class="grid gap-px bg-[color:var(--line)] sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <div class="bg-[color:var(--card)] px-4 py-3"><p class="text-[10px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Étudiants</p><p class="mt-1 text-xl font-black text-slate-900">{{ result_summary.student_count }}</p></div>
+        <div class="bg-[color:var(--card)] px-4 py-3"><p class="text-[10px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Dossiers complets</p><p class="mt-1 text-xl font-black text-[color:var(--success)]">{{ result_summary.completed_students }}</p></div>
+        <div class="bg-[color:var(--card)] px-4 py-3"><p class="text-[10px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Bloqués</p><p class="mt-1 text-xl font-black {% if result_summary.blocked_students %}text-[color:var(--danger)]{% else %}text-slate-900{% endif %}">{{ result_summary.blocked_students }}</p></div>
+        <div class="bg-[color:var(--card)] px-4 py-3"><p class="text-[10px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Notes saisies</p><p class="mt-1 text-xl font-black text-slate-900">{{ selected_semester_row.entered }} / {{ selected_semester_row.expected }}</p></div>
+        <div class="bg-[color:var(--card)] px-4 py-3"><p class="text-[10px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Moyenne de classe</p><p class="mt-1 text-xl font-black text-[color:var(--school-primary)]">{{ result_summary.class_average }} <span class="text-sm">/ 20</span></p></div>
+        <div class="bg-[color:var(--card)] px-4 py-3"><p class="text-[10px] font-bold uppercase tracking-wide text-[color:var(--muted)]">Progression</p><p class="mt-1 text-xl font-black text-slate-900">{{ selected_semester_row.progress }} %</p></div>
       </div>
-      <div class="h-2 w-full rounded-full bg-[color:var(--line)] overflow-hidden">
-        <div class="h-2 rounded-full transition-all duration-700 ease-out
-          {% if row.progress >= 80 %}bg-[color:var(--success)]{% elif row.progress >= 40 %}bg-[color:var(--warning)]{% else %}bg-[color:var(--danger)]{% endif %}"
-             style="width: {{ row.progress }}%"></div>
-      </div>
-    </div>
+    </section>
 
-    <!-- Actions -->
-    <div class="flex flex-wrap gap-2 px-5 py-3">
-      {% if row.can_validate %}
-      <button type="button"
-        hx-post="{% url 'accounts_portal:director_results_action' %}"
-        hx-vals='{"action": "validate", "semester_id": "{{ row.semester.id }}"}'
-        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-        hx-target="#director-results-subcontent" hx-swap="innerHTML"
-        hx-confirm="Valider le Semestre {{ row.semester.number }} ?"
-        hx-disabled-elt="this"
-        @htmx:before-request="loading = true"
-        hx-on::after-request="window.deCloseDrawer && window.deCloseDrawer()"
-        class="inline-flex items-center justify-center rounded-lg border border-[color:var(--school-primary)] bg-[color:var(--school-primary)] px-3 py-1.5 text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-60">
-        <i data-lucide="check-circle" class="w-3.5 h-3.5 mr-1.5"></i>Valider
-      </button>
-      {% endif %}
-      {% if row.can_publish %}
-      <button type="button"
-        hx-post="{% url 'accounts_portal:director_results_action' %}"
-        hx-vals='{"action": "publish", "semester_id": "{{ row.semester.id }}"}'
-        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-        hx-target="#director-modal-content" hx-swap="innerHTML"
-        hx-disabled-elt="this"
-        hx-on::after-request="window.deOpenModal && window.deOpenModal()"
-        class="inline-flex items-center justify-center rounded-lg border border-[color:var(--school-primary)] bg-[color:var(--school-primary)] px-3 py-1.5 text-xs font-bold text-white transition hover:opacity-90 disabled:opacity-60">
-        <i data-lucide="send" class="w-3.5 h-3.5 mr-1.5"></i>Publier (OTP)
-      </button>
-      {% endif %}
-      {% if row.can_generate %}
-      <button type="button"
-        hx-post="{% url 'accounts_portal:director_bulletin_action' %}"
-        hx-vals='{"action": "generate_semester_class", "semester_id": "{{ row.semester.id }}"}'
-        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-        hx-target="#director-results-subcontent" hx-swap="innerHTML"
-        hx-disabled-elt="this"
-        hx-on::after-request="window.deCloseDrawer && window.deCloseDrawer()"
-        class="inline-flex items-center justify-center rounded-lg border border-[color:var(--line)] bg-[color:var(--surface)] px-3 py-1.5 text-xs font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--card)] disabled:opacity-60">
-        <i data-lucide="file-text" class="w-3.5 h-3.5 mr-1.5"></i>Bulletins
-      </button>
-      <a href="{% url 'academics:class_reports_overview' row.semester.id %}" target="_blank"
-        class="inline-flex items-center justify-center rounded-lg border border-[color:var(--line)] bg-[color:var(--card)] px-3 py-1.5 text-xs font-semibold text-[color:var(--text)] transition hover:bg-[color:var(--surface)]">
-        <i data-lucide="external-link" class="w-3.5 h-3.5 mr-1.5"></i>Consulter
-      </a>
-      {% endif %}
-      {% if row.can_reject %}
-      <button type="button"
-        hx-post="{% url 'accounts_portal:director_results_action' %}"
-        hx-vals='{"action": "reject", "semester_id": "{{ row.semester.id }}"}'
-        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-        hx-target="#director-results-subcontent" hx-swap="innerHTML"
-        hx-confirm="Renvoyer S{{ row.semester.number }} en correction ?"
-        hx-disabled-elt="this"
-        hx-on::after-request="window.deCloseDrawer && window.deCloseDrawer()"
-        class="inline-flex items-center justify-center rounded-lg border border-[color:var(--danger-soft)] bg-[color:var(--danger-soft)] px-3 py-1.5 text-xs font-semibold text-[color:var(--danger)] transition hover:opacity-90 disabled:opacity-60">
-        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5 mr-1.5"></i>Rejeter
-      </button>
-      {% endif %}
-      {% if not row.can_validate and not row.can_publish and not row.can_generate and not row.can_reject %}
-      <p class="text-xs italic text-[color:var(--muted)]">Aucune action disponible pour ce semestre.</p>
-      {% endif %}
-    </div>
+    <div class="grid gap-5 xl:grid-cols-5">
+      <section class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 shadow-sm xl:col-span-3">
+        <div class="flex items-start justify-between gap-4"><div><p class="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--school-primary)]">État du workflow</p><h4 class="mt-1 text-base font-black text-slate-900">Contrôle du semestre</h4></div><span class="text-sm font-black text-[color:var(--school-primary)]">{{ selected_semester_row.progress }} %</span></div>
+        <div class="mt-4 h-2.5 overflow-hidden rounded-full bg-[color:var(--line)]"><div class="h-full rounded-full {% if selected_semester_row.progress >= 80 %}bg-[color:var(--success)]{% elif selected_semester_row.progress >= 40 %}bg-[color:var(--warning)]{% else %}bg-[color:var(--danger)]{% endif %}" style="width: {{ selected_semester_row.progress }}%"></div></div>
+        <dl class="mt-5 grid gap-4 sm:grid-cols-2"><div><dt class="text-xs font-semibold text-[color:var(--muted)]">État actuel</dt><dd class="mt-1 text-sm font-black text-slate-900">{{ selected_semester_row.state_label }}</dd></div><div><dt class="text-xs font-semibold text-[color:var(--muted)]">Notes attendues</dt><dd class="mt-1 text-sm font-black text-slate-900">{{ selected_semester_row.expected }}</dd></div></dl>
+      </section>
 
-  </div>
-  {% empty %}
-  <div class="rounded-xl border border-dashed border-[color:var(--line)] p-8 text-center text-sm font-semibold text-[color:var(--muted)]">
-    Aucun semestre pour cette classe.
-  </div>
-  {% endfor %}
-
-  <!-- Anomalies -->
-  {% if result_anomalies %}
-  <div x-data="{ open: true }" class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm overflow-hidden">
-    <button type="button" @click="open = !open"
-      class="flex w-full items-center justify-between border-b border-[color:var(--line)] px-5 py-3 text-left transition hover:bg-[color:var(--surface)]">
-      <div class="flex items-center gap-2">
-        <span class="flex h-5 w-5 items-center justify-center rounded-full bg-[color:var(--danger-soft)]">
-          <i data-lucide="alert-triangle" class="w-3 h-3 text-[color:var(--danger)]"></i>
-        </span>
-        <h4 class="text-sm font-black text-[color:var(--danger)]">Anomalies</h4>
-        <span class="inline-flex items-center rounded-full bg-[color:var(--danger-soft)] px-2 py-0.5 text-xs font-bold text-[color:var(--danger)]">{{ result_anomalies|length }}</span>
-      </div>
-      <i :class="open ? 'rotate-180' : ''" data-lucide="chevron-down" class="w-4 h-4 text-[color:var(--muted)] transition-transform duration-200"></i>
-    </button>
-    <div x-show="open"
-         x-transition:enter="transition ease-out duration-150"
-         x-transition:enter-start="opacity-0 -translate-y-1"
-         x-transition:enter-end="opacity-100 translate-y-0">
-      <div class="divide-y divide-[color:var(--line)]">
-        {% for anomaly in result_anomalies %}
-        <div class="flex items-start gap-3 px-5 py-3">
-          <div class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg
-            {% if anomaly.level == 'blocking' %}bg-[color:var(--danger-soft)] text-[color:var(--danger)]{% else %}bg-[color:var(--warning-soft)] text-[color:var(--warning)]{% endif %}">
-            <i data-lucide="{% if anomaly.level == 'blocking' %}x-circle{% else %}alert-circle{% endif %}" class="w-3.5 h-3.5"></i>
-          </div>
-          <div>
-            <p class="text-xs font-bold text-slate-900">{{ anomaly.student }}</p>
-            <p class="text-xs text-[color:var(--muted)]">{{ anomaly.message }}</p>
-          </div>
+      <section class="rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] p-5 shadow-sm xl:col-span-2">
+        <p class="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--school-primary)]">Autres semestres</p><h4 class="mt-1 text-base font-black text-slate-900">Même classe</h4>
+        <div class="mt-4 flex flex-wrap gap-2">
+          {% for row in selected_class_rows %}
+            <button type="button" hx-get="{% url 'accounts_portal:director_drawer' %}?panel=evaluations&class_id={{ selected_class.id }}&semester_id={{ row.semester.id }}" hx-target="#director-drawer-content" hx-swap="innerHTML" hx-disabled-elt="this" class="rounded-ui-button border px-3 py-2 text-left text-xs font-bold transition {% if row.semester.id == selected_semester.id %}border-[color:var(--school-primary)] bg-[color:var(--school-primary-soft)] text-[color:var(--school-primary)]{% else %}border-[color:var(--line)] bg-[color:var(--surface)] text-[color:var(--text)] hover:bg-[color:var(--card)]{% endif %}"><span class="block">Semestre {{ row.semester.number }}</span><span class="mt-0.5 block font-medium opacity-75">{{ row.state_label }}</span></button>
+          {% endfor %}
         </div>
-        {% endfor %}
+      </section>
+    </div>
+
+    <section class="overflow-hidden rounded-2xl border border-[color:var(--line)] bg-[color:var(--card)] shadow-sm">
+      <div class="flex items-center justify-between gap-4 border-b border-[color:var(--line)] px-5 py-4 sm:px-6"><div><p class="text-[10px] font-black uppercase tracking-[0.14em] text-[color:var(--school-primary)]">Signaux de contrôle</p><h4 class="mt-1 text-base font-black text-slate-900">Points à traiter</h4></div><span class="inline-flex shrink-0 rounded-full px-2.5 py-1 text-xs font-black {% if result_anomalies %}bg-[color:var(--warning-soft)] text-[color:var(--warning)]{% else %}bg-[color:var(--success-soft)] text-[color:var(--success)]{% endif %}">{{ result_anomalies|length }}</span></div>
+      {% if result_anomalies %}
+        <div class="overflow-x-auto"><table class="min-w-full divide-y divide-[color:var(--line)] text-sm"><thead class="bg-[color:var(--surface)] text-left text-[10px] font-black uppercase tracking-wide text-[color:var(--muted)]"><tr><th class="px-5 py-3 sm:px-6">Étudiant</th><th class="px-5 py-3">Type de signal</th><th class="px-5 py-3">Constat</th><th class="px-5 py-3 sm:px-6">État</th></tr></thead><tbody class="divide-y divide-[color:var(--line)]">{% for anomaly in result_anomalies %}<tr class="align-top"><td class="whitespace-nowrap px-5 py-3.5 font-bold text-slate-900 sm:px-6">{{ anomaly.student }}</td><td class="px-5 py-3.5 text-[color:var(--text)]">{% if anomaly.level == 'blocking' %}Notes manquantes{% else %}Moyenne sous le seuil{% endif %}</td><td class="min-w-[16rem] px-5 py-3.5 text-[color:var(--muted)]">{{ anomaly.message }}</td><td class="px-5 py-3.5 sm:px-6"><span class="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold {% if anomaly.level == 'blocking' %}bg-[color:var(--danger-soft)] text-[color:var(--danger)]{% else %}bg-[color:var(--warning-soft)] text-[color:var(--warning)]{% endif %}">{% if anomaly.level == 'blocking' %}Bloquant{% else %}À surveiller{% endif %}</span></td></tr>{% endfor %}</tbody></table></div>
+      {% else %}
+        <div class="flex items-center gap-3 px-5 py-5 sm:px-6"><span class="grid h-9 w-9 place-items-center rounded-full bg-[color:var(--success-soft)] text-[color:var(--success)]"><i data-lucide="circle-check" class="h-4 w-4"></i></span><p class="text-sm font-semibold text-[color:var(--text)]">Aucun point bloquant ou signal à traiter pour ce semestre.</p></div>
+      {% endif %}
+    </section>
+
+    <div class="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 border border-[color:var(--line)] bg-[color:var(--card)] px-5 py-4 shadow-[0_-8px_20px_rgba(15,23,42,0.08)] sm:px-6">
+      <div><p class="text-xs font-black text-slate-900">Actions de décision</p><p class="mt-0.5 text-xs text-[color:var(--muted)]">Seules les actions autorisées par le workflow sont proposées.</p></div>
+      <div class="flex flex-wrap gap-2">
+        {% if selected_semester_row.can_reject %}<button type="button" hx-post="{% url 'accounts_portal:director_results_action' %}" hx-vals='{"action": "reject", "semester_id": "{{ selected_semester.id }}"}' hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-target="#director-results-subcontent" hx-swap="innerHTML" hx-confirm="Renvoyer S{{ selected_semester.number }} en correction ?" hx-disabled-elt="this" hx-on::after-request="window.deCloseDrawer && window.deCloseDrawer()" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-[color:var(--danger-soft)] bg-[color:var(--danger-soft)] px-4 text-sm font-semibold text-[color:var(--danger)] hover:opacity-90 disabled:opacity-60"><i data-lucide="rotate-ccw" class="h-4 w-4"></i>Rejeter</button>{% endif %}
+        {% if selected_semester_row.can_generate %}<button type="button" hx-post="{% url 'accounts_portal:director_bulletin_action' %}" hx-vals='{"action": "generate_semester_class", "semester_id": "{{ selected_semester.id }}"}' hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-target="#director-results-subcontent" hx-swap="innerHTML" hx-disabled-elt="this" hx-on::after-request="window.deCloseDrawer && window.deCloseDrawer()" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-[color:var(--line)] bg-[color:var(--surface)] px-4 text-sm font-semibold text-[color:var(--text)] hover:bg-[color:var(--card)] disabled:opacity-60"><i data-lucide="file-text" class="h-4 w-4"></i>Bulletins</button><a href="{% url 'academics:class_reports_overview' selected_semester.id %}" target="_blank" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-[color:var(--line)] bg-[color:var(--card)] px-4 text-sm font-semibold text-[color:var(--text)] hover:bg-[color:var(--surface)]"><i data-lucide="external-link" class="h-4 w-4"></i>Consulter</a>{% endif %}
+        {% if selected_semester_row.can_validate %}<button type="button" hx-post="{% url 'accounts_portal:director_results_action' %}" hx-vals='{"action": "validate", "semester_id": "{{ selected_semester.id }}"}' hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-target="#director-results-subcontent" hx-swap="innerHTML" hx-confirm="Valider le Semestre {{ selected_semester.number }} ?" hx-disabled-elt="this" hx-on::after-request="window.deCloseDrawer && window.deCloseDrawer()" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-[color:var(--school-primary)] px-4 text-sm font-black text-white hover:opacity-90 disabled:opacity-60"><i data-lucide="check-circle" class="h-4 w-4"></i>Valider</button>{% endif %}
+        {% if selected_semester_row.can_publish %}<button type="button" hx-post="{% url 'accounts_portal:director_results_action' %}" hx-vals='{"action": "publish", "semester_id": "{{ selected_semester.id }}"}' hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-target="#director-results-subcontent" hx-swap="innerHTML" hx-disabled-elt="this" hx-on::after-request="window.deCloseDrawer && window.deCloseDrawer()" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-[color:var(--school-primary)] px-4 text-sm font-black text-white hover:opacity-90 disabled:opacity-60"><i data-lucide="send" class="h-4 w-4"></i>Publier</button>{% endif %}
+        {% if not selected_semester_row.can_validate and not selected_semester_row.can_publish and not selected_semester_row.can_generate and not selected_semester_row.can_reject %}<span class="text-sm font-semibold text-[color:var(--muted)]">Aucune action disponible pour cet état.</span>{% endif %}
       </div>
     </div>
-  </div>
+  {% else %}
+    <div class="rounded-2xl border border-dashed border-[color:var(--line)] bg-[color:var(--card)] p-8 text-center text-sm font-semibold text-[color:var(--muted)]">Aucun semestre disponible pour cette classe.</div>
   {% endif %}
-
 </div>

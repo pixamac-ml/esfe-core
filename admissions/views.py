@@ -38,7 +38,7 @@ def _programme_cycle_key(programme):
 
 def _build_formation_cards(cycle_slug="all", branch_id=None):
     formations_qs = (
-        Programme.objects.filter(is_active=True)
+        Programme.objects.accepting_admissions()
         .select_related("cycle", "diploma_awarded")
         .prefetch_related("years__fees")
         .order_by("title")
@@ -137,7 +137,7 @@ def _initial_tunnel_state(request):
         request.GET.get("formation") or request.GET.get("formation_slug") or ""
     ).strip()
     programme = (
-        Programme.objects.filter(is_active=True, slug=formation_slug)
+        Programme.objects.accepting_admissions().filter(slug=formation_slug)
         .select_related("cycle")
         .first()
         if formation_slug
@@ -301,7 +301,7 @@ def admission_tunnel(request):
         programme = None
         if form_data["formation_slug"]:
             programme = (
-                Programme.objects.filter(is_active=True, slug=form_data["formation_slug"])
+                Programme.objects.accepting_admissions().filter(slug=form_data["formation_slug"])
                 .select_related("cycle")
                 .first()
             )
@@ -463,10 +463,7 @@ def admission_step3_documents(request):
     required_documents = []
 
     if formation_slug:
-        selected_programme = Programme.objects.filter(
-            slug=formation_slug,
-            is_active=True,
-        ).first()
+        selected_programme = Programme.objects.accepting_admissions().filter(slug=formation_slug).first()
         if selected_programme:
             required_documents = selected_programme.required_documents.select_related("document")
 
@@ -495,9 +492,8 @@ def apply_to_programme(request, slug):
     """
 
     programme = get_object_or_404(
-        Programme,
+        Programme.objects.accepting_admissions(),
         slug=slug,
-        is_active=True
     )
 
     # Documents requis pour ce programme

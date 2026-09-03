@@ -76,6 +76,22 @@ class CardSecurityTests(TestCase):
         self.assertIsNone(verifier_token(""))
         self.assertIsNone(verifier_token("v2.abc.def"))  # mauvaise version
 
+    def test_token_v2_opaque_student_et_personnel(self):
+        from students.services.card_security import signer_carte_reference, verifier_token
+
+        student_token = signer_carte_reference(
+            reference="123e4567-e89b-12d3-a456-426614174000",
+            annee="2026-2027", annexe="BKO-MORIBA", kind="student",
+        )
+        staff_token = signer_carte_reference(
+            reference="123e4567-e89b-12d3-a456-426614174001",
+            annee="2026-2027", annexe="BKO-MORIBA", kind="staff",
+        )
+
+        self.assertEqual(verifier_token(student_token)["kind"], "student")
+        self.assertEqual(verifier_token(staff_token)["kind"], "staff")
+        self.assertNotIn("ESFE-", student_token)
+
     def test_code_lisible_format(self):
         from students.services.card_security import generer_code_lisible, signer_carte
 

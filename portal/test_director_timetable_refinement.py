@@ -1,10 +1,13 @@
-from datetime import date, time
+from datetime import date, datetime, time
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
-from academics.models import AcademicClass, AcademicYear, EC, Semester, UE, WeeklyScheduleSlot
+from academics.models import AcademicClass, AcademicScheduleEvent, AcademicYear, EC, Semester, UE, WeeklyScheduleSlot
+from academics.services.schedule_service import create_schedule_event
+from portal.services.director.timetable_service import build_weekly_timetable_grid
 from branches.models import Branch
 from formations.models import Cycle, Diploma, Filiere, Programme
 
@@ -261,3 +264,121 @@ class DirectorTimetableRefinementTests(TestCase):
             {"source": "weekly"},
         )
         self.assertEqual(outside.status_code, 403)
+
+    def test_dated_week_print_uses_the_selected_week_and_document_identity(self):
+        create_schedule_event(
+            user=self.director, title="Comptabilité - impression datée",
+            event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+            status=AcademicScheduleEvent.STATUS_PLANNED,
+            academic_class=self.academic_class, academic_year=self.academic_year,
+            branch=self.branch, ec=self.ec, teacher=self.teacher,
+            start_datetime=timezone.make_aware(datetime(2026, 11, 23, 8, 0)),
+            end_datetime=timezone.make_aware(datetime(2026, 11, 23, 10, 0)), location="Salle A12", is_online=False,
+        )
+        response = self.client.get(
+            reverse("accounts_portal:schedule_class_print", args=[self.academic_class.pk]),
+            {"source": "week", "week_start": "2026-11-23"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Emploi du temps de la classe")
+        self.assertContains(response, "Du 23/11/2026 au 28/11/2026")
+        self.assertContains(response, f"EDT-{self.academic_class.pk}-20261123")
+        self.assertContains(response, "Direction des études")
+
+    def test_dated_week_grid_does_not_reuse_another_week(self):
+        create_schedule_event(
+            user=self.director, title="Comptabilité - semaine A",
+            event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+            status=AcademicScheduleEvent.STATUS_PLANNED,
+            academic_class=self.academic_class, academic_year=self.academic_year,
+            branch=self.branch, ec=self.ec, teacher=self.teacher,
+            start_datetime=timezone.make_aware(datetime(2026, 11, 23, 8, 0)),
+            end_datetime=timezone.make_aware(datetime(2026, 11, 23, 10, 0)), location="Salle A12", is_online=False,
+        )
+        week_a = build_weekly_timetable_grid(self.academic_class, week_start=date(2026, 11, 23))
+        week_before = build_weekly_timetable_grid(self.academic_class, week_start=date(2026, 11, 16))
+        self.assertEqual(len(week_a["slots"]), 1)
+        self.assertEqual(len(week_before["slots"]), 0)
+
+    def test_navigation_between_two_weeks_loads_each_weeks_own_courses(self):
+        first = create_schedule_event(
+            user=self.director, title="Comptabilité - semaine 1",
+            event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+            status=AcademicScheduleEvent.STATUS_PLANNED,
+            academic_class=self.academic_class, academic_year=self.academic_year,
+            branch=self.branch, ec=self.ec, teacher=self.teacher,
+            start_datetime=timezone.make_aware(datetime(2026, 11, 16, 8, 0)),
+            end_datetime=timezone.make_aware(datetime(2026, 11, 16, 10, 0)), location="Salle A12", is_online=False,
+        )
+        second = create_schedule_event(
+            user=self.director, title="Comptabilité - semaine 2",
+            event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+            status=AcademicScheduleEvent.STATUS_PLANNED,
+            academic_class=self.academic_class, academic_year=self.academic_year,
+            branch=self.branch, ec=self.ec, teacher=self.teacher,
+            start_datetime=timezone.make_aware(datetime(2026, 11, 23, 10, 15)),
+            end_datetime=timezone.make_aware(datetime(2026, 11, 23, 12, 15)), location="Salle B02", is_online=False,
+        )
+        week_one = build_weekly_timetable_grid(self.academic_class, week_start=date(2026, 11, 16))
+        week_two = build_weekly_timetable_grid(self.academic_class, week_start=date(2026, 11, 23))
+        self.assertEqual([item["id"] for item in week_one["slots"]], [first.id])
+        self.assertEqual([item["id"] for item in week_two["slots"]], [second.id])
+
+    def test_dated_event_update_and_delete_only_affect_selected_occurrence(self):
+        event = AcademicScheduleEvent.objects.create(
+            title="Comptabilité - semaine A", event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+            status=AcademicScheduleEvent.STATUS_PLANNED, academic_class=self.academic_class,
+            academic_year=self.academic_year, branch=self.branch, ec=self.ec, teacher=self.teacher,
+            start_datetime=timezone.make_aware(datetime(2026, 11, 23, 8, 0)), end_datetime=timezone.make_aware(datetime(2026, 11, 23, 10, 0)),
+            location="Salle A12", is_online=False, created_by=self.director, updated_by=self.director,
+        )
+        updated = self.client.post(reverse("accounts_portal:director_timetable_event_action"), {
+            "action": "save", "class_id": self.academic_class.pk, "event_id": event.pk,
+            "date": "2026-11-23", "start_time": "10:15", "end_time": "12:15",
+            "ec_id": self.ec.pk, "teacher_id": self.teacher.pk, "room": "Salle B02", "week_start": "2026-11-23",
+        })
+        self.assertEqual(updated.status_code, 200)
+        event.refresh_from_db()
+        self.assertEqual(event.location, "Salle B02")
+        deleted = self.client.post(reverse("accounts_portal:director_timetable_event_action"), {
+            "action": "delete", "class_id": self.academic_class.pk, "event_id": event.pk, "week_start": "2026-11-23",
+        })
+        self.assertEqual(deleted.status_code, 200)
+        self.assertEqual(deleted.headers["HX-Retarget"], "#director-timetable-subcontent")
+        self.assertEqual(deleted.headers["HX-Trigger"], "director-drawer-close")
+        event.refresh_from_db()
+        self.assertEqual(event.status, AcademicScheduleEvent.STATUS_CANCELLED)
+        refreshed_week = build_weekly_timetable_grid(self.academic_class, week_start=date(2026, 11, 23))
+        self.assertEqual(refreshed_week["slots"], [])
+
+    def test_week_grid_always_uses_dated_sessions_even_if_a_template_mode_is_requested(self):
+        event = AcademicScheduleEvent.objects.create(
+            title="Comptabilité - semaine A", event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+            status=AcademicScheduleEvent.STATUS_PLANNED, academic_class=self.academic_class,
+            academic_year=self.academic_year, branch=self.branch, ec=self.ec, teacher=self.teacher,
+            start_datetime=timezone.make_aware(datetime(2026, 11, 23, 8, 0)), end_datetime=timezone.make_aware(datetime(2026, 11, 23, 10, 0)),
+            location="Salle A12", is_online=False, created_by=self.director, updated_by=self.director,
+        )
+        week_response = self.client.get(reverse("accounts_portal:director_timetable_subcontent"), {
+            "view": "builder", "mode": "week", "class_id": self.academic_class.pk, "week_start": "2026-11-23",
+        }, HTTP_HX_REQUEST="true")
+        self.assertContains(week_response, f"event_id={event.pk}")
+        self.assertContains(week_response, reverse("accounts_portal:director_timetable_event_drawer"))
+        self.assertContains(week_response, "Séances de la semaine sélectionnée")
+
+        requested_template_response = self.client.get(reverse("accounts_portal:director_timetable_subcontent"), {
+            "view": "builder", "mode": "template", "class_id": self.academic_class.pk, "week_start": "2026-11-23",
+        }, HTTP_HX_REQUEST="true")
+        self.assertContains(requested_template_response, "Séances de la semaine sélectionnée")
+        self.assertNotContains(requested_template_response, "Modèle hebdomadaire récurrent")
+        self.assertContains(requested_template_response, reverse("accounts_portal:director_timetable_event_drawer"))
+
+    def test_director_grid_cannot_materialize_recurring_slots_into_other_weeks(self):
+        self._create_slot()
+        response = self.client.post(reverse("accounts_portal:director_timetable_action"), {
+            "action": "materialize_month", "class_id": self.academic_class.pk,
+            "week_start": "2026-11-23",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "génération automatique de semaines est désactivée")
+        self.assertFalse(AcademicScheduleEvent.objects.filter(academic_class=self.academic_class).exists())

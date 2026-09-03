@@ -6,20 +6,28 @@
   {% endcomponent %}
   {% if toast %}{% component "ui_core.alert" title="Information" message=toast.message tone=toast.level %}{% endcomponent %}{% endif %}
   {% component "ui_core.panel" title="Contexte officiel de la séance" subtitle="Ces informations proviennent de l'emploi du temps publié." tone="primary" %}<div class="grid gap-3 text-sm sm:grid-cols-2"><div><span class="block text-xs text-ui-text-muted">Classe</span><strong class="text-ui-text">{{ schedule_event.academic_class.display_name }}</strong></div><div><span class="block text-xs text-ui-text-muted">Créneau</span><strong class="text-ui-text">{{ schedule_event.start_datetime|date:"d/m/Y · H:i" }} – {{ schedule_event.end_datetime|date:"H:i" }}</strong></div><div><span class="block text-xs text-ui-text-muted">Salle</span><strong class="text-ui-text">{{ schedule_event.location|default:"Non précisée" }}</strong></div><div>{% component "ui_core.status_badge" label=lesson_log_session_state.label tone=lesson_log_session_state.tone icon="clock-3" %}{% endcomponent %}</div></div>{% endcomponent %}
+  {% if lesson_log and lesson_log.validated_by_id %}{% component "ui_core.alert" title="Cahier validé" message="Cette déclaration est désormais verrouillée ; les heures éligibles ont été transmises au workflow des honoraires." tone="success" %}{% endcomponent %}{% endif %}
+  {% if lesson_log and lesson_log.status == "returned" %}{% component "ui_core.alert" title="Correction demandée" message=lesson_log.review_comment tone="warning" %}{% endcomponent %}{% endif %}
   <form method="post" hx-post="{% url 'accounts_portal:teacher_lesson_log_panel' schedule_event.id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" class="space-y-4">
     {% csrf_token %}
     {% component "ui_core.panel" title="Déclaration de la séance" subtitle=schedule_event.location|default:"Salle non précisée" %}
       {% fill "default" %}
       <div class="space-y-4">
-        <label class="block"><span class="mb-1 block text-sm font-semibold text-ui-text">Statut</span><select name="status" class="w-full rounded-ui-input border-ui-border bg-ui-surface px-3 py-2 text-sm text-ui-text focus:border-ui-focus focus:ring-ui-focus">{% for value, label in lesson_log_status_choices %}<option value="{{ value }}"{% if lesson_log and lesson_log.status == value %} selected{% elif not lesson_log and value == 'done' %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+        {% component "ui_core.alert" title="Étape 1 · Déclaration" message="Enregistrez un brouillon ou soumettez le chapitre traité au surveillant académique. Seul son contrôle peut déclarer officiellement le cours fait." tone="info" %}{% endcomponent %}
         <label class="block"><span class="mb-1 block text-sm font-semibold text-ui-text">Contenu du cours</span><textarea name="content" rows="5" class="w-full rounded-ui-input border-ui-border bg-ui-surface px-3 py-2 text-sm text-ui-text focus:border-ui-focus focus:ring-ui-focus" placeholder="Résumé du cours, progression et notions traitées…">{{ lesson_log.content|default:"" }}</textarea></label>
         <label class="block"><span class="mb-1 block text-sm font-semibold text-ui-text">Travaux / devoirs</span><textarea name="homework" rows="3" class="w-full rounded-ui-input border-ui-border bg-ui-surface px-3 py-2 text-sm text-ui-text focus:border-ui-focus focus:ring-ui-focus">{{ lesson_log.homework|default:"" }}</textarea></label>
         <label class="block"><span class="mb-1 block text-sm font-semibold text-ui-text">Observations</span><textarea name="observations" rows="3" class="w-full rounded-ui-input border-ui-border bg-ui-surface px-3 py-2 text-sm text-ui-text focus:border-ui-focus focus:ring-ui-focus">{{ lesson_log.observations|default:"" }}</textarea></label>
-        <label class="flex items-center gap-2 text-sm font-semibold text-ui-text"><input type="checkbox" name="mark_present" value="1"{% if teacher_marked_present %} checked{% endif %} class="rounded border-ui-border text-ui-primary focus:ring-ui-focus"> Je certifie être présent(e) pour cette séance.</label>
+        {% component "ui_core.alert" title="Validation de la séance" message="Votre cahier est transmis au surveillant académique. La présence et le cours assuré sont constatés séparément avant validation des heures." tone="neutral" %}{% endcomponent %}
       </div>
       {% endfill %}
-      {% fill "footer" %}<div class="flex flex-wrap gap-2"><button type="submit" class="rounded-ui-button bg-ui-primary px-3 py-2 text-sm font-semibold text-ui-on-primary">Enregistrer</button><button type="button" hx-get="{% url 'accounts_portal:teacher_class_detail' schedule_event.academic_class_id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" class="rounded-ui-button border border-ui-border px-3 py-2 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">Retour à la classe</button></div>{% endfill %}
+      {% fill "footer" %}<div class="flex flex-wrap gap-2"><button type="submit" name="workflow_action" value="draft"{% if lesson_log and lesson_log.validated_by_id %} disabled aria-disabled="true"{% endif %} class="rounded-ui-button border border-ui-border px-3 py-2 text-sm font-semibold text-ui-text disabled:cursor-not-allowed disabled:opacity-60">Enregistrer le brouillon</button><button type="submit" name="workflow_action" value="sign_submit"{% if lesson_log and lesson_log.validated_by_id %} disabled aria-disabled="true"{% endif %} class="rounded-ui-button bg-ui-primary px-3 py-2 text-sm font-semibold text-ui-on-primary disabled:cursor-not-allowed disabled:opacity-60">Signer et soumettre</button><button type="button" hx-get="{% url 'accounts_portal:teacher_class_detail' schedule_event.academic_class_id %}" hx-target="#sg-drawer-content" hx-swap="innerHTML" class="rounded-ui-button border border-ui-border px-3 py-2 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">Retour à la classe</button></div>{% endfill %}
     {% endcomponent %}
   </form>
 </div>
-{% else %}{% component "ui_core.empty_state" icon="file-warning" title="Cours introuvable" message="Cette séance n'est pas accessible depuis votre annexe." %}{% endcomponent %}{% endif %}
+{% else %}
+  {% if toast %}
+    {% component "ui_core.empty_state" icon="file-warning" title="Action indisponible" message=toast.message %}{% endcomponent %}
+  {% else %}
+    {% component "ui_core.empty_state" icon="file-warning" title="Cours introuvable" message="Cette séance n'est pas accessible depuis votre annexe." %}{% endcomponent %}
+  {% endif %}
+{% endif %}

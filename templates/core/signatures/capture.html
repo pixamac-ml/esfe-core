@@ -1,0 +1,38 @@
+<div class="space-y-5" data-signature-capture>
+  <div class="border-b border-ui-border pb-4">
+    <p class="text-xs font-semibold uppercase tracking-wide text-ui-primary">Signature ESFE</p>
+    <h2 class="mt-1 text-xl font-bold text-ui-text">{{ signature_request.title }}</h2>
+    <p class="mt-2 text-sm text-ui-text-muted">Votre signature confirme la version affichée du document. Elle est horodatée et ne peut pas être réutilisée après expiration.</p>
+  </div>
+  {% if signature_error %}<div class="rounded-ui-card border border-ui-danger bg-ui-danger-soft p-3 text-sm text-ui-danger">{{ signature_error }}</div>{% endif %}
+  <dl class="grid gap-3 rounded-ui-card bg-ui-surface-muted p-4 text-sm sm:grid-cols-2">
+    <div><dt class="text-xs font-semibold text-ui-text-muted">Signataire</dt><dd class="mt-1 font-bold text-ui-text">{{ signature_request.signer.get_full_name|default:signature_request.signer.username }}</dd></div>
+    <div><dt class="text-xs font-semibold text-ui-text-muted">Valable jusqu'au</dt><dd class="mt-1 font-bold text-ui-text">{{ signature_request.expires_at|date:"d/m/Y H:i" }}</dd></div>
+  </dl>
+  <form method="post" action="{{ signature_submit_url }}" hx-post="{{ signature_submit_url }}" hx-target="{{ signature_target|default:'#sg-drawer-content' }}" hx-swap="innerHTML" class="space-y-4" id="signature-capture-form">
+    {% csrf_token %}
+    <label class="block text-sm font-semibold text-ui-text">Signature manuscrite</label>
+    <div class="overflow-hidden rounded-ui-card border-2 border-dashed border-ui-border bg-white"><canvas id="signature-capture-pad" class="h-56 w-full touch-none"></canvas></div>
+    <input type="hidden" name="signature_data" id="signature-capture-data">
+    <div class="flex flex-wrap justify-between gap-3"><button type="button" id="signature-capture-clear" class="ui-focus-ring h-ui-control rounded-ui-button border border-ui-border px-4 text-sm font-semibold text-ui-text">Effacer</button><button type="submit" class="ui-focus-ring h-ui-control rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary">Signer et soumettre</button></div>
+  </form>
+</div>
+<script>
+(() => {
+  const canvas = document.getElementById('signature-capture-pad');
+  const form = document.getElementById('signature-capture-form');
+  if (!canvas || !form) return;
+  const ctx = canvas.getContext('2d'); let drawing = false; let hasSignature = false;
+  function resize() { const rect = canvas.getBoundingClientRect(); const ratio = window.devicePixelRatio || 1; canvas.width = rect.width * ratio; canvas.height = rect.height * ratio; ctx.scale(ratio, ratio); ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.strokeStyle = '#1d4ed8'; }
+  function point(event) { const rect = canvas.getBoundingClientRect(); const pointer = event.touches?.[0] || event; return {x: pointer.clientX - rect.left, y: pointer.clientY - rect.top}; }
+  function start(event) { drawing = true; hasSignature = true; const p = point(event); ctx.beginPath(); ctx.moveTo(p.x, p.y); event.preventDefault(); }
+  function move(event) { if (!drawing) return; const p = point(event); ctx.lineTo(p.x, p.y); ctx.stroke(); event.preventDefault(); }
+  function end() { drawing = false; }
+  resize(); window.addEventListener('resize', resize);
+  ['mousedown', 'touchstart'].forEach((name) => canvas.addEventListener(name, start, {passive: false}));
+  ['mousemove', 'touchmove'].forEach((name) => canvas.addEventListener(name, move, {passive: false}));
+  ['mouseup', 'mouseleave', 'touchend'].forEach((name) => canvas.addEventListener(name, end));
+  document.getElementById('signature-capture-clear')?.addEventListener('click', () => { ctx.clearRect(0, 0, canvas.width, canvas.height); hasSignature = false; });
+  form.addEventListener('submit', (event) => { if (!hasSignature) { event.preventDefault(); window.alert('Veuillez signer avant de soumettre.'); return; } document.getElementById('signature-capture-data').value = canvas.toDataURL('image/png'); });
+})();
+</script>

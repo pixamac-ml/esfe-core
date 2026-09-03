@@ -1,7 +1,8 @@
 from io import BytesIO
 
 from django.core.files.base import ContentFile
-from django.db import transaction
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -11,7 +12,8 @@ from reportlab.platypus import Table, TableStyle
 
 from core.pdf_documents import generate_pdf as generate_esfe_pdf
 
-from accounts.models import AccountingDocumentSequence, BranchCashMovement
+from accounts.models import AccountingDocumentSequence, BranchCashMovement, PaymentSignatureSession
+from accounts.services.financial_integrity import assert_financial_period_open
 
 
 PREFIX_BY_TYPE = {
@@ -165,6 +167,17 @@ def ensure_cash_movement_receipt(movement):
     if movement.receipt_pdf:
         return movement.receipt_pdf
 
+    is_personnel_withdrawal = movement.source in {
+        BranchCashMovement.SOURCE_PAYROLL,
+        BranchCashMovement.SOURCE_HONORARIUM,
+    }
+    beneficiary = ""
+    if is_personnel_withdrawal and " - " in (movement.label or ""):
+        beneficiary = movement.label.split(" - ", 1)[1].strip()
+    signature = movement.payment_signature_sessions.filter(
+        status=PaymentSignatureSession.STATUS_COMPLETED,
+    ).order_by("-completed_at", "-pk").first()
+
     pdf_bytes = generate_esfe_pdf("esfe_cash_receipt", {
         "receipt_number": movement.receipt_number or movement.reference,
         "reference": movement.reference or "",
@@ -177,6 +190,14 @@ def ensure_cash_movement_receipt(movement):
         "amount": f"{movement.amount:,}".replace(",", " "),
         "agent": movement.created_by.get_full_name() if movement.created_by_id else "",
         "notes": movement.notes or "",
+        "document_title": "BORDEREAU DE RETRAIT" if is_personnel_withdrawal else "PIECE DE CAISSE",
+        "beneficiary": beneficiary,
+        "beneficiary_label": "Beneficiaire" if beneficiary else "",
+        "is_personnel_withdrawal": is_personnel_withdrawal,
+        "signature_data": signature.signature_data if signature else "",
+        "signature_name": signature.beneficiary.get_full_name() or signature.beneficiary.username if signature else "",
+        "signature_date": signature.signed_at.strftime("%d/%m/%Y %H:%M") if signature and signature.signed_at else "",
+        "signature_hash_short": signature.signature_sha256[:16] if signature else "",
     })
     movement.receipt_pdf.save(
         f"piece-caisse-{movement.receipt_number}.pdf",
@@ -193,5 +214,51 @@ def finalize_cash_movement_document(movement):
 
 
 def create_cash_movement(**kwargs):
-    movement = BranchCashMovement.objects.create(**kwargs)
+    """Create one ledger movement, safely retryable by HTMX and synchronizers.
+
+    ``source_reference`` is the business idempotency key of an automatic
+    operation. A repeated request therefore returns the original movement
+    rather than altering the branch balance a second time.
+    """
+    branch = kwargs["branch"]
+    movement_date = kwargs.get("movement_date") or timezone.localdate()
+    assert_financial_period_open(branch, movement_date)
+    source_reference = (kwargs.get("source_reference") or "").strip()
+
+    if not source_reference:
+        movement = BranchCashMovement.objects.create(**kwargs)
+        return finalize_cash_movement_document(movement)
+
+    lookup = {
+        "branch": branch,
+        "source": kwargs.get("source", BranchCashMovement.SOURCE_MANUAL),
+        "source_reference": source_reference,
+    }
+    defaults = {**kwargs, "source_reference": source_reference}
+    try:
+        with transaction.atomic():
+            movement, created = BranchCashMovement.objects.get_or_create(
+                **lookup,
+                defaults=defaults,
+            )
+    except IntegrityError:
+        movement = BranchCashMovement.objects.get(**lookup)
+        created = False
+
+    if not created:
+        expected = {
+            "movement_type": kwargs.get("movement_type"),
+            "amount": kwargs.get("amount"),
+        }
+        actual = {
+            "movement_type": movement.movement_type,
+            "amount": movement.amount,
+        }
+        if expected != actual:
+            raise ValidationError(
+                "Cette reference de caisse existe deja avec des donnees differentes. "
+                "Une correction doit passer par une contre-ecriture tracee."
+            )
+        return movement
+
     return finalize_cash_movement_document(movement)

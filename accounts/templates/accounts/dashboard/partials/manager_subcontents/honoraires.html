@@ -1,0 +1,42 @@
+{% load component_tags %}
+<div class="min-w-0 space-y-5">
+  {% if manager_ui.subview == "overview" %}
+    {% include "accounts/dashboard/partials/manager_subview_kpi_grid.html" %}
+    {% component "ui_core.panel" title="Circuit des honoraires" subtitle="Les fiches sont calculées depuis les heures validées et le tarif officiel de chaque enseignant." %}
+      {% fill "default" %}
+        {% component "ui_core.alert" title="Circuit séparé des salaires" message="Les honoraires ne sont jamais mélangés aux salaires du personnel. La gestionnaire contrôle la fiche et le paiement ; les heures proviennent des activités pédagogiques validées." tone="info" %}{% endcomponent %}
+        <div class="mt-4 flex flex-wrap gap-2">
+          <button type="button" hx-post="{% url 'accounts:htmx_manager_teacher_honorarium_prepare_all' %}" hx-vals='{"period_month":"{{ salary_month_value }}"}' hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-target="body" hx-swap="beforeend" hx-confirm="Vérifier et synchroniser les fiches d'honoraires manquantes de ce mois ?" data-ui-confirm class="inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border px-4 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover"><i data-lucide="refresh-cw" class="h-4 w-4"></i>Synchroniser les fiches</button>
+          <button type="button" hx-post="{% url 'accounts:htmx_manager_teacher_honorarium_pay_ready_all' %}" hx-vals='{"period_month":"{{ salary_month_value }}"}' hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-target="body" hx-swap="beforeend" hx-confirm="Rendre disponibles les fiches prêtes et notifier les enseignants ?" data-ui-confirm class="inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong"><i data-lucide="bell" class="h-4 w-4"></i>Rendre les fiches disponibles</button>
+        </div>
+      {% endfill %}
+    {% endcomponent %}
+    {% component "ui_core.panel" title="Étapes de travail" subtitle="Une fiche passe de la préparation au paiement avec une trace financière." padding=False %}
+      <div class="grid divide-y divide-ui-border md:grid-cols-3 md:divide-x md:divide-y-0">
+        <a href="{{ manager_ui.subnavigation.1.href }}" hx-get="{{ manager_ui.subnavigation.1.hx_get }}" hx-target="{{ manager_ui.subnavigation.1.hx_target }}" hx-indicator="{{ manager_ui.subnavigation.1.hx_indicator }}" hx-push-url="{{ manager_ui.subnavigation.1.hx_push_url }}" hx-swap="innerHTML" class="ui-focus-ring flex items-center gap-3 p-4 hover:bg-ui-surface-hover"><span class="grid h-9 w-9 shrink-0 place-items-center rounded-ui-button bg-ui-primary-soft text-ui-primary">1</span><span><strong class="block text-sm">Préparer les fiches</strong><span class="text-xs text-ui-text-muted">Heures validées et tarif officiel</span></span></a>
+        <a href="{{ manager_ui.subnavigation.2.href }}" hx-get="{{ manager_ui.subnavigation.2.hx_get }}" hx-target="{{ manager_ui.subnavigation.2.hx_target }}" hx-indicator="{{ manager_ui.subnavigation.2.hx_indicator }}" hx-push-url="{{ manager_ui.subnavigation.2.hx_push_url }}" hx-swap="innerHTML" class="ui-focus-ring flex items-center gap-3 p-4 hover:bg-ui-surface-hover"><span class="grid h-9 w-9 shrink-0 place-items-center rounded-ui-button bg-ui-warning-soft text-ui-warning">2</span><span><strong class="block text-sm">Contrôler</strong><span class="text-xs text-ui-text-muted">Aucun changement des heures</span></span></a>
+        <a href="{{ manager_ui.subnavigation.3.href }}" hx-get="{{ manager_ui.subnavigation.3.hx_get }}" hx-target="{{ manager_ui.subnavigation.3.hx_target }}" hx-indicator="{{ manager_ui.subnavigation.3.hx_indicator }}" hx-push-url="{{ manager_ui.subnavigation.3.hx_push_url }}" hx-swap="innerHTML" class="ui-focus-ring flex items-center gap-3 p-4 hover:bg-ui-surface-hover"><span class="grid h-9 w-9 shrink-0 place-items-center rounded-ui-button bg-ui-success-soft text-ui-success">3</span><span><strong class="block text-sm">Payer et archiver</strong><span class="text-xs text-ui-text-muted">Bordereau et pièce de caisse</span></span></a>
+      </div>
+    {% endcomponent %}
+  {% else %}
+    {% component "ui_core.panel" title="Fiches d'honoraires" subtitle="Filtrez la période, ouvrez une fiche, puis contrôlez ou enregistrez le paiement." %}
+      {% fill "default" %}
+        <div class="flex flex-wrap gap-2">
+          <button type="button" hx-post="{% url 'accounts:htmx_manager_teacher_honorarium_prepare_all' %}" hx-vals='{"period_month":"{{ salary_month_value }}"}' hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-target="body" hx-swap="beforeend" class="inline-flex h-9 items-center gap-2 rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover"><i data-lucide="refresh-cw" class="h-4 w-4"></i>Synchroniser</button>
+          <button type="button" hx-post="{% url 'accounts:htmx_manager_teacher_honorarium_pay_ready_all' %}" hx-vals='{"period_month":"{{ salary_month_value }}"}' hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-target="body" hx-swap="beforeend" class="inline-flex h-9 items-center gap-2 rounded-ui-button bg-ui-primary px-3 text-xs font-semibold text-ui-on-primary"><i data-lucide="bell" class="h-4 w-4"></i>Rendre disponibles</button>
+        </div>
+      {% endfill %}
+    {% endcomponent %}
+    {% component "ui_core.filter_bar" filters=manager_ui.filters.items action=manager_ui.filters.action reset_url=manager_ui.filters.reset_url hidden_fields=manager_ui.filters.hidden_fields active_filters=manager_ui.filters.active_filters target="#honoraires-results" select="#honoraires-results" swap="outerHTML" indicator=manager_ui.subcontent_indicator submit_label="Appliquer" density="compact" %}{% endcomponent %}
+    <div id="honoraires-results">
+      {% component "ui_core.data_table" id="manager-honorarium-table" caption="Honoraires enseignants" headers=manager_ui.table.headers rows=manager_ui.table.rows result_count=manager_ui.table.result_count page=manager_ui.table.page page_count=manager_ui.table.page_count density="compact" empty_title="Aucun enseignant" empty_message="Aucune fiche d'honoraires ne correspond aux filtres de cette période." %}
+        {% fill "footer" %}
+          <nav class="flex items-center gap-2" aria-label="Pagination des honoraires">
+            {% if manager_ui.table.previous_url %}<a href="{{ manager_ui.table.previous_url }}" hx-get="{{ manager_ui.table.previous_url }}" hx-target="#honoraires-results" hx-select="#honoraires-results" hx-swap="outerHTML" hx-indicator="{{ manager_ui.subcontent_indicator }}" class="inline-flex h-9 items-center rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover">Précédent</a>{% endif %}
+            {% if manager_ui.table.next_url %}<a href="{{ manager_ui.table.next_url }}" hx-get="{{ manager_ui.table.next_url }}" hx-target="#honoraires-results" hx-select="#honoraires-results" hx-swap="outerHTML" hx-indicator="{{ manager_ui.subcontent_indicator }}" class="inline-flex h-9 items-center rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover">Suivant</a>{% endif %}
+          </nav>
+        {% endfill %}
+      {% endcomponent %}
+    </div>
+  {% endif %}
+</div>

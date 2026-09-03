@@ -1,0 +1,50 @@
+{% load component_tags %}
+<section class="space-y-5" data-dashboard-section="formations" data-executive-section="formations">
+  {% component "ui_core.page_header" eyebrow="Académique" title="Catalogue des formations" subtitle="Source institutionnelle unique utilisée par le site public, les admissions et les structures académiques." %}
+    {% fill "actions" %}
+      <button type="button" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-3 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=programme_admin')"><i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i> Créer une formation</button>
+    {% endfill %}
+  {% endcomponent %}
+
+  <form class="grid gap-3 rounded-ui-card border border-ui-border bg-ui-surface p-4 md:grid-cols-[1fr_13rem_auto]" hx-get="{% url 'accounts_portal:dg_section' section='formations' %}" hx-target="#executive-workspace" hx-swap="innerHTML" hx-push-url="true">
+    <label class="sr-only" for="programme-search">Rechercher</label>
+    <input id="programme-search" name="q" value="{{ programme_query }}" class="h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text focus:border-ui-focus focus:ring-ui-focus" placeholder="Rechercher une formation, filière ou cycle">
+    <select name="state" class="h-ui-control rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text focus:border-ui-focus focus:ring-ui-focus">
+      <option value="all" {% if programme_state == 'all' %}selected{% endif %}>Tous les états</option>
+      <option value="published" {% if programme_state == 'published' %}selected{% endif %}>Publiées</option>
+      <option value="admissions_open" {% if programme_state == 'admissions_open' %}selected{% endif %}>Admissions ouvertes</option>
+      <option value="internal" {% if programme_state == 'internal' %}selected{% endif %}>Non publiées</option>
+      <option value="inactive" {% if programme_state == 'inactive' %}selected{% endif %}>Inactives</option>
+      <option value="archived" {% if programme_state == 'archived' %}selected{% endif %}>Archivées</option>
+    </select>
+    <button class="inline-flex h-ui-control items-center justify-center rounded-ui-button border border-ui-border px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover" type="submit">Filtrer</button>
+  </form>
+
+  <div class="overflow-hidden rounded-ui-card border border-ui-border bg-ui-surface">
+    <div class="flex items-center justify-between border-b border-ui-border px-4 py-3 text-sm text-ui-text-muted"><span>{{ programme_count }} formation{{ programme_count|pluralize }}</span><span>Une formation archivée est conservée, jamais supprimée.</span></div>
+    <div class="divide-y divide-ui-border">
+      {% for programme in programme_rows %}
+        <article class="flex flex-col gap-3 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <div class="min-w-0">
+            <h3 class="font-semibold text-ui-text">{{ programme.title }}</h3>
+            <p class="mt-1 text-sm text-ui-text-muted">{{ programme.cycle.name }} · {{ programme.filiere.name }} · {{ programme.diploma_awarded.name }} · {{ programme.duration_years }} an{{ programme.duration_years|pluralize }}</p>
+            <div class="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
+              <span class="rounded-full bg-ui-surface-hover px-2 py-1 text-ui-text">{{ programme.candidature_count }} candidature{{ programme.candidature_count|pluralize }}</span>
+              <span class="rounded-full bg-ui-surface-hover px-2 py-1 text-ui-text">{{ programme.class_count }} classe{{ programme.class_count|pluralize }}</span>
+              <span class="rounded-full px-2 py-1 {% if programme.is_archived %}bg-ui-danger-soft text-ui-danger{% elif programme.is_public and programme.is_active %}bg-ui-success-soft text-ui-success{% else %}bg-ui-warning-soft text-ui-warning{% endif %}">{% if programme.is_archived %}Archivée{% elif programme.is_public and programme.is_active %}Publiée{% else %}Interne / inactive{% endif %}</span>
+              <span class="rounded-full px-2 py-1 {% if programme.admissions_open and not programme.is_archived %}bg-ui-success-soft text-ui-success{% else %}bg-ui-surface-hover text-ui-text-muted{% endif %}">{% if programme.admissions_open and not programme.is_archived %}Admissions ouvertes{% else %}Admissions fermées{% endif %}</span>
+            </div>
+          </div>
+          <div class="flex shrink-0 flex-wrap gap-2">
+            <button type="button" class="inline-flex h-ui-control items-center rounded-ui-button border border-ui-border px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=programme_admin&programme_id={{ programme.id }}')">Modifier</button>
+            {% if not programme.is_archived %}
+              <form method="post" action="{% url 'accounts_portal:dg_programme_archive' %}" onsubmit="return dgSubmitAction(this)">{% csrf_token %}<input type="hidden" name="programme_id" value="{{ programme.id }}"><button class="inline-flex h-ui-control items-center rounded-ui-button border border-ui-danger px-3 text-sm font-semibold text-ui-danger hover:bg-ui-danger-soft" type="submit">Archiver</button></form>
+            {% endif %}
+          </div>
+        </article>
+      {% empty %}
+        <div class="px-4 py-12 text-center text-sm text-ui-text-muted">Aucune formation ne correspond à ce filtre.</div>
+      {% endfor %}
+    </div>
+  </div>
+</section>

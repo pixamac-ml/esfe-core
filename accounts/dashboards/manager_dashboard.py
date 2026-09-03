@@ -11,11 +11,13 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET
 
+from academics.models import AcademicClass, AcademicYear
 from admissions.models import Candidature
-from accounts.forms import BranchBankTransferForm, BranchCashMovementForm, BranchExpenseForm, BranchMonthlyClosureForm, DonationForm
-from accounts.models import BranchBankTransfer, BranchCashMovement, BranchExpense, BranchMonthlyClosure, Donation, PayrollEntry, Profile, TeacherHonorariumEntry
+from accounts.forms import BranchBankTransferForm, BranchCashMovementForm, BranchExpenseForm, BranchMonthlyClosureForm, BranchWalletForm, CashRegisterCloseForm, CashRegisterOpenForm, DonationForm, WalletAmountForm
+from accounts.models import BranchBankTransfer, BranchCashMovement, BranchCashRegisterSession, BranchExpense, BranchMonthlyClosure, BranchWallet, Donation, PayrollEntry, Profile, TeacherHonorariumEntry
 from accounts.services.manager_intelligence import build_manager_intelligence_context
 from accounts.services.manager_intelligence import get_branch_cash_balance
+from accounts.services.wallets import branch_unallocated_cash, wallet_balance
 from accounts.services.financial_reports import build_manager_financial_report_context, resolve_financial_report_period
 from accounts.services.manager_dashboard_presentation import (
     MANAGER_SUBVIEW_DEFINITIONS,
@@ -24,7 +26,7 @@ from accounts.services.manager_dashboard_presentation import (
 )
 from accounts.services.manager_workspace_access import manager_workspace_required
 from coupons.services.querysets import active_coupons_for_branch
-from shop.forms import ShopCounterOrderForm, ShopProductForm, ShopStockInForm
+from shop.forms import ShopCounterOrderForm, ShopProductForm, ShopStockAdjustmentForm, ShopStockInForm
 from shop.services.shop_cash_session import manager_shop_sessions_for_agent
 from shop.services.shop_service import get_manager_shop_context
 from shop.views import get_branch_public_shop_identifier
@@ -34,6 +36,7 @@ from students.models import Student
 
 from accounts.dashboards.helpers import get_user_branch, is_manager
 from portal.services import build_role_dashboard_shell
+from portal.services.reenrollment_service import get_reenrollment_dashboard_context
 
 
 PAYABLE_INSCRIPTION_STATUSES = {
@@ -64,6 +67,18 @@ def _resolve_report_period(request, today):
     return resolve_financial_report_period(request, today=today)
 
 
+def _read_activity_date(request, parameter):
+    """Return one safe ISO date used only to consult a workspace history."""
+
+    raw_value = (request.GET.get(parameter) or "").strip()
+    if not raw_value:
+        return None, ""
+    try:
+        return date.fromisoformat(raw_value), raw_value
+    except ValueError:
+        return None, ""
+
+
 def _get_manager_agent(user, branch):
     return (
         PaymentAgent.objects
@@ -76,6 +91,43 @@ def _get_manager_agent(user, branch):
 def _manager_context(request, active_section="overview"):
     branch = request.branch
     today = timezone.now().date()
+
+    reenrollment_context = {}
+    if active_section == "reenrollment":
+        source_year = AcademicYear.objects.filter(pk=request.GET.get("source_year")).first() if str(request.GET.get("source_year", "")).isdigit() else None
+        target_year = AcademicYear.objects.filter(pk=request.GET.get("target_year")).first() if str(request.GET.get("target_year", "")).isdigit() else None
+        scoped_classes = AcademicClass.objects.filter(branch=branch, is_archived=False).select_related(
+            "academic_year", "programme", "branch"
+        )
+        source_class = scoped_classes.filter(pk=request.GET.get("source_class")).first() if str(request.GET.get("source_class", "")).isdigit() else None
+        target_class = scoped_classes.filter(pk=request.GET.get("target_class"), is_active=True).first() if str(request.GET.get("target_class", "")).isdigit() else None
+        if source_class is not None:
+            source_year = source_class.academic_year
+        if target_class is not None:
+            target_year = target_class.academic_year
+        programme = None
+        programme_id = request.GET.get("programme", "")
+        if str(programme_id).isdigit():
+            programme = scoped_classes.filter(programme_id=programme_id).values_list("programme", flat=True).first()
+            if programme is not None:
+                from formations.models import Programme
+
+                programme = Programme.objects.filter(pk=programme).first()
+        reenrollment_context = get_reenrollment_dashboard_context(
+            branch=branch,
+            source_year=source_year,
+            source_class=source_class,
+            target_year=target_year,
+            target_class=target_class,
+            programme=programme,
+            decision_value=(request.GET.get("decision") or "").strip(),
+            workflow_status=(request.GET.get("workflow_status") or "").strip(),
+            finance_state=(request.GET.get("finance_state") or "").strip(),
+            search=(request.GET.get("q") or "").strip()[:120],
+            actor=request.user,
+            surface="manager",
+            workspace_target="#reenrollment-workspace",
+        )
     start_of_week = today - timedelta(days=today.weekday())
     start_of_month = today.replace(day=1)
     now = timezone.now()
@@ -201,6 +253,13 @@ def _manager_context(request, active_section="overview"):
     inscriptions_with_balance = base_inscriptions.filter(
         status__in=[Inscription.STATUS_PARTIAL, Inscription.STATUS_AWAITING_PAYMENT]
     ).count()
+    inscriptions_to_finalize = base_inscriptions.filter(
+        status__in=[
+            Inscription.STATUS_CREATED,
+            Inscription.STATUS_AWAITING_PAYMENT,
+            Inscription.STATUS_PARTIAL,
+        ]
+    ).count()
     inscription_amounts = base_inscriptions.aggregate(
         due=Sum("amount_due"),
         paid=Sum("amount_paid"),
@@ -247,16 +306,24 @@ def _manager_context(request, active_section="overview"):
 
     cand_status = request.GET.get("cand_status", "").strip()
     cand_search = request.GET.get("cand_q", "").strip()
+    cand_activity_date, cand_activity_date_value = _read_activity_date(request, "cand_date")
     candidatures_qs = (
         base_candidatures
         .select_related("programme", "programme__cycle", "inscription")
         .order_by("-submitted_at")
     )
     if cand_status:
-        if cand_status == "accepted":
+        if cand_status == "open":
+            candidatures_qs = candidatures_qs.filter(status__in=["submitted", "under_review"])
+        elif cand_status == "accepted":
             candidatures_qs = candidatures_qs.filter(status__in=["accepted", "accepted_with_reserve"])
         else:
             candidatures_qs = candidatures_qs.filter(status=cand_status)
+    if cand_activity_date:
+        candidatures_qs = candidatures_qs.filter(
+            Q(submitted_at__date=cand_activity_date)
+            | Q(reviewed_at__date=cand_activity_date)
+        )
     if cand_search:
         candidatures_qs = candidatures_qs.filter(
             Q(first_name__icontains=cand_search)
@@ -275,6 +342,7 @@ def _manager_context(request, active_section="overview"):
 
     ins_status = request.GET.get("ins_status", "").strip()
     ins_search = request.GET.get("ins_q", "").strip()
+    ins_activity_date, ins_activity_date_value = _read_activity_date(request, "ins_date")
     inscriptions_qs = (
         base_inscriptions
         .select_related(
@@ -285,7 +353,21 @@ def _manager_context(request, active_section="overview"):
         .order_by("-created_at")
     )
     if ins_status:
-        inscriptions_qs = inscriptions_qs.filter(status=ins_status)
+        if ins_status == "open":
+            inscriptions_qs = inscriptions_qs.filter(
+                status__in=[
+                    Inscription.STATUS_CREATED,
+                    Inscription.STATUS_AWAITING_PAYMENT,
+                    Inscription.STATUS_PARTIAL,
+                ]
+            )
+        else:
+            inscriptions_qs = inscriptions_qs.filter(status=ins_status)
+    if ins_activity_date:
+        inscriptions_qs = inscriptions_qs.filter(
+            Q(created_at__date=ins_activity_date)
+            | Q(updated_at__date=ins_activity_date)
+        )
     if ins_search:
         inscriptions_qs = inscriptions_qs.filter(
             Q(candidature__first_name__icontains=ins_search)
@@ -426,11 +508,14 @@ def _manager_context(request, active_section="overview"):
     cash_type = request.GET.get("cash_type", "").strip()
     cash_source = request.GET.get("cash_source", "").strip()
     cash_search = request.GET.get("cash_q", "").strip()
+    cash_activity_date, cash_activity_date_value = _read_activity_date(request, "cash_date")
     cash_movements_qs = BranchCashMovement.objects.filter(branch=branch).select_related("expense", "created_by")
     if cash_type:
         cash_movements_qs = cash_movements_qs.filter(movement_type=cash_type)
     if cash_source:
         cash_movements_qs = cash_movements_qs.filter(source=cash_source)
+    if cash_activity_date:
+        cash_movements_qs = cash_movements_qs.filter(movement_date=cash_activity_date)
     if cash_search:
         cash_movements_qs = cash_movements_qs.filter(
             Q(label__icontains=cash_search)
@@ -504,6 +589,15 @@ def _manager_context(request, active_section="overview"):
                 profile for profile in staff_profiles_filtered
                 if profile.user_id not in payroll_entries_by_employee
             ]
+        elif salary_status == "payable":
+            staff_profiles_filtered = [
+                profile for profile in staff_profiles_filtered
+                if payroll_entries_by_employee.get(profile.user_id)
+                and payroll_entries_by_employee[profile.user_id].status in {
+                    PayrollEntry.STATUS_READY,
+                    PayrollEntry.STATUS_PARTIAL,
+                }
+            ]
         else:
             staff_profiles_filtered = [
                 profile for profile in staff_profiles_filtered
@@ -537,7 +631,12 @@ def _manager_context(request, active_section="overview"):
         "prepared": payroll_entries_qs.count(),
         "paid": sum(1 for entry in payroll_entries_qs if entry.status == PayrollEntry.STATUS_PAID),
         "partial": sum(1 for entry in payroll_entries_qs if entry.status == PayrollEntry.STATUS_PARTIAL),
+        "to_review": sum(1 for entry in payroll_entries_qs if entry.status == PayrollEntry.STATUS_DRAFT),
         "ready": sum(1 for entry in payroll_entries_qs if entry.status == PayrollEntry.STATUS_READY),
+        "payable": sum(
+            1 for entry in payroll_entries_qs
+            if entry.status in {PayrollEntry.STATUS_READY, PayrollEntry.STATUS_PARTIAL}
+        ),
         "due_total": payroll_total_due,
         "paid_total": payroll_total_paid,
         "remaining_total": payroll_remaining,
@@ -561,6 +660,15 @@ def _manager_context(request, active_section="overview"):
             teacher_profiles_filtered = [
                 profile for profile in teacher_profiles_filtered
                 if profile.user_id not in honorarium_entries_by_teacher
+            ]
+        elif honorarium_status == "payable":
+            teacher_profiles_filtered = [
+                profile for profile in teacher_profiles_filtered
+                if honorarium_entries_by_teacher.get(profile.user_id)
+                and honorarium_entries_by_teacher[profile.user_id].status in {
+                    TeacherHonorariumEntry.STATUS_READY,
+                    TeacherHonorariumEntry.STATUS_PARTIAL,
+                }
             ]
         else:
             teacher_profiles_filtered = [
@@ -594,7 +702,15 @@ def _manager_context(request, active_section="overview"):
         "prepared": honorarium_entries_qs.count(),
         "paid": sum(1 for entry in honorarium_entries_qs if entry.status == TeacherHonorariumEntry.STATUS_PAID),
         "partial": sum(1 for entry in honorarium_entries_qs if entry.status == TeacherHonorariumEntry.STATUS_PARTIAL),
+        "to_review": sum(1 for entry in honorarium_entries_qs if entry.status == TeacherHonorariumEntry.STATUS_DRAFT),
         "ready": sum(1 for entry in honorarium_entries_qs if entry.status == TeacherHonorariumEntry.STATUS_READY),
+        "payable": sum(
+            1 for entry in honorarium_entries_qs
+            if entry.status in {
+                TeacherHonorariumEntry.STATUS_READY,
+                TeacherHonorariumEntry.STATUS_PARTIAL,
+            }
+        ),
         "due_total": honorarium_total_due,
         "paid_total": honorarium_total_paid,
         "remaining_total": honorarium_remaining,
@@ -611,9 +727,77 @@ def _manager_context(request, active_section="overview"):
         branch_staff_user_ids=branch_staff_user_ids,
         branch_teacher_user_ids=branch_teacher_user_ids,
     )
+    daily_work_items = [
+        {
+            "label": "Candidatures à traiter",
+            "description": "Dossiers soumis ou en analyse",
+            "count": candidatures_pending,
+            "href": "?section=candidatures&view=to_process",
+            "icon": "file-check",
+            "tone": "primary",
+        },
+        {
+            "label": "Inscriptions à finaliser",
+            "description": "Créées, en attente ou partielles",
+            "count": inscriptions_to_finalize,
+            "href": "?section=inscriptions&view=pending",
+            "icon": "id-card",
+            "tone": "info",
+        },
+        {
+            "label": "Paiements à valider",
+            "description": "Justificatifs ou encaissements en attente",
+            "count": pending_payments,
+            "href": "?section=paiements&view=to_validate",
+            "icon": "circle-dollar-sign",
+            "tone": "success",
+        },
+        {
+            "label": "Dépenses à traiter",
+            "description": "Soumises ou approuvées, à suivre",
+            "count": expense_stats["submitted"] + expense_stats["approved"],
+            "href": "?section=depenses&view=to_approve",
+            "icon": "receipt-text",
+            "tone": "warning",
+        },
+        {
+            "label": "Salaires à payer",
+            "description": "Fiches disponibles ou paiements partiels",
+            "count": payroll_stats["payable"],
+            "href": "?section=salaires&view=to_pay",
+            "icon": "users-round",
+            "tone": "warning",
+        },
+        {
+            "label": "Honoraires à payer",
+            "description": "Fiches disponibles ou paiements partiels",
+            "count": honorarium_stats["payable"],
+            "href": "?section=honoraires&view=to_pay",
+            "icon": "graduation-cap",
+            "tone": "info",
+        },
+    ]
+    today_activity_count = (
+        base_candidatures.filter(reviewed_at__date=today).count()
+        + base_inscriptions.filter(Q(created_at__date=today) | Q(updated_at__date=today)).count()
+        + base_payments.filter(status=Payment.STATUS_VALIDATED, paid_at__date=today).count()
+        + BranchCashMovement.objects.filter(branch=branch, movement_date=today).count()
+        + BranchExpense.objects.filter(branch=branch, paid_at__date=today).count()
+    )
+    daily_work_pending_count = sum(item["count"] for item in daily_work_items)
     shop_context = {
         "shop_products": [],
+        "shop_catalogue_products": [],
+        "shop_counter_catalog": [],
         "shop_orders": [],
+        "shop_order_queues": {"pending": [], "paid": [], "ready": []},
+        "shop_recent_payments": [],
+        "shop_recent_stock_movements": [],
+        "shop_journal_query": "",
+        "shop_journal_date": "",
+        "shop_stock_query": "",
+        "shop_stock_state": "",
+        "shop_stock_category": "",
         "shop_stats": {
             "products": 0,
             "required": 0,
@@ -622,12 +806,21 @@ def _manager_context(request, active_section="overview"):
             "paid_not_delivered": 0,
             "ready_orders": 0,
             "month_sales": 0,
+            "today_sales": 0,
+            "today_sales_count": 0,
         },
         "shop_error": "",
     }
     if active_section == "boutique":
         try:
-            shop_context = get_manager_shop_context(branch)
+            shop_context = get_manager_shop_context(
+                branch,
+                journal_query=request.GET.get("shop_q", ""),
+                journal_date=request.GET.get("shop_date", ""),
+                stock_query=request.GET.get("shop_stock_q", ""),
+                stock_state=request.GET.get("shop_stock_state", ""),
+                stock_category=request.GET.get("shop_stock_category", ""),
+            )
             shop_context.setdefault("shop_error", "")
         except (ProgrammingError, OperationalError):
             shop_context["shop_error"] = (
@@ -735,6 +928,14 @@ def _manager_context(request, active_section="overview"):
         .order_by("-transfer_date", "-created_at"),
         param_name="transfer_page",
     )
+    cash_register_session = (
+        BranchCashRegisterSession.objects.filter(branch=branch, session_date=today)
+        .select_related("opened_by", "closed_by")
+        .first()
+    )
+    wallets = list(BranchWallet.objects.filter(branch=branch).order_by("-is_favorite", "name"))
+    for wallet in wallets:
+        wallet.current_balance = wallet_balance(wallet)
 
     return {
         "active_page": "manager",
@@ -746,6 +947,7 @@ def _manager_context(request, active_section="overview"):
         "inscriptions_this_month": inscriptions_this_month,
         "inscriptions_active": inscriptions_active,
         "inscriptions_with_balance": inscriptions_with_balance,
+        "inscriptions_to_finalize": inscriptions_to_finalize,
         "candidatures_pending": candidatures_pending,
         "candidatures_to_complete": candidatures_to_complete,
         "candidatures_accepted": candidatures_accepted,
@@ -781,10 +983,12 @@ def _manager_context(request, active_section="overview"):
         "candidature_stats": candidature_stats,
         "cand_status": cand_status,
         "cand_search": cand_search,
+        "cand_activity_date": cand_activity_date_value,
         "inscriptions": inscriptions_page,
         "inscription_stats": inscription_stats,
         "ins_status": ins_status,
         "ins_search": ins_search,
+        "ins_activity_date": ins_activity_date_value,
         "payments": payments_page,
         "payment_stats": payment_stats,
         "report_period": report_period,
@@ -812,10 +1016,22 @@ def _manager_context(request, active_section="overview"):
         "recent_financial_logs": recent_financial_logs,
         "period_summary": period_summary,
         "operational_flow": operational_flow,
+        "daily_work_items": daily_work_items,
+        "daily_work_pending_count": daily_work_pending_count,
+        "today_activity_count": today_activity_count,
         "cash_type": cash_type,
         "cash_source": cash_source,
         "cash_search": cash_search,
+        "cash_activity_date": cash_activity_date_value,
         "cash_form": BranchCashMovementForm(),
+        "cash_register_session": cash_register_session,
+        "cash_register_open_form": CashRegisterOpenForm(initial={"opening_amount": get_branch_cash_balance(branch)}),
+        "cash_register_close_form": CashRegisterCloseForm(initial={"counted_amount": get_branch_cash_balance(branch)}),
+        "wallets": wallets,
+        "favorite_wallets": [wallet for wallet in wallets if wallet.is_favorite and wallet.status == BranchWallet.STATUS_ACTIVE][:4],
+        "wallet_unallocated_balance": branch_unallocated_cash(branch),
+        "wallet_form": BranchWalletForm(),
+        "wallet_amount_form": WalletAmountForm(),
         "cash_sources": BranchCashMovement.SOURCE_CHOICES,
         "closure_form": BranchMonthlyClosureForm(initial={
             "period_month": payroll_month,
@@ -844,41 +1060,65 @@ def _manager_context(request, active_section="overview"):
         "donation_form": DonationForm(),
         "shop_product_form": ShopProductForm(),
         "shop_stock_form": ShopStockInForm(branch=branch),
+        "shop_stock_adjustment_form": ShopStockAdjustmentForm(branch=branch),
         "shop_counter_order_form": ShopCounterOrderForm(branch=branch),
         "shop_public_identifier": get_branch_public_shop_identifier(branch),
         **shop_context,
         "manager_search": quick_search,
         "quick_results": quick_results,
         "dashboard_type": "manager",
+        **reenrollment_context,
     }
 
 
 def _manager_navigation_groups(context, access, *, dashboard_url="", workspace_url=""):
     groups = [
         {
-            "label": "Pilotage",
+            "label": "Pilotage du jour",
             "items": [
-                {"key": "overview", "label": "Vue globale", "icon": "layout-dashboard"},
-                {"key": "candidatures", "label": "Candidatures", "icon": "file-check", "badge": context.get("candidatures_pending") or None},
-                {"key": "inscriptions", "label": "Inscriptions", "icon": "id-card"},
-                {"key": "paiements", "label": "Paiements", "icon": "credit-card", "badge": context.get("pending_payments") or None},
+                {"key": "overview", "label": "Travail du jour", "icon": "layout-dashboard"},
             ],
         },
         {
-            "label": "Exploitation",
+            "label": "Parcours étudiant",
             "items": [
-                {"key": "salaires", "label": "Salaires", "icon": "user-round-cog"},
-                {"key": "depenses", "label": "Depenses", "icon": "receipt"},
-                {"key": "boutique", "label": "Boutique", "icon": "store"},
-                {"key": "dons", "label": "Dons", "icon": "hand-heart"},
+                {"key": "candidatures", "label": "Candidatures", "icon": "file-check", "badge": context.get("candidatures_pending") or None},
+                {"key": "inscriptions", "label": "Inscriptions et échéances", "icon": "id-card", "badge": context.get("inscriptions_to_finalize") or None},
+                {"key": "reenrollment", "label": "Réinscriptions", "icon": "refresh-cw", "badge": (context.get("reenrollment_metrics") or {}).get("awaiting_payment") or None},
             ],
         },
         {
             "label": "Tresorerie",
             "items": [
-                {"key": "caisse", "label": "Caisse", "icon": "vault"},
-                {"key": "rapport", "label": "Rapports", "icon": "chart-no-axes-combined"},
-                {"key": "cloture", "label": "Cloture mensuelle", "icon": "lock"},
+                {"key": "paiements", "label": "Encaissements", "icon": "credit-card", "badge": context.get("pending_payments") or None},
+                {"key": "caisse", "label": "Caisse et mouvements", "icon": "vault"},
+            ],
+        },
+        {
+            "label": "Dépenses et logistique",
+            "items": [
+                {"key": "depenses", "label": "Dépenses", "icon": "receipt"},
+                {"key": "boutique", "label": "Boutique et stock", "icon": "store"},
+                {"key": "dons", "label": "Dons et appuis", "icon": "hand-heart"},
+            ],
+        },
+        {
+            "label": "Personnel et engagements",
+            "items": [
+                {"key": "salaires", "label": "Salaires du personnel", "icon": "user-round-cog"},
+                {"key": "honoraires", "label": "Honoraires enseignants", "icon": "graduation-cap"},
+            ],
+        },
+        {
+            "label": "Contrôle, rapports et clôture",
+            "items": [
+                {"key": "cloture", "label": "Clôture mensuelle", "icon": "lock"},
+                {"key": "rapport", "label": "Rapports et archives", "icon": "chart-no-axes-combined"},
+            ],
+        },
+        {
+            "label": "Compte",
+            "items": [
                 {"key": "settings", "label": "Mon compte", "icon": "user-cog"},
             ],
         },
@@ -904,17 +1144,35 @@ def _manager_navigation_groups(context, access, *, dashboard_url="", workspace_u
         if items:
             filtered_groups.append({"label": group["label"], "items": items})
 
-    if access.can("view_reenrollment_finance"):
+    if workspace_url:
+        # Espace personnel : messagerie interne et salaire via les endpoints
+        # génériques staff, échangés dans le workspace gestionnaire.
         filtered_groups.append(
             {
-                "label": "Parcours",
+                "label": "Espace personnel",
                 "items": [
                     {
-                        "key": "reenrollment",
-                        "label": "Passages et reinscriptions",
-                        "icon": "refresh-cw",
-                        "url": reverse("accounts_portal:reenrollment_workspace"),
-                    }
+                        "key": "messagerie",
+                        "label": "Messagerie",
+                        "icon": "mail",
+                        "url": dashboard_url,
+                        "hx_get": f"{reverse('accounts_portal:staff_messaging')}?dash=manager",
+                        "hx_target": "#manager-workspace",
+                        "hx_swap": "innerHTML",
+                        "hx_push_url": dashboard_url,
+                        "hx_indicator": "#manager-loading",
+                    },
+                    {
+                        "key": "mon-salaire",
+                        "label": "Mon salaire",
+                        "icon": "wallet",
+                        "url": dashboard_url,
+                        "hx_get": f"{reverse('accounts_portal:staff_salary')}?dash=manager",
+                        "hx_target": "#manager-workspace",
+                        "hx_swap": "innerHTML",
+                        "hx_push_url": dashboard_url,
+                        "hx_indicator": "#manager-loading",
+                    },
                 ],
             }
         )
@@ -950,8 +1208,14 @@ def _render_manager_dashboard(
         forced_subview if forced_subview is not None else request.GET.get("view")
     )
     role_default_subview = {
-        "paiements": "payments" if finance_context else "overview",
-        "candidatures": "list" if admissions_context else "overview",
+        "paiements": "payments" if finance_context else "to_validate",
+        "candidatures": "list" if admissions_context else "to_process",
+        "inscriptions": "pending",
+        "reenrollment": "overview",
+        "depenses": "to_approve",
+        "salaires": "to_validate",
+        "honoraires": "to_validate",
+        "boutique": "sell",
     }.get(active_section, "overview")
     active_subview = normalize_manager_subview(
         active_section,

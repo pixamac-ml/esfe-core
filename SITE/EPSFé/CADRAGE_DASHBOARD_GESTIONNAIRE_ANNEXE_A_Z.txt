@@ -1,0 +1,788 @@
+CADRAGE FONCTIONNEL — DASHBOARD GESTIONNAIRE D'ANNEXE
+ESFE / EPSFé
+Document de travail pour validation avant implementation
+
+
+0. DECISION DIRECTRICE
+---------------------
+
+Le Gestionnaire d'annexe n'est ni un second Directeur des Etudes, ni un
+secretaire, ni un administrateur informatique. C'est le responsable local de
+l'execution administrative, financiere et logistique de SON annexe.
+
+Son tableau de bord doit donc repondre a une question simple :
+
+    « Que dois-je controler, faire valider, payer ou justifier aujourd'hui
+    pour que l'annexe fonctionne correctement ? »
+
+La simplification ne signifie pas retirer les controles. Elle signifie mettre
+un meme dossier et un meme flux au meme endroit, avec des sous-sections
+naturelles, plutot que dupliquer les informations dans plusieurs ecrans.
+
+
+1. SOURCES UTILISEES POUR CE CADRAGE
+------------------------------------
+
+- Code de deontologie et d'ethique EPSFé : responsabilite, confidentialite,
+  tracabilite et bonne administration.
+- Reglement interieur EPSFé : inscription, carte, assiduite, discipline et
+  obligations de l'etablissement.
+- Charte des examens EPSFé : le Gestionnaire ne modifie ni notes ni decisions
+  pedagogiques ; il facilite uniquement les moyens administratifs et
+  logistiques necessaires.
+- Procedure de recrutement des enseignants : separation claire entre besoin,
+  evaluation pedagogique, choix/validation et suivi administratif.
+- Charte de stage, grille de stage et procedure de reclamations : besoins
+  logistiques, preuves, suivi et archivage, sans confondre les responsables
+  pedagogiques et financiers.
+- Rapports d'activites, fichiers d'effectifs et outils de planification : les
+  indicateurs doivent etre fiables, periodiques et exploitables par la DG.
+
+ATTENTION : les documents classes A_VERIFIER, les modeles et les procedures
+« type » sont des references de travail. Ils ne deviennent pas une regle
+institutionnelle definitive sans validation DG.
+
+
+2. MANDAT COMPLET DU GESTIONNAIRE D'ANNEXE
+------------------------------------------
+
+Le Gestionnaire pilote, dans les limites de son annexe :
+
+1) Le parcours administratif et financier de l'etudiant
+   - visualiser la candidature et le dossier acceptee ;
+   - suivre l'inscription, les pieces et l'echeancier ;
+   - encaisser ou controler les paiements selon ses permissions ;
+   - remettre les recus et suivre les impayes ;
+   - ne pas prendre une decision pedagogique d'admission a la place du
+     service Admissions/Secretariat/DE.
+
+2) La tresorerie locale
+   - ouvrir et suivre les sessions espece ;
+   - controler les entrees, sorties, justificatifs et ecarts ;
+   - preparer les versements bancaires ;
+   - effectuer la cloture mensuelle sans supprimer l'historique ;
+   - produire les pieces et rapports de son annexe.
+
+3) Les depenses, achats et appuis
+   - enregistrer une demande ou une depense avec motif, beneficiaire,
+     montant, piece et statut ;
+   - suivre son approbation, son paiement et son archivage ;
+   - tracer distinctement les dons/appuis financiers ou en nature ;
+   - suivre la boutique et son stock lorsqu'elle existe dans l'annexe.
+
+4) Les engagements envers le personnel
+   - verifier les fiches de salaires du personnel, generees automatiquement
+     par le systeme ;
+   - verifier les honoraires enseignants, calcules a partir des heures
+     validees et du tarif ;
+   - corriger uniquement les donnees autorisees, valider, payer et archiver ;
+   - ne jamais creer manuellement une paie ou des honoraires pour contourner
+     les mecanismes automatiques.
+
+5) La logistique locale
+   - suivre besoins, achats, stock, fournitures et demandes de fonctionnement ;
+   - contribuer aux moyens des examens, stages et activites ;
+   - remonter une anomalie ou une demande a la personne competente.
+
+6) Le pilotage et le reporting
+   - consulter les alertes operationnelles ;
+   - produire les rapports journalier, hebdomadaire, mensuel ou personnalise ;
+   - preparer les elements de cloture et les archives consultables ;
+   - communiquer avec les services concernes via la messagerie commune.
+
+
+3. CE QUE LE GESTIONNAIRE NE DOIT PAS FAIRE
+-------------------------------------------
+
+- Voir, modifier ou payer des donnees d'une autre annexe.
+- Modifier les notes, moyennes, decisions de jury, rattrapages, programmes,
+  emplois du temps ou evaluations pedagogiques.
+- Creer manuellement les salaires du personnel ou les honoraires enseignants.
+- Valider seul une depense ou une correction qui exige une approbation DG/DGA.
+- Supprimer une operation financiere, une cloture ou une preuve : toute
+  correction doit etre tracee par une operation prevue par le workflow.
+- Gerer les comptes, roles, mots de passe, imports techniques ou regles
+  systeme : cela releve de l'Informaticien.
+- Se substituer au Secretariat pour l'accueil, aux Admissions pour l'analyse
+  documentaire ou au DE pour les decisions academiques.
+
+
+4. CADENCE DE TRAVAIL ATTENDUE
+------------------------------
+
+QUOTIDIEN
+- verifier les alertes, les paiements en attente et les sessions de caisse ;
+- traiter les justifications et les recus ;
+- suivre les depenses urgentes et la disponibilite de caisse ;
+- repondre aux demandes utiles dans la messagerie partagee.
+
+HEBDOMADAIRE
+- controler les impayes, les depenses en attente et les ecarts de caisse ;
+- verifier les besoins logistiques avec Secretariat, Surveillant et DE ;
+- transmettre un point de situation quand une anomalie le justifie.
+
+MENSUEL
+- verifier salaires et honoraires auto-generes ;
+- preparer le versement bancaire ;
+- lancer les controles de cloture sans perte d'historique ;
+- produire le rapport financier et les archives de la periode.
+
+
+5. AUDIT DU DASHBOARD EXISTANT
+------------------------------
+
+Le dashboard actuel utilise correctement le shell certifie commun et filtre
+les donnees par annexe dans ses querysets. Il possede deja ces sections :
+
+Pilotage : Vue globale, Candidatures, Inscriptions, Paiements.
+Exploitation : Salaires, Depenses, Boutique, Dons.
+Tresorerie : Caisse, Rapports, Cloture mensuelle, Mon compte.
+Parcours : Passages et reinscriptions (si permission).
+
+Il existe egalement des sous-onglets. C'est une bonne base, mais la structure
+est encore trop decoupee pour le travail quotidien :
+
+- Candidatures et Inscriptions sont deux etapes successives d'un seul
+  parcours etudiant.
+- Paiements et Caisse montrent deux angles d'un meme circuit d'encaissement.
+- Rapports, Caisse et Cloture reutilisent les memes chiffres financiers sous
+  trois entrees principales differentes.
+- Salaires et Honoraires sont separes : les honoraires se trouvent aujourd'hui
+  dans « Cloture mensuelle », ce qui est difficile a comprendre.
+- La Vue globale reutilise des actions et des chiffres egalement disponibles
+  dans les sections detaillees ; elle doit devenir une veritable liste de
+  priorites, pas une seconde version de toutes les sections.
+- Les boutons « Voir la caisse » / « Rapport financier » sont utiles, mais
+  ils signalent que l'architecture elle-meme doit rapprocher ces objets.
+
+POINT TECHNIQUE IMPORTANT
+Le dashboard propose deja une navigation HTMX par section et sous-section,
+des composants UI partages, des filtres, pagination, pieces de caisse,
+exports, modales/drawers et controles de permission. La recommandation est de
+recomposer cette navigation en reutilisant ces flux existants, PAS de les
+reecrire ni de creer un nouveau shell.
+
+
+6. DECISION PAR FONCTION EXISTANTE
+----------------------------------
+
+A CONSERVER TEL QUEL, EN SECURISANT LES DONNEES
+
+- Filtrage strict par annexe sur toutes les lectures et ecritures.
+- Shell certifie commun, navigation HTMX et composants de la bibliotheque UI.
+- Sessions espece, recus/pieces, traces financiers et rapprochement de caisse.
+- Generation automatique des fiches de salaires et d'honoraires.
+- Exports Excel/PDF et archives de cloture.
+- Boutique, dons et reinscriptions lorsqu'ils sont reellement actifs dans
+  l'annexe et autorises pour ce profil.
+- « Mon compte » et Messagerie comme services communs, non comme modules
+  metier du Gestionnaire.
+
+A FUSIONNER DANS UNE MEME SECTION RACINE
+
+- Candidatures + Inscriptions + echeances de paiement
+  => PARCOURS ETUDIANT.
+
+- Paiements + Sessions especes + Caisse + versements bancaires
+  => TRESORERIE.
+
+- Salaires du personnel + Honoraires enseignants
+  => PERSONNEL ET ENGAGEMENTS.
+  Les deux circuits restent juridiquement et metierement separes a l'interieur
+  de cette section. Ils ne doivent jamais etre additionnes ou melanges.
+
+- Rapports + Clotures + Archives
+  => CONTROLE ET CLOTURE.
+  Les rapports deviennent une vue de lecture/export ; la cloture conserve son
+  workflow protege ; les archives restent consultables.
+
+A GARDER SEPARE
+
+- Depenses et achats : circuit de sortie avec approbation, preuve et paiement.
+- Boutique et stock : uniquement si l'annexe exploite effectivement ce canal.
+- Dons/appuis : objet distinct des droits d'inscription et des recettes de
+  boutique, avec source, nature, affectation et preuve.
+
+A RETIRER DU TABLEAU DE BORD PRINCIPAL (SANS SUPPRIMER LE SYSTEME)
+
+- Les grosses cartes et resume redondants dans chaque sous-section.
+- Les statistiques pedagogiques qui appartiennent au DE.
+- Les actions techniques Informaticien et les parametrages globaux.
+- Toute « notification » en double : la messagerie commune reste le seul
+  centre de messages et notifications. Le dashboard ne montre que les actions
+  urgentes qui ont une consequence operationnelle.
+
+
+7. ARCHITECTURE CIBLE SIMPLE ET PUISSANTE
+-----------------------------------------
+
+Navigation principale recommandee (6 entrees metier maximum) :
+
+1. PILOTAGE DU JOUR
+   Sous-sections : Priorites | Situation du jour | Alertes | Taches recentes
+   But : savoir quoi faire maintenant, pas consulter toutes les donnees.
+
+2. PARCOURS ETUDIANT
+   Sous-sections : A traiter | Candidatures | Inscriptions | Soldes et echeances
+   Une recherche unique : nom, matricule, telephone, email, reference dossier.
+   Chaque fiche etudiant affiche une chronologie compacte : candidature,
+   dossier, inscription, paiements, solde, recus. Aucune decision academique
+   non autorisee ne doit etre exposee comme action du Gestionnaire.
+
+3. TRESORERIE
+   Sous-sections : Encaissements | Sessions espece | Caisse et mouvements |
+   Versements bancaires.
+   Les chiffres clefs sont uniques : encaisse aujourd'hui, disponible caisse,
+   a justifier, a verser. Les details restent accessibles sans repeter les KPI.
+
+4. DEPENSES ET LOGISTIQUE
+   Sous-sections : Demandes et depenses | A approuver | Payees | Achats/stock |
+   Boutique (si active) | Dons et appuis (si active).
+   Les sous-sections optionnelles sont masquees si l'annexe ne les utilise pas.
+
+5. PERSONNEL ET ENGAGEMENTS
+   Sous-sections : Salaires personnel | Honoraires enseignants | A verifier |
+   A payer | Historique.
+   Une indication explicite rappelle que les fiches sont preparees
+   automatiquement et que les deux circuits ne se melangent jamais.
+
+6. CONTROLE, RAPPORTS ET CLOTURE
+   Sous-sections : Tableau de periode | Exports | Cloture en cours |
+   Versements et archives.
+   La cloture est une action protegee, avec controles prealables, validation,
+   trace et consultation ulterieure ; elle ne reinitialise ni ne supprime
+   l'historique.
+
+Services globaux hors navigation metier : Recherche, Messagerie, Profil,
+Help/manuel. Ils sont fournis par le shell certifie et ne doivent pas creer
+de cartes ou sous-sections redondantes.
+
+
+8. REGLES UX A APPLIQUER PARTOUT
+--------------------------------
+
+- Une section = une intention claire ; les sous-sections sont les etapes
+  naturelles de ce meme travail.
+- Une fiche detaillee s'ouvre dans le drawer certifie existant, pas dans une
+  nouvelle page qui fait perdre le contexte.
+- Une table longue a toujours : recherche, filtres utiles, etat, pagination,
+  compteur et action principale clairement visible.
+- Les actions destructives ou financieres sensibles demandent confirmation et
+  affichent un resultat trace ; les actions ordinaires ne doivent pas etre
+  noyees sous des modales inutiles.
+- Les alertes de Pilotage sont actionnables : « 7 paiements a verifier » ouvre
+  directement Tresorerie > Encaissements > A verifier.
+- Ne pas reproduire le meme montant dans Pilotage, Paiements, Caisse et
+  Rapports. Pilotage expose seulement les quatre a six chiffres decisifs.
+- Chaque chiffre indique sa periode et sa source : aujourd'hui, mois en cours,
+  periode choisie, ou historique.
+- Mobile/tablette : consultation et validation simples. Desktop : tables,
+  recherches et traitement de lots. Aucune table ne doit faire defiler le shell
+  horizontalement.
+
+
+9. FRONTIERES ENTRE ROLES (REPARTITION PRATIQUE)
+------------------------------------------------
+
+SECRETARIAT / ADMISSIONS
+- recoit, complete et suit le dossier administratif ;
+- transmet le dossier eligible au parcours d'inscription ;
+- le Gestionnaire consulte le statut et agit sur la partie financiere autorisee.
+
+DIRECTEUR DES ETUDES
+- programmes, calendrier, enseignants, evaluation, notes, deliberation,
+  rattrapage, decisions academiques ;
+- transmet les heures validees, besoins et elements necessaires aux honoraires.
+
+SURVEILLANT GENERAL
+- assiduite, discipline, salles, securite et incidents ;
+- transmet les besoins ou incidents a incidence logistique/financiere.
+
+GESTIONNAIRE D'ANNEXE
+- execution, controle, preuves, caisse, depenses, engagements, rapports de
+  son annexe.
+
+INFORMATICIEN
+- comptes, roles, cartes, imports, support technique, audit systeme ;
+- ne valide pas une depense ou une caisse a la place du Gestionnaire.
+
+DG / DGA
+- gouvernance, approbations reservees, vision inter-annexes, arbitrages et
+  controle final. Le Gestionnaire ne voit que sa propre annexe.
+
+
+10. CONTROLES NON NEGOCIABLES
+-----------------------------
+
+1) Annexe : chaque queryset, fichier telecharge, export, action HTMX et
+   ecriture doit porter et verifier l'annexe de l'utilisateur.
+
+2) Argent : aucune sortie sans motif, montant, auteur, date, statut et piece
+   si celle-ci est requise. Les corrections ne suppriment pas le passe.
+
+3) Salaires/honoraires : source automatique, verification, validation, paiement
+   et archive. Les heures enseignants valides sont la source des honoraires.
+
+4) Cloture : controle des mouvements, versements, engagements et ecarts avant
+   cloture ; archive consultable ensuite ; aucune destruction de donnees.
+
+5) Documents : recus, justificatifs, bordereaux et exports doivent etre lies
+   a l'operation et accessibles aux personnes autorisees uniquement.
+
+6) Audit : les actions sensibles doivent conserver qui, quand, quoi, avant/apres
+   lorsque cela est applicable, et la reference de l'operation.
+
+
+11. INDICATEURS UTILES (PAS DECORATIFS)
+----------------------------------------
+
+PILOTAGE DU JOUR
+- encaissements aujourd'hui ;
+- caisse disponible ;
+- paiements / justificatifs a verifier ;
+- depenses a approuver ou payer ;
+- fiches salaire/honoraires a verifier ;
+- ecarts ou sessions de caisse ouvertes.
+
+PARCOURS ETUDIANT
+- dossiers a completer ;
+- inscriptions en attente de paiement ;
+- impayes / soldes echus ;
+- taux de collecte de la periode.
+
+CONTROLE MENSUEL
+- recettes par source ;
+- charges par categorie ;
+- salaires et honoraires distincts ;
+- dons/appuis distincts ;
+- versements bancaires ;
+- resultat net et engagements restants.
+
+Les effectifs, reussite, rattrapages, qualite des enseignements et stages sont
+des indicateurs de gouvernance ou pedagogiques : le Gestionnaire peut les
+consulter si necessaire a la logistique, mais ils ne doivent pas encombrer son
+pilotage financier quotidien.
+
+
+12. PLAN D'IMPLEMENTATION PROPOSE (SANS REECRIRE LE METIER)
+------------------------------------------------------------
+
+ETAPE 1 — VALIDER CE CADRAGE AVEC LA DG
+Valider les limites de role, les approbations, le statut de Boutique/Dons,
+les seuils de controle et les indicateurs officiels.
+
+ETAPE 2 — RECOMPOSER LA NAVIGATION
+Conserver les URLs, vues, permissions et services existants. Changer seulement
+les entrees et sous-sections visibles afin de presenter les six domaines
+cibles. Prevoir les redirections de compatibilite pour les anciennes URLs.
+
+ETAPE 3 — SIMPLIFIER LE PILOTAGE
+Transformer la Vue globale en priorites, indicateurs uniques et raccourcis
+contextuels. Retirer les cartes qui repettent les tableaux metier.
+
+ETAPE 4 — UNIFIER LES ESPACES
+Regrouper les fragments existants dans Parcours etudiant, Tresorerie,
+Personnel et Controle/Cloture sans modifier leurs regles metier. Les actions
+restent les endpoints actuels apres verification de permission.
+
+ETAPE 5 — AUDIT DES CAS SENSIBLES
+Tester par annexe : paiement, correction, session espece, depense, versement,
+paie, honoraires, cloture, export et acces refuse hors perimetre.
+
+ETAPE 6 — POLISSAGE FINAL
+Uniformiser drawers, filtres, tables, etats vides, erreurs et actions de la
+bibliotheque UI. Aucune nouvelle modal ou copie de composant si un composant
+certifie existe deja.
+
+
+13. DECISIONS A PRENDRE AVANT LE CODAGE
+---------------------------------------
+
+1) Boutique : est-elle active dans toutes les annexes, certaines annexes, ou
+   seulement une phase future ?
+
+2) Dons/appuis : qui peut creer, approuver et consulter un don ? Comment les
+   dons en nature sont-ils evalues et justifies ?
+
+3) Depenses : quels seuils exigent une approbation DG/DGA et quelles pieces
+   sont obligatoires selon la nature de la depense ?
+
+4) Versements bancaires : qui enregistre, qui controle et qui valide le
+   bordereau ?
+
+5) Parcours etudiant : le Gestionnaire peut-il seulement suivre la candidature
+   acceptee ou aussi agir sur certains dossiers administratifs ?
+
+6) Logistique : faut-il un registre de stock/fournitures centralise ou la
+   Boutique couvre-t-elle deja ce besoin ?
+
+7) Rapports : quels formats et destinataires sont officiels (journalier,
+   hebdomadaire, mensuel, DG, annexes) ?
+
+
+14. CONCLUSION
+--------------
+
+La base technique du dashboard Gestionnaire est saine : shell certifie,
+permissions par profil, perimetre d'annexe, fragments HTMX, composants UI et
+workflows financiers existent deja. Le chantier prioritaire n'est donc pas de
+reconstruire le systeme : c'est de rendre son architecture lisible.
+
+La cible est un Gestionnaire qui travaille dans six espaces coherents,
+retrouve chaque operation une seule fois, garde les controles d'audit, et ne
+marche jamais sur les responsabilites du Secretariat, du DE, de
+l'Informaticien ou de la DG.
+
+
+15. ARBITRAGE APRES RECADRAGE METIER — FORMULE UNIQUE RETENUE
+--------------------------------------------------------------
+
+L'ajout au present document confirme le fond du cadrage et precise trois
+points qui doivent guider le chantier :
+
+1) ADMISSIONS
+La Gestionnaire d'annexe est bien l'operatrice des candidatures de SON annexe.
+Elle consulte le dossier, controle les pieces, demande les complements et
+accepte/refuse/valide dans les limites du workflow autorise. Cette competence
+existe deja dans le contrat d'acces du dashboard. Il ne faut donc pas la
+retirer au motif qu'elle ne decide pas du pedagogique.
+
+La frontiere corrigee est la suivante :
+- Gestionnaire : dossier administratif, statut de candidature, inscription,
+  echeancier et suivi financier ;
+- DE : programme, classe, pedagogie, notes, jury, decisions academiques ;
+- DG/DGA : validations superieures et exceptions prevues par le workflow.
+
+La cible fonctionnelle n'est donc pas une suppression de Candidatures et
+Inscriptions : c'est leur presentation sous une entree unique « Parcours
+etudiant », avec les sous-sections Candidatures, Dossiers a completer,
+Inscriptions et Soldes/echeances.
+
+2) TRESORERIE
+Le principe de la grande caisse de l'annexe est retenu. Les paiements
+etudiants en espece, depenses, salaires, honoraires, boutique, dons et
+versements bancaires alimentent deja ou debitent un journal de caisse unique
+et trace. Le systeme dispose deja de controles contre une caisse negative,
+de pieces de caisse, de rapprochements et de blocages de cloture en cas
+d'anomalie.
+
+Les sous-caisses/affectations internes (informatique, boutique,
+fonctionnement, activites...) sont une bonne orientation, mais ne doivent PAS
+etre simulees par de simples libelles ou filtres : le modele actuel de
+mouvement porte l'annexe, le type, la source, le montant et la reference ; il
+ne porte pas encore une caisse interne ni un transfert entre caisses.
+
+Decision de feuille de route :
+- Phase 1 : consolider et presenter proprement la grande caisse existante ;
+- Phase 2 : ajouter, seulement apres validation DG, un vrai sous-systeme de
+  caisses internes avec affectation, transferts, responsables, soldes,
+  permissions, pieces et audit. Cette phase implique une migration, des tests
+  et des controles de solde : elle ne doit pas etre cachee dans une retouche UI.
+
+3) PAIE ET HONORAIRES
+Les deux circuits existent et sont deja distincts. Une fiche de paie contient
+base, indemnites, retenues, avances, montant paye et statut. Un honoraire
+utilise heures validees x tarif, ajustements, retenues, avances et montant
+paye. Les paiements sont bloques si la caisse est insuffisante et sont traces.
+
+La V1 doit conserver ce mecanisme. Les retenues INPS ou autres ne doivent pas
+etre « calculees » par une formule figee dans l'interface. Avant toute
+automatisation supplementaire, la DG/RH doit valider les parametres applicables
+(taux, assiette, employeur/salarie, exceptions, date d'effet). Le chantier UI
+affichera les composantes deja calculees ; un futur chantier de parametrage
+paie pourra les rendre configurables proprement.
+
+4) PAIEMENTS ET REMISES
+La V1 affiche et optimise d'abord l'espece, qui est le moyen reellement
+operationnel. Le modele metier doit rester extensible pour accueillir d'autres
+canaux plus tard, mais l'interface ne doit pas afficher de faux moyens de
+paiement non actifs.
+
+Les remises restent produites par le mecanisme autorise par la DG. La
+Gestionnaire applique une remise valide et tracee ; elle ne cree ni ne modifie
+librement une remise.
+
+5) RAPPORT ET CLOTURE
+Le rapport PDF/Excel et la cloture existent deja. La cible est de les rendre
+un seul parcours lisible : controles prealables -> tableau de periode ->
+versement bancaire eventuel -> validation/cloture -> archive -> rapport DG.
+Le rapport mensuel officiel doit presenter, pour une periode et une annexe :
+recettes par source, depenses par categorie, salaires, honoraires, retenues
+si elles sont parametrees, dons/appuis, versements, solde d'ouverture et de
+cloture, impayes/engagements et anomalies. Aucun element ne doit etre invente
+si sa source n'est pas encore fiable dans les donnees.
+
+
+16. FEUILLE DE ROUTE UNIQUE AVANT ET PENDANT LE CHANTIER
+--------------------------------------------------------
+
+PRINCIPE
+On ne reconstruit pas le dashboard. On conserve son shell certifie, ses URLs,
+ses vues, ses permissions, ses modeles, ses endpoints HTMX et ses composants
+UI. On audite chaque flux, corrige les ecarts reels et recompose la navigation
+pour qu'elle represente le travail quotidien.
+
+PHASE A — AUDIT DE VERITE (A FAIRE EN PREMIER)
+
+A1. Admissions : deposer, ouvrir, completer, accepter/refuser, valider,
+    transformer en inscription et tester le verrouillage apres validation.
+A2. Paiement espece : encaisser, generer le recu, verifier le solde, tenter
+    une correction et verifier l'autorisation superieure.
+A3. Tresorerie : entrer une sortie justifiee, tenter une sortie superieure au
+    solde, verifier mouvement et piece de caisse, verifier versement bancaire.
+A4. Personnel : verifier l'auto-generation, le calcul, le paiement partiel,
+    le blocage de double paiement et l'impact caisse pour salaire/honoraire.
+A5. Cloture : provoquer une anomalie, verifier le blocage, regulariser,
+    cloturer, consulter archive et exporter PDF/Excel.
+
+Sortie de phase A : une matrice « fonctionnalite / endpoint / permission /
+donnee source / resultat attendu / ecart » ; aucun changement d'interface ne
+masque un ecart metier non resolu.
+
+PHASE B — NAVIGATION ET HIERARCHIE
+
+B1. Conserver les flux, mais remplacer les entrees racines actuelles par :
+    Pilotage du jour ; Parcours etudiant ; Tresorerie ; Depenses et
+    Logistique ; Personnel et engagements ; Controle, rapports et cloture.
+B2. Installer les sous-sections citees au chapitre 7, en mappant chaque
+    onglet vers les fragments existants. Les anciennes URLs restent
+    compatibles/redirigees.
+B3. Rattacher Honoraires a Personnel et engagements, sans le melanger aux
+    salaires. Rattacher Rapports et Archives a Controle/Cloture, sans retirer
+    les actions protegees de cloture.
+B4. Supprimer de la vue globale les repetitions et garder seulement les
+    priorites actionnables et les indicateurs du jour.
+
+PHASE C — FICHES, TABLES ET COMPONENTS CERTIFIES
+
+C1. Une recherche de parcours etudiant unique et une fiche detaillee dans le
+    drawer certifie : dossier -> inscription -> echeances -> paiements -> recus.
+C2. Tables compactes, filtres limites aux decisions utiles, pagination,
+    statuts coherents et liens directs depuis les alertes.
+C3. Une meme action ne doit apparaitre qu'a un endroit principal ; les liens
+    secondaires dirigent vers ce meme flux, sans dupliquer formulaires ni
+    endpoints.
+C4. Boutique et Dons sont visibles seulement lorsque ces activites sont
+    autorisees et actives dans l'annexe.
+
+PHASE D — EVOLUTIONS METIER VALIDEES SEPAREMENT
+
+D1. Sous-caisses/affectations internes : modele, migration, transferts,
+    reconciliations, permissions et tests dedies.
+D2. Parametrage officiel des retenues de paie : decision DG/RH puis modele
+    versionne, date d'effet, affichage de la composition et tests.
+D3. Nouveaux moyens de paiement : actives progressivement par configuration,
+    jamais par boutons decoratifs.
+
+PHASE E — RECETTE DE PRODUCTION
+
+E1. Verifier toutes les ecritures et tous les fichiers d'une annexe contre
+    un utilisateur d'une autre annexe : acces refuse obligatoire.
+E2. Verifier les permissions Gestionnaire, Finance, Agent de paiement,
+    Admissions et DG/DGA.
+E3. Executer les tests existants de workflows Gestionnaire, les tests cibles
+    ajoutes pour les ecarts corriges, puis Django check avec les settings de
+    test locaux.
+E4. Faire une recette humaine sur une annexe test avec un cycle complet du
+    dossier candidat au rapport mensuel.
+
+
+17. ORDRE D'EXECUTION RECOMMANDE
+--------------------------------
+
+1. Valider cette formule unique avec vous et les decisions DG encore ouvertes.
+2. Auditer les flux existants de la phase A et produire les ecarts reels.
+3. Corriger les ecarts metier prioritaires sans retouche visuelle cosmetique.
+4. Recomposer la navigation et les sous-sections avec les composants existants.
+5. Polir les fiches, tables, drawers et alertes.
+6. Traiter les sous-caisses et le parametrage paie comme chantiers distincts,
+   si et seulement si leur regle institutionnelle est validee.
+7. Recette complete et stabilisation.
+
+Cette formule concilie les deux orientations : elle preserve le dashboard deja
+construit et ses automatismes, tout en le mettant au service du fonctionnement
+reel d'une Gestionnaire d'annexe. Elle evite surtout de confondre une
+amelioration de navigation avec une evolution comptable qui exigerait des
+modeles, migrations et controles nouveaux.
+
+
+
+
+# Recadrage métier — Gestionnaire d’annexe
+
+Le dashboard Gestionnaire est déjà largement construit. **Il ne faut pas le reconstruire ni changer son architecture générale sans nécessité.** Le travail consiste maintenant à fiabiliser les workflows existants pour qu'ils correspondent exactement au fonctionnement réel d'une Gestionnaire d'annexe.
+
+## 1. Admissions et inscriptions
+
+La Gestionnaire est responsable du traitement opérationnel des dossiers de candidature de son annexe.
+
+Elle doit pouvoir :
+
+* recevoir et consulter les candidatures déposées en ligne ;
+* ouvrir le dossier complet du candidat ;
+* contrôler les informations et les pièces fournies ;
+* demander une correction ou un complément lorsque le dossier est incomplet ;
+* accepter ou refuser le dossier selon le workflow prévu ;
+* valider définitivement un dossier lorsque toutes les conditions sont réunies.
+
+Une fois le dossier validé, **le système doit poursuivre automatiquement le processus d'inscription prévu**, sans obliger la Gestionnaire à recréer manuellement les informations du candidat.
+
+En revanche, une inscription déjà validée ne doit pas pouvoir être modifiée librement.
+
+Toute modification sensible après validation doit passer par le workflow d'autorisation prévu, avec validation supérieure si nécessaire et traçabilité complète.
+
+## 2. Paiements étudiants
+
+Pour la V1, le moyen de paiement réellement opérationnel est principalement **l'espèce**.
+
+La Gestionnaire :
+
+* enregistre ou valide l'encaissement ;
+* rattache obligatoirement le paiement à l'étudiant et à l'échéance concernée ;
+* remet le reçu généré par le système ;
+* consulte le montant attendu, payé et restant ;
+* suit les impayés et échéances.
+
+Les autres moyens de paiement seront intégrés progressivement sans modifier la logique comptable centrale.
+
+Les **remises** ne sont pas créées librement par la Gestionnaire. Elles proviennent du mécanisme autorisé par la DG. La Gestionnaire applique uniquement les remises valides auxquelles elle a accès.
+
+## 3. Trésorerie et caisses
+
+La Gestionnaire est responsable de toute la trésorerie de son annexe.
+
+Le système doit distinguer :
+
+**Grande caisse de l'annexe**
+
+* totalité des entrées ;
+* totalité des sorties ;
+* solde réel disponible.
+
+**Caisses / affectations internes**
+
+* salle informatique ;
+* boutique ;
+* fonctionnement ;
+* activités particulières ;
+* ou toute autre caisse interne autorisée.
+
+Ces sous-caisses permettent de savoir **où l'argent est affecté et utilisé**, mais elles restent rattachées à la trésorerie globale de l'annexe.
+
+Toute entrée ou sortie doit donc avoir au minimum :
+
+* montant ;
+* catégorie ;
+* caisse/source ;
+* motif ;
+* date ;
+* auteur ;
+* bénéficiaire si nécessaire ;
+* justificatif lorsque requis ;
+* référence de l'opération.
+
+Aucune suppression silencieuse d'une opération financière ne doit être possible.
+
+## 4. Dépenses et fonctionnement
+
+La Gestionnaire prend en charge les dépenses nécessaires au fonctionnement de l'annexe :
+
+* loyers ;
+* matériel et équipements ;
+* réparations ;
+* fournitures ;
+* achats ;
+* charges de fonctionnement ;
+* dépenses liées aux salles ou services ;
+* autres dépenses autorisées.
+
+Chaque dépense doit entrer dans la trésorerie comme une **sortie identifiable, justifiée et traçable**.
+
+Les dépenses nécessitant une autorisation supérieure doivent conserver le workflow DG/DGA prévu.
+
+## 5. Salaires du personnel
+
+La Gestionnaire assure le paiement des salariés de son annexe.
+
+Le système doit gérer clairement :
+
+**Salaire brut → retenues/prélèvements → autres éléments éventuels → salaire net à payer.**
+
+Les prélèvements, notamment ceux liés à l'INPS ou aux règles de paie configurées, ne doivent pas être codés arbitrairement dans l'interface.
+
+Ils doivent provenir du paramétrage prévu afin de pouvoir évoluer.
+
+La Gestionnaire contrôle la fiche préparée par le système, effectue le paiement et valide l'opération.
+
+Le paiement devient alors une sortie de trésorerie et reste archivé.
+
+## 6. Honoraires enseignants
+
+Les enseignants constituent un circuit distinct des salariés.
+
+Le montant dû doit être calculé à partir des éléments validés dans le système :
+
+**heures validées × tarif horaire = honoraires dus.**
+
+Selon le fonctionnement retenu, un enseignant peut être payé périodiquement ou selon les honoraires accumulés.
+
+La Gestionnaire ne doit pas inventer les heures effectuées.
+
+Elle récupère les heures validées par le workflow académique, contrôle le montant dû, effectue le paiement et génère la preuve correspondante.
+
+Les paiements déjà effectués doivent être conservés afin d'éviter tout double paiement.
+
+## 7. Clôture mensuelle
+
+C'est un point central du dashboard.
+
+À la fin de chaque mois, la Gestionnaire doit pouvoir vérifier que la comptabilité opérationnelle de son annexe est cohérente :
+
+* inscriptions et encaissements ;
+* autres recettes ;
+* dépenses ;
+* achats/ventes lorsqu'ils existent ;
+* mouvements des différentes caisses ;
+* salaires du personnel ;
+* honoraires enseignants ;
+* retenues et charges ;
+* versements éventuels ;
+* justificatifs manquants ;
+* solde de trésorerie.
+
+Le système doit signaler les anomalies **avant d'autoriser la clôture**.
+
+La clôture ne supprime et ne remet aucune donnée à zéro. Elle fige et archive la période.
+
+## 8. Rapport mensuel destiné à la DG
+
+Après contrôle/clôture, la Gestionnaire doit pouvoir générer et télécharger un **rapport mensuel officiel de son annexe**.
+
+Ce rapport doit synthétiser au minimum :
+
+* total des recettes ;
+* recettes d'inscriptions ;
+* autres recettes ;
+* total des dépenses ;
+* dépenses par catégorie ;
+* salaires versés ;
+* honoraires enseignants versés ;
+* retenues/charges ;
+* situation des caisses ;
+* solde d'ouverture ;
+* solde de clôture ;
+* impayés ou engagements restant à traiter ;
+* éventuelles anomalies ou observations.
+
+Le rapport doit être téléchargeable, notamment en PDF et Excel, et rester archivé afin que la DG puisse contrôler l'historique mensuel.
+
+## Principe final
+
+Le dashboard Gestionnaire doit finalement répondre à quatre questions :
+
+**1. Qu'est-ce qui est entré ?**
+**2. Qu'est-ce qui est sorti et pourquoi ?**
+**3. Qu'est-ce qui reste à payer, encaisser, vérifier ou justifier ?**
+**4. Est-ce que la situation de l'annexe est suffisamment propre pour clôturer le mois et rendre compte à la DG ?**
+
+Ne pas refaire les fonctionnalités déjà présentes. **Auditer l'existant par rapport à ce fonctionnement, identifier les écarts, puis corriger et connecter les workflows manquants en réutilisant les modèles, permissions, composants UI et endpoints existants.**

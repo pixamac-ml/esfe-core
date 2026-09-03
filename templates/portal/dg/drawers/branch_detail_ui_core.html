@@ -1,0 +1,52 @@
+{% load component_tags humanize %}
+<section class="space-y-5" data-overlay-title="{{ drawer_branch.name }}">
+  <div>
+    <p class="text-xs font-bold uppercase tracking-wide text-ui-primary">Fiche annexe</p>
+    <p class="mt-1 text-sm text-ui-text-muted">{{ drawer_branch.city|default:"Ville non renseignée" }} · Responsable : {% if drawer_branch.manager %}{{ drawer_branch.manager.get_full_name|default:drawer_branch.manager.username }}{% else %}Non assigné{% endif %}</p>
+  </div>
+
+  <div class="grid gap-3 sm:grid-cols-2">
+    {% component "ui_core.stat_card" label="Étudiants" value=drawer_branch_summary.student_count|intcomma icon="graduation-cap" tone="primary" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Classes" value=drawer_branch_summary.class_count|intcomma icon="school" tone="info" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Inscriptions" value=drawer_branch_summary.active_inscription_count|intcomma icon="file-check-2" tone="success" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Alertes" value=drawer_branch_summary.open_alert_count|intcomma icon="triangle-alert" tone="warning" compact=True %}{% endcomponent %}
+  </div>
+
+  {% component "ui_core.panel" title="Situation financière" subtitle="Montants limités à l’année académique et à l’annexe actives." density="compact" %}
+    <div class="grid gap-3 sm:grid-cols-3">
+      {% component "ui_core.stat_card" label="Revenus" value=drawer_branch_finance.revenue|intcomma unit="FCFA" icon="wallet-cards" tone="success" compact=True %}{% endcomponent %}
+      {% component "ui_core.stat_card" label="Dépenses" value=drawer_branch_finance.expenses|intcomma unit="FCFA" icon="receipt-text" tone="danger" compact=True %}{% endcomponent %}
+      {% component "ui_core.stat_card" label="Solde" value=drawer_branch_finance.balance|intcomma unit="FCFA" icon="scale" tone="primary" compact=True %}{% endcomponent %}
+    </div>
+  {% endcomponent %}
+
+  {% component "ui_core.panel" title="Actions" subtitle="Accédez directement au bon sous-espace, sans empiler de fenêtres." density="compact" %}
+    <div class="grid gap-2 sm:grid-cols-2">
+      <button type="button" class="inline-flex h-ui-control items-center justify-center gap-2 rounded-ui-button border border-ui-border px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=branch_admin&amp;branch_id={{ drawer_branch.id }}')"><i data-lucide="pencil" class="h-4 w-4" aria-hidden="true"></i> Modifier l’annexe</button>
+      <button type="button" class="inline-flex h-ui-control items-center justify-center gap-2 rounded-ui-button border border-ui-border px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover" onclick="dgOpenScopedSection('finance', '{{ drawer_branch.id }}')"><i data-lucide="wallet-cards" class="h-4 w-4" aria-hidden="true"></i> Voir la finance</button>
+      <button type="button" class="inline-flex h-ui-control items-center justify-center gap-2 rounded-ui-button border border-ui-border px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover" onclick="dgOpenScopedSection('students', '{{ drawer_branch.id }}')"><i data-lucide="users-round" class="h-4 w-4" aria-hidden="true"></i> Voir les étudiants</button>
+      <button type="button" class="inline-flex h-ui-control items-center justify-center gap-2 rounded-ui-button border border-ui-border px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover" onclick="dgOpenScopedSection('rh', '{{ drawer_branch.id }}')"><i data-lucide="users" class="h-4 w-4" aria-hidden="true"></i> Voir le personnel</button>
+    </div>
+  {% endcomponent %}
+
+  <div class="grid gap-5 lg:grid-cols-2">
+    {% component "ui_core.panel" title="Classes principales" density="compact" %}
+      <div class="space-y-2">
+        {% for academic_class in drawer_branch_summary.top_classes|slice:":6" %}
+          <div class="flex items-center justify-between gap-3 rounded-ui-button bg-ui-surface-muted px-3 py-2 text-sm"><span class="font-semibold text-ui-text">{{ academic_class.display_name|default:academic_class }}</span><span class="font-bold text-ui-text-muted">{{ academic_class.student_count|default:0|intcomma }}</span></div>
+        {% empty %}
+          {% component "ui_core.empty_state" title="Aucune classe active" compact=True %}{% endcomponent %}
+        {% endfor %}
+      </div>
+    {% endcomponent %}
+    {% component "ui_core.panel" title="Programmes" density="compact" %}
+      <div class="space-y-2">
+        {% for programme in drawer_branch_summary.top_programmes|slice:":6" %}
+          <div class="flex items-center justify-between gap-3 rounded-ui-button bg-ui-surface-muted px-3 py-2 text-sm"><span class="font-semibold text-ui-text">{{ programme.programme__title|default:"Programme non renseigné" }}</span><span class="font-bold text-ui-text-muted">{{ programme.total|default:0|intcomma }}</span></div>
+        {% empty %}
+          {% component "ui_core.empty_state" title="Aucun programme actif" compact=True %}{% endcomponent %}
+        {% endfor %}
+      </div>
+    {% endcomponent %}
+  </div>
+</section>

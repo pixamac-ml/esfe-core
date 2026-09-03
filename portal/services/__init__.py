@@ -18,6 +18,7 @@ from .teacher_dashboard_service import (
     build_teacher_settings_context,
     build_teacher_supports_context,
     build_teacher_lesson_log_context,
+    build_lesson_log_signature_snapshot,
 )
 
 __all__ = [
@@ -38,4 +39,5 @@ __all__ = [
     "build_teacher_supports_context",
     "build_teacher_class_detail_context",
     "build_teacher_lesson_log_context",
+    "build_lesson_log_signature_snapshot",
 ]

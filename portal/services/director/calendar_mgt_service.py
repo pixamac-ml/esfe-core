@@ -12,7 +12,12 @@ import json
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
-from academics.models import AcademicCalendar, AcademicCalendarEntry, AcademicYear
+from academics.models import (
+    AcademicCalendar,
+    AcademicCalendarDisruption,
+    AcademicCalendarEntry,
+    AcademicYear,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -53,11 +58,11 @@ EVENT_META = {
         "color_bg": "bg-blue-50",
         "color_text": "text-blue-700",
         "unique_per_calendar": False,
-        "force_scope": AcademicCalendarEntry.SCOPE_BRANCH,
+        "force_scope": None,
         "is_blocking": False,
         "needs_class": False,
         "needs_semester": False,
-        "description": "Debut d'un semestre pour toute l'annexe.",
+        "description": "Debut d'un semestre, commun a l'annexe ou cible a une classe/semestre.",
     },
     AcademicCalendarEntry.EVENT_SEMESTER_END: {
         "label": "Fin de semestre",
@@ -66,11 +71,11 @@ EVENT_META = {
         "color_bg": "bg-blue-50",
         "color_text": "text-blue-500",
         "unique_per_calendar": False,
-        "force_scope": AcademicCalendarEntry.SCOPE_BRANCH,
+        "force_scope": None,
         "is_blocking": False,
         "needs_class": False,
         "needs_semester": False,
-        "description": "Fin d'un semestre pour toute l'annexe.",
+        "description": "Fin d'un semestre, commune a l'annexe ou ciblee a une classe/semestre.",
     },
     AcademicCalendarEntry.EVENT_HOLIDAY: {
         "label": "Vacances",
@@ -131,11 +136,11 @@ EVENT_META = {
         "color_bg": "bg-red-50",
         "color_text": "text-red-700",
         "unique_per_calendar": False,
-        "force_scope": AcademicCalendarEntry.SCOPE_BRANCH,
+        "force_scope": None,
         "is_blocking": True,
         "needs_class": False,
         "needs_semester": False,
-        "description": "Periode d'examens pour toute l'annexe. Une entree couvre toutes les classes.",
+        "description": "Periode d'examens : commune ou ciblee selon la formation, la classe ou le semestre.",
     },
     AcademicCalendarEntry.EVENT_RETAKE_SESSION: {
         "label": "Session de rattrapage",
@@ -144,11 +149,11 @@ EVENT_META = {
         "color_bg": "bg-rose-50",
         "color_text": "text-rose-700",
         "unique_per_calendar": False,
-        "force_scope": AcademicCalendarEntry.SCOPE_BRANCH,
+        "force_scope": None,
         "is_blocking": True,
         "needs_class": False,
         "needs_semester": False,
-        "description": "Periode de rattrapage pour toute l'annexe.",
+        "description": "Periode de rattrapage : commune ou ciblee selon le parcours.",
     },
     AcademicCalendarEntry.EVENT_JURY: {
         "label": "Jury",
@@ -157,11 +162,11 @@ EVENT_META = {
         "color_bg": "bg-purple-50",
         "color_text": "text-purple-700",
         "unique_per_calendar": False,
-        "force_scope": AcademicCalendarEntry.SCOPE_BRANCH,
+        "force_scope": None,
         "is_blocking": True,
         "needs_class": False,
         "needs_semester": False,
-        "description": "Deliberation du jury pour toute l'annexe.",
+        "description": "Deliberation du jury, rattachee au public academique concerne.",
     },
     AcademicCalendarEntry.EVENT_RESULT_PUBLICATION: {
         "label": "Publication des resultats",
@@ -170,11 +175,11 @@ EVENT_META = {
         "color_bg": "bg-purple-50",
         "color_text": "text-purple-600",
         "unique_per_calendar": False,
-        "force_scope": AcademicCalendarEntry.SCOPE_BRANCH,
+        "force_scope": None,
         "is_blocking": False,
         "needs_class": False,
         "needs_semester": False,
-        "description": "Publication officielle des resultats pour toute l'annexe.",
+        "description": "Publication officielle des resultats pour le public academique concerne.",
     },
     AcademicCalendarEntry.EVENT_CEREMONY: {
         "label": "Ceremonie",
@@ -261,7 +266,8 @@ EVENT_GROUPS = _make_event_groups()
 
 
 def validate_entry_business_rules(*, calendar, event_type, start_datetime, end_datetime,
-                                   target_scope, academic_class, semester, exclude_entry_id=None):
+                                   target_scope, academic_class, semester, programme=None,
+                                   exclude_entry_id=None):
     """
     Valide les regles metier specifiques a chaque type d'evenement.
     Doit etre appelee AVANT la creation ou la modification d'une AcademicCalendarEntry.
@@ -272,6 +278,17 @@ def validate_entry_business_rules(*, calendar, event_type, start_datetime, end_d
         raise ValidationError(f"Type d'evenement inconnu : {event_type!r}")
 
     academic_year = calendar.academic_year
+
+    if target_scope == AcademicCalendarEntry.SCOPE_PROGRAMME and programme is None:
+        raise ValidationError("Une formation ciblee est obligatoire pour cette portee.")
+    if programme is not None and not AcademicClass.objects.filter(
+        branch=calendar.branch,
+        academic_year=academic_year,
+        programme=programme,
+    ).exists():
+        raise ValidationError(
+            "La formation ciblee n'est pas disponible dans l'annexe et l'annee du calendrier."
+        )
 
     # 1. Unicite par calendrier (types a instance unique)
     if meta["unique_per_calendar"]:
@@ -373,7 +390,10 @@ def validate_entry_business_rules(*, calendar, event_type, start_datetime, end_d
 
 
 
-_MUTABLE_CAL_STATUS = {AcademicCalendar.STATUS_DRAFT}
+_MUTABLE_CAL_STATUS = {
+    AcademicCalendar.STATUS_DRAFT,
+    AcademicCalendar.STATUS_REJECTED,
+}
 
 
 def _entry_row(entry):
@@ -389,7 +409,7 @@ def _entry_row(entry):
         "label": entry.event_type,
         "is_blocking": False,
     })
-    cal_is_draft = entry.calendar.status == AcademicCalendar.STATUS_DRAFT
+    cal_is_draft = entry.calendar.status in _MUTABLE_CAL_STATUS
     duration_days = (entry.end_datetime.date() - entry.start_datetime.date()).days
     return {
         "entry": entry,
@@ -428,7 +448,7 @@ def _next_version_for(branch, academic_year):
     return (result["max_v"] or 0) + 1
 
 
-def build_director_calendar_context(branch, selected_calendar_id=None):
+def build_director_calendar_context(branch, selected_calendar_id=None, academic_year=None):
     """
     Construit le contexte complet pour la section Calendrier du dashboard directeur.
     Retourne un dict prefixe director_calendar_* pret a etre unpacke dans le contexte.
@@ -437,18 +457,17 @@ def build_director_calendar_context(branch, selected_calendar_id=None):
 
     # --- Annees academiques ---
     all_years = list(AcademicYear.objects.order_by("-start_date")[:10])
-    active_year = next((y for y in all_years if y.is_active), None) or (
+    active_year = academic_year or next((y for y in all_years if y.is_active), None) or (
         all_years[0] if all_years else None
     )
 
     # --- Tous les calendriers de l'annexe ---
-    calendars = list(
-        AcademicCalendar.objects.select_related(
-            "academic_year", "created_by", "updated_by", "published_by"
-        )
-        .filter(branch=branch)
-        .order_by("-academic_year__start_date", "-version")
-    )
+    calendars_queryset = AcademicCalendar.objects.select_related(
+        "academic_year", "created_by", "updated_by", "published_by", "revision_of"
+    ).filter(branch=branch)
+    if academic_year is not None:
+        calendars_queryset = calendars_queryset.filter(academic_year=academic_year)
+    calendars = list(calendars_queryset.order_by("-academic_year__start_date", "-version"))
 
     # --- Calendrier selectionne ---
     selected = None
@@ -458,6 +477,8 @@ def build_director_calendar_context(branch, selected_calendar_id=None):
         # Priorite : brouillon actif > valide > publie > plus recent
         for status_pref in (
             AcademicCalendar.STATUS_DRAFT,
+            AcademicCalendar.STATUS_REJECTED,
+            AcademicCalendar.STATUS_SUBMITTED,
             AcademicCalendar.STATUS_VALIDATED,
             AcademicCalendar.STATUS_PUBLISHED,
         ):
@@ -473,9 +494,17 @@ def build_director_calendar_context(branch, selected_calendar_id=None):
     entry_rows = []
     entry_counts_by_type = {}
     available_classes = []
+    available_programmes = []
     available_semesters = []
     missing_key_events = []
     next_version = 1
+    upcoming_rows = []
+    active_rows = []
+    pilotage_alerts = []
+    recent_disruptions = []
+    recent_disruption_rows = []
+    construction_progress = 0
+    readiness_checks = []
 
     if selected:
         entries = list(
@@ -500,8 +529,12 @@ def build_director_calendar_context(branch, selected_calendar_id=None):
                 branch=branch,
                 academic_year=selected.academic_year,
                 is_active=True,
-            ).order_by("name")
+            ).select_related("programme").order_by("name")
         )
+        available_programmes = list({
+            academic_class.programme_id: academic_class.programme
+            for academic_class in available_classes
+        }.values())
         available_semesters = list(
             Semester.objects.filter(
                 academic_class__branch=branch,
@@ -523,13 +556,96 @@ def build_director_calendar_context(branch, selected_calendar_id=None):
             if t not in existing_types
         ]
 
+        upcoming_rows = [row for row in entry_rows if row["is_upcoming"]][:5]
+        active_rows = [row for row in entry_rows if row["is_active"]]
+        recent_disruptions = list(
+            AcademicCalendarDisruption.objects.filter(calendar=selected)
+            .select_related("reported_by")
+            .order_by("-starts_at", "-id")[:3]
+        )
+        from academics.services.calendar_service import (
+            get_calendar_readiness,
+            get_disruption_impacts,
+        )
+        readiness_checks = get_calendar_readiness(selected)
+        recent_disruption_rows = [
+            {
+                "disruption": disruption,
+                "impacts": get_disruption_impacts(disruption),
+            }
+            for disruption in recent_disruptions
+        ]
+        required_key_event_count = len(KEY_EVENTS)
+        completed_key_event_count = required_key_event_count - len(missing_key_events)
+        construction_progress = min(
+            100,
+            round((completed_key_event_count / required_key_event_count) * 45)
+            + min(35, len(entries) * 7)
+            + (20 if selected.status in {
+                AcademicCalendar.STATUS_SUBMITTED,
+                AcademicCalendar.STATUS_VALIDATED,
+                AcademicCalendar.STATUS_PUBLISHED,
+                AcademicCalendar.STATUS_SUPERSEDED,
+                AcademicCalendar.STATUS_ARCHIVED,
+            } else 0),
+        )
+
+        for label in missing_key_events:
+            pilotage_alerts.append({
+                "tone": "warning",
+                "icon": "circle-alert",
+                "title": f"{label} manquante",
+                "detail": "Ajoutez cette date officielle avant la soumission.",
+            })
+        for check in readiness_checks:
+            if check["level"] == "error":
+                tone, icon, title = "danger", "circle-x", "Correction obligatoire"
+            elif check["level"] == "warning":
+                tone, icon, title = "warning", "triangle-alert", "Point a confirmer"
+            else:
+                tone, icon, title = "success", "badge-check", "Calendrier coherent"
+            pilotage_alerts.append({
+                "tone": tone,
+                "icon": icon,
+                "title": title,
+                "detail": check["message"],
+            })
+        if selected.status == AcademicCalendar.STATUS_REJECTED:
+            pilotage_alerts.append({
+                "tone": "danger",
+                "icon": "rotate-ccw",
+                "title": "Calendrier retourne pour correction",
+                "detail": selected.rejection_reason,
+            })
+        elif selected.status == AcademicCalendar.STATUS_SUBMITTED:
+            pilotage_alerts.append({
+                "tone": "info",
+                "icon": "clock-3",
+                "title": "En attente de validation",
+                "detail": "Le calendrier est verrouille jusqu'a la decision institutionnelle.",
+            })
+        elif selected.status == AcademicCalendar.STATUS_PUBLISHED:
+            pilotage_alerts.append({
+                "tone": "success",
+                "icon": "badge-check",
+                "title": "Version officielle applicable",
+                "detail": "Toute modification doit passer par une revision ou un avenant trace.",
+            })
+        if not available_classes:
+            pilotage_alerts.append({
+                "tone": "info",
+                "icon": "school",
+                "title": "Aucune classe active pour cette annee",
+                "detail": "Les jalons generaux restent possibles ; les portees classe et semestre apparaitront ensuite.",
+            })
+
         # Prochaine version pour ce couple annee/annexe
         next_version = _next_version_for(branch, selected.academic_year)
 
     # --- Permissions d'action sur le calendrier selectionne ---
     can_validate = (
         selected is not None
-        and selected.status == AcademicCalendar.STATUS_DRAFT
+        and selected.status == AcademicCalendar.STATUS_SUBMITTED
         and len(entries) >= 1
     )
     can_publish = (
@@ -542,7 +658,16 @@ def build_director_calendar_context(branch, selected_calendar_id=None):
     )
     can_add_entry = (
         selected is not None
-        and selected.status == AcademicCalendar.STATUS_DRAFT
+        and selected.status in _MUTABLE_CAL_STATUS
+    )
+    can_submit = (
+        selected is not None
+        and selected.status in _MUTABLE_CAL_STATUS
+        and len(entries) >= 1
+    )
+    can_create_revision = (
+        selected is not None
+        and selected.status == AcademicCalendar.STATUS_PUBLISHED
     )
 
     # --- Metadonnees JSON pour Alpine.js ---
@@ -564,19 +689,42 @@ def build_director_calendar_context(branch, selected_calendar_id=None):
     new_cal_next_version = (
         _next_version_for(branch, active_year) if active_year else 1
     )
+    calendar_count_by_year = {}
+    for calendar in calendars:
+        calendar_count_by_year[calendar.academic_year_id] = (
+            calendar_count_by_year.get(calendar.academic_year_id, 0) + 1
+        )
+    academic_year_rows = [
+        {
+            "year": year,
+            "calendar_count": calendar_count_by_year.get(year.id, 0),
+            "can_attempt_delete": not year.is_active,
+        }
+        for year in all_years
+    ]
 
     return {
         "director_all_academic_years": all_years,
         "director_active_academic_year": active_year,
+        "director_calendar_academic_year_rows": academic_year_rows,
         "director_academic_calendars": calendars,
         "director_selected_calendar": selected,
         "director_calendar_entries": entry_rows,
         "director_calendar_entry_count": len(entries),
+        "director_calendar_construction_progress": construction_progress,
+        "director_calendar_upcoming_rows": upcoming_rows,
+        "director_calendar_active_rows": active_rows,
+        "director_calendar_pilotage_alerts": pilotage_alerts,
+        "director_calendar_readiness_checks": readiness_checks,
+        "director_calendar_recent_disruptions": recent_disruptions,
+        "director_calendar_recent_disruption_rows": recent_disruption_rows,
         "director_calendar_entry_counts_by_type": entry_counts_by_type,
         "director_calendar_can_validate": can_validate,
+        "director_calendar_can_submit": can_submit,
         "director_calendar_can_publish": can_publish,
         "director_calendar_can_archive": can_archive,
         "director_calendar_can_add_entry": can_add_entry,
+        "director_calendar_can_create_revision": can_create_revision,
         "director_calendar_missing_key_events": missing_key_events,
         "director_calendar_event_type_choices": AcademicCalendarEntry.EVENT_TYPE_CHOICES,
         "director_calendar_event_groups": EVENT_GROUPS,
@@ -585,6 +733,7 @@ def build_director_calendar_context(branch, selected_calendar_id=None):
             ensure_ascii=False,
         ),
         "director_calendar_available_classes": available_classes,
+        "director_calendar_available_programmes": available_programmes,
         "director_calendar_available_semesters": available_semesters,
         "director_calendar_no_semesters": selected is not None and not available_semesters,
         "director_calendar_no_classes": selected is not None and not available_classes,

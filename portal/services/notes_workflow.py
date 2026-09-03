@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.db.models import Count
 
 from academics.models import AcademicEnrollment, ECGrade, Semester
@@ -18,6 +19,7 @@ STATE_IN_PROGRESS = "in_progress"
 STATE_READY_TO_PUBLISH_NORMAL = "ready_to_publish_normal"
 STATE_NORMAL_PUBLISHED = "normal_published"
 STATE_RETAKE_IN_PROGRESS = "retake_in_progress"
+STATE_READY_FOR_DIRECTOR = "ready_for_director"
 STATE_READY_TO_PUBLISH_FINAL = "ready_to_publish_final"
 STATE_FINAL_PUBLISHED = "final_published"
 
@@ -27,6 +29,7 @@ ACTION_VERIFY = "verifier_notes"
 ACTION_PUBLISH_NORMAL = "publier_session_normale"
 ACTION_PREVIEW_RETAKE = "ouvrir_rattrapage"
 ACTION_ACTIVATE_RETAKE = "activer_rattrapage"
+ACTION_SUBMIT_TO_DIRECTOR = "transmettre_au_de"
 ACTION_PUBLISH_FINAL = "publier_resultats_finaux"
 ACTION_GENERATE_DECISIONS = "generer_decisions_annuelles"
 ACTION_GENERATE_BULLETINS = "generer_bulletins"
@@ -46,6 +49,7 @@ class NotesWorkflowState:
     retake_candidates_count: int
     retake_subjects_count: int
     retake_ready: bool
+    retake_pending_entries: int
     final_publish_ready: bool
 
 
@@ -64,6 +68,7 @@ STATE_LABELS = {
     STATE_READY_TO_PUBLISH_NORMAL: "Session normale prete a publier",
     STATE_NORMAL_PUBLISHED: "Session normale publiee",
     STATE_RETAKE_IN_PROGRESS: "Rattrapage actif",
+    STATE_READY_FOR_DIRECTOR: "Transmis au Directeur des etudes",
     STATE_READY_TO_PUBLISH_FINAL: "Resultats finaux prets",
     STATE_FINAL_PUBLISHED: "Resultats finaux publies",
 }
@@ -91,8 +96,10 @@ def get_retake_candidates(*, academic_class, semester) -> list[RetakeCandidate]:
         .order_by("ec__ue__code", "ec__title")
     )
     grades_by_enrollment: dict[int, list[ECGrade]] = {}
+    grades_by_enrollment_and_ec: dict[int, dict[int, ECGrade]] = {}
     for grade in grades:
         grades_by_enrollment.setdefault(grade.enrollment_id, []).append(grade)
+        grades_by_enrollment_and_ec.setdefault(grade.enrollment_id, {})[grade.ec_id] = grade
 
     candidates: list[RetakeCandidate] = []
     for enrollment in enrollments:
@@ -100,7 +107,11 @@ def get_retake_candidates(*, academic_class, semester) -> list[RetakeCandidate]:
         for grade in grades_by_enrollment.get(enrollment.id, []):
             ec_threshold = resolve_ec_threshold(grade.ec.coefficient)
             normal_status = compute_ec_status(grade.normal_score, ec_threshold)
-            if normal_status != "failed" and grade.retake_score is None:
+            final_status = compute_ec_status(grade.final_score, ec_threshold)
+            # Une matière n'est proposée au rattrapage que si elle a échoué
+            # en session normale et reste non validée après une éventuelle
+            # note de rattrapage.
+            if normal_status != "failed" or final_status == "validated":
                 continue
             failed_subjects.append(
                 {
@@ -115,7 +126,11 @@ def get_retake_candidates(*, academic_class, semester) -> list[RetakeCandidate]:
             )
         if not failed_subjects:
             continue
-        semester_summary = compute_semester_result(semester, enrollment)
+        semester_summary = compute_semester_result(
+            semester,
+            enrollment,
+            grades_by_ec_id=grades_by_enrollment_and_ec[enrollment.id],
+        )
         candidates.append(
             RetakeCandidate(
                 enrollment_id=enrollment.id,
@@ -129,11 +144,39 @@ def get_retake_candidates(*, academic_class, semester) -> list[RetakeCandidate]:
 
 
 def can_edit_retake_grade(*, grade, threshold):
-    if grade is None:
-        return False
-    if grade.retake_score is not None:
-        return True
-    return compute_ec_status(grade.normal_score, threshold) == "failed"
+    """A retake is only available for an EC failed in the normal session.
+
+    A previously entered retake score must not turn an otherwise validated EC
+    into an editable record after a correction of the normal-session score.
+    """
+    return bool(
+        grade is not None
+        and grade.normal_score is not None
+        and compute_ec_status(grade.normal_score, threshold) == "failed"
+    )
+
+
+def get_retake_pending_entries(*, academic_class, semester) -> int:
+    """Return the failed normal-session ECs still lacking a retake mark.
+
+    A failed retake remains a valid final result and must therefore not block
+    the technical handoff once the rattrapage mark was entered.
+    """
+    if not academic_class or not semester:
+        return 0
+    pending = 0
+    grades = ECGrade.objects.select_related("ec").filter(
+        enrollment__academic_class=academic_class,
+        enrollment__academic_year=academic_class.academic_year,
+        enrollment__is_active=True,
+        ec__ue__semester=semester,
+        normal_score__isnull=False,
+    )
+    for grade in grades:
+        threshold = resolve_ec_threshold(grade.ec.coefficient)
+        if compute_ec_status(grade.normal_score, threshold) == "failed" and grade.retake_score is None:
+            pending += 1
+    return pending
 
 
 def get_notes_state(*, academic_class, semester) -> NotesWorkflowState | None:
@@ -159,11 +202,17 @@ def get_notes_state(*, academic_class, semester) -> NotesWorkflowState | None:
 
     retake_candidates = get_retake_candidates(academic_class=academic_class, semester=semester)
     retake_subjects_count = sum(len(candidate.failed_subjects) for candidate in retake_candidates)
+    retake_pending_entries = get_retake_pending_entries(
+        academic_class=academic_class,
+        semester=semester,
+    )
 
     if semester.status == Semester.STATUS_PUBLISHED:
         code = STATE_FINAL_PUBLISHED
     elif semester.status == Semester.STATUS_FINALIZED:
         code = STATE_READY_TO_PUBLISH_FINAL
+    elif semester.status == Semester.STATUS_READY_FOR_DIRECTOR:
+        code = STATE_READY_FOR_DIRECTOR
     elif semester.status == Semester.STATUS_RETAKE_ENTRY:
         code = STATE_RETAKE_IN_PROGRESS
     elif semester.status == Semester.STATUS_NORMAL_LOCKED:
@@ -181,6 +230,7 @@ def get_notes_state(*, academic_class, semester) -> NotesWorkflowState | None:
         STATE_READY_TO_PUBLISH_NORMAL: "Toutes les notes normales sont renseignees. La session normale peut etre publiee.",
         STATE_NORMAL_PUBLISHED: "La session normale est publiee. Le rattrapage peut maintenant etre prepare.",
         STATE_RETAKE_IN_PROGRESS: "Le rattrapage est actif. Les notes normales restent visibles et seules les notes de rattrapage doivent etre ajustees.",
+        STATE_READY_FOR_DIRECTOR: "La session technique est cloturee et transmise au Directeur des etudes pour controle, validation puis publication.",
         STATE_READY_TO_PUBLISH_FINAL: "Le semestre est finalise et pret pour publication finale.",
         STATE_FINAL_PUBLISHED: "Les releves et exports finaux sont deblocables selon les regles du semestre.",
     }
@@ -193,6 +243,8 @@ def get_notes_state(*, academic_class, semester) -> NotesWorkflowState | None:
         technical_alerts.append(f"{missing_grades} note(s) manquante(s) dans la grille.")
     if retake_candidates:
         technical_alerts.append(f"{len(retake_candidates)} etudiant(s) ont un rattrapage potentiel sur {retake_subjects_count} matiere(s).")
+    if semester.status == Semester.STATUS_RETAKE_ENTRY and retake_pending_entries:
+        technical_alerts.append(f"{retake_pending_entries} note(s) de rattrapage restent a saisir avant transmission au DE.")
 
     return NotesWorkflowState(
         code=code,
@@ -207,11 +259,12 @@ def get_notes_state(*, academic_class, semester) -> NotesWorkflowState | None:
         retake_candidates_count=len(retake_candidates),
         retake_subjects_count=retake_subjects_count,
         retake_ready=semester.status == Semester.STATUS_NORMAL_LOCKED and bool(retake_candidates),
-        final_publish_ready=semester.status in {Semester.STATUS_RETAKE_ENTRY, Semester.STATUS_NORMAL_LOCKED, Semester.STATUS_FINALIZED},
+        retake_pending_entries=retake_pending_entries,
+        final_publish_ready=semester.status in {Semester.STATUS_READY_FOR_DIRECTOR, Semester.STATUS_FINALIZED},
     )
 
 
-def get_available_actions(*, state: NotesWorkflowState | None):
+def get_available_actions(*, state: NotesWorkflowState | None, audience: str | None = None):
     if state is None:
         return []
     actions_by_state = {
@@ -229,18 +282,39 @@ def get_available_actions(*, state: NotesWorkflowState | None):
         STATE_NORMAL_PUBLISHED: (
             [{"code": ACTION_PREVIEW_RETAKE, "label": "Ouvrir rattrapage", "style": "secondary", "kind": "modal"}]
             if state.retake_ready
-            else []
+            else [{"code": ACTION_SUBMIT_TO_DIRECTOR, "label": "Transmettre au DE", "style": "primary"}]
         ),
         STATE_RETAKE_IN_PROGRESS: [
             {"code": ACTION_VERIFY, "label": "Verifier les notes", "style": "secondary"},
-        ],
+        ] + (
+            [{"code": ACTION_SUBMIT_TO_DIRECTOR, "label": "Transmettre au DE", "style": "primary"}]
+            if not state.retake_pending_entries else []
+        ),
+        STATE_READY_FOR_DIRECTOR: [],
         STATE_READY_TO_PUBLISH_FINAL: [],
         STATE_FINAL_PUBLISHED: [],
     }
-    return actions_by_state.get(state.code, [])
+    actions = actions_by_state.get(state.code, [])
+    if audience == "it_support":
+        # L'informaticien est l'operateur technique de la saisie : il peut
+        # cloturer la session normale apres controle et preparer le
+        # rattrapage. La validation officielle et la publication definitive
+        # restent exclusivement dans le workflow du Directeur des etudes.
+        allowed = {
+            ACTION_START,
+            ACTION_CONTINUE,
+            ACTION_VERIFY,
+            ACTION_PUBLISH_NORMAL,
+            ACTION_PREVIEW_RETAKE,
+            ACTION_SUBMIT_TO_DIRECTOR,
+        }
+        return [action for action in actions if action["code"] in allowed]
+    return actions
 
 
+@transaction.atomic
 def apply_notes_workflow_action(*, actor, academic_class, semester, action):
+    semester = Semester.objects.select_for_update().get(pk=semester.pk)
     state = get_notes_state(academic_class=academic_class, semester=semester)
     if state is None:
         raise ValidationError("Selection classe/semestre invalide.")
@@ -308,6 +382,28 @@ def apply_notes_workflow_action(*, actor, academic_class, semester, action):
             action_type=SupportAuditLog.ACTION_RESULTS_SENT,
             target_label=f"Activation rattrapage {academic_class.display_name} S{semester.number}",
             details="Rattrapage active depuis le dashboard informaticien.",
+        )
+        return
+
+    if action == ACTION_SUBMIT_TO_DIRECTOR:
+        if state.missing_grades:
+            raise ValidationError("Toutes les notes normales doivent etre renseignees avant transmission au DE.")
+        if semester.status == Semester.STATUS_NORMAL_LOCKED:
+            if state.retake_candidates_count:
+                raise ValidationError("Activez puis terminez le rattrapage avant transmission au DE.")
+        elif semester.status == Semester.STATUS_RETAKE_ENTRY:
+            if state.retake_pending_entries:
+                raise ValidationError("Toutes les notes de rattrapage attendues doivent etre renseignees avant transmission au DE.")
+        else:
+            raise ValidationError("La session ne peut pas etre transmise au DE dans son etat actuel.")
+        semester.status = Semester.STATUS_READY_FOR_DIRECTOR
+        semester.save(update_fields=["status"])
+        log_support_action(
+            actor=actor,
+            branch=get_user_branch(actor),
+            action_type=SupportAuditLog.ACTION_RESULTS_SENT,
+            target_label=f"Transmission DE {academic_class.display_name} S{semester.number}",
+            details="Session technique cloturee et transmise au Directeur des etudes.",
         )
         return
 

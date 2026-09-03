@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<main class="mx-auto max-w-2xl px-4 py-10">
+  <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <p class="text-xs font-bold uppercase tracking-wider text-violet-700">Validation direction</p>
+    <h1 class="mt-2 text-2xl font-bold text-slate-900">{{ action.get_action_type_display }}</h1>
+    <p class="mt-2 text-sm text-slate-600">Annexe : {{ action.branch.name }} · Demande par {{ action.requested_by.get_full_name|default:action.requested_by.username }}</p>
+    <dl class="mt-5 space-y-3 text-sm"><div><dt class="font-semibold text-slate-700">Motif</dt><dd>{{ action.reason|default:"Non precise" }}</dd></div><div><dt class="font-semibold text-slate-700">Etat demande</dt><dd><pre class="mt-1 overflow-auto rounded bg-slate-50 p-3 text-xs">{{ action.requested_state }}</pre></dd></div></dl>
+    {% if annual_rows %}
+      <section class="mt-6 overflow-x-auto rounded-lg border border-slate-200">
+        <table class="min-w-[920px] w-full text-left text-xs">
+          <thead class="bg-slate-50 text-slate-600"><tr><th class="p-3">Matricule</th><th class="p-3">Étudiant</th><th class="p-3">S1</th><th class="p-3">S2</th><th class="p-3">Décision proposée</th><th class="p-3">Observations</th></tr></thead>
+          <tbody>{% for row in annual_rows %}<tr class="border-t border-slate-100 align-top"><td class="p-3 font-semibold">{{ row.matricule }}</td><td class="p-3">{{ row.student.full_name }}</td>{% for semester in row.semesters %}<td class="p-3">{{ semester.average|default:"—" }}/20<br><span class="text-slate-500">{{ semester.credit_obtained }}/{{ semester.credit_required }} crédits</span></td>{% endfor %}<td class="p-3 font-semibold">{{ row.cycle_decision }}</td><td class="p-3">{% for debt in row.debts %}{{ debt.ec }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td></tr>{% endfor %}</tbody>
+        </table>
+      </section>
+    {% endif %}
+    {% if error %}<p class="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{{ error }}</p>{% endif %}
+    {% if action.status == 'pending' %}<form method="post" action="{% url 'accounts:financial_approval_confirm' action.pk %}" class="mt-6 flex gap-3">{% csrf_token %}<input name="otp_code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required placeholder="Code recu" class="rounded-lg border border-slate-300 px-3 py-2"><button class="rounded-lg bg-violet-700 px-4 py-2 font-semibold text-white">Approuver</button></form>{% else %}<p class="mt-6 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">Demande {{ action.get_status_display|lower }}.</p>{% endif %}
+  </section>
+</main>
+{% endblock %}

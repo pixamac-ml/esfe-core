@@ -1,6 +1,6 @@
 {% load component_tags %}
 {% load humanize %}
-<div class="space-y-0">
+<div class="space-y-5" data-ui-core="manager-honorarium-workflow">
 <div class="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between">
             <div>
                 <h2 class="text-xl font-bold text-slate-900">Honoraire enseignant</h2>
@@ -12,8 +12,10 @@
     </div>
 </div>
 
-    <div class="p-6 space-y-6">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="space-y-5">
+            {% component "ui_core.panel" title="Fiche d'honoraire" subtitle="Heures validées, tarif officiel et état du paiement." density="compact" %}
+            {% fill "default" %}
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
                     <p class="text-xs uppercase tracking-wide text-slate-400">Enseignant</p>
                     <p class="mt-2 text-sm font-semibold text-slate-900">{{ teacher_profile.user.get_full_name|default:teacher_profile.user.username }}</p>
@@ -27,21 +29,31 @@
                 <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
                     <p class="text-xs uppercase tracking-wide text-slate-400">Tarif horaire</p>
                     <p class="mt-2 text-sm font-semibold text-slate-900">{{ teacher_profile.teacher_hourly_rate|intcomma }} FCFA</p>
-                    <p class="text-xs text-slate-500 mt-1">{{ teacher_profile.get_employment_status_display }}</p>
+                    <p class="text-xs text-slate-500 mt-1">Tarif figé automatiquement à la première heure approuvée.</p>
                 </div>
             </div>
 
+            <div class="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                <strong>Heures validées :</strong> {{ validated_hours }} h. Elles proviennent des cahiers de texte validés et ne sont pas saisissables par la gestionnaire.
+            </div>
+
             {% if honorarium_entry %}
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div class="rounded-2xl bg-emerald-50 border border-emerald-100 p-4"><p class="text-xs uppercase tracking-wide text-emerald-700">Net</p><p class="mt-2 text-xl font-bold text-slate-900">{{ honorarium_entry.net_amount|intcomma }}</p></div>
-                <div class="rounded-2xl bg-blue-50 border border-blue-100 p-4"><p class="text-xs uppercase tracking-wide text-blue-700">Paye</p><p class="mt-2 text-xl font-bold text-slate-900">{{ honorarium_entry.paid_amount|intcomma }}</p></div>
-                <div class="rounded-2xl bg-rose-50 border border-rose-100 p-4"><p class="text-xs uppercase tracking-wide text-rose-700">Reste</p><p class="mt-2 text-xl font-bold text-slate-900">{{ honorarium_entry.remaining_amount|intcomma }}</p></div>
-                <div class="rounded-2xl bg-violet-50 border border-violet-100 p-4"><p class="text-xs uppercase tracking-wide text-violet-700">Etat</p><p class="mt-2 text-sm font-bold text-slate-900">{{ honorarium_entry.get_status_display }}</p></div>
+            <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+              {% component "ui_core.stat_card" label="Net à payer" value=honorarium_entry.net_amount|intcomma unit="FCFA" icon="wallet" tone="primary" compact=True %}{% endcomponent %}
+              {% component "ui_core.stat_card" label="Déjà versé" value=honorarium_entry.paid_amount|intcomma unit="FCFA" icon="circle-check" tone="success" compact=True %}{% endcomponent %}
+              {% component "ui_core.stat_card" label="Reste" value=honorarium_entry.remaining_amount|intcomma unit="FCFA" icon="banknote" tone="warning" compact=True %}{% endcomponent %}
+              {% component "ui_core.stat_card" label="État" value=honorarium_entry.get_status_display icon="file-check" tone="info" compact=True %}{% endcomponent %}
             </div>
             {% endif %}
+            {% endfill %}
+            {% endcomponent %}
 
-            <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-6">
-                {% if otp_request_id %}
+            {% component "ui_core.panel" title="Contrôler puis payer" subtitle="Les heures proviennent du suivi pédagogique ; la caisse ne bouge qu'au paiement effectif." tone="primary" %}
+            {% fill "default" %}
+            <div class="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+                {% if approval_pending %}
+                <div class="rounded-2xl border border-violet-200 bg-violet-50 p-5 text-sm text-violet-800"><strong>Demande envoyee a la direction.</strong> Le DG ou la DGA doit approuver depuis son propre compte avant toute modification.</div>
+                {% elif otp_request_id %}
                 <div class="rounded-2xl border border-violet-200 bg-violet-50 p-5 space-y-4">
                     <div>
                         <h3 class="text-sm font-semibold uppercase tracking-wide text-violet-800">Validation DG / DGA requise</h3>
@@ -104,6 +116,11 @@
                         </button>
                     </form>
                 </div>
+                {% elif honorarium_entry and honorarium_entry.status == "ready" %}
+                <div class="rounded-2xl border border-blue-200 bg-blue-50 p-5 text-sm text-blue-900">
+                    <h3 class="font-semibold">Honoraire disponible et figé</h3>
+                    <p class="mt-1">Les heures validées et le tarif ne changent plus avant le retrait. Utilisez le bordereau de service comme preuve de contrôle.</p>
+                </div>
                 {% else %}
                 <form
                     hx-post="{% url 'accounts:htmx_manager_teacher_honorarium_upsert' teacher_profile.user_id %}"
@@ -112,9 +129,7 @@
                     hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                     class="space-y-4">
                     {% include "accounts/dashboard/partials/dg_form_fields.html" with form=honorarium_form %}
-                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                        Les honoraires sont calcules depuis les heures validees. Rendre la fiche disponible notifie l'enseignant.
-                    </div>
+                    {% component "ui_core.alert" title="Montant calculé automatiquement" message="Les heures et le tarif officiel ne sont pas modifiables ici. Utilisez uniquement les ajustements, retenues, avances et observations avec un motif traçable." tone="info" %}{% endcomponent %}
                     <div class="flex flex-col sm:flex-row gap-3">
                         <button type="submit" name="submit_action" value="draft" class="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">
                             {% component "icon" name="save" %}{% endcomponent %}
@@ -133,7 +148,15 @@
                         <p class="text-xs uppercase tracking-wide text-slate-400">Retrait honoraire</p>
                         <h3 class="text-lg font-semibold text-slate-900 mt-1">Enregistrer le paiement effectif</h3>
                     </div>
-                    {% if honorarium_entry %}
+                    {% if payment_signature_session %}
+                    <div class="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900">
+                      {% if payment_signature_session.status == "signed" %}
+                      <p class="font-semibold">Signature reçue pour {{ payment_signature_session.amount|intcomma }} FCFA.</p><p class="mt-1">Vérifiez le récapitulatif signé puis approuvez le décaissement.</p>
+                      <img src="{{ payment_signature_session.signature_data }}" alt="Signature électronique de l'enseignant" class="mt-3 h-20 max-w-xs rounded-lg border border-violet-200 bg-white object-contain p-2">
+                      <button type="button" hx-post="{% url 'accounts:htmx_manager_payment_signature_approve' payment_signature_session.id %}" hx-target="body" hx-swap="beforeend" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' class="mt-3 inline-flex items-center rounded-xl bg-emerald-600 px-4 py-2 font-semibold text-white">Approuver et payer</button>
+                      {% else %}<p class="font-semibold">Lien de signature envoyé à la tablette.</p><p class="mt-1">Attendez la signature de l'enseignant avant de valider le paiement.</p>{% endif %}
+                    </div>
+                    {% elif honorarium_entry and honorarium_entry.remaining_amount > 0 and honorarium_entry.status == "ready" or honorarium_entry and honorarium_entry.remaining_amount > 0 and honorarium_entry.status == "partial" %}
                     <form
                         hx-post="{% url 'accounts:htmx_manager_teacher_honorarium_pay' honorarium_entry.id %}"
                         hx-target="#manager-modal-content"
@@ -155,6 +178,10 @@
                             Enregistrer le retrait
                         </button>
                     </form>
+                    {% elif honorarium_entry and honorarium_entry.remaining_amount > 0 %}
+                    <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-5 text-sm text-amber-800">
+                        Vérifiez puis rendez d'abord cet honoraire disponible. Aucun retrait n'est autorisé sur une fiche « À vérifier ».
+                    </div>
                     {% else %}
                     <div class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500">
                         Prepare d'abord l'honoraire du mois pour cet enseignant.
@@ -162,5 +189,35 @@
                     {% endif %}
                 </div>
             </div>
+            {% endfill %}
+            {% endcomponent %}
+
+            {% if honorarium_entry %}
+            {% component "ui_core.panel" title="Documents de l'honoraire" subtitle="Preuve des heures, bordereau de montant et pièces de caisse." density="compact" %}
+            {% fill "default" %}
+            <div>
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div><h3 class="text-sm font-semibold text-slate-900">Documents de l'honoraire</h3><p class="mt-1 text-sm text-slate-500">La fiche de service prouve les heures ; le bordereau récapitule le montant ; chaque versement crée sa pièce de caisse.</p></div>
+                    <div class="flex flex-wrap gap-2">
+                        <a href="{% url 'accounts:manager_teacher_service_sheet_pdf' honorarium_entry.pk %}" target="_blank" rel="noopener" class="inline-flex h-ui-control items-center rounded-ui-button border border-ui-border px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">Fiche de service</a>
+                        <a href="{% url 'accounts:manager_honorarium_statement_pdf' honorarium_entry.pk %}" target="_blank" rel="noopener" class="inline-flex h-ui-control items-center rounded-ui-button border border-ui-border px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">Bordereau honoraire</a>
+                    </div>
+                </div>
+                {% if withdrawal_documents %}
+                <div class="mt-4 space-y-2">
+                    {% for movement in withdrawal_documents %}
+                    <a href="{% url 'accounts:htmx_manager_cash_movement_receipt' movement.pk %}" target="_blank" rel="noopener" class="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-sm hover:bg-slate-50">
+                        <span><strong class="text-slate-900">{{ movement.receipt_number|default:movement.reference }}</strong><span class="ml-2 text-slate-500">{{ movement.created_at|date:"d/m/Y H:i" }}</span></span>
+                        <span class="font-semibold text-slate-900">{{ movement.amount|intcomma }} FCFA · Ouvrir</span>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="mt-4 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">Aucune pièce de caisse pour le moment : elle sera créée automatiquement à chaque versement effectif.</p>
+                {% endif %}
+            </div>
+            {% endfill %}
+            {% endcomponent %}
+            {% endif %}
     </div>
 </div>

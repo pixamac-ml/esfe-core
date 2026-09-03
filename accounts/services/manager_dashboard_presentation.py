@@ -24,26 +24,33 @@ from accounts.models import (
 )
 from inscriptions.models import Inscription
 from payments.models import Payment
+from shop.models import ShopProduct
 
 
 SECTION_PRESENTATION = {
     "overview": {
-        "eyebrow": "Gestionnaire / Pilotage",
-        "title": "Vue globale de l'annexe",
-        "subtitle": "Admissions, encaissements, engagements et priorites dans un seul espace operationnel.",
+        "eyebrow": "Gestionnaire / Pilotage du jour",
+        "title": "Espace de travail de l'annexe",
+        "subtitle": "Traitez les opérations ouvertes ; le reste demeure accessible dans l'historique.",
         "components": ("page_header", "stat_card", "panel", "alert", "empty_state"),
     },
     "candidatures": {
-        "eyebrow": "Gestionnaire / Admissions",
+        "eyebrow": "Gestionnaire / Parcours étudiant",
         "title": "Candidatures",
         "subtitle": "Traiter les dossiers entrants, demander les complements et ouvrir le parcours d'inscription.",
         "components": ("page_header", "stat_card", "filter_bar", "data_table", "status_badge", "empty_state"),
     },
     "inscriptions": {
-        "eyebrow": "Gestionnaire / Admissions",
+        "eyebrow": "Gestionnaire / Parcours étudiant",
         "title": "Inscriptions",
         "subtitle": "Finaliser les dossiers acceptes et suivre leur situation administrative et financiere.",
         "components": ("page_header", "stat_card", "filter_bar", "data_table", "status_badge", "drawer"),
+    },
+    "reenrollment": {
+        "eyebrow": "Gestionnaire / Parcours étudiant",
+        "title": "Réinscriptions",
+        "subtitle": "Préparer les dossiers validés pédagogiquement, suivre le paiement existant et laisser le moteur activer la nouvelle année.",
+        "components": ("page_header", "stat_card", "filter_bar", "data_table", "status_badge", "empty_state"),
     },
     "paiements": {
         "eyebrow": "Gestionnaire / Finance",
@@ -55,6 +62,12 @@ SECTION_PRESENTATION = {
         "eyebrow": "Gestionnaire / Personnel",
         "title": "Salaires du personnel",
         "subtitle": "Verifier, corriger, valider puis payer les fiches automatiquement preparees.",
+        "components": ("page_header", "stat_card", "filter_bar", "data_table", "status_badge", "modal"),
+    },
+    "honoraires": {
+        "eyebrow": "Gestionnaire / Enseignement",
+        "title": "Honoraires enseignants",
+        "subtitle": "Contrôler les heures validées, rendre les fiches disponibles et tracer chaque paiement.",
         "components": ("page_header", "stat_card", "filter_bar", "data_table", "status_badge", "modal"),
     },
     "depenses": {
@@ -70,15 +83,15 @@ SECTION_PRESENTATION = {
         "components": ("page_header", "stat_card", "panel", "filter_bar", "data_table", "confirm_dialog"),
     },
     "rapport": {
-        "eyebrow": "Gestionnaire / Pilotage financier",
-        "title": "Rapport financier",
-        "subtitle": "Analyser la periode, les recettes, les charges, le resultat net et les versements bancaires.",
+        "eyebrow": "Gestionnaire / Contrôle et archives",
+        "title": "Rapports et archives",
+        "subtitle": "Consulter une période, contrôler les flux et exporter le rapport de l'annexe.",
         "components": ("page_header", "filter_bar", "stat_card", "alert", "data_table", "chart_panel"),
     },
     "cloture": {
-        "eyebrow": "Gestionnaire / Tresorerie",
-        "title": "Honoraires et cloture mensuelle",
-        "subtitle": "Controler les honoraires enseignants, archiver la periode et enregistrer le versement bancaire.",
+        "eyebrow": "Gestionnaire / Contrôle et clôture",
+        "title": "Clôture mensuelle et archives",
+        "subtitle": "Contrôler la période, la clôturer sans suppression et conserver ses archives.",
         "components": ("page_header", "stat_card", "alert", "panel", "data_table", "confirm_dialog"),
     },
     "boutique": {
@@ -116,6 +129,9 @@ MANAGER_SUBVIEW_DEFINITIONS = {
         ("list", "Inscriptions", "id-card"),
         ("pending", "En attente", "clock-3"),
     ),
+    "reenrollment": (
+        ("overview", "Tableau opérationnel", "refresh-cw"),
+    ),
     "paiements": (
         ("overview", "Vue d'ensemble", "layout-dashboard"),
         ("payments", "Paiements", "credit-card"),
@@ -125,7 +141,16 @@ MANAGER_SUBVIEW_DEFINITIONS = {
     "salaires": (
         ("overview", "Vue d'ensemble", "layout-dashboard"),
         ("entries", "Fiches", "files"),
-        ("to_validate", "À valider", "circle-check"),
+        ("to_validate", "À contrôler", "scan-search"),
+        ("to_pay", "À payer", "wallet-cards"),
+        ("history", "Historique", "history"),
+    ),
+    "honoraires": (
+        ("overview", "Vue d'ensemble", "layout-dashboard"),
+        ("entries", "Fiches", "files"),
+        ("to_validate", "À contrôler", "scan-search"),
+        ("to_pay", "À payer", "wallet-cards"),
+        ("history", "Historique", "history"),
     ),
     "depenses": (
         ("overview", "Vue d'ensemble", "layout-dashboard"),
@@ -135,6 +160,7 @@ MANAGER_SUBVIEW_DEFINITIONS = {
     ),
     "caisse": (
         ("overview", "Vue d'ensemble", "layout-dashboard"),
+        ("wallets", "Mini-caisses", "wallet"),
         ("movements", "Mouvements", "arrow-left-right"),
         ("operations", "Opérations", "plus"),
     ),
@@ -145,7 +171,6 @@ MANAGER_SUBVIEW_DEFINITIONS = {
     ),
     "cloture": (
         ("overview", "Vue d'ensemble", "layout-dashboard"),
-        ("honoraria", "Honoraires", "graduation-cap"),
         ("closures", "Clôtures", "lock"),
         ("archives", "Archives", "archive"),
     ),
@@ -154,17 +179,33 @@ MANAGER_SUBVIEW_DEFINITIONS = {
         ("register", "Enregistrer", "plus"),
         ("history", "Historique", "history"),
     ),
+    "boutique": (
+        ("sell", "Vendre", "shopping-cart"),
+        ("to_collect", "À encaisser", "badge-dollar-sign"),
+        ("to_prepare", "À préparer", "package-check"),
+        ("to_deliver", "À remettre", "package-open"),
+        ("stock", "Stock & articles", "package"),
+        ("journal", "Journal", "book-open-check"),
+    ),
 }
 
 # A focused tab starts with the matching existing server-side filter.  The
 # user can still refine it through the normal filter bar; branch filtering
 # remains owned by the queryset layer.
 MANAGER_SUBVIEW_FILTERS = {
-    ("candidatures", "to_process"): {"cand_status": "under_review"},
-    ("inscriptions", "pending"): {"ins_status": "awaiting_payment"},
+    ("candidatures", "to_process"): {"cand_status": "open"},
+    ("inscriptions", "pending"): {"ins_status": "open"},
     ("paiements", "to_validate"): {"pay_status": "pending"},
-    ("salaires", "to_validate"): {"salary_status": "ready"},
+    ("salaires", "to_validate"): {"salary_status": "draft"},
+    ("salaires", "to_pay"): {"salary_status": "payable"},
+    ("salaires", "history"): {"salary_status": "paid"},
+    ("honoraires", "to_validate"): {"honorarium_status": "draft"},
+    ("honoraires", "to_pay"): {"honorarium_status": "payable"},
+    ("honoraires", "history"): {"honorarium_status": "paid"},
     ("depenses", "to_approve"): {"expense_status": "submitted"},
+    ("boutique", "to_collect"): {"shop_status": "pending_payment"},
+    ("boutique", "to_prepare"): {"shop_status": "paid"},
+    ("boutique", "to_deliver"): {"shop_status": "ready"},
 }
 
 
@@ -202,13 +243,14 @@ def _manager_section_query(section, context, **params):
     return query
 
 
-def _manager_subnav_items(*, section, active, dashboard_url, subcontent_url):
+def _manager_subnav_items(*, section, active, dashboard_url, subcontent_url, counts=None):
     definitions = MANAGER_SUBVIEW_DEFINITIONS.get(section, ())
     if not definitions:
         return []
     target = manager_subcontent_target(section)
     indicator = manager_subcontent_indicator(section)
     items = []
+    counts = counts or {}
     for item_id, label, icon in definitions:
         query = {"section": section, "view": item_id}
         query.update(MANAGER_SUBVIEW_FILTERS.get((section, item_id), {}))
@@ -218,6 +260,7 @@ def _manager_subnav_items(*, section, active, dashboard_url, subcontent_url):
                 "id": item_id,
                 "label": label,
                 "icon": icon,
+                "count": counts.get(item_id),
                 "href": f"{dashboard_url}?{encoded_query}",
                 "hx_get": f"{subcontent_url}?{encoded_query}",
                 "hx_target": target,
@@ -550,14 +593,18 @@ def _admission_stat_cards(context):
 def _admission_filters(context, *, dashboard_url):
     status = context.get("cand_status") or ""
     search = context.get("cand_search") or ""
+    activity_date = context.get("cand_activity_date") or ""
     status_choices = (("accepted", "Acceptée (toutes)"),) + tuple(
         choice for choice in Candidature.STATUS_CHOICES if choice[0] not in {"accepted", "accepted_with_reserve"}
     )
+    status_choices = (("open", "À traiter"),) + status_choices
     active_filters = []
     if status:
         active_filters.append(dict(status_choices).get(status, status))
     if search:
         active_filters.append(f'Recherche : "{search}"')
+    if activity_date:
+        active_filters.append(f"Activité : {activity_date}")
     return {
         "action": dashboard_url,
         "reset_url": f"{dashboard_url}?section=candidatures",
@@ -565,6 +612,7 @@ def _admission_filters(context, *, dashboard_url):
         "active_filters": active_filters,
         "items": [
             {"name": "cand_status", "label": "Statut", "options": _choice_options(status_choices, status, empty_label="Tous les statuts")},
+            {"name": "cand_date", "label": "Date d'activité", "type": "date", "value": activity_date},
             {"name": "cand_q", "label": "Candidat", "value": search, "placeholder": "Nom ou adresse email…", "clearable": True},
         ],
     }
@@ -689,6 +737,7 @@ def _admission_table(context, *, capabilities, dashboard_url):
         "candidatures",
         context,
         cand_status=context.get("cand_status") or "",
+        cand_date=context.get("cand_activity_date") or "",
         cand_q=context.get("cand_search") or "",
     )
 
@@ -719,18 +768,23 @@ def _inscription_stat_cards(context):
 def _inscription_filters(context, *, dashboard_url):
     status = context.get("ins_status") or ""
     search = context.get("ins_search") or ""
+    activity_date = context.get("ins_activity_date") or ""
+    status_choices = (("open", "À finaliser"),) + tuple(Inscription.STATUS_CHOICES)
     active_filters = []
     if status:
         active_filters.append(dict(Inscription.STATUS_CHOICES).get(status, status))
     if search:
         active_filters.append(f'Recherche : "{search}"')
+    if activity_date:
+        active_filters.append(f"Activité : {activity_date}")
     return {
         "action": dashboard_url,
         "reset_url": f"{dashboard_url}?section=inscriptions",
         "hidden_fields": [{"name": "section", "value": "inscriptions"}],
         "active_filters": active_filters,
         "items": [
-            {"name": "ins_status", "label": "Statut", "options": _choice_options(Inscription.STATUS_CHOICES, status, empty_label="Tous les statuts")},
+            {"name": "ins_status", "label": "Statut", "options": _choice_options(status_choices, status, empty_label="Tous les statuts")},
+            {"name": "ins_date", "label": "Date d'activité", "type": "date", "value": activity_date},
             {"name": "ins_q", "label": "Étudiant ou token", "value": search, "placeholder": "Nom, email ou token…", "clearable": True},
         ],
     }
@@ -781,6 +835,7 @@ def _inscription_table(context, *, capabilities, dashboard_url):
         "inscriptions",
         context,
         ins_status=context.get("ins_status") or "",
+        ins_date=context.get("ins_activity_date") or "",
         ins_q=context.get("ins_search") or "",
     )
 
@@ -813,6 +868,7 @@ def _cash_filters(context, *, dashboard_url):
     movement_type = context.get("cash_type") or ""
     source = context.get("cash_source") or ""
     search = context.get("cash_search") or ""
+    activity_date = context.get("cash_activity_date") or ""
     active_filters = []
     if movement_type:
         active_filters.append(dict(BranchCashMovement.TYPE_CHOICES).get(movement_type, movement_type))
@@ -820,6 +876,8 @@ def _cash_filters(context, *, dashboard_url):
         active_filters.append(dict(BranchCashMovement.SOURCE_CHOICES).get(source, source))
     if search:
         active_filters.append(f'Recherche : "{search}"')
+    if activity_date:
+        active_filters.append(f"Date : {activity_date}")
     return {
         "action": dashboard_url,
         "reset_url": f"{dashboard_url}?section=caisse",
@@ -828,6 +886,7 @@ def _cash_filters(context, *, dashboard_url):
         "items": [
             {"name": "cash_type", "label": "Type", "options": _choice_options(BranchCashMovement.TYPE_CHOICES, movement_type, empty_label="Tous les types")},
             {"name": "cash_source", "label": "Source", "options": _choice_options(BranchCashMovement.SOURCE_CHOICES, source, empty_label="Toutes les sources")},
+            {"name": "cash_date", "label": "Date", "type": "date", "value": activity_date},
             {"name": "cash_q", "label": "Mouvement", "value": search, "placeholder": "Libellé, référence ou note…", "clearable": True},
         ],
     }
@@ -864,6 +923,7 @@ def _cash_table(context, *, dashboard_url):
         context,
         cash_type=context.get("cash_type") or "",
         cash_source=context.get("cash_source") or "",
+        cash_date=context.get("cash_activity_date") or "",
         cash_q=context.get("cash_search") or "",
     )
 
@@ -1019,7 +1079,10 @@ def _payroll_filters(context, *, dashboard_url):
     status = context.get("salary_status") or ""
     search = context.get("salary_search") or ""
     month = context.get("salary_month_value") or ""
-    status_choices = tuple(PayrollEntry.STATUS_CHOICES) + (("missing", "Sans fiche"),)
+    status_choices = tuple(PayrollEntry.STATUS_CHOICES) + (
+        ("payable", "À payer (disponible ou partiel)"),
+        ("missing", "Sans fiche"),
+    )
     active_filters = []
     if status:
         active_filters.append(dict(status_choices).get(status, status))
@@ -1051,10 +1114,15 @@ def build_payroll_table_row(profile, *, salary_month_value):
     detail_url = reverse("accounts:htmx_manager_salary_detail", args=[profile.user_id])
     if salary_month_value:
         detail_url = f"{detail_url}?{urlencode({'salary_month': salary_month_value})}"
+    action_label = (
+        "Contrôler" if not entry or entry.status == PayrollEntry.STATUS_DRAFT
+        else "Payer" if entry.status in {PayrollEntry.STATUS_READY, PayrollEntry.STATUS_PARTIAL}
+        else "Voir"
+    )
     actions = [
         {
-            "label": "Gérer",
-            "icon": "eye",
+            "label": action_label,
+            "icon": "banknote" if action_label == "Payer" else "scan-search" if action_label == "Contrôler" else "eye",
             "get_url": detail_url,
             "target": "#manager-modal-content",
             "swap": "innerHTML",
@@ -1079,6 +1147,7 @@ def build_payroll_table_row(profile, *, salary_month_value):
             {"value": f"{_money(base_salary)} FCFA", "amount": True},
             {"value": f"{_money(entry.net_salary)} FCFA" if entry else "—", "amount": bool(entry)},
             {"value": f"{_money(entry.paid_amount)} FCFA" if entry else "—", "amount": bool(entry)},
+            {"value": f"{_money(entry.remaining_salary)} FCFA" if entry else "—", "amount": bool(entry), "tone": "warning" if entry and entry.remaining_salary else "neutral"},
             {"value": entry.get_status_display() if entry else "À vérifier", "tone": status_tones.get(entry.status, "neutral") if entry else "neutral"},
         ],
         "actions": actions,
@@ -1101,7 +1170,7 @@ def _payroll_table(context, *, dashboard_url):
         return f"{dashboard_url}?{urlencode({**query, 'salary_page': number})}"
 
     return {
-        "headers": ["Employé", "Salaire officiel", "Net", "Payé", "Statut"],
+        "headers": ["Employé", "Salaire officiel", "Net", "Payé", "Reste", "Statut"],
         "rows": rows,
         "result_count": page.paginator.count,
         "page": page.number,
@@ -1146,6 +1215,7 @@ def _report_filters(context, *, dashboard_url):
                     (
                         ("month", "Mois"),
                         ("today", "Aujourd'hui"),
+                        ("yesterday", "Hier"),
                         ("week", "Semaine"),
                         ("two_weeks", "Deux semaines"),
                         ("three_months", "Trois mois"),
@@ -1272,7 +1342,10 @@ def _honorarium_filters(context, *, dashboard_url):
     status = context.get("honorarium_status") or ""
     search = context.get("honorarium_search") or ""
     month = context.get("salary_month_value") or ""
-    status_choices = tuple(TeacherHonorariumEntry.STATUS_CHOICES) + (("missing", "Sans fiche"),)
+    status_choices = tuple(TeacherHonorariumEntry.STATUS_CHOICES) + (
+        ("payable", "À payer (disponible ou partiel)"),
+        ("missing", "Sans fiche"),
+    )
     active_filters = []
     if status:
         active_filters.append(dict(status_choices).get(status, status))
@@ -1282,8 +1355,8 @@ def _honorarium_filters(context, *, dashboard_url):
         active_filters.append(f'Recherche : "{search}"')
     return {
         "action": dashboard_url,
-        "reset_url": f"{dashboard_url}?section=cloture",
-        "hidden_fields": [{"name": "section", "value": "cloture"}],
+        "reset_url": f"{dashboard_url}?section=honoraires",
+        "hidden_fields": [{"name": "section", "value": "honoraires"}],
         "active_filters": active_filters,
         "items": [
             {"name": "salary_month", "label": "Mois", "type": "month", "value": month},
@@ -1304,7 +1377,12 @@ def build_honorarium_table_row(profile, *, salary_month_value):
     detail_url = reverse("accounts:htmx_manager_teacher_honorarium_detail", args=[profile.user_id])
     if salary_month_value:
         detail_url = f"{detail_url}?{urlencode({'salary_month': salary_month_value})}"
-    actions = [{"label": "Gérer", "icon": "eye", "get_url": detail_url, "target": "#manager-modal-content", "swap": "innerHTML", "open_overlay": "manager-modal"}]
+    action_label = (
+        "Contrôler" if not entry or entry.status == TeacherHonorariumEntry.STATUS_DRAFT
+        else "Payer" if entry.status in {TeacherHonorariumEntry.STATUS_READY, TeacherHonorariumEntry.STATUS_PARTIAL}
+        else "Voir"
+    )
+    actions = [{"label": action_label, "icon": "banknote" if action_label == "Payer" else "scan-search" if action_label == "Contrôler" else "eye", "get_url": detail_url, "target": "#manager-modal-content", "swap": "innerHTML", "open_overlay": "manager-modal"}]
     if entry:
         actions.append({"label": "Bordereau", "icon": "file-text", "href": reverse("accounts:manager_honorarium_statement_pdf", args=[entry.pk]), "external": True})
     return {
@@ -1316,6 +1394,7 @@ def build_honorarium_table_row(profile, *, salary_month_value):
             {"value": f"{entry.validated_hours} h" if entry else "—"},
             {"value": f"{_money(entry.net_amount)} FCFA" if entry else "—", "amount": bool(entry)},
             {"value": f"{_money(entry.paid_amount)} FCFA" if entry else "—", "amount": bool(entry)},
+            {"value": f"{_money(entry.remaining_amount)} FCFA" if entry else "—", "amount": bool(entry), "tone": "warning" if entry and entry.remaining_amount else "neutral"},
             {"value": entry.get_status_display() if entry else "À vérifier", "tone": status_tones.get(entry.status, "neutral") if entry else "neutral"},
         ],
         "actions": actions,
@@ -1327,7 +1406,7 @@ def _honorarium_table(context, *, dashboard_url):
     month = context.get("salary_month_value") or ""
     rows = [build_honorarium_table_row(item, salary_month_value=month) for item in page.object_list]
     query = _manager_section_query(
-        "cloture",
+        "honoraires",
         context,
         salary_month=month,
         honorarium_status=context.get("honorarium_status") or "",
@@ -1338,7 +1417,7 @@ def _honorarium_table(context, *, dashboard_url):
         return f"{dashboard_url}?{urlencode({**query, 'honorarium_page': number})}"
 
     return {
-        "headers": ["Enseignant", "Taux", "Heures", "Net", "Payé", "Statut"],
+        "headers": ["Enseignant", "Taux", "Heures", "Net", "Payé", "Reste", "Statut"],
         "rows": rows,
         "result_count": page.paginator.count,
         "page": page.number,
@@ -1465,14 +1544,15 @@ def _donation_table(context, *, dashboard_url, subcontent_url):
 def _shop_stat_cards(context):
     stats = context.get("shop_stats") or {}
     return [
-        {"label": "Articles", "value": intcomma(stats.get("products") or 0), "icon": "package", "tone": "primary", "description": f"{intcomma(stats.get('required') or 0)} obligatoire(s)"},
-        {"label": "Stock faible", "value": intcomma(stats.get("low_stock") or 0), "icon": "package-search", "tone": "danger" if stats.get("low_stock") else "success", "description": "Articles au seuil d'alerte"},
-        {"label": "Commandes à traiter", "value": intcomma((stats.get("pending_orders") or 0) + (stats.get("paid_not_delivered") or 0) + (stats.get("ready_orders") or 0)), "icon": "shopping-bag", "tone": "warning", "description": "Paiement, préparation ou remise"},
-        {"label": "Ventes du mois", "value": _money(stats.get("month_sales")), "unit": "FCFA", "icon": "badge-dollar-sign", "tone": "success", "description": "Recettes boutique de l'annexe"},
+        {"label": "Ventes du jour", "value": _money(stats.get("today_sales")), "unit": "FCFA", "icon": "trending-up", "tone": "success", "description": "Recettes boutique encaissées aujourd’hui"},
+        {"label": "Tickets du jour", "value": intcomma(stats.get("today_sales_count") or 0), "icon": "receipt-text", "tone": "primary", "description": "Ventes réellement validées"},
+        {"label": "À encaisser", "value": intcomma(stats.get("pending_orders") or 0), "icon": "badge-dollar-sign", "tone": "warning", "description": "Commandes en attente de règlement"},
+        {"label": "À préparer", "value": intcomma(stats.get("paid_not_delivered") or 0), "icon": "package-check", "tone": "primary", "description": "Ventes encaissées à préparer"},
+        {"label": "À remettre", "value": intcomma(stats.get("ready_orders") or 0), "icon": "package-open", "tone": "info", "description": "Commandes prêtes pour le client"},
     ]
 
 
-def _shop_order_table(context):
+def _shop_order_table(context, *, orders=None):
     status_tones = {
         "draft": "neutral",
         "pending_payment": "warning",
@@ -1481,8 +1561,9 @@ def _shop_order_table(context):
         "delivered": "success",
         "cancelled": "danger",
     }
+    current_view = context.get("manager_subview") or "sell"
     rows = []
-    for order in context.get("shop_orders") or ():
+    for order in (orders if orders is not None else context.get("shop_orders") or ()):
         actions = []
         for payment in order.payments.all():
             if payment.status == "pending":
@@ -1490,7 +1571,7 @@ def _shop_order_table(context):
                     {
                         "label": "Valider paiement",
                         "icon": "check",
-                        "post_url": reverse("shop:manager_payment_validate", args=[payment.pk]),
+                        "post_url": f"{reverse('shop:manager_payment_validate', args=[payment.pk])}?view={current_view}",
                         "target": "#manager-shop-module",
                         "swap": "outerHTML",
                         "csrf": True,
@@ -1505,19 +1586,19 @@ def _shop_order_table(context):
                 {
                     "label": "Préparer",
                     "icon": "package-check",
-                    "post_url": reverse("shop:manager_order_mark_ready", args=[order.pk]),
+                    "post_url": f"{reverse('shop:manager_order_mark_ready', args=[order.pk])}?view={current_view}",
                     "target": "#manager-shop-module",
                     "swap": "outerHTML",
                     "csrf": True,
                     "confirm": f"Marquer la commande {order.reference} comme prête ?",
                 }
             )
-        if order.status in {"paid", "ready"}:
+        if order.status == "ready":
             actions.append(
                 {
                     "label": "Remettre",
                     "icon": "package-open",
-                    "post_url": reverse("shop:manager_order_deliver", args=[order.pk]),
+                    "post_url": f"{reverse('shop:manager_order_deliver', args=[order.pk])}?view={current_view}",
                     "target": "#manager-shop-module",
                     "swap": "outerHTML",
                     "csrf": True,
@@ -1543,6 +1624,155 @@ def _shop_order_table(context):
     return {"headers": ["Commande", "Acheteur", "Articles", "Total", "État"], "rows": rows, "result_count": len(rows), "page": 1, "page_count": 1}
 
 
+def _shop_order_queues(context):
+    queues = context.get("shop_order_queues") or {}
+    return {
+        "pending": _shop_order_table(context, orders=queues.get("pending") or ()),
+        "paid": _shop_order_table(context, orders=queues.get("paid") or ()),
+        "ready": _shop_order_table(context, orders=queues.get("ready") or ()),
+    }
+
+
+def _shop_journal_tables(context):
+    payment_rows = []
+    for payment in context.get("shop_recent_payments") or ():
+        payment_rows.append(
+            {
+                "id": f"shop-payment-journal-{payment.pk}",
+                "label": payment.reference or str(payment.pk),
+                "cells": [
+                    {"value": payment.reference or "Paiement boutique", "secondary": formats.date_format(payment.paid_at, "d/m/Y H:i"), "strong": True},
+                    {"value": payment.order.buyer_display, "secondary": payment.order.reference},
+                    {"value": payment.get_method_display()},
+                    {"value": f"{_money(payment.amount)} FCFA", "amount": True},
+                    {"value": payment.get_status_display(), "tone": "success" if payment.status == "validated" else "warning" if payment.status == "pending" else "danger"},
+                ],
+                "actions": ([{"label": "Reçu", "icon": "file-text", "href": reverse("shop:payment_receipt", args=[payment.pk]), "external": True}] if payment.receipt_pdf else []),
+            }
+        )
+    movement_rows = []
+    tone_by_type = {"in": "success", "out": "warning", "adjustment": "info"}
+    for movement in context.get("shop_recent_stock_movements") or ():
+        movement_rows.append(
+            {
+                "id": f"shop-stock-journal-{movement.pk}",
+                "label": movement.reference or str(movement.pk),
+                "cells": [
+                    {"value": formats.date_format(movement.created_at, "d/m/Y H:i"), "secondary": movement.reference or "Sans référence", "strong": True},
+                    {"value": movement.product.name},
+                    {"value": movement.get_movement_type_display(), "tone": tone_by_type.get(movement.movement_type, "neutral")},
+                    {"value": f"{movement.quantity:+d}", "amount": True},
+                    {"value": movement.notes or "—", "secondary": movement.created_by.get_full_name() if movement.created_by_id else "Système"},
+                ],
+            }
+        )
+    return {
+        "payments": {"headers": ["Référence", "Client", "Paiement", "Montant", "État"], "rows": payment_rows, "result_count": len(payment_rows), "page": 1, "page_count": 1},
+        "stock": {"headers": ["Date", "Article", "Mouvement", "Quantité", "Motif / auteur"], "rows": movement_rows, "result_count": len(movement_rows), "page": 1, "page_count": 1},
+    }
+
+
+def _shop_journal_filters(context, *, action_url):
+    query = context.get("shop_journal_query") or ""
+    journal_date = context.get("shop_journal_date") or ""
+    active_filters = []
+    if query:
+        active_filters.append(f'Recherche : "{query}"')
+    if journal_date:
+        active_filters.append(f"Date : {journal_date}")
+    return {
+        "action": action_url,
+        "reset_url": f"{action_url}?{urlencode({'section': 'boutique', 'view': 'journal'})}",
+        "hidden_fields": [
+            {"name": "section", "value": "boutique"},
+            {"name": "view", "value": "journal"},
+        ],
+        "active_filters": active_filters,
+        "items": [
+            {"name": "shop_date", "label": "Date", "type": "date", "value": journal_date},
+            {"name": "shop_q", "label": "Référence, client ou article", "value": query, "placeholder": "Rechercher…", "clearable": True},
+        ],
+    }
+
+
+def _shop_catalogue_table(context):
+    rows = []
+    for product in context.get("shop_catalogue_products") or ():
+        stock = product.inventory_stock if hasattr(product, "inventory_stock") else product.current_stock
+        low_stock = product.inventory_low if hasattr(product, "inventory_low") else product.is_low_stock
+        action = "Archiver" if product.is_active else "Réactiver"
+        rows.append(
+            {
+                "id": f"manager-shop-product-{product.pk}",
+                "label": product.name,
+                "cells": [
+                    {"value": product.name, "secondary": product.get_category_display(), "strong": True},
+                    {"value": f"{_money(product.unit_price)} FCFA", "amount": True},
+                    {"value": str(stock), "secondary": f"Seuil : {product.low_stock_threshold}", "tone": "danger" if low_stock else "success"},
+                    {"value": "Obligatoire" if product.is_required else "Libre", "tone": "primary" if product.is_required else "neutral"},
+                    {"value": "Actif" if product.is_active else "Archivé", "tone": "success" if product.is_active else "neutral"},
+                ],
+                "actions": [{
+                    "label": action,
+                    "icon": "archive" if product.is_active else "rotate-ccw",
+                    "post_url": reverse("shop:manager_product_delete", args=[product.pk]),
+                    "target": "#manager-shop-module",
+                    "swap": "outerHTML",
+                    "csrf": True,
+                    "confirm": f"{action} l'article {product.name} ?",
+                    "tone": "warning" if product.is_active else "success",
+                }],
+            }
+        )
+    return {
+        "headers": ["Article", "Prix unitaire", "Stock", "Usage", "Publication"],
+        "rows": rows,
+        "result_count": len(rows),
+        "page": 1,
+        "page_count": 1,
+    }
+
+
+def _shop_stock_filters(context, *, action_url):
+    query = context.get("shop_stock_query") or ""
+    state = context.get("shop_stock_state") or ""
+    category = context.get("shop_stock_category") or ""
+    active_filters = []
+    if query:
+        active_filters.append(f'Recherche : "{query}"')
+    if state:
+        active_filters.append(
+            {
+                "low": "Au seuil d'alerte",
+                "available": "Stock disponible",
+                "active": "Articles actifs",
+                "archived": "Articles archivés",
+            }.get(state, state)
+        )
+    if category:
+        labels = {value: label for value, label in ShopProduct.CATEGORY_CHOICES}
+        active_filters.append(f"Catégorie : {labels.get(category, category)}")
+    return {
+        "action": action_url,
+        "reset_url": f"{action_url}?{urlencode({'section': 'boutique', 'view': 'stock'})}",
+        "hidden_fields": [
+            {"name": "section", "value": "boutique"},
+            {"name": "view", "value": "stock"},
+        ],
+        "active_filters": active_filters,
+        "items": [
+            {"name": "shop_stock_q", "label": "Article", "value": query, "placeholder": "Rechercher…", "clearable": True},
+            {"name": "shop_stock_category", "label": "Catégorie", "options": _choice_options(ShopProduct.CATEGORY_CHOICES, category, empty_label="Toutes les catégories")},
+            {"name": "shop_stock_state", "label": "État du stock", "options": _choice_options((
+                ("low", "Au seuil d’alerte"),
+                ("available", "Disponible"),
+                ("active", "Articles actifs"),
+                ("archived", "Articles archivés"),
+            ), state, empty_label="Tous les états")},
+        ],
+    }
+
+
 def build_manager_dashboard_presentation(
     *,
     active_section,
@@ -1563,8 +1793,12 @@ def build_manager_dashboard_presentation(
     stat_cards = []
     filters = {}
     table = {}
+    catalogue_table = {}
+    shop_order_queues = {}
+    shop_journal_tables = {}
     report = {}
     closure_tables = {}
+    subview_counts = {}
 
     if section == "overview":
         stat_cards = _overview_stat_cards(context)
@@ -1584,7 +1818,7 @@ def build_manager_dashboard_presentation(
             {
                 "label": "Passages et réinscriptions",
                 "icon": "refresh-cw",
-                "href": reverse("accounts_portal:reenrollment_workspace"),
+                "href": f"{dashboard_url}?section=reenrollment",
                 "primary": False,
             }
         ]
@@ -1598,6 +1832,8 @@ def build_manager_dashboard_presentation(
         filters = _inscription_filters(context, dashboard_url=dashboard_url)
         table = _inscription_table(context, capabilities=capabilities, dashboard_url=dashboard_url)
         header_actions = [{"label": "Voir les candidatures", "icon": "file-check", "href": f"{dashboard_url}?section=candidatures", "primary": False}]
+    elif section == "reenrollment":
+        header_actions = [{"label": "Encaissements", "icon": "credit-card", "href": f"{dashboard_url}?section=paiements", "primary": False}]
     elif section == "caisse":
         stat_cards = _cash_stat_cards(context)
         filters = _cash_filters(context, dashboard_url=dashboard_url)
@@ -1612,6 +1848,23 @@ def build_manager_dashboard_presentation(
         stat_cards = _payroll_stat_cards(context)
         filters = _payroll_filters(context, dashboard_url=dashboard_url)
         table = _payroll_table(context, dashboard_url=dashboard_url)
+        payroll_stats = context.get("payroll_stats") or {}
+        subview_counts = {
+            "to_validate": payroll_stats.get("to_review") or 0,
+            "to_pay": payroll_stats.get("payable") or 0,
+            "history": payroll_stats.get("paid") or 0,
+        }
+        header_actions = [{"label": "Voir la caisse", "icon": "vault", "href": f"{dashboard_url}?section=caisse", "primary": False}]
+    elif section == "honoraires":
+        stat_cards = _honorarium_stat_cards(context)
+        filters = _honorarium_filters(context, dashboard_url=dashboard_url)
+        table = _honorarium_table(context, dashboard_url=dashboard_url)
+        honorarium_stats = context.get("honorarium_stats") or {}
+        subview_counts = {
+            "to_validate": honorarium_stats.get("to_review") or 0,
+            "to_pay": honorarium_stats.get("payable") or 0,
+            "history": honorarium_stats.get("paid") or 0,
+        }
         header_actions = [{"label": "Voir la caisse", "icon": "vault", "href": f"{dashboard_url}?section=caisse", "primary": False}]
     elif section == "rapport":
         stat_cards = _report_stat_cards(context)
@@ -1623,9 +1876,6 @@ def build_manager_dashboard_presentation(
             {"label": "État PDF", "icon": "file-text", "href": report["pdf_url"], "primary": False, "external": True},
         ]
     elif section == "cloture":
-        stat_cards = _honorarium_stat_cards(context)
-        filters = _honorarium_filters(context, dashboard_url=dashboard_url)
-        table = _honorarium_table(context, dashboard_url=dashboard_url)
         closure_tables = _closure_tables(
             context,
             subcontent_url=subcontent_url or workspace_url or dashboard_url,
@@ -1641,7 +1891,34 @@ def build_manager_dashboard_presentation(
         header_actions = [{"label": "Voir la caisse", "icon": "vault", "href": f"{dashboard_url}?section=caisse", "primary": False}]
     elif section == "boutique":
         stat_cards = _shop_stat_cards(context)
-        table = _shop_order_table(context)
+        shop_order_queues = _shop_order_queues(context)
+        catalogue_table = _shop_catalogue_table(context)
+        shop_journal_tables = _shop_journal_tables(context)
+        if subview == "to_collect":
+            table = shop_order_queues["pending"]
+        elif subview == "to_prepare":
+            table = shop_order_queues["paid"]
+        elif subview == "to_deliver":
+            table = shop_order_queues["ready"]
+        elif subview == "stock":
+            table = catalogue_table
+            filters = _shop_stock_filters(
+                context,
+                action_url=subcontent_url or workspace_url or dashboard_url,
+            )
+        elif subview == "journal":
+            table = shop_journal_tables["payments"]
+            filters = _shop_journal_filters(
+                context,
+                action_url=subcontent_url or workspace_url or dashboard_url,
+            )
+        stats = context.get("shop_stats") or {}
+        subview_counts = {
+            "to_collect": stats.get("pending_orders") or 0,
+            "to_prepare": stats.get("paid_not_delivered") or 0,
+            "to_deliver": stats.get("ready_orders") or 0,
+            "stock": stats.get("low_stock") or 0,
+        }
         header_actions = [{"label": "Voir la caisse", "icon": "vault", "href": f"{dashboard_url}?section=caisse", "primary": False}]
 
     filters = _augment_manager_filters(filters, section=section, subview=subview)
@@ -1655,6 +1932,7 @@ def build_manager_dashboard_presentation(
             active=subview,
             dashboard_url=dashboard_url,
             subcontent_url=subcontent_endpoint,
+            counts=subview_counts,
         ),
         "subcontent_template": manager_subcontent_template(section),
         "subcontent_target": manager_subcontent_target(section),
@@ -1664,6 +1942,9 @@ def build_manager_dashboard_presentation(
         "stat_cards": stat_cards,
         "filters": filters,
         "table": table,
+        "catalogue_table": catalogue_table,
+        "shop_order_queues": shop_order_queues,
+        "shop_journal_tables": shop_journal_tables,
         "report": report,
         "closure_tables": closure_tables,
         "component_targets": SECTION_PRESENTATION[section]["components"],

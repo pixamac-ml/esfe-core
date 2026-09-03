@@ -3,6 +3,7 @@ from django.core.exceptions import ValidationError
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from django.utils.text import slugify
@@ -16,8 +17,11 @@ from shop.forms import (
     ShopCounterOrderForm,
     ShopProductForm,
     ShopPublicOrderForm,
+    ShopStockAdjustmentForm,
     ShopStockInForm,
     StudentShopPaymentForm,
+    StudentRemoteOrderRequestForm,
+    StudentRemoteOrderOtpForm,
 )
 from shop.models import ShopCashPaymentSession, ShopOrder, ShopPayment, ShopProduct, ShopSequence, ShopStockMovement
 from shop.services.shop_cash_session import manager_shop_sessions_for_agent, verify_agent_and_create_shop_session
@@ -25,7 +29,10 @@ from shop.services.shop_service import (
     create_counter_order,
     create_shop_payment,
     create_student_required_order,
+    request_student_remote_order_confirmation,
+    confirm_student_remote_order,
     deliver_order,
+    ensure_stock_available,
     get_branch_public_shop_identifier,
     get_recommended_products_for_student,
     get_required_shop_context,
@@ -67,7 +74,7 @@ def manager_shop_redirect(request):
     return response
 
 
-def render_manager_shop_panel(request, *, product_form=None, stock_form=None, counter_order_form=None, shop_error="", status=200):
+def render_manager_shop_panel(request, *, product_form=None, stock_form=None, stock_adjustment_form=None, counter_order_form=None, shop_error="", status=200):
     shop_context = get_manager_shop_context(request.branch)
     manager_agent = _payment_agent_for_branch_manager(request.user, request.branch)
     active_shop_cash_sessions = manager_shop_sessions_for_agent(manager_agent, limit=12) if manager_agent else []
@@ -77,6 +84,7 @@ def render_manager_shop_panel(request, *, product_form=None, stock_form=None, co
         "shop_error": shop_error or shop_context.get("shop_error", ""),
         "shop_product_form": product_form or ShopProductForm(),
         "shop_stock_form": stock_form or ShopStockInForm(branch=request.branch),
+        "shop_stock_adjustment_form": stock_adjustment_form or ShopStockAdjustmentForm(branch=request.branch),
         "shop_counter_order_form": counter_order_form or ShopCounterOrderForm(branch=request.branch),
         "manager_agent": manager_agent,
         "active_shop_cash_sessions": active_shop_cash_sessions,
@@ -87,6 +95,7 @@ def render_manager_shop_panel(request, *, product_form=None, stock_form=None, co
         active_section="boutique",
         context=context,
         dashboard_url=reverse("accounts:manager_dashboard"),
+        active_subview=(request.POST.get("shop_view") or request.GET.get("view") or "sell"),
     )
     response = render(request, "shop/partials/manager_shop_panel.html", context)
     response.status_code = status
@@ -277,6 +286,44 @@ def student_create_required_order(request):
 
 @login_required
 @require_GET
+def student_remote_order_modal(request):
+    products = {product.pk: product for product in get_recommended_products_for_student(request.user)}
+    product = products.get(request.GET.get("product", "") and int(request.GET["product"])) if request.GET.get("product", "").isdigit() else None
+    if not product:
+        return HttpResponse("Article indisponible.", status=404)
+    return render(request, "shop/partials/student_remote_order_modal.html", {"product": product, "order_request_form": StudentRemoteOrderRequestForm(initial={"product_id": product.pk})})
+
+
+@login_required
+@require_POST
+def student_remote_order_request(request):
+    form = StudentRemoteOrderRequestForm(request.POST)
+    if not form.is_valid():
+        return render(request, "shop/partials/student_remote_order_modal.html", {"order_request_form": form}, status=400)
+    try:
+        confirmation, product = request_student_remote_order_confirmation(student=request.user, product_id=form.cleaned_data["product_id"], quantity=form.cleaned_data["quantity"])
+    except ValidationError as exc:
+        form.add_error(None, exc)
+        return render(request, "shop/partials/student_remote_order_modal.html", {"order_request_form": form}, status=400)
+    return render(request, "shop/partials/student_remote_order_otp.html", {"product": product, "quantity": confirmation.quantity, "order_otp_form": StudentRemoteOrderOtpForm(initial={"confirmation_id": confirmation.pk})})
+
+
+@login_required
+@require_POST
+def student_remote_order_confirm(request):
+    form = StudentRemoteOrderOtpForm(request.POST)
+    if not form.is_valid():
+        return render(request, "shop/partials/student_remote_order_otp.html", {"order_otp_form": form}, status=400)
+    try:
+        order = confirm_student_remote_order(student=request.user, confirmation_id=form.cleaned_data["confirmation_id"], code=form.cleaned_data["otp_code"])
+    except ValidationError as exc:
+        form.add_error(None, exc)
+        return render(request, "shop/partials/student_remote_order_otp.html", {"order_otp_form": form}, status=400)
+    return render(request, "shop/partials/student_remote_order_success.html", {"order": order})
+
+
+@login_required
+@require_GET
 def student_order_detail(request, pk):
     order = get_object_or_404(
         ShopOrder.objects.prefetch_related("items", "items__product", "items__variant", "payments"),
@@ -407,11 +454,10 @@ def manager_product_create(request):
 @require_POST
 def manager_product_delete(request, pk):
     product = get_object_or_404(ShopProduct, pk=pk, branch=request.branch)
-    if product.order_items.exists() or product.stock_movements.exists():
-        product.is_active = False
-        product.save(update_fields=["is_active", "updated_at"])
-    else:
-        product.delete()
+    # Catalogue items can be part of a sale or a stock movement. Archive or
+    # restore them instead of deleting the accounting and stock history.
+    product.is_active = not product.is_active
+    product.save(update_fields=["is_active", "updated_at"])
     if request.headers.get("HX-Request"):
         return render_manager_shop_panel(request)
     return manager_shop_redirect(request)
@@ -439,6 +485,40 @@ def manager_stock_in(request):
 
 @manager_required
 @require_POST
+def manager_stock_adjust(request):
+    form = ShopStockAdjustmentForm(request.POST, branch=request.branch)
+    if not form.is_valid():
+        return render_manager_shop_panel(request, stock_adjustment_form=form, status=400)
+
+    try:
+        with transaction.atomic():
+            product = ShopProduct.objects.select_for_update().get(
+                pk=form.cleaned_data["product"].pk,
+                branch=request.branch,
+                is_active=True,
+            )
+            quantity = form.cleaned_data["quantity"]
+            if quantity < 0:
+                ensure_stock_available(product=product, quantity=abs(quantity))
+            ShopStockMovement.objects.create(
+                branch=request.branch,
+                product=product,
+                movement_type=ShopStockMovement.TYPE_ADJUSTMENT,
+                quantity=quantity,
+                reference=next_shop_reference(request.branch, ShopSequence.TYPE_STOCK),
+                notes=form.cleaned_data["notes"],
+                created_by=request.user,
+            )
+    except ValidationError as exc:
+        form.add_error(None, exc)
+        return render_manager_shop_panel(request, stock_adjustment_form=form, status=400)
+    if request.headers.get("HX-Request"):
+        return render_manager_shop_panel(request, stock_adjustment_form=ShopStockAdjustmentForm(branch=request.branch))
+    return manager_shop_redirect(request)
+
+
+@manager_required
+@require_POST
 def manager_counter_order_create(request):
     form = ShopCounterOrderForm(request.POST, branch=request.branch)
     if not form.is_valid():
@@ -447,8 +527,7 @@ def manager_counter_order_create(request):
     try:
         create_counter_order(
             branch=request.branch,
-            product=form.cleaned_data["product"],
-            quantity=form.cleaned_data["quantity"],
+            lines=form.cart_lines,
             payment_method=form.cleaned_data["payment_method"],
             created_by=request.user,
             student=student,

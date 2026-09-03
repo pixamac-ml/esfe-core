@@ -41,13 +41,13 @@ _SECTION_VIEWS = {
         ("alerts", "Alertes", "triangle-alert"),
     ),
     "teachers": (
-        ("overview", "Vue d'ensemble", "bar-chart-3"),
-        ("today", "Présence du jour", "user-check"),
+        ("overview", "Synthèse des séances", "bar-chart-3"),
+        ("today", "Séances à contrôler", "clipboard-check"),
         ("history", "Historique", "history"),
     ),
     "schedule": (
+        ("week", "Grille publiée", "calendar-range"),
         ("today", "Aujourd'hui", "calendar-check"),
-        ("week", "Semaine publiée", "calendar-range"),
     ),
     "signals": (
         ("overview", "Vue d'ensemble", "layout-dashboard"),

@@ -110,7 +110,7 @@ class DirectorProgrammeWorkflowTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Programmes et classes")
+        self.assertContains(response, "Maquettes")
         self.assertContains(response, "Vue d&#x27;ensemble")
         self.assertContains(response, "Classes")
         self.assertContains(response, "Maquettes pédagogiques")
@@ -305,3 +305,43 @@ class DirectorProgrammeWorkflowTests(TestCase):
         self.assertContains(response, self.academic_class.name)
         self.assertNotContains(response, self.other_class.name)
         self.assertNotContains(response, self.other_ue.title)
+
+    def test_director_branch_settings_are_limited_to_its_own_branch(self):
+        workspace = self.client.get(
+            reverse("accounts_portal:director_workspace"), {"section": "settings"}
+        )
+        self.assertEqual(workspace.status_code, 200)
+        self.assertContains(workspace, "Param")
+        self.assertContains(workspace, self.branch.code)
+        self.assertNotContains(workspace, self.other_branch.name)
+
+        response = self.client.post(
+            reverse("accounts_portal:director_branch_settings_save"),
+            {
+                "address": "Rue des Ecoles",
+                "city": "Bamako",
+                "phone": "+223 70 00 00 00",
+                "email": "programme@esfe.test",
+                "branch_id": self.other_branch.pk,
+            },
+            HTTP_HX_REQUEST="true",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.branch.refresh_from_db()
+        self.other_branch.refresh_from_db()
+        self.assertEqual(self.branch.address, "Rue des Ecoles")
+        self.assertEqual(self.other_branch.address, "")
+        self.assertContains(response, "Les informations")
+
+    def test_director_sees_the_existing_it_entry_state_from_semester_status(self):
+        self.semester_1.status = Semester.STATUS_NORMAL_ENTRY
+        self.semester_1.save(update_fields=["status"])
+
+        response = self.client.get(
+            reverse("accounts_portal:director_drawer"),
+            {"panel": "evaluations", "class_id": self.academic_class.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Saisie en cours")

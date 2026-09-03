@@ -150,8 +150,8 @@ class PortalDashboardTemplateContractTests(SimpleTestCase):
         "DIRECTOR_OF_STUDIES": "portal/staff/director_dashboard.html",
         "IT_SUPPORT": "portal/staff/informaticien_dashboard_v2.html",
         "MARKETING_MANAGER": "marketing/dashboard.html",
-        "EXECUTIVE_DIRECTOR": "portal/dg/dashboard.html",
-        "DEPUTY_EXECUTIVE_DIRECTOR": "portal/dg/dashboard.html",
+        "EXECUTIVE_DIRECTOR": "portal/dg/dashboard_ui_core.html",
+        "DEPUTY_EXECUTIVE_DIRECTOR": "portal/dg/dashboard_ui_core.html",
         "SUPER_ADMIN": "superadmin/dashboard.html",
         "PAYMENT_AGENT": "portal/staff/finance_dashboard.html",
     }

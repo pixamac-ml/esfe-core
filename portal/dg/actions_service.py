@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from django.db import transaction
+from django.core.exceptions import ValidationError
+from datetime import timedelta
 
 from portal.models import SupportAuditLog, SupportTicket
+from .selectors import get_academic_year_datetime_bounds
 from students.models import AttendanceAlert, StudentCase, StudentCaseNote
 
 
@@ -17,8 +20,17 @@ def _audit(*, actor, branch, action_type, target_label, details=""):
 
 
 @transaction.atomic
-def resolve_attendance_alert(*, actor, alert_id):
-    alert = AttendanceAlert.objects.select_for_update().select_related("branch", "student").get(id=alert_id)
+def resolve_attendance_alert(*, actor, alert_id, scope_branch_ids=None, academic_year=None):
+    queryset = AttendanceAlert.objects.select_for_update().select_related("branch", "student")
+    if scope_branch_ids is not None:
+        queryset = queryset.filter(branch_id__in=scope_branch_ids)
+    if academic_year is not None:
+        academic_year_start, academic_year_end = get_academic_year_datetime_bounds(academic_year)
+        queryset = queryset.filter(
+            triggered_at__gte=academic_year_start,
+            triggered_at__lt=academic_year_end,
+        )
+    alert = queryset.get(id=alert_id)
     if alert.is_resolved:
         return {"message": "Alerte deja resolue.", "status": "done"}
     alert.is_resolved = True
@@ -34,8 +46,17 @@ def resolve_attendance_alert(*, actor, alert_id):
 
 
 @transaction.atomic
-def resolve_student_case(*, actor, case_id):
-    case = StudentCase.objects.select_for_update().select_related("branch", "student").get(id=case_id)
+def resolve_student_case(*, actor, case_id, scope_branch_ids=None, academic_year=None):
+    queryset = StudentCase.objects.select_for_update().select_related("branch", "student")
+    if scope_branch_ids is not None:
+        queryset = queryset.filter(branch_id__in=scope_branch_ids)
+    if academic_year is not None:
+        academic_year_start, academic_year_end = get_academic_year_datetime_bounds(academic_year)
+        queryset = queryset.filter(
+            created_at__gte=academic_year_start,
+            created_at__lt=academic_year_end,
+        )
+    case = queryset.get(id=case_id)
     if case.status == StudentCase.STATUS_RESOLU:
         return {"message": "Cas deja resolu.", "status": "done"}
     case.resolve(actor)
@@ -50,8 +71,17 @@ def resolve_student_case(*, actor, case_id):
 
 
 @transaction.atomic
-def escalate_student_case(*, actor, case_id):
-    case = StudentCase.objects.select_for_update().select_related("branch", "student").get(id=case_id)
+def escalate_student_case(*, actor, case_id, scope_branch_ids=None, academic_year=None):
+    queryset = StudentCase.objects.select_for_update().select_related("branch", "student")
+    if scope_branch_ids is not None:
+        queryset = queryset.filter(branch_id__in=scope_branch_ids)
+    if academic_year is not None:
+        academic_year_start, academic_year_end = get_academic_year_datetime_bounds(academic_year)
+        queryset = queryset.filter(
+            created_at__gte=academic_year_start,
+            created_at__lt=academic_year_end,
+        )
+    case = queryset.get(id=case_id)
     if case.status == StudentCase.STATUS_ESCALADE:
         return {"message": "Cas deja escalade.", "status": "done"}
     case.status = StudentCase.STATUS_ESCALADE
@@ -71,7 +101,9 @@ def escalate_student_case(*, actor, case_id):
     return {"message": "Cas escalade a la direction.", "status": "done", "refresh": "alerts"}
 
 
-def create_finance_followup(*, actor, branch):
+def create_finance_followup(*, actor, branch, scope_branch_ids=None):
+    if scope_branch_ids is not None and branch.id not in scope_branch_ids:
+        raise ValidationError("Cette annexe est hors du contexte DG actif.")
     title = f"Suivi finance DG - {branch.name}"
     open_tickets = list(
         SupportTicket.objects.filter(

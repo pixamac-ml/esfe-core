@@ -28,6 +28,12 @@ class TeacherSupportsSection(_TeacherSection):
     template_name = "dashboard/teacher_supports_section.html"
 
 
+@component.register("teacher_evaluations_section")
+class TeacherEvaluationsSection(_TeacherSection):
+    section_name = "evaluations"
+    template_name = "dashboard/teacher_evaluations_section.html"
+
+
 @component.register("teacher_schedule_section")
 class TeacherScheduleSection(_TeacherSection):
     section_name = "schedule"

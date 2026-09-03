@@ -5,7 +5,7 @@
       <div class="dg-section-hero-title">
         <i class="fa-solid fa-sack-dollar" style="color:#16a34a; margin-right:8px;"></i>Finance consolidee
       </div>
-      <div class="dg-section-hero-sub">Vue financiere globale · {{ dashboard_period_label|default:"Ce mois" }}</div>
+      <div class="dg-section-hero-sub">Vue financiere consolidee · cumul de l'annee academique selectionnee</div>
     </div>
     <div class="dg-section-actions">
       <button type="button" class="dg-btn dg-btn-outline" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=finance')">
@@ -20,11 +20,11 @@
   <div class="dg-context-bar">
     <div>
       <div class="dg-context-label">Perimetre financier</div>
-      <div class="dg-context-hint">La lecture suit l'annexe et la periode choisies dans le bandeau DG.</div>
+      <div class="dg-context-hint">Les montants couvrent l'annee academique et l'annexe actuellement selectionnees.</div>
     </div>
     <div class="dg-context-main">
       <span class="dg-scope-chip">{{ dashboard_scope_label|default:"Toutes les annexes" }}</span>
-      <span class="dg-scope-chip">{{ dashboard_period_label|default:"Ce mois" }}</span>
+      <span class="dg-scope-chip">{{ selected_academic_year.name|default:"Annee academique non definie" }}</span>
       <span class="dg-scope-chip">{{ finance.validated_payments|default:0|intcomma }} paiements valides</span>
     </div>
   </div>
@@ -34,12 +34,12 @@
     <div class="dg-kpi-card" style="border-top:3px solid #16a34a; min-height:auto; padding:14px;">
       <div style="font-size:.65rem; font-weight:900; color:#16a34a; text-transform:uppercase;">Revenus</div>
       <div style="font-size:1.5rem; font-weight:900; color:#16a34a; margin-top:4px;">{{ finance.revenue|intcomma }}</div>
-      <div style="font-size:.62rem; color:#94a3b8; font-weight:700;">FCFA ce mois</div>
+      <div style="font-size:.62rem; color:#94a3b8; font-weight:700;">FCFA - cumul annuel</div>
     </div>
     <div class="dg-kpi-card" style="border-top:3px solid #ef4444; min-height:auto; padding:14px;">
       <div style="font-size:.65rem; font-weight:900; color:#ef4444; text-transform:uppercase;">Depenses</div>
       <div style="font-size:1.5rem; font-weight:900; color:#ef4444; margin-top:4px;">{{ finance.expenses|intcomma }}</div>
-      <div style="font-size:.62rem; color:#94a3b8; font-weight:700;">FCFA ce mois</div>
+      <div style="font-size:.62rem; color:#94a3b8; font-weight:700;">FCFA - cumul annuel</div>
     </div>
     <div class="dg-kpi-card" style="border-top:3px solid #7c3aed; min-height:auto; padding:14px;">
       <div style="font-size:.65rem; font-weight:900; color:{% if finance.balance >= 0 %}#16a34a{% else %}#ef4444{% endif %}; text-transform:uppercase;">Solde</div>
@@ -111,7 +111,13 @@
     <div class="dg-panel">
       <div class="dg-panel-title">Repartition des depenses</div>
       <div style="height:220px; background:#f8fafc; border-radius:8px; padding:12px; margin-bottom:14px;">
-        <canvas id="dgFinanceChart"></canvas>
+        <canvas
+          id="dgFinanceChart"
+          data-dg-chart="finance"
+          data-ui-chart='{"type":"doughnut","data":{"labels":["Encaissements","Depenses"],"datasets":[{"data":[{{ finance.revenue|default:0 }},{{ finance.expenses|default:0 }}],"backgroundColor":["#16a34a","#ef4444"]}]},"options":{"plugins":{"legend":{"position":"bottom"}}}}'
+          role="img"
+          aria-label="Repartition des encaissements et depenses de l'annee academique selectionnee"
+        ></canvas>
       </div>
       {% with total=finance.expenses|default:1 %}
       <div class="dg-bar-item">
@@ -180,7 +186,7 @@
             </td>
             <td>
               {% if closure.status == 'draft' %}
-              <form method="post" action="{% url 'accounts_portal:dg_exec_action' %}" class="inline-flex" onsubmit="return dgSubmitAction(this)">
+              <form method="post" action="{% url 'accounts_portal:dg_exec_action' %}" class="inline-flex" onsubmit="return dgConfirmExecutiveAction(this)">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="validate_closure">
                 <input type="hidden" name="closure_id" value="{{ closure.id }}">

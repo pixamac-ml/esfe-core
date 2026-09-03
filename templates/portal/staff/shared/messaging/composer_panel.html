@@ -1,0 +1,96 @@
+<section
+  class="flex min-h-full flex-col"
+  x-data="{
+    audience: '{{ message_form.audience.value|default:'individual'|escapejs }}',
+    recipientQuery: '',
+    selectedRecipients: [{% for recipient in message_recipients %}{% if recipient.selected %}{ id: '{{ recipient.id }}', name: '{{ recipient.name|escapejs }}' },{% endif %}{% endfor %}],
+    isSelected(id) { return this.selectedRecipients.some((recipient) => recipient.id === String(id)); },
+    chooseIndividualMode() { this.audience = 'individual'; this.$refs.audience.value = 'individual'; },
+    toggleRecipient(id, name) {
+      const option = Array.from(this.$refs.recipients.options).find((item) => item.value === String(id));
+      if (!option) return;
+      option.selected = !option.selected;
+      this.selectedRecipients = this.isSelected(id)
+        ? this.selectedRecipients.filter((recipient) => recipient.id !== String(id))
+        : [...this.selectedRecipients, { id: String(id), name }];
+    },
+    removeRecipient(id) { if (this.isSelected(id)) this.toggleRecipient(id, ''); }
+  }"
+>
+  <header class="flex flex-wrap items-start justify-between gap-3 border-b border-ui-border pb-4">
+    <div>
+      <p class="text-xs font-semibold uppercase tracking-wide text-ui-primary">Messagerie interne</p>
+      <h2 class="mt-1 text-xl font-bold text-ui-text">{% if reply_to %}Répondre{% elif forward_from %}Transférer un message{% else %}Nouveau message{% endif %}</h2>
+      <p class="mt-1 text-sm text-ui-text-muted">Choisissez les destinataires puis rédigez sans quitter votre boîte de réception.</p>
+    </div>
+    <button type="button" hx-get="{% url 'accounts_portal:staff_messaging' %}?dash={{ staff_dash }}&box={{ message_box|default:'inbox' }}" hx-target="{{ staff_workspace_target }}" hx-swap="innerHTML" class="ui-focus-ring inline-flex h-9 items-center gap-2 rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover"><i data-lucide="x" class="h-4 w-4"></i>Annuler</button>
+  </header>
+
+  {% if message_form.non_field_errors %}
+    <div class="mt-4 rounded-ui-card border border-ui-danger/30 bg-ui-danger/5 px-3 py-2 text-xs text-ui-danger">{{ message_form.non_field_errors|join:" " }}</div>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data" hx-encoding="multipart/form-data" hx-post="{% url 'accounts_portal:staff_message_compose' %}" hx-target="{{ staff_workspace_target }}" hx-swap="innerHTML" hx-sync="this:drop" hx-disabled-elt="button[type=submit]" class="flex min-h-0 flex-1 flex-col">
+    {% csrf_token %}
+    <input type="hidden" name="dash" value="{{ staff_dash }}">
+    <input type="hidden" name="workspace" value="1">
+    <input type="hidden" name="submission_key" value="{{ submission_key }}">
+    {% if reply_to %}<input type="hidden" name="reply_to" value="{{ reply_to }}">{% endif %}
+    {% if forward_from %}<input type="hidden" name="forward_from" value="{{ forward_from }}">{% endif %}
+
+    <div class="space-y-4 py-4">
+      <div class="rounded-ui-card border border-ui-border bg-ui-surface-muted/40 p-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p class="text-xs font-semibold text-ui-text">Destinataires</p>
+            <p class="mt-0.5 text-[11px] text-ui-text-muted" x-show="audience === 'individual'">Une personne ou plusieurs personnes, selon votre sélection.</p>
+            <p class="mt-0.5 text-[11px] text-ui-text-muted" x-show="audience !== 'individual'">Envoi collectif selon les droits de votre fonction.</p>
+          </div>
+          <button type="button" @click="chooseIndividualMode()" class="ui-focus-ring inline-flex h-8 items-center gap-1.5 rounded-ui-button border px-2.5 text-xs font-semibold" :class="audience === 'individual' ? 'border-ui-primary bg-ui-primary-soft text-ui-primary' : 'border-ui-border text-ui-text hover:bg-ui-surface-hover'"><i data-lucide="users" class="h-3.5 w-3.5"></i>Personnes</button>
+        </div>
+        <label class="mt-3 block text-[11px] font-semibold text-ui-text-muted" for="{{ message_form.audience.id_for_label }}">Mode d'envoi</label>
+        <select x-ref="audience" name="{{ message_form.audience.html_name }}" id="{{ message_form.audience.id_for_label }}" @change="audience = $event.target.value" class="mt-1 h-9 w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-xs font-semibold text-ui-text focus:border-ui-focus focus:outline-none focus:ring-2 focus:ring-ui-focus/20">
+          {% for value, label in message_form.audience.field.choices %}<option value="{{ value }}" {% if message_form.audience.value == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+        {% if message_form.audience.errors %}<p class="mt-1 text-xs text-ui-danger">{{ message_form.audience.errors|join:" " }}</p>{% endif %}
+      </div>
+
+      <section x-show="audience === 'individual'" x-cloak aria-label="Sélection des personnes">
+        <div class="relative">
+          <i data-lucide="search" class="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-ui-text-muted"></i>
+          <input type="search" x-model="recipientQuery" placeholder="Rechercher par nom, identifiant ou fonction" class="h-9 w-full rounded-ui-input border border-ui-border bg-ui-surface pl-9 pr-3 text-xs text-ui-text outline-none focus:border-ui-focus focus:ring-2 focus:ring-ui-focus/20">
+        </div>
+        <div class="mt-2 flex flex-wrap gap-1.5" x-show="selectedRecipients.length">
+          <template x-for="recipient in selectedRecipients" :key="recipient.id">
+            <button type="button" @click="removeRecipient(recipient.id)" class="ui-focus-ring inline-flex h-7 items-center gap-1 rounded-ui-badge bg-ui-primary-soft px-2 text-[11px] font-semibold text-ui-primary"><span x-text="recipient.name"></span><i data-lucide="x" class="h-3 w-3"></i></button>
+          </template>
+        </div>
+        <div class="mt-3 max-h-60 divide-y divide-ui-border overflow-y-auto rounded-ui-card border border-ui-border bg-ui-surface">
+          {% for recipient in message_recipients %}
+            <button type="button" @click="toggleRecipient('{{ recipient.id }}', '{{ recipient.name|escapejs }}')" x-show="$el.dataset.search.includes(recipientQuery.toLowerCase())" data-search="{{ recipient.name|lower }} {{ recipient.username|lower }} {{ recipient.position|lower }}" class="ui-focus-ring flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-ui-surface-hover" :class="isSelected('{{ recipient.id }}') ? 'bg-ui-primary-soft/60' : ''">
+              <span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-ui-primary-soft text-xs font-bold text-ui-primary">{{ recipient.initial }}</span>
+              <span class="min-w-0 flex-1"><span class="block truncate text-xs font-semibold text-ui-text">{{ recipient.name }}</span><span class="mt-0.5 block truncate text-[11px] text-ui-text-muted">{{ recipient.position }} · {{ recipient.username }}</span></span>
+              <span class="grid h-5 w-5 shrink-0 place-items-center rounded-full border border-ui-border text-ui-primary" :class="isSelected('{{ recipient.id }}') ? 'border-ui-primary bg-ui-primary text-ui-on-primary' : ''"><span x-show="isSelected('{{ recipient.id }}')" class="text-xs leading-none">✓</span></span>
+            </button>
+          {% empty %}
+            <p class="px-3 py-6 text-center text-xs text-ui-text-muted">Aucun destinataire disponible dans votre périmètre.</p>
+          {% endfor %}
+        </div>
+        <div class="hidden">{{ message_form.recipients.as_widget }}</div>
+        {% if message_form.recipients.errors %}<p class="mt-1 text-xs text-ui-danger">{{ message_form.recipients.errors|join:" " }}</p>{% endif %}
+      </section>
+
+      {% if message_form.target_classes %}<div x-show="audience === 'classes'" x-cloak>{% include "portal/staff/director/partials/_form_field.html" with field=message_form.target_classes %}</div>{% endif %}
+      {% if message_form.target_programmes %}<div x-show="audience === 'programmes'" x-cloak>{% include "portal/staff/director/partials/_form_field.html" with field=message_form.target_programmes %}</div>{% endif %}
+      {% if message_form.target_roles %}<fieldset x-show="audience === 'staff'" x-cloak class="rounded-ui-card border border-ui-border p-3"><legend class="px-1 text-xs font-semibold text-ui-text">Fonctions</legend><div class="mt-2 grid gap-2 sm:grid-cols-2">{% for checkbox in message_form.target_roles %}<label class="flex items-center gap-2 text-xs font-semibold text-ui-text">{{ checkbox.tag }} {{ checkbox.choice_label }}</label>{% endfor %}</div></fieldset>{% endif %}
+
+      <div>{% include "portal/staff/director/partials/_form_field.html" with field=message_form.title %}</div>
+      <div>{% include "portal/staff/director/partials/_form_field.html" with field=message_form.body %}</div>
+      <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]"><div>{% include "portal/staff/director/partials/_form_field.html" with field=message_form.priority %}</div><div>{% include "portal/staff/director/partials/_form_field.html" with field=message_form.attachment %}<p class="mt-1 text-[11px] text-ui-text-muted">Image, PDF ou document · 10 Mo maximum.</p></div></div>
+    </div>
+
+    <footer class="sticky bottom-0 mt-auto flex justify-end gap-2 border-t border-ui-border bg-ui-surface py-4">
+      <button type="submit" class="ui-focus-ring inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong"><i data-lucide="send" class="h-4 w-4"></i>Envoyer le message</button>
+    </footer>
+  </form>
+</section>

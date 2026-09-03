@@ -92,6 +92,7 @@ def resolve_financial_report_period(request, today=None):
 
     period_map = {
         "today": (today, today, "Aujourd'hui"),
+        "yesterday": (today - timedelta(days=1), today - timedelta(days=1), "Hier"),
         "week": (today - timedelta(days=6), today, "Cette semaine glissante"),
         "two_weeks": (today - timedelta(days=13), today, "Deux semaines"),
         "month": (today.replace(day=1), today, "Ce mois"),

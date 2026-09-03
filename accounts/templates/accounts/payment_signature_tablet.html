@@ -1,0 +1,33 @@
+{% load humanize static %}
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Signature de paiement ESFE</title><link rel="stylesheet" href="{% static 'public/css/main.css' %}"></head>
+<body class="min-h-screen bg-slate-100 p-4 text-slate-900 sm:p-8">
+<main class="mx-auto max-w-2xl space-y-5">
+  <section class="rounded-3xl bg-white p-6 shadow-sm sm:p-8">
+    <p class="text-xs font-bold uppercase tracking-[.2em] text-violet-600">ESFE · Signature tablette</p>
+    <h1 class="mt-2 text-2xl font-bold">Vérifier et signer le paiement</h1>
+    <p class="mt-2 text-sm text-slate-600">Ce lien est temporaire, personnel et utilisable une seule fois. Vérifiez chaque information avant de signer.</p>
+    <div class="mt-6 grid gap-3 rounded-2xl bg-slate-50 p-4 text-sm sm:grid-cols-2">
+      <div><span class="text-slate-500">Bénéficiaire</span><p class="font-semibold">{{ session.snapshot.employee_name }}</p></div>
+      <div><span class="text-slate-500">Nature</span><p class="font-semibold">{{ session.snapshot.label }}</p></div>
+      <div><span class="text-slate-500">Période</span><p class="font-semibold">{{ session.snapshot.period_label }}</p></div>
+      <div><span class="text-slate-500">Montant à payer</span><p class="font-semibold text-violet-700">{{ session.amount|intcomma }} FCFA</p></div>
+      {% if session.snapshot.validated_hours %}<div><span class="text-slate-500">Heures validées</span><p class="font-semibold">{{ session.snapshot.validated_hours }} h</p></div>{% endif %}
+    </div>
+    {% if error %}<div class="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{{ error }}</div>{% endif %}
+    {% if session.status == 'signed' %}<div class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">Signature déjà enregistrée. Remettez la tablette à la gestionnaire pour l'approbation.</div>{% else %}
+    <form method="post" action="{% url 'accounts:payment_signature_tablet_submit' token %}" class="mt-6 space-y-4" id="signature-form">{% csrf_token %}
+      <label class="block text-sm font-semibold">Votre signature électronique</label>
+      <div class="overflow-hidden rounded-2xl border-2 border-dashed border-slate-300 bg-white"><canvas id="signature-pad" class="h-56 w-full touch-none"></canvas></div>
+      <input type="hidden" name="signature_data" id="signature-data">
+      <div class="flex flex-wrap gap-3"><button type="button" id="clear-signature" class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold">Effacer</button><button type="submit" class="rounded-xl bg-violet-600 px-5 py-2 text-sm font-semibold text-white">Enregistrer ma signature</button></div>
+    </form>{% endif %}
+  </section>
+</main>
+<script>
+(() => { const canvas=document.getElementById('signature-pad'); if(!canvas)return; const ctx=canvas.getContext('2d'); let drawing=false, has=false;
+function resize(){const r=canvas.getBoundingClientRect(),d=window.devicePixelRatio||1;canvas.width=r.width*d;canvas.height=r.height*d;ctx.scale(d,d);ctx.lineWidth=2;ctx.lineCap='round';ctx.strokeStyle='#1d4ed8'} resize(); window.addEventListener('resize',resize);
+function point(e){const r=canvas.getBoundingClientRect(),t=e.touches?.[0]||e;return{x:t.clientX-r.left,y:t.clientY-r.top}}
+function start(e){drawing=true;has=true;const p=point(e);ctx.beginPath();ctx.moveTo(p.x,p.y);e.preventDefault()} function move(e){if(!drawing)return;const p=point(e);ctx.lineTo(p.x,p.y);ctx.stroke();e.preventDefault()} function end(){drawing=false}
+['mousedown','touchstart'].forEach(x=>canvas.addEventListener(x,start,{passive:false}));['mousemove','touchmove'].forEach(x=>canvas.addEventListener(x,move,{passive:false}));['mouseup','mouseleave','touchend'].forEach(x=>canvas.addEventListener(x,end));
+document.getElementById('clear-signature').onclick=()=>{ctx.clearRect(0,0,canvas.width,canvas.height);has=false}; document.getElementById('signature-form').onsubmit=(e)=>{if(!has){e.preventDefault();alert('Veuillez signer avant de soumettre.');return}document.getElementById('signature-data').value=canvas.toDataURL('image/png')}; })();
+</script></body></html>

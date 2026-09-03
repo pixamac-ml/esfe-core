@@ -11,11 +11,16 @@ from academics.services.grading import calculate_ec_grade, resolve_ec_threshold,
 TWO_PLACES = Decimal("0.01")
 
 
-def compute_ue_result(ue, enrollment):
+def compute_ue_result(ue, enrollment, *, grades_by_ec_id=None):
     """
     Calcule le résultat global d'une UE pour un étudiant.
 
-    La moyenne UE = somme(note_coefficient EC) / somme(coefficients EC)
+    La moyenne UE provisoire = somme(note_coefficient EC saisis) /
+    somme(coefficients EC saisis). Les EC non notes ne sont donc jamais
+    assimiles a une note nulle pendant la saisie.
+
+    La validation officielle de l'UE reste bloquee tant que tous les EC ne
+    sont pas notes.
     Les crédits obtenus UE = somme(crédits obtenus EC)
     """
     from academics.models import ECGrade
@@ -23,6 +28,7 @@ def compute_ue_result(ue, enrollment):
     ecs = ue.ecs.all().order_by("id")
 
     total_coefficients = Decimal("0.00")
+    entered_coefficients = Decimal("0.00")
     total_note_coefficients = Decimal("0.00")
     total_obtained_credits = Decimal("0.00")
     expected_grades = 0
@@ -30,10 +36,11 @@ def compute_ue_result(ue, enrollment):
     missing_grades = 0
     failed_subjects = []
 
-    grades_by_ec_id = {
-        grade.ec_id: grade
-        for grade in ECGrade.objects.filter(enrollment=enrollment, ec__ue=ue).select_related("ec")
-    }
+    if grades_by_ec_id is None:
+        grades_by_ec_id = {
+            grade.ec_id: grade
+            for grade in ECGrade.objects.filter(enrollment=enrollment, ec__ue=ue).select_related("ec")
+        }
     class_threshold = resolve_threshold(enrollment)
 
     rows = []
@@ -53,6 +60,7 @@ def compute_ue_result(ue, enrollment):
         has_score = note is not None
         if has_score:
             entered_grades += 1
+            entered_coefficients += Decimal(str(ec.coefficient))
         else:
             missing_grades += 1
         ec_threshold = resolve_ec_threshold(ec.coefficient)
@@ -89,8 +97,8 @@ def compute_ue_result(ue, enrollment):
         })
 
     ue_average = (
-        total_note_coefficients / total_coefficients
-        if total_coefficients > 0 and missing_grades == 0 else None
+        total_note_coefficients / entered_coefficients
+        if entered_coefficients > 0 else None
     )
     if ue_average is not None:
         ue_average = ue_average.quantize(TWO_PLACES, rounding=ROUND_HALF_UP)
@@ -108,6 +116,7 @@ def compute_ue_result(ue, enrollment):
         "rows": rows,
         "average": ue_average,
         "total_coefficients": total_coefficients,
+        "entered_coefficients": entered_coefficients,
         "total_note_coefficients": total_note_coefficients,
         "credit_required": ue.credit_required,
         "credit_obtained": total_obtained_credits,
@@ -115,6 +124,7 @@ def compute_ue_result(ue, enrollment):
         "entered_grades": entered_grades,
         "missing_grades": missing_grades,
         "is_complete": is_complete,
+        "is_provisional": ue_average is not None and not is_complete,
         "is_validated": is_validated,
         "failed_subjects": failed_subjects,
         "status": "incomplete" if not is_complete else ("validated" if is_validated else "failed"),

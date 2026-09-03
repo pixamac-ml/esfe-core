@@ -15,13 +15,23 @@ LEVEL_INFO = "info"
 LEVEL_ORDER = {LEVEL_CRITICAL: 0, LEVEL_WARNING: 1, LEVEL_INFO: 2}
 
 
-def _task(category, count, level, message, *, target, action_label="Traiter"):
+def _task(
+    category,
+    count,
+    level,
+    message,
+    *,
+    target,
+    subview="overview",
+    action_label="Traiter",
+):
     return {
         "category": category,
         "count": count,
         "level": level,
         "message": message,
         "target": target,
+        "subview": subview,
         "action_label": action_label,
     }
 
@@ -35,9 +45,9 @@ def build_director_tasks_center(*, branch, semester_rows, teacher_unassigned_cou
             "grades_entry_in_progress",
             len(entry_in_progress),
             LEVEL_WARNING,
-            f"{len(entry_in_progress)} classe(s) en cours de saisie de notes (session normale).",
-            target="results",
-            action_label="Voir les resultats",
+            f"{len(entry_in_progress)} classe(s) en cours de saisie de notes pour la session normale.",
+            target="evaluations",
+            action_label="Contrôler les notes",
         ))
 
     if teacher_unassigned_count:
@@ -45,9 +55,10 @@ def build_director_tasks_center(*, branch, semester_rows, teacher_unassigned_cou
             "teachers_unassigned",
             teacher_unassigned_count,
             LEVEL_WARNING,
-            f"{teacher_unassigned_count} enseignant(s) sans aucune affectation pour l'annee en cours.",
-            target="teachers",
-            action_label="Voir les enseignants",
+            f"{teacher_unassigned_count} enseignant(s) sans affectation pour l'année en cours.",
+            target="enseignants",
+            subview="assignments",
+            action_label="Gérer les affectations",
         ))
 
     ready_to_validate = [row for row in semester_rows if row["can_validate"]]
@@ -56,9 +67,10 @@ def build_director_tasks_center(*, branch, semester_rows, teacher_unassigned_cou
             "semesters_ready_to_validate",
             len(ready_to_validate),
             LEVEL_CRITICAL,
-            f"{len(ready_to_validate)} semestre(s) prets a etre valides (toutes les notes sont saisies).",
-            target="results",
-            action_label="Valider",
+            f"{len(ready_to_validate)} semestre(s) prêt(s) à être validé(s) : toutes les notes sont saisies.",
+            target="evaluations",
+            subview="validation",
+            action_label="Ouvrir la validation",
         ))
 
     pending_documents = TeacherDocument.objects.filter(branch=branch, is_verified=False).count() if branch else 0
@@ -67,9 +79,10 @@ def build_director_tasks_center(*, branch, semester_rows, teacher_unassigned_cou
             "documents_pending",
             pending_documents,
             LEVEL_WARNING,
-            f"{pending_documents} document(s) enseignant en attente de verification.",
-            target="documents",
-            action_label="Verifier",
+            f"{pending_documents} document(s) enseignant en attente de vérification.",
+            target="enseignants",
+            subview="files",
+            action_label="Vérifier les dossiers",
         ))
 
     pending_transfers = (
@@ -80,9 +93,10 @@ def build_director_tasks_center(*, branch, semester_rows, teacher_unassigned_cou
             "transfers_pending",
             pending_transfers,
             LEVEL_WARNING,
-            f"{pending_transfers} demande(s) de transfert en attente de decision.",
-            target="documents",
-            action_label="Decider",
+            f"{pending_transfers} demande(s) de transfert en attente de décision.",
+            target="transferts",
+            subview="pending",
+            action_label="Traiter les demandes",
         ))
 
     if result_anomalies:
@@ -92,9 +106,9 @@ def build_director_tasks_center(*, branch, semester_rows, teacher_unassigned_cou
             "result_anomalies",
             len(result_anomalies),
             level,
-            f"{len(result_anomalies)} anomalie(s) de notes detectee(s) ({blocking_count} bloquante(s)).",
-            target="results",
-            action_label="Examiner",
+            f"{len(result_anomalies)} anomalie(s) de notes détectée(s), dont {blocking_count} bloquante(s).",
+            target="evaluations",
+            action_label="Examiner les anomalies",
         ))
 
     tasks.sort(key=lambda item: (LEVEL_ORDER.get(item["level"], 3), -item["count"]))

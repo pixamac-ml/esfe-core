@@ -1,0 +1,30 @@
+{% if director_all_academic_years %}
+  <form hx-post="{% url 'accounts_portal:director_calendar_action' %}" hx-target="#director-calendar-section" hx-swap="outerHTML" hx-indicator="#director-calendar-loading" class="mb-5 flex flex-col gap-3 rounded-ui-button border border-ui-border bg-ui-surface-muted p-3 sm:flex-row sm:items-end">
+    {% csrf_token %}<input type="hidden" name="action" value="create_calendar">
+    <div class="min-w-0 flex-1"><label class="mb-1 block text-xs font-semibold text-ui-text">Créer un brouillon pour une année existante</label><select name="academic_year_id" class="ui-focus-ring h-ui-control w-full rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm text-ui-text">{% for year in director_all_academic_years %}<option value="{{ year.id }}" {% if year.is_active %}selected{% endif %}>{{ year.name }}{% if year.is_active %} · active{% endif %}</option>{% endfor %}</select></div>
+    <button class="ui-focus-ring h-ui-control rounded-ui-button border border-ui-border bg-ui-surface px-4 text-sm font-semibold text-ui-text">Créer le brouillon</button>
+  </form>
+{% endif %}
+
+<details class="rounded-ui-button border border-ui-border bg-ui-surface px-3 py-3">
+  <summary class="cursor-pointer text-xs font-semibold text-ui-primary">Créer une nouvelle année académique</summary>
+  <form hx-post="{% url 'accounts_portal:director_calendar_action' %}" hx-target="#director-calendar-section" hx-swap="outerHTML" hx-indicator="#director-calendar-loading" class="mt-3 grid gap-3 lg:grid-cols-12">
+    {% csrf_token %}
+    <div class="lg:col-span-4"><label class="mb-1 block text-xs font-semibold text-ui-text">Année académique</label><input required name="year_name" maxlength="9" pattern="[0-9]{4}-[0-9]{4}" class="ui-focus-ring h-ui-control w-full rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm text-ui-text" placeholder="2028-2029"></div>
+    <div class="lg:col-span-3"><label class="mb-1 block text-xs font-semibold text-ui-text">Début</label><input required type="date" name="year_start" class="ui-focus-ring h-ui-control w-full rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm text-ui-text"></div>
+    <div class="lg:col-span-3"><label class="mb-1 block text-xs font-semibold text-ui-text">Fin</label><input required type="date" name="year_end" class="ui-focus-ring h-ui-control w-full rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm text-ui-text"></div>
+    <div class="flex items-end lg:col-span-2"><button name="action" value="create_year_and_calendar" class="ui-focus-ring h-ui-control w-full rounded-ui-button bg-ui-primary px-3 text-sm font-semibold text-ui-on-primary">Créer et ouvrir</button></div>
+  </form>
+</details>
+
+<details class="mt-3 rounded-ui-button border border-ui-border bg-ui-surface px-3 py-3">
+  <summary class="cursor-pointer text-xs font-semibold text-ui-danger">Supprimer une année inactive</summary>
+  <div class="mt-3 divide-y divide-ui-border border-t border-ui-border">
+    {% for row in director_calendar_academic_year_rows %}
+      {% if not row.year.is_active and row.can_attempt_delete %}
+      <div class="flex flex-col gap-2 py-3 sm:flex-row sm:items-center"><p class="min-w-0 flex-1 text-xs text-ui-text"><strong>{{ row.year.name }}</strong><span class="text-ui-text-muted"> · {{ row.calendar_count }} calendrier{{ row.calendar_count|pluralize }}</span></p><form hx-post="{% url 'accounts_portal:director_calendar_action' %}" hx-target="#director-calendar-section" hx-swap="outerHTML" hx-indicator="#director-calendar-loading" class="flex gap-2">{% csrf_token %}<input type="hidden" name="action" value="delete_academic_year"><input type="hidden" name="academic_year_id" value="{{ row.year.id }}"><input required name="confirmation" class="ui-focus-ring h-8 w-28 rounded-ui-button border border-ui-border bg-ui-surface px-2 text-xs text-ui-text" placeholder="{{ row.year.name }}"><button class="ui-focus-ring h-8 rounded-ui-button bg-ui-danger px-3 text-xs font-semibold text-ui-on-danger">Supprimer</button></form></div>
+      {% endif %}
+    {% empty %}<p class="py-3 text-xs text-ui-text-muted">Aucune année inactive à supprimer.</p>{% endfor %}
+  </div>
+  <p class="mt-3 text-[11px] text-ui-text-muted">Une année active reste protégée. La suppression d’une année inactive retire aussi ses brouillons et jalons de préparation.</p>
+</details>

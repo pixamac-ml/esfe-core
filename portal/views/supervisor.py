@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model, update_session_auth_hash
 from django.contrib.auth.forms import PasswordChangeForm
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.db.models import Count, Q
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
@@ -13,6 +14,8 @@ from django.utils import timezone
 
 from accounts.forms import SystemProfileForm, UserPreferenceForm
 from accounts.models import Profile, UserPreference
+from core.models import SignatureRequest
+from core.services.signatures import approve_signature, get_signed_signature_for_subject
 
 from academics.models import AcademicClass, AcademicScheduleEvent, EC, LessonLog, WeeklyScheduleSlot
 from academics.services.lesson_log_service import create_lesson_log, update_lesson_log
@@ -72,6 +75,7 @@ from portal.services.supervisor_service import (
     build_teachers_weekly_report_context,
     next_attendance_status,
 )
+from portal.services.teacher_dashboard_service import build_lesson_log_signature_snapshot
 from portal.views.views import (
     _build_portal_context,
     _build_weekly_slots_workspace_context,
@@ -436,6 +440,8 @@ def supervisor_attendance_toggle_student(request):
             .get()
         )
         roll_date = timezone.localtime(schedule_event.start_datetime).date()
+        if roll_date > timezone.localdate():
+            raise ValidationError("La présence étudiante ne peut être saisie avant le jour de la séance.")
         assert_roll_allows_editing(
             branch=branch,
             academic_class_id=schedule_event.academic_class_id,
@@ -529,6 +535,8 @@ def supervisor_workflow_roll_action(request):
                 event_date = timezone.localtime(schedule_event.start_datetime).date()
                 if roll_date != event_date:
                     raise ValidationError("La date de l'appel doit correspondre à la séance.")
+                if roll_date > timezone.localdate():
+                    raise ValidationError("L'appel ne peut être ouvert avant le jour de la séance.")
                 start_daily_roll(
                     user=request.user,
                     branch=branch,
@@ -926,6 +934,8 @@ def supervisor_mark_student_attendance(request):
             .get()
         )
         roll_date = timezone.localtime(schedule_event.start_datetime).date()
+        if roll_date > timezone.localdate():
+            raise ValidationError("La présence étudiante ne peut être saisie avant le jour de la séance.")
         assert_roll_allows_editing(
             branch=branch,
             academic_class_id=schedule_event.academic_class_id,
@@ -944,6 +954,8 @@ def supervisor_mark_student_attendance(request):
             .distinct()
             .get()
         )
+        if timezone.localtime(schedule_event.start_datetime).date() > timezone.localdate():
+            raise ValidationError("Le constat enseignant ne peut être saisi avant le jour de la séance.")
         attendance_status = request.POST.get("status", "")
         result = mark_student_attendance(
             student=student,
@@ -1073,6 +1085,130 @@ def supervisor_mark_teacher_attendance(request):
         f"Presence enseignant enregistree: {attendance.teacher.get_full_name() or attendance.teacher.username} - {attendance.get_status_display()}.",
     )
     return _redirect_supervisor_dashboard("attendance")
+
+
+@_position_required({"academic_supervisor"})
+@transaction.atomic
+def supervisor_validate_lesson_log(request):
+    """Approve or return a submitted lesson after the factual attendance check."""
+    if request.method != "POST":
+        return _deny_portal_access(request)
+
+    branch = _resolve_supervisor_branch(request)
+    if branch is None:
+        return HttpResponseBadRequest("Aucune annexe n'est rattachée à ce compte.")
+
+    event = None
+    try:
+        event = (
+            AcademicScheduleEvent.objects.select_related("teacher", "academic_class", "ec", "branch")
+            .filter(
+                pk=request.POST.get("schedule_event_id"),
+                branch=branch,
+                event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE,
+                is_active=True,
+            )
+            .exclude(status__in={AcademicScheduleEvent.STATUS_DRAFT, AcademicScheduleEvent.STATUS_CANCELLED})
+            .get()
+        )
+        lesson_log = LessonLog.objects.select_related("teacher", "ec", "academic_class", "schedule_event").get(
+            pk=request.POST.get("lesson_log_id"),
+            branch=branch,
+            schedule_event=event,
+            teacher=event.teacher,
+        )
+        if timezone.localtime(event.start_datetime).date() > timezone.localdate():
+            raise ValidationError("Un cahier ne peut pas être contrôlé avant le jour de la séance.")
+        attendance = TeacherAttendance.objects.filter(
+            branch=branch,
+            teacher=event.teacher,
+            schedule_event=event,
+        ).first()
+        if lesson_log.status != LessonLog.STATUS_SUBMITTED:
+            raise ValidationError("Seul un cahier soumis peut être contrôlé.")
+        decision = (request.POST.get("decision") or "approve").strip()
+        review_comment = (request.POST.get("review_comment") or "").strip()
+        review_fields = {
+            "reviewed_by": request.user,
+            "reviewed_at": timezone.now(),
+            "review_comment": review_comment,
+        }
+        if decision == "return":
+            if not review_comment:
+                raise ValidationError("Indiquez le motif du retour à l'enseignant.")
+            update_lesson_log(
+                lesson_log,
+                updated_by=request.user,
+                status=LessonLog.STATUS_RETURNED,
+                validated_by=None,
+                **review_fields,
+            )
+            toast_message = "Cahier retourné à l'enseignant avec votre motif."
+        elif decision == "approve":
+            lesson_log_signature = get_signed_signature_for_subject(
+                branch=branch,
+                purpose=SignatureRequest.PURPOSE_LESSON_LOG,
+                subject=lesson_log,
+                signer=event.teacher,
+                snapshot=build_lesson_log_signature_snapshot(lesson_log),
+            )
+            if lesson_log_signature is None:
+                raise ValidationError(
+                    "La signature de l'enseignant est absente ou ne correspond plus au cahier déclaré."
+                )
+            if (
+                attendance is None
+                or attendance.status not in {TeacherAttendance.STATUS_PRESENT, TeacherAttendance.STATUS_LATE}
+                or attendance.course_delivered is not True
+            ):
+                raise ValidationError(
+                    "Enregistrez d'abord une présence présente/en retard et confirmez que le cours a été assuré."
+                )
+            roll_sheet = AttendanceRollSheet.objects.filter(
+                branch=branch,
+                academic_class=event.academic_class,
+                schedule_event=event,
+                status=AttendanceRollSheet.STATUS_VALIDATED,
+            ).first()
+            if roll_sheet is None:
+                raise ValidationError(
+                    "Validez d'abord la feuille d'appel étudiant de cette séance avant d'approuver le cahier."
+                )
+            update_lesson_log(
+                lesson_log,
+                updated_by=request.user,
+                status=LessonLog.STATUS_DONE,
+                validated_by=request.user,
+                **review_fields,
+            )
+            approve_signature(signature_request=lesson_log_signature, approver=request.user)
+            toast_message = "Cahier approuvé : les heures éligibles ont été transmises aux honoraires."
+        else:
+            raise ValidationError("Décision de contrôle invalide.")
+    except (AcademicScheduleEvent.DoesNotExist, LessonLog.DoesNotExist):
+        return HttpResponseBadRequest("Séance ou cahier introuvable dans votre annexe.")
+    except ValidationError as exc:
+        if event is None:
+            return HttpResponseBadRequest(" ".join(exc.messages))
+        context = _build_teacher_drawer_context(
+            branch=branch,
+            teacher=event.teacher,
+            event=event,
+        )
+        context["review_error"] = " ".join(exc.messages)
+        response = render(request, "portal/staff/supervisor/partials/teacher_drawer.html", context)
+        response.status_code = 400
+        return response
+
+    context = _build_teacher_drawer_context(branch=branch, teacher=event.teacher, event=event)
+    response = render(request, "portal/staff/supervisor/partials/teacher_drawer.html", context)
+    response["HX-Trigger"] = json.dumps(
+        {
+            "toast": toast_message,
+            "supervisor-attendance-updated": "",
+        }
+    )
+    return response
 
 
 @_position_required({"academic_supervisor"})
@@ -1773,10 +1909,49 @@ def _build_teacher_drawer_context(*, branch, teacher, event):
         teacher=teacher,
         schedule_event=event,
     ).first()
+    lesson_log = (
+        LessonLog.objects.select_related("validated_by")
+        .filter(branch=branch, teacher=teacher, schedule_event=event)
+        .order_by("-updated_at", "-id")
+        .first()
+    )
+    roll_sheet = AttendanceRollSheet.objects.filter(
+        branch=branch,
+        academic_class=event.academic_class,
+        schedule_event=event,
+    ).first()
+    student_attendance_qs = StudentAttendance.objects.filter(
+        branch=branch,
+        academic_class=event.academic_class,
+        schedule_event=event,
+    )
+    student_attendance_counts = {
+        "present": student_attendance_qs.filter(status=StudentAttendance.STATUS_PRESENT).count(),
+        "late": student_attendance_qs.filter(status=StudentAttendance.STATUS_LATE).count(),
+        "absent": student_attendance_qs.filter(status=StudentAttendance.STATUS_ABSENT).count(),
+    }
+    lesson_log_signature = None
+    if lesson_log is not None:
+        lesson_log_signature = get_signed_signature_for_subject(
+            branch=branch,
+            purpose=SignatureRequest.PURPOSE_LESSON_LOG,
+            subject=lesson_log,
+            signer=teacher,
+            snapshot=build_lesson_log_signature_snapshot(lesson_log),
+        )
     return {
         "teacher": teacher,
         "selected_event": event,
         "teacher_attendance": attendance,
+        "lesson_log": lesson_log,
+        "lesson_log_signature": lesson_log_signature,
+        "lesson_log_signature_ready": lesson_log_signature is not None,
+        "attendance_roll_sheet": roll_sheet,
+        "student_attendance_total": student_attendance_qs.count(),
+        "student_attendance_counts": student_attendance_counts,
+        "student_attendance_ready": bool(
+            roll_sheet and roll_sheet.status == AttendanceRollSheet.STATUS_VALIDATED
+        ),
     }
 
 

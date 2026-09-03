@@ -1,0 +1,22 @@
+{% load component_tags humanize %}
+<section class="space-y-5" data-dashboard-section="finance" data-executive-section="finance">
+  {% component "ui_core.page_header" eyebrow="Pilotage institutionnel" title="Finance" subtitle="Synthèse réelle de l’année académique et du périmètre d’annexes sélectionnés." %}
+    {% fill "actions" %}
+      <button type="button" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" onclick="dgShowSection('closures')">
+        <i data-lucide="calendar-check-2" class="h-4 w-4" aria-hidden="true"></i> Clôtures
+      </button>
+      <button type="button" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-3 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" onclick="dgShowSection('payments')">
+        <i data-lucide="receipt-text" class="h-4 w-4" aria-hidden="true"></i> Encaissements
+      </button>
+    {% endfill %}
+  {% endcomponent %}
+
+  <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    {% component "ui_core.stat_card" label="Revenus" value=finance.revenue|intcomma unit="FCFA" icon="wallet-cards" tone="success" description="Paiements validés dans le contexte actif" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Dépenses" value=finance.expenses|intcomma unit="FCFA" icon="receipt-text" tone="danger" description="Dépenses comptabilisées dans le contexte actif" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Solde" value=finance.balance|intcomma unit="FCFA" icon="scale" tone="primary" description="Revenus moins dépenses" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="En attente" value=finance.pending_payments icon="clock-3" tone="warning" description="Paiements non validés" compact=True %}{% endcomponent %}
+  </div>
+
+  {% component "ui_core.data_table" id="dg-finance-payments" caption="Derniers encaissements" headers=finance_payment_headers rows=finance_payment_rows result_count=finance_payment_rows|length density="compact" empty_title="Aucun encaissement dans ce contexte" empty_message="Changez l’annexe ou l’année académique pour consulter une autre période." %}{% endcomponent %}
+</section>

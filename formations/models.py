@@ -1,5 +1,6 @@
 from django.db import models
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.text import slugify
 from unidecode import unidecode
 from django_ckeditor_5.fields import CKEditor5Field
@@ -79,6 +80,16 @@ class Filiere(models.Model):
 # ==================================================
 # PROGRAMME
 # ==================================================
+class ProgrammeQuerySet(models.QuerySet):
+    """Lecture canonique du catalogue institutionnel selon son état public."""
+
+    def public(self):
+        return self.filter(is_active=True, is_public=True, is_archived=False)
+
+    def accepting_admissions(self):
+        return self.public().filter(admissions_open=True)
+
+
 class Programme(models.Model):
     title = models.CharField(max_length=255)
     slug = models.SlugField(unique=True, blank=True)
@@ -154,11 +165,18 @@ class Programme(models.Model):
 
     # ==================================================
 
+    # Le statut institutionnel, la publication et l'admission restent distincts.
     is_active = models.BooleanField(default=True)
+    is_public = models.BooleanField(default=True, db_index=True)
+    admissions_open = models.BooleanField(default=True, db_index=True)
+    is_archived = models.BooleanField(default=False, db_index=True)
+    archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
     is_featured = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)  # ✅ NOUVEAU
+
+    objects = ProgrammeQuerySet.as_manager()
 
     class Meta:
         ordering = ["title"]
@@ -185,7 +203,25 @@ class Programme(models.Model):
     def effective_og_image(self):
         return self.og_image or self.illustration
 
+    def archive(self):
+        """Retire le programme des flux vivants sans détruire son historique."""
+        self.is_archived = True
+        self.is_active = False
+        self.admissions_open = False
+        self.is_featured = False
+        self.archived_at = timezone.now()
+        self.save(update_fields=[
+            "is_archived", "is_active", "admissions_open", "is_featured",
+            "archived_at", "updated_at",
+        ])
+
     def save(self, *args, **kwargs):
+        if self.is_archived:
+            self.is_active = False
+            self.admissions_open = False
+            self.is_featured = False
+            if self.archived_at is None:
+                self.archived_at = timezone.now()
         if not self.slug:
             base = unidecode(self.title).lower()
             base = base.replace("'", "").replace("'", "")

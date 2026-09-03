@@ -1,0 +1,24 @@
+{% load component_tags %}
+<section class="rounded-ui-card border border-ui-border bg-ui-surface p-4 shadow-ui-card sm:p-5">
+  {% if cards_view == "students" %}
+    <h2 class="text-base font-bold text-ui-text">Suivi des cartes étudiantes</h2>
+    <p class="mt-1 text-sm text-ui-text-muted">État réel des cartes déjà émises dans votre annexe.</p>
+  {% else %}
+    <h2 class="text-base font-bold text-ui-text">Suivi des cartes du personnel</h2>
+    <p class="mt-1 text-sm text-ui-text-muted">État réel des cartes professionnelles déjà émises dans votre annexe.</p>
+  {% endif %}
+    <form class="mb-4 flex flex-wrap gap-2" hx-get="{% url 'accounts_portal:it_cards_workspace' %}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">
+      <input type="hidden" name="view" value="{{ cards_view }}">
+      {% if selected_class %}<input type="hidden" name="class_id" value="{{ selected_class.id }}">{% endif %}
+      <input name="q" value="{{ card_search }}" class="min-w-56 rounded-ui-input border border-ui-border bg-ui-surface px-3 py-2 text-sm" placeholder="Nom, matricule ou code…">
+      <button class="btn btn-secondary" type="submit"><i data-lucide="search" class="h-4 w-4"></i> Rechercher</button>
+    </form>
+    <div class="overflow-x-auto"><table class="min-w-full text-sm"><thead class="border-b border-ui-border text-left text-xs uppercase tracking-wide text-ui-text-muted"><tr><th class="px-3 py-2">Titulaire</th><th class="px-3 py-2">Année</th><th class="px-3 py-2">Émise le</th><th class="px-3 py-2">Expiration</th><th class="px-3 py-2">État</th><th class="px-3 py-2 text-right">Actions</th></tr></thead><tbody class="divide-y divide-ui-border">
+    {% if cards_view == "students" %}{% for card in student_cards %}
+      <tr><td class="px-3 py-3"><strong class="block text-ui-text">{{ card.etudiant.full_name }}</strong><span class="text-xs text-ui-text-muted">{{ card.etudiant.matricule }}</span></td><td class="px-3 py-3">{{ card.annee }}</td><td class="px-3 py-3">{{ card.date_emission|date:"d/m/Y" }}</td><td class="px-3 py-3">{{ card.date_expiration|date:"d/m/Y" }}</td><td class="px-3 py-3">{% if card.is_valide %}{% component "ui_core.status_badge" label="Active" tone="success" %}{% endcomponent %}{% elif card.statut == "perdue" %}{% component "ui_core.status_badge" label="Perdue" tone="danger" %}{% endcomponent %}{% elif card.statut == "revoquee" %}{% component "ui_core.status_badge" label="Révoquée" tone="danger" %}{% endcomponent %}{% else %}{% component "ui_core.status_badge" label="Expirée" tone="warning" %}{% endcomponent %}{% endif %}</td><td class="px-3 py-3"><div class="flex justify-end gap-2"><a class="btn btn-secondary" target="_blank" href="{% url 'accounts_portal:it_student_card_pdf' card.etudiant.id %}?preview=1">PDF</a>{% include "portal/informaticien/workflows/cards_status_actions.html" with card=card scope="student" %}</div></td></tr>
+    {% empty %}<tr><td class="px-3 py-6 text-ui-text-muted" colspan="6">Aucune carte étudiante ne correspond à cette sélection.</td></tr>{% endfor %}
+    {% else %}{% for card in staff_cards %}
+      <tr><td class="px-3 py-3"><strong class="block text-ui-text">{{ card.profile.user.get_full_name|default:card.profile.user.username }}</strong><span class="text-xs text-ui-text-muted">{{ card.profile.get_position_display|default:"Personnel" }} · {{ card.profile.employee_code|default:"Sans code" }}</span></td><td class="px-3 py-3">{{ card.annee }}</td><td class="px-3 py-3">{{ card.date_emission|date:"d/m/Y" }}</td><td class="px-3 py-3">{{ card.date_expiration|date:"d/m/Y" }}</td><td class="px-3 py-3">{% if card.is_valide %}{% component "ui_core.status_badge" label="Active" tone="success" %}{% endcomponent %}{% elif card.statut == "perdue" %}{% component "ui_core.status_badge" label="Perdue" tone="danger" %}{% endcomponent %}{% elif card.statut == "revoquee" %}{% component "ui_core.status_badge" label="Révoquée" tone="danger" %}{% endcomponent %}{% else %}{% component "ui_core.status_badge" label="Expirée" tone="warning" %}{% endcomponent %}{% endif %}</td><td class="px-3 py-3"><div class="flex justify-end gap-2"><a class="btn btn-secondary" target="_blank" href="{% url 'accounts_portal:it_staff_card_pdf' card.profile.user.id %}?preview=1">PDF</a>{% include "portal/informaticien/workflows/cards_status_actions.html" with card=card scope="staff" %}</div></td></tr>
+    {% empty %}<tr><td class="px-3 py-6 text-ui-text-muted" colspan="6">Aucune carte professionnelle ne correspond à cette sélection.</td></tr>{% endfor %}{% endif %}
+    </tbody></table></div>
+</section>

@@ -1,0 +1,47 @@
+{% load component_tags %}
+<div class="space-y-5">
+  {% if director_selected_calendar %}
+  <div class="grid min-w-0 gap-3 sm:grid-cols-3">
+    {% component "ui_core.stat_card" label="Construction" value=director_calendar_construction_progress|add:"%" icon="chart-no-axes-column-increasing" tone="primary" description="Jalons structurants renseignés" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Échéances" value=director_calendar_entry_count icon="calendar-days" tone="info" description="Dans cette version" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="État" value=director_selected_calendar.get_status_display icon="shield-check" tone="success" description="Version V{{ director_selected_calendar.version }}" compact=True %}{% endcomponent %}
+  </div>
+
+  <div class="grid min-w-0 gap-5 xl:grid-cols-[1.35fr_0.85fr]">
+    {% component "ui_core.panel" title="Prochaines echeances" subtitle="Les jalons a surveiller dans l'ordre chronologique." padding=False %}
+      {% if director_calendar_upcoming_rows %}
+        <div class="divide-y divide-ui-border">
+          {% for row in director_calendar_upcoming_rows %}
+          <article class="flex min-w-0 items-center gap-3 px-4 py-3.5">
+            <span class="grid h-9 w-9 shrink-0 place-items-center rounded-ui-button {{ row.color_bg }} {{ row.color_text }}"><i data-lucide="{{ row.icon }}" class="h-4 w-4"></i></span>
+            <div class="min-w-0 flex-1"><h3 class="truncate text-sm font-bold text-ui-text">{{ row.entry.title }}</h3><p class="mt-0.5 text-xs text-ui-text-muted">{{ row.type_label }} · {{ row.entry.start_datetime|date:"d/m/Y" }}{% if row.class_label %} · {{ row.class_label }}{% endif %}</p></div>
+            {% if row.entry.is_blocking %}{% component "ui_core.status_badge" label="Bloquant" tone="danger" %}{% endcomponent %}{% endif %}
+          </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        {% component "ui_core.empty_state" title="Aucune echeance a venir" message="Ajoutez les jalons de l'annee pour voir les prochaines actions du DE." icon="calendar-clock" %}{% endcomponent %}
+      {% endif %}
+    {% endcomponent %}
+
+    <div class="space-y-4">
+      {% component "ui_core.panel" title="Prochaine action" subtitle="Un seul parcours, sans détour." padding=False %}
+        <div class="divide-y divide-ui-border">
+          <a href="{{ calendar_tabs.1.href }}" hx-get="{{ calendar_tabs.1.hx_get }}" hx-target="#director-calendar-subcontent" hx-swap="innerHTML" hx-push-url="{{ calendar_tabs.1.hx_push_url }}" hx-indicator="#director-calendar-loading" class="ui-focus-ring flex items-center gap-3 p-4 hover:bg-ui-surface-hover"><span class="grid h-9 w-9 place-items-center rounded-ui-button bg-ui-primary-soft text-ui-primary"><i data-lucide="calendar-plus" class="h-4 w-4"></i></span><span class="min-w-0 flex-1"><strong class="block text-sm text-ui-text">Ajouter ou corriger les dates</strong><span class="text-xs text-ui-text-muted">Le document, puis les échéances.</span></span><i data-lucide="chevron-right" class="h-4 w-4 text-ui-text-muted"></i></a>
+          <a href="{{ calendar_tabs.4.href }}" hx-get="{{ calendar_tabs.4.hx_get }}" hx-target="#director-calendar-subcontent" hx-swap="innerHTML" hx-push-url="{{ calendar_tabs.4.hx_push_url }}" hx-indicator="#director-calendar-loading" class="ui-focus-ring flex items-center gap-3 p-4 hover:bg-ui-surface-hover"><span class="grid h-9 w-9 place-items-center rounded-ui-button bg-ui-warning-soft text-ui-warning"><i data-lucide="shield-check" class="h-4 w-4"></i></span><span class="min-w-0 flex-1"><strong class="block text-sm text-ui-text">Verifier avant publication</strong><span class="text-xs text-ui-text-muted">Erreurs, alertes et circuit officiel</span></span><i data-lucide="chevron-right" class="h-4 w-4 text-ui-text-muted"></i></a>
+        </div>
+      {% endcomponent %}
+    </div>
+  </div>
+
+  {% if director_calendar_pilotage_alerts %}
+    {% for item in director_calendar_pilotage_alerts %}
+      {% component "ui_core.alert" title=item.title message=item.detail tone=item.tone %}{% endcomponent %}
+    {% endfor %}
+  {% endif %}
+  {% else %}
+    {% component "ui_core.panel" title="Votre année académique n'a pas encore de calendrier" subtitle="Commencez ici : le système créera un brouillon local à votre annexe, que vous structurerez ensuite avant publication." %}
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div class="flex min-w-0 items-start gap-3"><span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button bg-ui-primary-soft text-ui-primary"><i data-lucide="calendar-plus" class="h-5 w-5"></i></span><div><p class="text-sm font-bold text-ui-text">Étape 1 : créer la version de travail</p><p class="mt-1 text-xs text-ui-text-muted">Aucune date n'est publiée à ce stade ; vous préparez seulement le calendrier officiel.</p></div></div><a href="{{ calendar_tabs.1.href }}" hx-get="{{ calendar_tabs.1.hx_get }}" hx-target="#director-calendar-subcontent" hx-swap="innerHTML" hx-push-url="{{ calendar_tabs.1.hx_push_url }}" hx-indicator="#director-calendar-loading" class="ui-focus-ring inline-flex h-ui-control shrink-0 items-center justify-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary"><i data-lucide="arrow-right" class="h-4 w-4"></i>Créer le calendrier</a></div>
+    {% endcomponent %}
+  {% endif %}
+</div>

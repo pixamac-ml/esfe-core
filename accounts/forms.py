@@ -5,6 +5,8 @@ from django.contrib.auth import get_user_model
 from .models import (
     BranchBankTransfer,
     BranchCashMovement,
+    BranchCashRegisterSession,
+    BranchWallet,
     BranchExpense,
     BranchMonthlyClosure,
     Donation,
@@ -279,8 +281,6 @@ class TeacherHonorariumEntryForm(forms.ModelForm):
     class Meta:
         model = TeacherHonorariumEntry
         fields = [
-            "hourly_rate",
-            "validated_hours",
             "adjustments",
             "deductions",
             "advances",
@@ -292,7 +292,7 @@ class TeacherHonorariumEntryForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for field_name in ["hourly_rate", "validated_hours", "adjustments", "deductions", "advances"]:
+        for field_name in ["adjustments", "deductions", "advances"]:
             self.fields[field_name].widget.attrs.update({"class": "dg-input"})
         self.fields["notes"].widget.attrs.update({
             "class": "dg-input",
@@ -430,6 +430,88 @@ class BranchCashMovementForm(forms.ModelForm):
                 "Un mouvement manuel doit utiliser la source Manuel ou Ajustement."
             )
         return source
+
+
+class CashRegisterOpenForm(forms.Form):
+    opening_amount = forms.IntegerField(min_value=0, label="Comptage d'ouverture")
+    opening_notes = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 2}))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["opening_amount"].widget.attrs.update({"class": "dg-input", "min": "0"})
+        self.fields["opening_notes"].widget.attrs.update({
+            "class": "dg-input",
+            "placeholder": "Observation d'ouverture (facultatif)...",
+        })
+
+
+class CashRegisterCloseForm(forms.Form):
+    counted_amount = forms.IntegerField(min_value=0, label="Comptage physique de fermeture")
+    closing_notes = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 2}))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["counted_amount"].widget.attrs.update({"class": "dg-input", "min": "0"})
+        self.fields["closing_notes"].widget.attrs.update({
+            "class": "dg-input",
+            "placeholder": "Justification obligatoire en cas d'ecart...",
+        })
+
+
+class BranchWalletForm(forms.ModelForm):
+    """A deliberately small, business-facing form for logical cash compartments."""
+
+    PROFILE_CHOICES = [
+        ("salary", "Salaires du personnel"),
+        ("honorarium", "Honoraires des enseignants"),
+        ("expense", "Dépenses quotidiennes"),
+        ("event", "Événement ou mission temporaire"),
+        ("shop", "Recettes de la boutique"),
+        ("student_payment", "Encaissements étudiants"),
+        ("donation", "Dons reçus"),
+        ("other", "Autre besoin"),
+    ]
+    PROFILE_CONFIGURATION = {
+        "salary": (BranchWallet.TYPE_DISBURSEMENT, "salary", BranchWallet.NATURE_RECURRING),
+        "honorarium": (BranchWallet.TYPE_DISBURSEMENT, "honorarium", BranchWallet.NATURE_RECURRING),
+        "expense": (BranchWallet.TYPE_DISBURSEMENT, "expense", BranchWallet.NATURE_RECURRING),
+        "event": (BranchWallet.TYPE_DISBURSEMENT, "event", BranchWallet.NATURE_TEMPORARY),
+        "shop": (BranchWallet.TYPE_RECEIPT, "shop", BranchWallet.NATURE_RECURRING),
+        "student_payment": (BranchWallet.TYPE_RECEIPT, "student_payment", BranchWallet.NATURE_RECURRING),
+        "donation": (BranchWallet.TYPE_RECEIPT, "donation", BranchWallet.NATURE_RECURRING),
+        "other": (BranchWallet.TYPE_DISBURSEMENT, "other", BranchWallet.NATURE_RECURRING),
+    }
+
+    profile = forms.ChoiceField(label="Usage", choices=PROFILE_CHOICES)
+
+    class Meta:
+        model = BranchWallet
+        fields = ["name"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.widget.attrs.update({"class": "dg-input"})
+        self.fields["name"].widget.attrs.update(
+            {"placeholder": "Ex. Salaires septembre"}
+        )
+
+    def apply_profile(self, wallet):
+        """Apply controlled technical values after the user chose an understandable use."""
+        wallet.wallet_type, wallet.category, wallet.nature = self.PROFILE_CONFIGURATION[
+            self.cleaned_data["profile"]
+        ]
+        return wallet
+
+
+class WalletAmountForm(forms.Form):
+    amount = forms.IntegerField(min_value=1)
+    notes = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 2}))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.widget.attrs.update({"class": "dg-input"})
 
 
 class DonationForm(forms.ModelForm):

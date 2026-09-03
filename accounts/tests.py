@@ -1,6 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, cast
+import unittest
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -1930,6 +1931,36 @@ class PortalPhaseOneTests(TestCase):
 		self.assertContains(response, "Gestion des notes")
 		self.assertContains(response, f"Semestre {semester.number}")
 
+	def test_it_role_scope_forbids_academic_governance_routes(self):
+		it_user = self._create_user("portal_it_restricted_scope", position="it_support")
+		self.client.force_login(it_user)
+
+		for url_name in (
+			"it_structure_workspace",
+			"it_structure_drawer",
+			"it_structure_modal",
+			"it_archives_workspace",
+			"it_catalog_workspace",
+			"it_branch_settings_workspace",
+			"it_support_flow_workspace",
+			"it_supervision_workspace",
+			"it_surveillance_workspace",
+			"surveillance_general_api",
+			"it_notes_decisions",
+			"it_notes_retake_modal",
+		):
+			with self.subTest(url_name=url_name):
+				self.assertEqual(self.client.get(reverse(f"accounts_portal:{url_name}")).status_code, 403)
+
+		self.assertEqual(
+			self.client.post(
+				reverse("accounts_portal:it_notes_workflow_action"),
+				{"action": "publier_session_normale"},
+			).status_code,
+			403,
+		)
+
+	@unittest.skip("Consultation des décisions transférée au Directeur des Études.")
 	def test_it_notes_decisions_uses_official_annual_decision(self):
 		it_user = self._create_user("portal_it_notes_decisions", position="it_support")
 		student_user = self._create_user("portal_student_notes_decisions", role="student")
@@ -1976,6 +2007,7 @@ class PortalPhaseOneTests(TestCase):
 			0,
 		)
 
+	@unittest.skip("Publication normale et activation du rattrapage transférées au Directeur des Études.")
 	def test_it_notes_workflow_publishes_normal_session_then_unlocks_retake_modal(self):
 		it_user = self._create_user("portal_it_notes_publish_normal", position="it_support")
 		student_user = self._create_user("portal_student_notes_normal", role="student")
@@ -2054,6 +2086,7 @@ class PortalPhaseOneTests(TestCase):
 
 		self.assertContains(response, "Seules les matieres non validees peuvent etre modifiees au rattrapage.", status_code=403)
 
+	@unittest.skip("Le paramétrage académique est transféré au Directeur des Études.")
 	def test_it_structure_workspace_renders_academic_configuration_module(self):
 		it_user = self._create_user("portal_it_structure_workspace", position="it_support")
 		academic_year, academic_class, _ec = self._create_academic_class_bundle("L3IT")
@@ -2074,6 +2107,7 @@ class PortalPhaseOneTests(TestCase):
 		self.assertContains(response, '#it-dashboard-modal-content', html=False)
 		self.assertContains(response, '#it-dashboard-drawer-content', html=False)
 
+	@unittest.skip("Le workflow Tickets est retiré du rôle Informaticien.")
 	def test_it_support_workspace_uses_certified_subnavigation(self):
 		it_user = self._create_user("portal_it_support_subnavigation", position="it_support")
 		self.client.force_login(it_user)
@@ -2090,6 +2124,7 @@ class PortalPhaseOneTests(TestCase):
 		self.assertContains(response, "En cours")
 		self.assertContains(response, "Résolus")
 
+	@unittest.skip("La création de classe est transférée au Directeur des Études.")
 	def test_it_structure_action_can_create_academic_class(self):
 		it_user = self._create_user("portal_it_structure_create", position="it_support")
 		academic_year = AcademicYear.objects.create(
@@ -2118,6 +2153,7 @@ class PortalPhaseOneTests(TestCase):
 		self.assertTrue(created_class.semesters.filter(number=1).exists())
 		self.assertTrue(created_class.semesters.filter(number=2).exists())
 
+	@unittest.skip("Le modal de paramétrage académique est transféré au Directeur des Études.")
 	def test_it_structure_action_keeps_modal_open_on_validation_error(self):
 		it_user = self._create_user("portal_it_structure_modal_error", position="it_support")
 		academic_year = AcademicYear.objects.create(
@@ -2318,6 +2354,7 @@ class PortalPhaseOneTests(TestCase):
 		grade.refresh_from_db()
 		self.assertEqual(grade.normal_score, Decimal("14.5"))
 
+	@unittest.skip("L'archivage académique est retiré du rôle Informaticien.")
 	def test_it_archives_class_and_restores_it(self):
 		it_user = self._create_user("portal_it_archive", position="it_support")
 		student_user = self._create_user("portal_archive_student", role="student")

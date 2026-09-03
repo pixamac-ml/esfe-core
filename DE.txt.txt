@@ -1,0 +1,588 @@
+# CADRAGE MÉTIER — RESTRUCTURATION DU DASHBOARD DIRECTEUR DES ÉTUDES
+
+## 1. OBJECTIF
+
+Le dashboard du Directeur des Études existe déjà et une grande partie de ses fonctionnalités est opérationnelle.
+
+**Il ne faut pas reconstruire ce dashboard.**
+
+Le travail demandé consiste à auditer, restructurer, connecter et perfectionner l’existant afin qu’il corresponde exactement aux responsabilités métier réelles du Directeur des Études.
+
+Le DE est avant tout **le responsable du fonctionnement académique et pédagogique de son établissement/annexe**.
+
+Son dashboard doit répondre quotidiennement à ces questions :
+
+> Qu'est-ce qui doit être organisé ?
+> Qu'est-ce qui doit être contrôlé ?
+> Qu'est-ce qui attend ma validation ?
+> Qu'est-ce qui doit être publié ?
+> Quels documents académiques dois-je produire ?
+
+Le dashboard doit donc devenir un véritable **poste de pilotage académique**, et non une accumulation de pages et de statistiques.
+
+---
+
+# 2. LES 6 DOMAINES MÉTIER DU DIRECTEUR DES ÉTUDES
+
+La restructuration doit s'organiser autour de six domaines cohérents :
+
+1. **Pilotage académique**
+2. **Structure académique / Maquettes**
+3. **Planification**
+4. **Enseignants**
+5. **Évaluations, notes et résultats**
+6. **Documents académiques**
+
+Ces domaines peuvent utiliser des sous-sections afin d'éviter de multiplier les grandes entrées de navigation.
+
+Réutiliser le shell, HTMX, les composants UI, drawers, tables, filtres, permissions et services existants.
+
+---
+
+# 3. PILOTAGE ACADÉMIQUE
+
+La page d'accueil du DE ne doit pas devenir une copie miniature de toutes les autres sections.
+
+Elle doit être son **centre de décision quotidien**.
+
+Afficher principalement les situations qui nécessitent réellement son attention :
+
+* maquettes académiques incomplètes ;
+* EC/matières non affectés ;
+* enseignants sans affectation complète ;
+* conflits d'emploi du temps ;
+* cours ou heures nécessitant un contrôle ;
+* évaluations prochaines ;
+* notes en attente de contrôle ;
+* résultats en attente de validation ;
+* résultats validés mais non publiés ;
+* documents nécessitant génération ou traitement ;
+* anomalies académiques importantes.
+
+Chaque alerte doit être **actionnable**.
+
+Exemple :
+
+`8 EC sans enseignant → clic → Enseignants > Affectations > Non affectés`
+
+Le Pilotage ne doit pas répéter toutes les statistiques disponibles ailleurs.
+
+---
+
+# 4. STRUCTURE ACADÉMIQUE / MAQUETTES
+
+Le Directeur des Études porte la structure académique de référence.
+
+Cette section doit centraliser :
+
+**Formation → Niveau/Classe → Semestre → UE → EC/Matière**
+
+avec les paramètres académiques associés lorsqu'ils existent :
+
+* crédits ;
+* coefficients ;
+* volumes horaires ;
+* statut actif/inactif ;
+* règles nécessaires aux calculs académiques.
+
+La maquette doit être la **source unique de vérité académique**.
+
+Les autres modules doivent consommer cette structure plutôt que recréer leurs propres UE, EC ou matières.
+
+Prévoir des états explicites, par exemple :
+
+`Brouillon → À compléter → Prête → Validée → Active`
+
+Ne pas permettre qu'une modification dangereuse d'une maquette déjà utilisée détruise l'historique académique.
+
+---
+
+# 5. PLANIFICATION
+
+Le DE organise le déroulement académique.
+
+Cette section doit regrouper logiquement :
+
+### Calendrier académique
+
+* périodes académiques ;
+* semestres ;
+* évaluations ;
+* examens ;
+* événements académiques ;
+* échéances importantes.
+
+### Emplois du temps
+
+Construction par :
+
+* classe ;
+* semestre ;
+* EC/matière ;
+* enseignant ;
+* salle ;
+* horaire.
+
+Le système doit contrôler automatiquement autant que possible :
+
+* conflit enseignant ;
+* conflit classe ;
+* conflit salle ;
+* chevauchement horaire ;
+* EC sans enseignant ;
+* incohérences de planification.
+
+### Publication
+
+Une planification préparée n'est pas nécessairement immédiatement visible par tout le monde.
+
+Prévoir un workflow clair :
+
+`Brouillon → Contrôlé → Validé → Publié`
+
+Après publication, les utilisateurs concernés récupèrent automatiquement les informations correspondant à leur profil.
+
+---
+
+# 6. ENSEIGNANTS
+
+Le DE gère le **volet académique** des enseignants.
+
+Il doit pouvoir :
+
+* consulter les enseignants ;
+* gérer leurs affectations pédagogiques ;
+* affecter un enseignant à une classe et un EC/matière ;
+* consulter sa charge d'enseignement ;
+* suivre les enseignements réalisés ;
+* consulter les évaluations/suivis nécessaires ;
+* produire les documents académiques correspondants.
+
+La logique centrale doit être :
+
+**Enseignant → Affectation → Classe → EC → Volume prévu → Activité réalisée**
+
+Il faut absolument séparer cette responsabilité du paiement.
+
+Le DE **ne paie pas l'enseignant**.
+
+Il produit/valide les informations académiques nécessaires.
+
+La Gestionnaire récupère ensuite les éléments validés nécessaires au calcul et au paiement des honoraires.
+
+Ainsi :
+
+**DE = réalité académique des heures**
+
+**Gestionnaire = traitement financier des honoraires validés**
+
+Ne jamais demander à la Gestionnaire de recréer manuellement les heures déjà validées dans le système académique.
+
+---
+
+# 7. ÉVALUATIONS, NOTES ET RÉSULTATS
+
+Cette section constitue l'un des workflows les plus sensibles.
+
+Elle doit couvrir le cycle complet :
+
+**Organisation → Saisie → Contrôle → Validation → Publication → Documents**
+
+## Organisation des évaluations
+
+Le DE :
+
+* programme les évaluations ;
+* définit les classes concernées ;
+* définit les EC concernés ;
+* organise les périodes ;
+* organise les besoins de surveillance lorsque nécessaire.
+
+## Saisie des notes
+
+Respecter le workflow déjà retenu dans le système.
+
+Si l'Informaticien assure la saisie technique des notes, ne pas recréer une deuxième saisie indépendante chez le DE.
+
+Le DE récupère les données préparées.
+
+## Contrôle académique
+
+Le système doit permettre au DE de détecter facilement :
+
+* notes manquantes ;
+* valeurs hors bornes ;
+* EC incomplets ;
+* étudiants sans note ;
+* incohérences de calcul ;
+* données encore en saisie ;
+* éléments nécessitant correction.
+
+## Validation
+
+Une fois les contrôles terminés :
+
+`Saisie en cours → À contrôler → Validé DE → Publié`
+
+La validation doit être traçable.
+
+## Publication
+
+**Validation et publication doivent rester deux actions distinctes.**
+
+Un résultat peut être académiquement validé sans être encore visible par l'étudiant.
+
+La publication rend les résultats accessibles aux personnes autorisées.
+
+---
+
+# 8. BULLETINS, RELEVÉS ET PV
+
+Les documents de résultats doivent provenir directement des données validées.
+
+Le système doit pouvoir générer notamment, selon les modèles disponibles :
+
+* relevé individuel ;
+* relevé général ;
+* bulletin ;
+* PV ;
+* décision ou document académique associé.
+
+Aucune ressaisie manuelle des notes dans un document ne doit être nécessaire.
+
+Le document doit récupérer automatiquement :
+
+* identité de l'établissement ;
+* logo ;
+* année académique ;
+* classe ;
+* semestre/session ;
+* étudiant lorsque nécessaire ;
+* matières/EC ;
+* notes ;
+* coefficients/crédits ;
+* moyennes ;
+* décisions validées ;
+* références nécessaires.
+
+---
+
+# 9. NOUVEAU PRINCIPE — DOCUMENTS ACADÉMIQUES GÉNÉRÉS PAR LE SYSTÈME
+
+Une collection de documents institutionnels réels sera fournie progressivement.
+
+**Ne pas inventer leur contenu ou leur présentation avant analyse de ces documents.**
+
+Ils doivent servir à créer les modèles officiels du système.
+
+L'objectif est d'éviter que le DE rédige manuellement à chaque fois les mêmes documents.
+
+Le fonctionnement cible est :
+
+**Workflow métier → Formulaire → Données système → Modèle officiel → Document généré**
+
+Exemple :
+
+Pour une décision d'affectation d'un enseignant, le système connaît déjà :
+
+* enseignant ;
+* classe ;
+* matière ;
+* année académique ;
+* annexe ;
+* date ;
+* responsable.
+
+Le DE complète uniquement les informations réellement variables.
+
+Le système génère ensuite le document officiel.
+
+---
+
+# 10. DEUX MODES POUR LES DOCUMENTS
+
+Prévoir deux possibilités.
+
+## A. Générer depuis le système — mode privilégié
+
+Le DE sélectionne le type de document.
+
+Un formulaire contextuel apparaît.
+
+Les données déjà connues doivent être préremplies automatiquement.
+
+Le système génère ensuite le document.
+
+Actions possibles :
+
+**Prévisualiser | Générer | Télécharger PDF | Imprimer | Archiver**
+
+Selon le besoin, prévoir également les autres formats pertinents déjà supportés.
+
+## B. Importer un document existant
+
+Si exceptionnellement le document a été produit en dehors du système :
+
+**Importer → classifier → rattacher au dossier concerné → archiver**
+
+Le document importé doit pouvoir être rattaché à son objet métier :
+
+* enseignant ;
+* étudiant ;
+* classe ;
+* évaluation ;
+* stage ;
+* année académique ;
+* autre objet pertinent.
+
+---
+
+# 11. MODÈLES DOCUMENTAIRES
+
+Ne pas créer un éditeur Word complexe.
+
+Créer plutôt une bibliothèque de **modèles institutionnels paramétrables**.
+
+Exemples issus des besoins identifiés :
+
+* décision d'affectation ;
+* contrat/prestation lorsque cela relève du workflow ;
+* décision de rupture ;
+* attestation de dispensation des cours ;
+* rapport d'évaluation enseignant ;
+* calendrier d'évaluation ;
+* PV ;
+* relevé ;
+* note de service ;
+* avis ;
+* convocation ;
+* invitation ;
+* lettre de stage ;
+* lettre d'information ;
+* fiche de transfert ;
+* fiche de fréquentation.
+
+Les documents réels fournis devront être analysés et reliés au bon workflow.
+
+Ne pas générer des modèles génériques si un modèle institutionnel officiel existe.
+
+---
+
+# 12. DOCUMENT = CONSÉQUENCE DU MÉTIER
+
+Éviter de créer une simple section contenant 30 boutons :
+
+`Générer décision`
+
+`Générer PV`
+
+`Générer attestation`
+
+etc.
+
+Lorsque c'est possible, le document doit être accessible **depuis son contexte métier**.
+
+Exemple :
+
+`Enseignants > Affectation > Enseignant X > Générer décision d'affectation`
+
+ou :
+
+`Résultats > Session S1 > Validée > Générer PV`
+
+La section Documents devient principalement :
+
+* bibliothèque ;
+* recherche ;
+* génération libre lorsque pertinente ;
+* documents récemment générés ;
+* documents importés ;
+* archives.
+
+Cela évite de casser le workflow de travail du DE.
+
+---
+
+# 13. TRAÇABILITÉ DOCUMENTAIRE
+
+Chaque document généré doit idéalement conserver :
+
+* type ;
+* référence unique ;
+* date ;
+* auteur ;
+* annexe/établissement ;
+* année académique ;
+* objet métier associé ;
+* version/modèle utilisé ;
+* fichier généré ;
+* statut si nécessaire.
+
+Une modification ultérieure du modèle ne doit pas altérer silencieusement un document historique déjà officiellement généré.
+
+---
+
+# 14. FRONTIÈRES DU RÔLE
+
+Le DE ne doit pas devenir un super-administrateur.
+
+### Directeur des Études
+
+Responsable de :
+
+* structure académique ;
+* planification ;
+* affectations pédagogiques ;
+* organisation des évaluations ;
+* contrôle académique ;
+* validation des résultats ;
+* publication ;
+* documents académiques correspondants.
+
+### Informaticien
+
+Responsable notamment de :
+
+* opérations techniques ;
+* comptes et accès ;
+* imports techniques ;
+* support ;
+* saisie technique des notes lorsque le workflow le prévoit.
+
+### Gestionnaire
+
+Responsable de :
+
+* encaissements ;
+* trésorerie ;
+* dépenses ;
+* salaires ;
+* honoraires à partir des éléments académiques validés ;
+* clôture financière.
+
+### Surveillant
+
+Responsable notamment de :
+
+* assiduité ;
+* discipline ;
+* surveillance opérationnelle ;
+* suivi quotidien correspondant à son périmètre.
+
+### DG/DGA
+
+Responsables de :
+
+* gouvernance ;
+* arbitrages ;
+* validations supérieures ;
+* vision globale/inter-annexes.
+
+---
+
+# 15. UX ATTENDUE
+
+Le dashboard doit être rapide.
+
+Utiliser des sous-sections plutôt que multiplier les pages principales.
+
+Une table métier doit disposer selon son besoin de :
+
+* recherche ;
+* filtres ;
+* statut ;
+* pagination ;
+* actions contextuelles.
+
+Utiliser les drawers existants pour consulter/modifier les détails sans faire perdre le contexte.
+
+Les états doivent être immédiatement compréhensibles :
+
+`À compléter`
+
+`À contrôler`
+
+`À valider`
+
+`Validé`
+
+`Publié`
+
+`Bloqué`
+
+Les actions importantes doivent être visibles sans surcharger l'écran.
+
+---
+
+# 16. MÉTHODE DE TRAVAIL DEMANDÉE À CODEX
+
+**Ne commence pas par coder une nouvelle architecture.**
+
+Commence par auditer le dashboard DE existant.
+
+Pour chaque fonctionnalité ou section actuelle, classifier :
+
+### CONSERVER
+
+Fonction correcte et conforme au métier.
+
+### DÉPLACER / REGROUPER
+
+Fonction correcte mais située dans une mauvaise section.
+
+### CONNECTER
+
+Fonction existante mais isolée alors qu'elle doit consommer les données d'un autre workflow.
+
+### CORRIGER
+
+Fonction présente mais dont la logique métier est incorrecte/incomplète.
+
+### MANQUANT
+
+Besoin métier réellement absent.
+
+### RETIRER DE L'INTERFACE DE
+
+Fonction appartenant à un autre rôle ou devenue redondante.
+
+Présenter d'abord cet audit avant les modifications structurelles importantes.
+
+---
+
+# 17. PRIORITÉ D'IMPLÉMENTATION
+
+Procéder progressivement :
+
+1. auditer l'existant ;
+2. fiabiliser Structure académique/Maquettes ;
+3. fiabiliser Planification ;
+4. fiabiliser Enseignants/Affectations ;
+5. vérifier le workflow Évaluations → Notes → Validation → Publication ;
+6. connecter correctement les bulletins/relevés/PV ;
+7. construire le moteur documentaire autour des modèles institutionnels ;
+8. relier progressivement les documents réels fournis à leurs workflows ;
+9. uniformiser l'UX ;
+10. tester permissions, annexe, année académique et traçabilité.
+
+---
+
+# RÉSULTAT FINAL ATTENDU
+
+À terme, le Directeur des Études doit pouvoir gérer son activité selon une chaîne cohérente :
+
+**STRUCTURER → PLANIFIER → AFFECTER → ORGANISER → CONTRÔLER → VALIDER → PUBLIER → DOCUMENTER**
+
+Il ne doit pas avoir à ressaisir une information que le système possède déjà.
+
+Un enseignant affecté doit alimenter la planification.
+
+La planification doit alimenter le suivi académique.
+
+Les données académiques validées doivent alimenter les évaluations et les honoraires lorsqu'elles sont pertinentes.
+
+Les notes validées doivent alimenter automatiquement les relevés, bulletins et PV.
+
+Les opérations métier doivent permettre de générer les documents institutionnels correspondants.
+
+**Le dashboard DE doit devenir un système académique intégré, pas une collection de modules indépendants.**

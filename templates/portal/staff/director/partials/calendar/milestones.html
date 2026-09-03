@@ -1,0 +1,45 @@
+{% load component_tags %}
+<div class="space-y-5">
+  {% if director_selected_calendar %}{% with cal=director_selected_calendar %}
+  {% component "ui_core.panel" title="Échéances" subtitle="Relisez les dates dans l’ordre. Modifiez ou supprimez seulement le jalon concerné." padding=False %}
+    {% if director_calendar_entries %}
+      <div class="divide-y divide-ui-border">
+        {% for row in director_calendar_entries %}
+        <article class="p-4">
+          <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
+            <span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button {{ row.color_bg }} {{ row.color_text }}"><i data-lucide="{{ row.icon }}" class="h-4 w-4"></i></span>
+            <div class="min-w-0 flex-1"><h3 class="text-sm font-bold text-ui-text">{{ row.entry.title }}</h3><p class="mt-1 text-xs text-ui-text-muted">{{ row.entry.start_datetime|date:"d/m/Y" }}{% if row.entry.end_datetime|date:"Y-m-d" != row.entry.start_datetime|date:"Y-m-d" %} au {{ row.entry.end_datetime|date:"d/m/Y" }}{% endif %} · {{ row.type_label }} · {{ row.scope_label }}</p>{% if row.entry.description %}<p class="mt-1 text-xs text-ui-text-muted">{{ row.entry.description }}</p>{% endif %}</div>
+            <div class="flex shrink-0 items-center gap-2">{% if row.entry.is_blocking %}{% component "ui_core.status_badge" label="Bloquant" tone="danger" %}{% endcomponent %}{% endif %}{% if row.is_active %}{% component "ui_core.status_badge" label="En cours" tone="success" %}{% endcomponent %}{% endif %}</div>
+          </div>
+          {% if row.can_edit %}
+            <div class="mt-3 flex flex-wrap gap-2">
+              <details class="rounded-ui-button border border-ui-border bg-ui-surface px-3 py-2">
+                <summary class="cursor-pointer text-xs font-semibold text-ui-primary">Modifier</summary>
+                <form x-data="{ scope: '{{ row.entry.target_scope }}' }" hx-post="{% url 'accounts_portal:director_calendar_action' %}" hx-target="#director-calendar-section" hx-swap="outerHTML" hx-indicator="#director-calendar-loading" class="mt-3 grid gap-3 lg:grid-cols-12">
+                  {% csrf_token %}<input type="hidden" name="action" value="edit_entry"><input type="hidden" name="calendar_id" value="{{ cal.id }}"><input type="hidden" name="entry_id" value="{{ row.entry.id }}">
+                  <div class="lg:col-span-4"><label class="mb-1 block text-xs font-semibold text-ui-text">Intitulé</label><input required name="title" value="{{ row.entry.title }}" class="ui-focus-ring h-ui-control w-full rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm text-ui-text"></div>
+                  <div class="lg:col-span-3"><label class="mb-1 block text-xs font-semibold text-ui-text">Type</label><select name="event_type" class="ui-focus-ring h-ui-control w-full rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm text-ui-text">{% for value,label in director_calendar_event_type_choices %}<option value="{{ value }}" {% if value == row.entry.event_type %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+                  <div class="lg:col-span-2"><label class="mb-1 block text-xs font-semibold text-ui-text">Début</label><input required type="date" name="start_date" value="{{ row.entry.start_datetime|date:'Y-m-d' }}" min="{{ cal.academic_year.start_date|date:'Y-m-d' }}" max="{{ cal.academic_year.end_date|date:'Y-m-d' }}" class="ui-focus-ring h-ui-control w-full rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm text-ui-text"></div>
+                  <div class="lg:col-span-2"><label class="mb-1 block text-xs font-semibold text-ui-text">Fin</label><input required type="date" name="end_date" value="{{ row.entry.end_datetime|date:'Y-m-d' }}" min="{{ cal.academic_year.start_date|date:'Y-m-d' }}" max="{{ cal.academic_year.end_date|date:'Y-m-d' }}" class="ui-focus-ring h-ui-control w-full rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm text-ui-text"></div>
+                  <div class="flex items-end lg:col-span-1"><button class="ui-focus-ring h-ui-control w-full rounded-ui-button bg-ui-primary text-xs font-semibold text-ui-on-primary">Enregistrer</button></div>
+                  <div class="lg:col-span-12"><label class="mb-1 block text-xs font-semibold text-ui-text">Note <span class="font-normal text-ui-text-muted">(facultative)</span></label><input name="description" value="{{ row.entry.description }}" class="ui-focus-ring h-ui-control w-full rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm text-ui-text"></div>
+                  <details class="lg:col-span-12 rounded-ui-button border border-ui-border bg-ui-surface-muted px-3 py-2"><summary class="cursor-pointer text-xs font-semibold text-ui-primary">Paramètres de portée</summary><div class="mt-3 grid gap-3 lg:grid-cols-12"><div class="lg:col-span-3"><label class="mb-1 block text-xs font-semibold text-ui-text">Portée</label><select x-model="scope" name="target_scope" class="ui-focus-ring h-ui-control w-full rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm text-ui-text"><option value="branch">Toute l’annexe</option><option value="programme">Formation</option><option value="class">Classe / niveau</option><option value="semester">Semestre</option></select></div><div x-show="scope === 'programme'" class="lg:col-span-3"><label class="mb-1 block text-xs font-semibold text-ui-text">Formation</label><select :disabled="scope !== 'programme'" name="programme_id" class="ui-focus-ring h-ui-control w-full rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm text-ui-text"><option value="">-- choisir --</option>{% for programme in director_calendar_available_programmes %}<option value="{{ programme.id }}" {% if programme.id == row.entry.programme_id %}selected{% endif %}>{{ programme.title }}</option>{% endfor %}</select></div><div x-show="scope === 'class'" class="lg:col-span-3"><label class="mb-1 block text-xs font-semibold text-ui-text">Classe</label><select :disabled="scope !== 'class'" name="class_id" class="ui-focus-ring h-ui-control w-full rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm text-ui-text"><option value="">-- choisir --</option>{% for cls in director_calendar_available_classes %}<option value="{{ cls.id }}" {% if cls.id == row.entry.academic_class_id %}selected{% endif %}>{{ cls.display_name }}</option>{% endfor %}</select></div><div x-show="scope === 'semester'" class="lg:col-span-3"><label class="mb-1 block text-xs font-semibold text-ui-text">Semestre</label><select :disabled="scope !== 'semester'" name="semester_id" class="ui-focus-ring h-ui-control w-full rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm text-ui-text"><option value="">-- choisir --</option>{% for sem in director_calendar_available_semesters %}<option value="{{ sem.id }}" {% if sem.id == row.entry.semester_id %}selected{% endif %}>{{ sem.academic_class.display_name }} · S{{ sem.number }}</option>{% endfor %}</select></div><label class="flex items-end gap-2 pb-2 text-xs font-semibold text-ui-text lg:col-span-2"><input type="checkbox" name="is_blocking" value="1" {% if row.entry.is_blocking %}checked{% endif %} class="rounded border-ui-border text-ui-primary focus:ring-ui-primary">Jalon bloquant</label></div></details>
+                </form>
+              </details>
+              <form hx-post="{% url 'accounts_portal:director_calendar_action' %}" hx-target="#director-calendar-section" hx-swap="outerHTML" hx-indicator="#director-calendar-loading" onsubmit="return window.confirm('Supprimer définitivement ce jalon ?')">{% csrf_token %}<input type="hidden" name="action" value="delete_entry"><input type="hidden" name="entry_id" value="{{ row.entry.id }}"><button class="ui-focus-ring h-9 rounded-ui-button border border-ui-danger bg-ui-danger-soft px-3 text-xs font-semibold text-ui-danger">Supprimer</button></form>
+            </div>
+          {% else %}
+            <p class="mt-3 text-xs text-ui-text-muted">Ce jalon est verrouillé. Créez une révision depuis le menu Plus pour le corriger.</p>
+          {% endif %}
+        </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      {% component "ui_core.empty_state" title="Aucune échéance" message="Ajoutez les jalons structurants depuis Construire." icon="calendar-x" %}{% endcomponent %}
+    {% endif %}
+  {% endcomponent %}
+  {% endwith %}
+  {% else %}
+    {% component "ui_core.empty_state" title="Aucun calendrier sélectionné" message="Sélectionnez un calendrier de travail pour consulter ses échéances." icon="calendar-x" %}{% endcomponent %}
+  {% endif %}
+</div>

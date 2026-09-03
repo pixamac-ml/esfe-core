@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.test import TestCase
+from unittest.mock import patch
 from django.urls import reverse
 
 from branches.models import Branch
@@ -10,8 +11,8 @@ from inscriptions.models import Inscription
 from admissions.models import Candidature
 from accounts.models import BranchCashMovement
 from payments.models import PaymentAgent
-from shop.models import ShopOrder, ShopPayment, ShopProduct, ShopStockMovement
-from shop.services.shop_service import create_counter_order, create_shop_payment, validate_shop_payment
+from shop.models import ShopOrder, ShopOrderEmailConfirmation, ShopPayment, ShopProduct, ShopStockMovement
+from shop.services.shop_service import create_counter_order, create_shop_payment, validate_shop_payment, confirm_student_remote_order, request_student_remote_order_confirmation
 from django.core.exceptions import ValidationError
 from students.models import Student
 
@@ -32,7 +33,8 @@ class ShopWorkflowTests(TestCase):
         self.manager.groups.add(group)
         manager_profile = self.manager.profile
         manager_profile.branch = self.branch
-        manager_profile.save(update_fields=["branch", "updated_at"])
+        manager_profile.position = "annex_manager"
+        manager_profile.save(update_fields=["branch", "position", "updated_at"])
 
         cycle = Cycle.objects.create(name="Licence", theme="accent", min_duration_years=1, max_duration_years=5)
         diploma = Diploma.objects.create(name="Diplome Shop", level="superieur")
@@ -198,14 +200,135 @@ class ShopWorkflowTests(TestCase):
         self.assertEqual(outs.count(), 1)
         self.assertEqual(self.product.current_stock, 3)
 
+    def test_counter_sale_supports_multiple_lines_with_one_cash_entry(self):
+        second_product = ShopProduct.objects.create(
+            branch=self.branch,
+            name="Badge étudiant",
+            category=ShopProduct.CATEGORY_BADGE,
+            unit_price=2000,
+            is_active=True,
+        )
+        for product, quantity, reference in (
+            (self.product, 5, "STK-MULTI-001"),
+            (second_product, 8, "STK-MULTI-002"),
+        ):
+            ShopStockMovement.objects.create(
+                branch=self.branch,
+                product=product,
+                movement_type=ShopStockMovement.TYPE_IN,
+                quantity=quantity,
+                reference=reference,
+                created_by=self.manager,
+            )
+
+        order, payment = create_counter_order(
+            branch=self.branch,
+            lines=[
+                {"product": self.product, "quantity": 2},
+                {"product": second_product, "quantity": 3},
+            ],
+            payment_method=ShopPayment.METHOD_CASH,
+            created_by=self.manager,
+            customer_name="Client comptoir",
+            immediate_settlement=True,
+        )
+
+        self.assertEqual(order.items.count(), 2)
+        self.assertEqual(order.total_amount, 36000)
+        self.assertEqual(payment.status, ShopPayment.STATUS_VALIDATED)
+        self.assertEqual(
+            BranchCashMovement.objects.filter(
+                branch=self.branch,
+                source=BranchCashMovement.SOURCE_SHOP,
+                source_reference=payment.reference,
+            ).count(),
+            1,
+        )
+        self.assertEqual(self.product.current_stock, 3)
+        self.assertEqual(second_product.current_stock, 5)
+
+    def test_manager_stock_adjustment_is_traced_and_cannot_make_stock_negative(self):
+        ShopStockMovement.objects.create(
+            branch=self.branch,
+            product=self.product,
+            movement_type=ShopStockMovement.TYPE_IN,
+            quantity=3,
+            reference="STK-ADJUST-001",
+            created_by=self.manager,
+        )
+        self.client.force_login(self.manager)
+        response = self.client.post(
+            reverse("shop:manager_stock_adjust"),
+            {"product": self.product.pk, "quantity": -1, "notes": "Comptage physique du jour"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(self.product.current_stock, 2)
+        adjustment = ShopStockMovement.objects.filter(
+            product=self.product,
+            movement_type=ShopStockMovement.TYPE_ADJUSTMENT,
+        ).get()
+        self.assertEqual(adjustment.quantity, -1)
+        self.assertEqual(adjustment.notes, "Comptage physique du jour")
+
     def test_manager_shop_panel_renders_for_branch(self):
         PaymentAgent.objects.create(user=self.manager, branch=self.branch, is_active=True)
         self.client.force_login(self.manager)
-        response = self.client.get(reverse("accounts:manager_dashboard"), {"section": "boutique"})
+        response = self.client.get(
+            reverse("accounts_portal:portal_annex_manager"),
+            {"section": "boutique"},
+        )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Vente comptoir")
+        self.assertContains(response, "Poste de vente comptoir")
         self.assertContains(response, "Blouse pratique")
+        self.assertContains(response, "À encaisser")
+        self.assertContains(response, "Stock &amp; articles")
+
+    def test_manager_shop_stock_and_journal_filters_keep_the_boutique_subview(self):
+        self.client.force_login(self.manager)
+        dashboard_url = reverse("accounts_portal:portal_annex_manager")
+
+        stock_response = self.client.get(
+            dashboard_url,
+            {"section": "boutique", "view": "stock", "shop_stock_state": "low"},
+        )
+        self.assertEqual(stock_response.status_code, 200)
+        self.assertContains(stock_response, 'name="shop_stock_q"')
+        self.assertContains(stock_response, 'name="shop_stock_category"')
+        self.assertContains(stock_response, 'name="shop_stock_state"')
+        self.assertContains(stock_response, 'name="view" value="stock"')
+
+        journal_response = self.client.get(
+            dashboard_url,
+            {"section": "boutique", "view": "journal", "shop_q": "Blouse"},
+        )
+        self.assertEqual(journal_response.status_code, 200)
+        self.assertContains(journal_response, 'name="shop_q"')
+        self.assertContains(journal_response, 'name="shop_date"')
+        self.assertContains(journal_response, 'name="view" value="journal"')
+
+    def test_manager_archives_and_restores_catalogue_item_without_deleting_it(self):
+        ShopStockMovement.objects.create(
+            branch=self.branch,
+            product=self.product,
+            movement_type=ShopStockMovement.TYPE_IN,
+            quantity=2,
+            reference="STK-ARCHIVE-001",
+            created_by=self.manager,
+        )
+        self.client.force_login(self.manager)
+        url = reverse("shop:manager_product_delete", args=[self.product.pk])
+
+        self.client.post(url)
+        self.product.refresh_from_db()
+        self.assertFalse(self.product.is_active)
+        self.assertTrue(ShopProduct.objects.filter(pk=self.product.pk).exists())
+        self.assertEqual(self.product.current_stock, 2)
+
+        self.client.post(url)
+        self.product.refresh_from_db()
+        self.assertTrue(self.product.is_active)
 
     def test_public_catalog_renders_branch_products(self):
         response = self.client.get(f"/shop/{self.branch.slug}/")
@@ -213,6 +336,23 @@ class ShopWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.branch.name)
         self.assertContains(response, "Blouse pratique")
+
+    @patch("shop.services.shop_service.NotificationBus.send_email")
+    def test_student_email_otp_confirms_order_without_creating_payment_or_stock_output(self, send_email):
+        ShopStockMovement.objects.create(branch=self.branch, product=self.product, movement_type=ShopStockMovement.TYPE_IN, quantity=4, reference="STK-OTP-001", created_by=self.manager)
+        with patch("shop.services.shop_service._shop_email_otp", return_value="123456"):
+            confirmation, _product = request_student_remote_order_confirmation(student=self.student_user, product_id=self.product.pk, quantity=2)
+        self.assertEqual(ShopOrder.objects.count(), 0)
+        self.assertEqual(confirmation.status, ShopOrderEmailConfirmation.STATUS_PENDING)
+        order = confirm_student_remote_order(student=self.student_user, confirmation_id=confirmation.pk, code="123456")
+        self.assertEqual(order.status, ShopOrder.STATUS_PENDING_PAYMENT)
+        self.assertEqual(order.total_amount, 30000)
+        self.assertFalse(ShopPayment.objects.filter(order=order).exists())
+        self.assertFalse(ShopStockMovement.objects.filter(order=order, movement_type=ShopStockMovement.TYPE_OUT).exists())
+        confirmation.refresh_from_db()
+        self.assertEqual(confirmation.status, ShopOrderEmailConfirmation.STATUS_CONFIRMED)
+        self.assertEqual(confirmation.order, order)
+        self.assertGreaterEqual(send_email.call_count, 2)
 
     def test_student_can_order_from_public_catalog(self):
         ShopStockMovement.objects.create(

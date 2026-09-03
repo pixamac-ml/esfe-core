@@ -1,0 +1,30 @@
+{% load component_tags %}
+<div class="space-y-5">
+  {% if toast %}{% component "ui_core.alert" title="Résultats académiques" message=toast.message tone=toast.level %}{% endcomponent %}{% endif %}
+  {% component "ui_core.panel" title=result_queue.title subtitle=result_queue.subtitle tone=result_queue.tone %}
+    <div class="flex items-center gap-3 rounded-ui-card border border-ui-border bg-ui-surface-muted p-3 text-sm text-ui-text-muted">
+      <span class="grid h-9 w-9 place-items-center rounded-ui-button bg-ui-surface text-ui-primary"><i data-lucide="{{ result_queue.icon }}" class="h-4 w-4"></i></span>
+      <span><strong class="text-ui-text">{{ result_queue_count }} élément(s) à traiter.</strong> Ouvrez une ligne, contrôlez les informations, puis confirmez l'action.</span>
+    </div>
+    {% if result_queue.rows %}
+      <div class="divide-y divide-ui-border">
+      {% for row in result_queue.rows %}
+        <button type="button"
+                hx-get="{% url 'accounts_portal:director_drawer' %}?panel=result&class_id={{ row.class.id }}&semester_id={{ row.semester.id }}"
+                hx-target="#director-drawer-content"
+                hx-swap="innerHTML"
+                hx-disabled-elt="this"
+                hx-on::after-request="window.deOpenDrawer && window.deOpenDrawer()"
+                class="ui-focus-ring flex w-full min-w-0 flex-wrap items-center gap-3 p-4 text-left hover:bg-ui-surface-hover">
+          <span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button bg-ui-primary-soft text-ui-primary"><i data-lucide="{{ result_queue.icon }}" class="h-5 w-5"></i></span>
+          <span class="min-w-0 flex-1"><strong class="block text-sm text-ui-text">{{ row.class.display_name }} · Semestre {{ row.semester.number }}</strong><span class="text-xs text-ui-text-muted">{{ row.entered }}/{{ row.expected }} notes · progression {{ row.progress }} %</span></span>
+          {% component "ui_core.status_badge" label=row.state_label tone=result_queue.tone %}{% endcomponent %}
+          <span class="inline-flex h-9 items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-xs font-semibold text-ui-text">{{ result_queue.action_label }}<i data-lucide="chevron-right" class="h-4 w-4"></i></span>
+        </button>
+      {% endfor %}
+      </div>
+    {% else %}
+      {% component "ui_core.empty_state" title=result_queue.empty_title message=result_queue.empty_message icon=result_queue.icon %}{% endcomponent %}
+    {% endif %}
+  {% endcomponent %}
+</div>

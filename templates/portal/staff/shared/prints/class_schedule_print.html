@@ -13,13 +13,17 @@
     .print-actions { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 14px; }
     .print-btn { cursor: pointer; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: #111827; padding: 9px 13px; font-size: 13px; font-weight: 700; text-decoration: none; }
     .print-btn.primary { border-color: #0f766e; background: #0f766e; color: #fff; }
-    .header { display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: end; border-bottom: 3px solid #0f766e; padding-bottom: 12px; margin-bottom: 14px; }
-    .school { margin: 0 0 4px; color: #0f766e; font-size: 13px; font-weight: 800; text-transform: uppercase; }
-    h1 { margin: 0; font-size: 24px; line-height: 1.15; }
-    .meta { margin: 5px 0 0; color: #475569; font-size: 12px; }
-    .summary { text-align: right; }
-    .summary strong { display: block; font-size: 16px; }
-    .summary span { display: block; margin-top: 4px; color: #64748b; font-size: 11px; }
+    .header { display: grid; grid-template-columns: 82px minmax(0, 1fr) auto; gap: 14px; align-items: center; border-bottom: 3px solid #0f766e; padding-bottom: 12px; margin-bottom: 12px; }
+    .logo { display: grid; width: 72px; height: 72px; place-items: center; overflow: hidden; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; color: #0f766e; font-size: 18px; font-weight: 900; }
+    .logo img { width: 100%; height: 100%; object-fit: contain; }
+    .school { margin: 0 0 3px; color: #0f766e; font-size: 13px; font-weight: 800; text-transform: uppercase; }
+    .branch { margin: 0; font-size: 11px; font-weight: 700; color: #334155; }
+    h1 { margin: 5px 0 0; font-size: 22px; line-height: 1.15; }
+    .meta { margin: 5px 0 0; color: #475569; font-size: 11px; }
+    .summary { min-width: 215px; border-left: 1px solid #cbd5e1; padding-left: 14px; text-align: right; }
+    .summary strong { display: block; color: #0f172a; font-size: 14px; }
+    .summary span { display: block; margin-top: 4px; color: #64748b; font-size: 10px; }
+    .document-reference { margin-top: 7px !important; color: #0f766e !important; font-weight: 800; letter-spacing: .04em; }
     .week-block { margin-bottom: 24px; break-inside: avoid; }
     .week-title { margin: 0 0 10px; font-size: 16px; }
     .schedule-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
@@ -36,13 +40,16 @@
     .course-meta { margin: 4px 0 0; color: #475569; font-size: 9px; line-height: 1.35; }
     .free { color: #cbd5e1; text-align: center; font-size: 10px; }
     .empty { border: 1px dashed #94a3b8; padding: 32px; color: #64748b; text-align: center; }
-    .footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 10px; color: #64748b; font-size: 9px; }
+    .validation { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 18px; }
+    .validation-box { min-height: 58px; border-top: 1px solid #94a3b8; padding-top: 5px; color: #475569; font-size: 9px; }
+    .validation-box strong { display: block; color: #0f172a; font-size: 10px; text-transform: uppercase; }
+    .footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 12px; border-top: 1px solid #e2e8f0; padding-top: 7px; color: #64748b; font-size: 9px; }
     @media print {
       @page { size: A4 landscape; margin: 8mm; }
       body { background: #fff; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
       .print-actions { display: none; }
       .page { width: auto; margin: 0; padding: 0; box-shadow: none; }
-      .week-block { break-inside: avoid; }
+      .week-block, .validation { break-inside: avoid; }
     }
     @media (max-width: 800px) {
       .page { width: 100%; margin: 0; padding: 12px; overflow-x: auto; }
@@ -58,24 +65,28 @@
     </div>
     <div class="print-sheet">
       <header class="header">
+        <div class="logo" aria-hidden="true">
+          {% if site_logo_url %}<img src="{{ site_logo_url }}" alt="">{% else %}{{ institution.short_name|default:"ESFE" }}{% endif %}
+        </div>
         <div>
-          <p class="school">ESFE · {{ branch.name }}</p>
-          <h1>Emploi du temps · {{ academic_class.display_name }}</h1>
-          <p class="meta">{{ academic_class.programme.title }} · Année académique {{ academic_class.academic_year.name }}</p>
+          <p class="school">{{ institution.name|default:"École Supérieure de Formation et d'Excellence" }}</p>
+          <p class="branch">{{ branch.name }}{% if branch.address %} · {{ branch.address }}{% endif %}{% if branch.phone %} · Tél. {{ branch.phone }}{% endif %}</p>
+          <h1>Emploi du temps de la classe</h1>
+          <p class="meta"><strong>{{ academic_class.display_name }}</strong> · {{ academic_class.programme.title }} · Année académique {{ academic_class.academic_year.name }}</p>
         </div>
         <div class="summary">
-          {% if source == "weekly" %}
+          {% if source == "weekly" or source == "week" %}
             <strong>{{ weekly_grid.total_hours }} h / semaine</strong>
             <span>Du {{ weekly_grid.week_start|date:"d/m/Y" }} au {{ weekly_grid.week_end|date:"d/m/Y" }} · {{ weekly_grid.slots|length }} cours</span>
+            <span class="document-reference">Réf. {{ print_reference }}</span>
           {% else %}
             <strong>{% if period == "month" %}Mois pédagogique{% else %}Semaine{% endif %}</strong>
           {% endif %}
         </div>
       </header>
 
-      {% if source == "weekly" %}
-        {% if weekly_grid.slots %}
-          <table class="schedule-table">
+      {% if source == "weekly" or source == "week" %}
+        <table class="schedule-table">
             <thead>
               <tr>
                 <th>Horaires</th>
@@ -100,10 +111,7 @@
                 </tr>
               {% endfor %}
             </tbody>
-          </table>
-        {% else %}
-          <div class="empty">Aucun cours n'est encore placé dans la grille hebdomadaire de cette classe.</div>
-        {% endif %}
+        </table>
       {% else %}
         {% for schedule in week_blocks %}
           <section class="week-block">
@@ -113,8 +121,15 @@
         {% endfor %}
       {% endif %}
 
+      {% if source == "weekly" or source == "week" %}
+      <section class="validation" aria-label="Visa de validation">
+        <div class="validation-box"><strong>Établi par</strong>Direction des études<br>Nom, date et signature</div>
+        <div class="validation-box"><strong>Visé par</strong>Direction de l'annexe<br>Nom, date et signature</div>
+        <div class="validation-box"><strong>Affichage</strong>Classe concernée<br>Date de mise à disposition</div>
+      </section>
+      {% endif %}
       <footer class="footer">
-        <span>Document de référence pour l'affichage interne.</span>
+        <span>Document de référence pour l'affichage interne · {{ institution.email|default:branch.email }}{% if institution.phone or branch.phone %} · {{ institution.phone|default:branch.phone }}{% endif %}</span>
         <span>Généré le {{ generated_at|date:"d/m/Y à H:i" }}</span>
       </footer>
     </div>

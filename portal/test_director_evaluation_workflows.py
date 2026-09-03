@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -16,6 +17,8 @@ from academics.models import (
     Semester,
     UE,
 )
+from academics.services.calendar_service import create_calendar, create_calendar_entry, publish_calendar, submit_calendar, validate_calendar
+from academics.services.evaluation_campaign_service import create_evaluation_campaign
 from academic_cycle.models import AcademicAuditLog
 from branches.models import Branch
 from formations.models import Cycle, Diploma, Filiere, Programme
@@ -102,6 +105,27 @@ class DirectorEvaluationWorkflowTests(TestCase):
         cls.other_teacher = cls._create_user(
             "workflow_other_teacher", "teacher", cls.other_branch
         )
+        calendar = create_calendar(actor=cls.director, branch=cls.branch, academic_year=cls.academic_year)
+        create_calendar_entry(
+            actor=cls.director, calendar=calendar, title="Rentrée", event_type=AcademicCalendarEntry.EVENT_ACADEMIC_START,
+            start_datetime=timezone.make_aware(datetime(2026, 10, 1, 8)), end_datetime=timezone.make_aware(datetime(2026, 10, 1, 18)),
+            target_scope=AcademicCalendarEntry.SCOPE_BRANCH,
+        )
+        cls.campaign_entry = create_calendar_entry(
+            actor=cls.director, calendar=calendar, title="Session normale S1", event_type=AcademicCalendarEntry.EVENT_EXAM_SESSION,
+            start_datetime=timezone.make_aware(datetime(2026, 11, 1, 8)), end_datetime=timezone.make_aware(datetime(2026, 12, 15, 18)),
+            target_scope=AcademicCalendarEntry.SCOPE_BRANCH, is_blocking=True,
+        )
+        create_calendar_entry(
+            actor=cls.director, calendar=calendar, title="Clôture", event_type=AcademicCalendarEntry.EVENT_ACADEMIC_END,
+            start_datetime=timezone.make_aware(datetime(2027, 7, 31, 8)), end_datetime=timezone.make_aware(datetime(2027, 7, 31, 18)),
+            target_scope=AcademicCalendarEntry.SCOPE_BRANCH,
+        )
+        submit_calendar(calendar, actor=cls.director)
+        validate_calendar(calendar, actor=cls.director)
+        publish_calendar(calendar, actor=cls.director)
+        cls.campaign_entry.refresh_from_db()
+        cls.campaign = create_evaluation_campaign(actor=cls.director, calendar_entry=cls.campaign_entry)
 
     @classmethod
     def _create_user(cls, username, position, branch):
@@ -124,6 +148,7 @@ class DirectorEvaluationWorkflowTests(TestCase):
     def _evaluation_payload(self, **overrides):
         payload = {
             "action": "create",
+            "campaign": str(self.campaign.id),
             "title": "Controle continu de droit",
             "event_type": AcademicScheduleEvent.EVENT_TYPE_EXAM,
             "class_id": str(self.academic_class.id),
@@ -178,6 +203,55 @@ class DirectorEvaluationWorkflowTests(TestCase):
         )
         self.assertContains(response, "a été planifiée")
         self.assertIn("section=evaluations_calendar", response.headers["HX-Push-Url"])
+
+    def test_attendance_sheet_is_built_from_the_planned_evaluation(self):
+        self.client.post(
+            reverse("accounts_portal:director_evaluation_action"),
+            self._evaluation_payload(),
+        )
+        event = AcademicScheduleEvent.objects.get(title="Controle continu de droit")
+
+        response = self.client.get(
+            reverse("accounts_portal:director_evaluation_attendance_sheet", args=[event.id]),
+            {"format": "print"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Fiche de présence")
+        self.assertContains(response, self.academic_class.name)
+        self.assertContains(response, self.ec.title)
+
+    def test_campaign_rejects_duplicate_class_ec_evaluation(self):
+        url = reverse("accounts_portal:director_evaluation_action")
+        first = self.client.post(url, self._evaluation_payload())
+        self.assertEqual(first.status_code, 200)
+        second = self.client.post(url, self._evaluation_payload(title="Deuxieme epreuve"))
+        self.assertEqual(second.status_code, 200)
+        self.assertContains(second, "Une epreuve est deja planifiee")
+        self.assertEqual(
+            AcademicScheduleEvent.objects.filter(
+                evaluation_campaign=self.campaign,
+                academic_class=self.academic_class,
+                ec=self.ec,
+                is_active=True,
+            ).count(),
+            1,
+        )
+
+    def test_campaign_rejects_ec_not_in_campaign_requirements(self):
+        other_ec = EC.objects.create(
+            ue=self.ue,
+            title="EC non prepare",
+            credit_required="2.00",
+            coefficient="1.00",
+        )
+        response = self.client.post(
+            reverse("accounts_portal:director_evaluation_action"),
+            self._evaluation_payload(ec=str(other_ec.id)),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ne fait pas partie de la preparation")
+        self.assertFalse(AcademicScheduleEvent.objects.filter(ec=other_ec).exists())
 
     def test_create_evaluation_rejects_cross_branch_relations(self):
         response = self.client.post(
@@ -276,13 +350,72 @@ class DirectorEvaluationWorkflowTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        calendar = AcademicCalendar.objects.get(branch=self.branch)
+        calendar = AcademicCalendar.objects.get(branch=self.branch, status=AcademicCalendar.STATUS_DRAFT)
         entry = calendar.entries.get(title="Examens du premier semestre")
         self.assertEqual(calendar.status, AcademicCalendar.STATUS_DRAFT)
         self.assertEqual(entry.status, AcademicCalendarEntry.STATUS_DRAFT)
         self.assertEqual(entry.target_scope, AcademicCalendarEntry.SCOPE_BRANCH)
         self.assertTrue(entry.is_blocking)
         self.assertContains(response, "a été créée en brouillon")
+
+    def test_session_workspace_starts_from_an_official_period(self):
+        response = self.client.get(
+            reverse("accounts_portal:director_exam_sessions_subcontent"),
+            {"view": "sessions"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Choisir la période officielle")
+        self.assertContains(response, 'name="action" value="create_campaign"')
+        self.assertNotContains(response, 'name="start_date"')
+
+    def test_campaign_workflow_subviews_keep_the_selected_campaign(self):
+        url = reverse("accounts_portal:director_exam_sessions_subcontent")
+        for view, expected in (
+            ("subjects", "Sujets à recevoir"),
+            ("supervision", "Surveillance et présences"),
+            ("copies", "Suivi des copies"),
+        ):
+            response = self.client.get(url, {"view": view, "campaign_id": self.campaign.id})
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, expected)
+            self.assertIn(f"campaign_id={self.campaign.id}", response.headers["HX-Push-Url"])
+
+    def test_campaign_subject_search_accepts_ec_title_and_ue_code(self):
+        url = reverse("accounts_portal:director_exam_sessions_subcontent")
+        by_title = self.client.get(
+            url,
+            {"view": "campaign", "campaign_id": self.campaign.id, "requirement_q": "Matiere"},
+        )
+        by_code = self.client.get(
+            url,
+            {"view": "campaign", "campaign_id": self.campaign.id, "requirement_q": "UE-EVAL"},
+        )
+        self.assertEqual(by_title.status_code, 200)
+        self.assertEqual(by_code.status_code, 200)
+        self.assertContains(by_title, self.ec.title)
+        self.assertContains(by_code, self.ec.title)
+
+    def test_subject_upload_marks_the_requirement_received_and_keeps_file(self):
+        requirement = self.campaign.requirements.get(
+            academic_class=self.academic_class,
+            ec=self.ec,
+        )
+        response = self.client.post(
+            reverse("accounts_portal:director_exam_session_action"),
+            {
+                "action": "record_subject",
+                "return_view": "subjects",
+                "campaign_id": self.campaign.id,
+                "requirement_id": requirement.id,
+                "subject_status": "expected",
+                "subject_file": SimpleUploadedFile("sujet-test.pdf", b"contenu du sujet", content_type="application/pdf"),
+            },
+        )
+        requirement.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Sujet de")
+        self.assertEqual(requirement.subject_status, "received")
+        self.assertTrue(requirement.subject_file.name.endswith(".pdf"))
 
     def test_cancel_exam_session_requires_reason_and_is_audited(self):
         self.client.post(

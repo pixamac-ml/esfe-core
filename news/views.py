@@ -366,7 +366,7 @@ def event_list_view(request):
     # ========================
     # MODE DE VUE
     # ========================
-    view_mode = request.GET.get("mode", "events")  # 'events' ou 'photos'
+    view_mode = request.GET.get("mode", "photos")  # 'events' ou 'photos'
 
     # ========================
     # FILTRAGE PAR TYPE

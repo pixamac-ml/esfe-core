@@ -372,6 +372,66 @@ class DocumentReceipt(SecretaryStatusMixin):
         super().save(*args, **kwargs)
 
 
+class SecretaryCall(SecretaryStatusMixin):
+    TYPE_INCOMING = "incoming"
+    TYPE_OUTGOING = "outgoing"
+    TYPE_CHOICES = ((TYPE_INCOMING, "Appel entrant"), (TYPE_OUTGOING, "Appel sortant"))
+    CALL_RECEIVED = "received"
+    CALL_MESSAGE_SENT = "message_sent"
+    CALL_TO_RETURN = "to_return"
+    CALL_RETURNED = "returned"
+    CALL_PROCESSED = "processed"
+    CALL_STATUS_CHOICES = (
+        (CALL_RECEIVED, "Reçu"), (CALL_MESSAGE_SENT, "Message transmis"),
+        (CALL_TO_RETURN, "À rappeler"), (CALL_RETURNED, "Rappel effectué"),
+        (CALL_PROCESSED, "Traité"),
+    )
+    branch = models.ForeignKey("branches.Branch", on_delete=models.PROTECT, related_name="secretary_calls")
+    call_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default=TYPE_INCOMING)
+    interlocutor = models.CharField(max_length=255)
+    phone = models.CharField(max_length=30, blank=True)
+    subject = models.CharField(max_length=255)
+    notes = models.TextField(blank=True)
+    target_service = models.CharField(max_length=120, blank=True)
+    priority = models.CharField(max_length=30, choices=RegistryEntry.PRIORITY_CHOICES, default=RegistryEntry.PRIORITY_NORMAL)
+    call_status = models.CharField(max_length=30, choices=CALL_STATUS_CHOICES, default=CALL_RECEIVED, db_index=True)
+    related_student = models.ForeignKey("students.Student", on_delete=models.SET_NULL, null=True, blank=True, related_name="secretary_calls")
+    called_at = models.DateTimeField(default=timezone.now, db_index=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="secretary_calls_created")
+
+    class Meta:
+        ordering = ["-called_at", "-id"]
+        indexes = [models.Index(fields=["branch", "call_status", "called_at"])]
+
+
+class SecretaryTransmission(SecretaryStatusMixin):
+    STATUS_SENT = "sent"
+    STATUS_TAKEN = "taken"
+    STATUS_PROCESSED = "processed"
+    STATUS_CLOSED = "closed"
+    TRANSMISSION_STATUS_CHOICES = (
+        (STATUS_SENT, "Transmis"), (STATUS_TAKEN, "Pris en charge"),
+        (STATUS_PROCESSED, "Traité"), (STATUS_CLOSED, "Clos"),
+    )
+    branch = models.ForeignKey("branches.Branch", on_delete=models.PROTECT, related_name="secretary_transmissions")
+    subject = models.CharField(max_length=255)
+    details = models.TextField()
+    source_service = models.CharField(max_length=120, default="Secrétariat")
+    target_service = models.CharField(max_length=120)
+    priority = models.CharField(max_length=30, choices=RegistryEntry.PRIORITY_CHOICES, default=RegistryEntry.PRIORITY_NORMAL)
+    transmission_status = models.CharField(max_length=30, choices=TRANSMISSION_STATUS_CHOICES, default=STATUS_SENT, db_index=True)
+    related_student = models.ForeignKey("students.Student", on_delete=models.SET_NULL, null=True, blank=True, related_name="secretary_transmissions")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="secretary_transmissions_created")
+    taken_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="secretary_transmissions_taken")
+    taken_at = models.DateTimeField(null=True, blank=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+    observation = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [models.Index(fields=["branch", "transmission_status", "created_at"])]
+
+
 class SecretaryTask(SecretaryStatusMixin):
     PRIORITY_LOW = "low"
     PRIORITY_MEDIUM = "medium"

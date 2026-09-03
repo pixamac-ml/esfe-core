@@ -46,6 +46,20 @@
 
         {% if resultat.valide and resultat.carte %}
           <div class="bg-gray-50 rounded-xl p-4 space-y-2 text-sm mb-6">
+            {% if resultat.type == "staff" %}
+            <div class="flex justify-between">
+              <span class="text-gray-500">Nom</span>
+              <span class="font-semibold">{{ resultat.carte.profile.user.get_full_name|default:resultat.carte.profile.user.username }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-500">Fonction</span>
+              <span class="font-semibold">{{ resultat.carte.profile.get_position_display|default:"Personnel" }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-500">Annexe</span>
+              <span class="font-semibold">{{ resultat.carte.code_annexe }}</span>
+            </div>
+            {% else %}
             <div class="flex justify-between">
               <span class="text-gray-500">Nom</span>
               <span class="font-semibold">{{ resultat.carte.etudiant.full_name }}</span>
@@ -62,6 +76,7 @@
               <span class="text-gray-500">Classe</span>
               <span class="font-semibold">{{ resultat.classe|default:"—" }}</span>
             </div>
+            {% endif %}
             <div class="flex justify-between">
               <span class="text-gray-500">Statut</span>
               <span class="font-semibold text-green-600">Actif</span>

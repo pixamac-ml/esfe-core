@@ -1,0 +1,59 @@
+{% load component_tags %}
+<div class="space-y-5">
+  {% if toast %}
+    {% component "ui_core.alert" title="Création de session" message=toast.message tone=toast.level %}{% endcomponent %}
+  {% endif %}
+
+  {% component "ui_core.panel" title="Créer une session officielle" subtitle="Définissez d'abord la période d'examens ou de rattrapage. Vous préparerez ensuite les sujets et les épreuves dans les étapes suivantes." tone="primary" %}
+    {% if exam_session_form.non_field_errors %}
+      {% component "ui_core.alert" title="Vérification nécessaire" message=exam_session_form.non_field_errors.0 tone="danger" %}{% endcomponent %}
+    {% endif %}
+    <div class="mb-5 grid gap-3 sm:grid-cols-3">
+      <div class="rounded-ui-card border border-ui-primary/20 bg-ui-primary-soft p-3"><span class="text-xs font-bold text-ui-primary">01 · Période</span><p class="mt-1 text-xs text-ui-text-muted">Définir les dates officielles.</p></div>
+      <div class="rounded-ui-card border border-ui-border bg-ui-surface-muted p-3"><span class="text-xs font-bold text-ui-text">02 · Préparation</span><p class="mt-1 text-xs text-ui-text-muted">Ajouter classes, sujets et matières.</p></div>
+      <div class="rounded-ui-card border border-ui-border bg-ui-surface-muted p-3"><span class="text-xs font-bold text-ui-text">03 · Planning</span><p class="mt-1 text-xs text-ui-text-muted">Programmer les épreuves et présences.</p></div>
+    </div>
+    {% component "ui_core.modal" id="create-official-session-modal" title="Nouvelle session officielle" trigger_label="Ouvrir le formulaire" size="wide" open=exam_session_form.errors %}
+    <div class="mb-4 rounded-ui-card border border-ui-border bg-ui-surface-muted p-3 text-sm text-ui-text-muted">
+      Renseignez uniquement la période officielle. Les matières, sujets et horaires seront préparés ensuite dans leurs sous-sections dédiées.
+    </div>
+    <form method="post"
+          hx-post="{% url 'accounts_portal:director_exam_session_action' %}"
+          hx-target="#director-session-subcontent"
+          hx-swap="innerHTML"
+          hx-disabled-elt="button[type=submit]"
+          hx-indicator="#director-session-form-loading"
+          hx-sync="#director-session-subcontent:replace"
+          class="space-y-5"
+          novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="action" value="create">
+      <div class="grid min-w-0 gap-4 md:grid-cols-2">
+        {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=exam_session_form.title span_two=True %}
+        {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=exam_session_form.event_type %}
+        {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=exam_session_form.start_date %}
+        {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=exam_session_form.end_date %}
+        {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=exam_session_form.description span_two=True %}
+      </div>
+      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-ui-border pt-4">
+        <div id="director-session-form-loading" class="htmx-indicator inline-flex items-center gap-2 text-xs font-semibold text-ui-text-muted" role="status">
+          <span class="h-4 w-4 animate-spin rounded-full border-2 border-ui-border border-t-ui-primary" aria-hidden="true"></span>
+          Vérification en cours
+        </div>
+        <button type="submit" class="ui-focus-ring inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary">
+          <i data-lucide="save" class="h-4 w-4" aria-hidden="true"></i>Enregistrer la session
+        </button>
+      </div>
+    </form>
+    {% endcomponent %}
+  {% endcomponent %}
+
+  <a href="{% url 'accounts_portal:portal_dashboard' %}?section=evaluations_calendar&view=sessions"
+     hx-get="{% url 'accounts_portal:director_exam_sessions_subcontent' %}?view=sessions"
+     hx-target="#director-session-subcontent"
+     hx-swap="innerHTML"
+     hx-push-url="{% url 'accounts_portal:portal_dashboard' %}?section=evaluations_calendar&view=sessions"
+     class="ui-focus-ring inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-4 text-sm font-semibold text-ui-text">
+    <i data-lucide="arrow-left" class="h-4 w-4" aria-hidden="true"></i>Retour aux sessions
+  </a>
+</div>

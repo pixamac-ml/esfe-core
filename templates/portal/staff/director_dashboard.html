@@ -50,18 +50,22 @@
     <div class="relative min-w-0 max-w-full">
       <div
         id="{{ dashboard_shell.loading_id }}"
-        class="hidden fixed left-1/2 top-20 z-40 -translate-x-1/2 rounded-ui-button border border-ui-border bg-ui-surface px-4 py-2 text-sm font-semibold text-ui-text shadow-ui-dropdown"
-        role="status"
-        aria-live="polite"
+        class="hidden fixed inset-x-0 top-0 z-40 h-0.5 pointer-events-none"
       >
-        <span class="inline-flex items-center gap-2">
-          <i data-lucide="loader-circle" class="h-4 w-4 animate-spin text-ui-primary" aria-hidden="true"></i>
-          Mise à jour
-        </span>
+        <div class="h-full w-1/3 animate-pulse rounded-r-full bg-ui-primary"></div>
       </div>
       <div
         id="{{ dashboard_shell.workspace_id }}"
         data-dashboard-workspace="{{ dashboard_shell.key }}"
+        {% if dashboard_shell.key == "executive" %}
+          data-dg-dashboard
+          data-dg-dashboard-url="{% url 'accounts_portal:portal_dg' %}"
+          data-dg-section-url="{% url 'accounts_portal:dg_section' section='overview' %}"
+          data-dg-modal-url="{% url 'accounts_portal:dg_modal' %}"
+          data-dg-initial-section="{{ dg_active_section|default:'overview' }}"
+          data-dashboard-section="{{ dg_active_section|default:'overview' }}"
+          data-executive-section="{{ dg_active_section|default:'overview' }}"
+        {% endif %}
         tabindex="-1"
         aria-live="polite"
         aria-busy="false"
@@ -73,26 +77,30 @@
       </div>
     </div>
 
-    {% component "ui_core.drawer" id=dashboard_shell.drawer_id title=dashboard_shell.drawer_title size="wide" %}
+    {% component "ui_core.drawer" id=dashboard_shell.drawer_id title=dashboard_shell.drawer_title size=dashboard_shell.drawer_size has_form=True %}
       {% fill "default" %}
         {% if dashboard_shell.role == "teacher" or dashboard_shell.role == "secretary" %}
           <div id="sg-drawer-content">
             <p class="text-sm text-ui-text-muted">{{ dashboard_shell.empty_drawer_message }}</p>
           </div>
         {% else %}
-          <p class="text-sm text-ui-text-muted">{{ dashboard_shell.empty_drawer_message }}</p>
+          <div id="{{ dashboard_shell.key }}-drawer-content">
+            <p class="text-sm text-ui-text-muted">{{ dashboard_shell.empty_drawer_message }}</p>
+          </div>
         {% endif %}
       {% endfill %}
     {% endcomponent %}
 
-    {% component "ui_core.modal" id=dashboard_shell.modal_id title=dashboard_shell.modal_title size="wide" %}
+    {% component "ui_core.modal" id=dashboard_shell.modal_id title=dashboard_shell.modal_title size="wide" has_form=True %}
       {% fill "default" %}
         {% if dashboard_shell.role == "teacher" or dashboard_shell.role == "secretary" %}
           <div id="sg-modal-content">
             <p class="text-sm text-ui-text-muted">{{ dashboard_shell.empty_modal_message }}</p>
           </div>
         {% else %}
-          <p class="text-sm text-ui-text-muted">{{ dashboard_shell.empty_modal_message }}</p>
+          <div id="{{ dashboard_shell.key }}-modal-content">
+            <p class="text-sm text-ui-text-muted">{{ dashboard_shell.empty_modal_message }}</p>
+          </div>
         {% endif %}
       {% endfill %}
     {% endcomponent %}

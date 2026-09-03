@@ -19,7 +19,11 @@ from payments.models import Payment
 from accounts.dashboards.htmx_utils import manager_required
 from accounts.services.donation_pdf import build_donation_receipt
 from accounts.services.financial_reports import render_manager_financial_report_pdf
-from accounts.services.payslip_pdf import build_honorarium_pdf, build_payroll_pdf
+from accounts.services.payslip_pdf import (
+    build_honorarium_pdf,
+    build_payroll_pdf,
+    build_teacher_service_sheet_pdf,
+)
 from core.pdf_documents import generate_pdf as generate_esfe_pdf
 
 
@@ -168,6 +172,20 @@ def honorarium_statement_pdf(request: HttpRequest, pk: int) -> HttpResponse:
     return _pdf_response(
         build_honorarium_pdf(entry),
         f"bordereau-honoraires-{entry.period_month:%Y-%m}-{entry.pk}.pdf",
+    )
+
+
+@manager_required
+@require_GET
+def teacher_service_sheet_pdf(request: HttpRequest, pk: int) -> HttpResponse:
+    entry = get_object_or_404(
+        TeacherHonorariumEntry.objects.select_related("teacher__profile", "branch"),
+        pk=pk,
+        branch=request.branch,
+    )
+    return _pdf_response(
+        build_teacher_service_sheet_pdf(entry),
+        f"fiche-service-{entry.period_month:%Y-%m}-{entry.pk}.pdf",
     )
 
 

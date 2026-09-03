@@ -4,6 +4,9 @@
     {% fill "actions" %}<span class="rounded-ui-badge bg-ui-info-soft px-3 py-1.5 text-xs font-semibold text-ui-info">{{ branch.name|default:"Annexe" }}</span>{% endfill %}
   {% endcomponent %}
   {% component "ui_core.panel" padding=False %}
-    {% component "import_panel" classes=classes selected_class=selected_class semesters=semesters selected_semester=selected_semester feedback=feedback ues=ues student_count=student_count ec_count=ec_count workflow_permissions=workflow_permissions notes_state=notes_state import_preview=import_preview %}{% endcomponent %}
+    {% if selected_class and selected_semester and not ec_count %}
+      {% component "ui_core.alert" message="Cette maquette doit être complétée par le Directeur des Études avant tout import ou export de notes." tone="warning" %}{% endcomponent %}
+    {% endif %}
+    {% component "import_panel" classes=classes selected_class=selected_class semesters=semesters selected_semester=selected_semester feedback=feedback student_count=student_count ec_count=ec_count workflow_permissions=workflow_permissions notes_state=notes_state import_preview=import_preview active_session_type=active_session_type %}{% endcomponent %}
   {% endcomponent %}
 </div>

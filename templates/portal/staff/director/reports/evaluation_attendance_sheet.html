@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Fiche de présence à l'évaluation — {{ event.academic_class.display_name }}</title>
+  <style>
+    @page { size: A4 portrait; margin: 10mm 12mm 13mm; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #111; font-family: Arial, sans-serif; font-size: 10.5pt; line-height: 1.25; }
+    .print-actions { display: flex; justify-content: center; gap: 10px; padding: 12px; background: #f1f5f9; }
+    .print-actions button { cursor: pointer; border: 1px solid #94a3b8; border-radius: 6px; background: #fff; padding: 8px 12px; font-weight: 700; }
+    .school { text-align: center; margin: 0 0 13px; }
+    .school strong { display: block; font-size: 12pt; text-transform: uppercase; }
+    .school span { display: block; margin-top: 2px; color: #475569; font-size: 8.5pt; }
+    h1 { margin: 8px 0 17px; text-align: center; font-size: 15pt; text-decoration: underline; }
+    .details { margin: 0 0 14px; }
+    .detail-line { min-height: 24px; margin: 4px 0; }
+    .label { font-weight: 700; }
+    .fill { display: inline-block; min-width: 170px; border-bottom: 1px dotted #111; font-weight: 700; }
+    .discipline { min-width: 390px; }
+    .check { display: inline-block; width: 13px; height: 13px; margin: 0 5px 0 12px; border: 1px solid #111; text-align: center; font-size: 10px; line-height: 11px; vertical-align: -1px; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    thead { display: table-header-group; }
+    th, td { border: 1px solid #111; padding: 4px; vertical-align: middle; }
+    th { height: 30px; text-align: center; font-size: 9pt; }
+    tbody tr { height: 30px; break-inside: avoid; page-break-inside: avoid; }
+    .col-number { width: 7%; text-align: center; } .col-name { width: 36%; } .col-programme { width: 23%; } .col-signature { width: 16%; } .col-observation { width: 18%; }
+    .supervision { margin-top: 13px; border: 1px solid #111; padding: 8px; }
+    .supervision h2 { margin: 0 0 5px; font-size: 10pt; text-decoration: underline; }
+    .supervision-row { min-height: 20px; }
+    .visa { display: grid; grid-template-columns: 1fr 1fr; gap: 35px; margin-top: 22px; }
+    .visa div { min-height: 52px; border-top: 1px solid #111; padding-top: 4px; text-align: center; font-size: 9pt; }
+    footer { margin-top: 8px; color: #64748b; font-size: 7.5pt; text-align: right; }
+    @media print { .print-actions { display: none; } }
+  </style>
+</head>
+<body>
+  {% if show_browser_actions %}<div class="print-actions"><button type="button" onclick="window.print()">Imprimer</button><button type="button" onclick="window.close()">Fermer</button></div>{% endif %}
+  <header class="school"><strong>École de Santé Félix Houphouët-Boigny</strong><span>{{ branch.name }} · Année académique {{ event.academic_year.name }}</span></header>
+  <h1>Fiche de présence / Évaluation</h1>
+  <section class="details">
+    <p class="detail-line"><span class="label">Semestre :</span> <span class="fill">{{ event.ec.ue.semester.number }}</span> <span class="label">Session :</span> <span class="fill">{{ event.evaluation_campaign.get_kind_display }}</span></p>
+    <p class="detail-line"><span class="label">Discipline :</span> <span class="fill discipline">{{ event.ec.title }}</span></p>
+    <p class="detail-line"><span class="label">Date :</span> <span class="fill">{{ event.start_datetime|date:"d/m/Y" }}</span><span class="check">{% if event.start_datetime|time:"H" < "12" %}✓{% endif %}</span>Matin<span class="check">{% if event.start_datetime|time:"H" >= "12" %}✓{% endif %}</span>Après-midi</p>
+  </section>
+  <table>
+    <thead><tr><th class="col-number">N°</th><th class="col-name">NOM / PRÉNOM</th><th class="col-programme">FILIÈRE</th><th class="col-signature">SIGNATURE</th><th class="col-observation">OBSERVATION</th></tr></thead>
+    <tbody>{% for enrollment in enrollments %}<tr><td class="col-number">{{ forloop.counter }}</td><td>{{ enrollment.student.get_full_name|default:enrollment.student.username }}</td><td>{{ event.academic_class.programme.title }}</td><td></td><td></td></tr>{% empty %}<tr><td colspan="5">Aucun étudiant actif n'est inscrit dans cette classe.</td></tr>{% endfor %}</tbody>
+  </table>
+  <section class="supervision"><h2>Contrôle de surveillance</h2><p class="supervision-row"><span class="label">Épreuve :</span> {{ event.ec.title }} &nbsp;&nbsp; <span class="label">Classe :</span> {{ event.academic_class.display_name }} &nbsp;&nbsp; <span class="label">Salle :</span> {{ event.location|default:"À préciser" }}</p><p class="supervision-row"><span class="label">Surveillant(s) affecté(s) :</span> {% for assignment in proctor_assignments %}{{ assignment.proctor.display_name }}{% if not forloop.last %}, {% endif %}{% empty %}À affecter avant l'épreuve{% endfor %}</p><p class="supervision-row"><span class="label">Effectif attendu :</span> {{ enrollments|length }} &nbsp;&nbsp; <span class="label">Présents :</span> __________ &nbsp;&nbsp; <span class="label">Absents :</span> __________ &nbsp;&nbsp; <span class="label">Incident :</span> ________________________</p></section>
+  <section class="visa"><div>Signature du surveillant principal</div><div>Visa du Directeur des études / responsable de centre</div></section>
+  <footer>Fiche générée le {{ generated_at|date:"d/m/Y à H:i" }} à partir de l'épreuve et des inscriptions actives.</footer>
+</body>
+</html>

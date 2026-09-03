@@ -1,64 +1,48 @@
 {% load component_tags humanize %}
 <section data-dashboard-section="overview" class="min-w-0 space-y-5">
-  {% component "ui_core.content_grid" columns=4 %}
+  {% component "ui_core.page_section" title="Travail du jour" description="Seules les opérations encore ouvertes apparaissent ici. Une fois traitées, elles restent consultables dans l'historique sans encombrer votre espace." labelled_by="manager-daily-work-title" %}
     {% fill "default" %}
-      <div id="live-kpi-grid" aria-label="Indicateurs de l'annexe">
-        {% with card=manager_ui.stat_cards.0 %}{% component "ui_core.stat_card" label=card.label value=card.value unit=card.unit icon=card.icon tone=card.tone description=card.description compact=True %}{% endcomponent %}{% endwith %}
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-labelledby="manager-daily-work-title">
+        {% for item in daily_work_items %}
+          {% if item.count %}
+            <a href="{{ item.href }}" class="ui-focus-ring group flex min-h-24 items-center gap-3 rounded-ui-card border border-ui-border bg-ui-surface p-4 text-ui-text shadow-ui-card transition hover:border-ui-primary/40 hover:bg-ui-surface-hover">
+              <span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button {% if item.tone == 'success' %}bg-ui-success-soft text-ui-success{% elif item.tone == 'warning' %}bg-ui-warning-soft text-ui-warning{% elif item.tone == 'info' %}bg-ui-info-soft text-ui-info{% else %}bg-ui-primary-soft text-ui-primary{% endif %}"><i data-lucide="{{ item.icon }}" class="h-5 w-5" aria-hidden="true"></i></span>
+              <span class="min-w-0 flex-1"><strong class="block text-sm">{{ item.label }}</strong><small class="mt-0.5 block text-xs text-ui-text-muted">{{ item.description }}</small></span>
+              <span class="inline-flex min-w-8 items-center justify-center rounded-ui-badge bg-ui-surface-muted px-2 py-1 text-sm font-bold text-ui-text">{{ item.count|intcomma }}</span>
+              <i data-lucide="chevron-right" class="h-4 w-4 shrink-0 text-ui-text-muted transition group-hover:text-ui-primary" aria-hidden="true"></i>
+            </a>
+          {% endif %}
+        {% empty %}{% endfor %}
       </div>
-      {% include "accounts/dashboard/partials/widget_today_payments.html" with stat_card=manager_ui.stat_cards.1 %}
-      <div id="alerts-kpi-card">{% with card=manager_ui.stat_cards.2 %}{% component "ui_core.stat_card" label=card.label value=card.value unit=card.unit icon=card.icon tone=card.tone description=card.description compact=True %}{% endcomponent %}{% endwith %}</div>
-      {% include "accounts/dashboard/partials/widget_cash_balance.html" with stat_card=manager_ui.stat_cards.3 %}
-    {% endfill %}
-  {% endcomponent %}
-
-  {% include "accounts/dashboard/partials/widget_active_coupons.html" %}
-
-  {% component "ui_core.page_section" title="Actions rapides" description="Accès aux opérations principales du jour" labelled_by="manager-quick-actions-title" %}
-    {% fill "default" %}
-      <nav class="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4" aria-labelledby="manager-quick-actions-title">
-        <a href="?section=candidatures" class="flex min-h-16 items-center gap-2 rounded-ui-card border border-ui-border bg-ui-surface p-3 text-ui-text shadow-ui-card transition hover:border-ui-primary/40 hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus"><span class="grid h-9 w-9 shrink-0 place-items-center rounded-ui-button bg-ui-primary-soft text-ui-primary"><i data-lucide="user-round-check" class="h-4 w-4" aria-hidden="true"></i></span><span><strong class="block text-sm">Traiter les candidatures</strong><small class="mt-0.5 block text-xs text-ui-text-muted">Dossiers en attente</small></span></a>
-        <a href="?section=paiements" class="flex min-h-16 items-center gap-2 rounded-ui-card border border-ui-border bg-ui-surface p-3 text-ui-text shadow-ui-card transition hover:border-ui-primary/40 hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus"><span class="grid h-9 w-9 shrink-0 place-items-center rounded-ui-button bg-ui-success-soft text-ui-success"><i data-lucide="badge-dollar-sign" class="h-4 w-4" aria-hidden="true"></i></span><span><strong class="block text-sm">Valider un paiement</strong><small class="mt-0.5 block text-xs text-ui-text-muted">Justificatifs reçus</small></span></a>
-        <a href="?section=depenses" class="flex min-h-16 items-center gap-2 rounded-ui-card border border-ui-border bg-ui-surface p-3 text-ui-text shadow-ui-card transition hover:border-ui-primary/40 hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus"><span class="grid h-9 w-9 shrink-0 place-items-center rounded-ui-button bg-ui-warning-soft text-ui-warning"><i data-lucide="receipt-text" class="h-4 w-4" aria-hidden="true"></i></span><span><strong class="block text-sm">Suivre les dépenses</strong><small class="mt-0.5 block text-xs text-ui-text-muted">Charges de la période</small></span></a>
-        <a href="?section=cloture" class="flex min-h-16 items-center gap-2 rounded-ui-card border border-ui-border bg-ui-surface p-3 text-ui-text shadow-ui-card transition hover:border-ui-primary/40 hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus"><span class="grid h-9 w-9 shrink-0 place-items-center rounded-ui-button bg-ui-info-soft text-ui-info"><i data-lucide="calendar-check-2" class="h-4 w-4" aria-hidden="true"></i></span><span><strong class="block text-sm">Préparer la clôture</strong><small class="mt-0.5 block text-xs text-ui-text-muted">Contrôles mensuels</small></span></a>
-      </nav>
+      {% if not daily_work_pending_count %}
+        {% component "ui_core.empty_state" title="Aucune opération en attente" message="Les flux de l'annexe ne demandent aucune action immédiate. Les opérations finalisées restent dans l'historique." icon="circle-check" compact=True %}{% endcomponent %}
+      {% endif %}
     {% endfill %}
   {% endcomponent %}
 
   <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
-    {% component "ui_core.panel" title="Priorités" subtitle="Actions à traiter dans l'ordre recommandé" density="compact" %}
+    {% component "ui_core.panel" title="Historique et journal" subtitle="Les données sont enregistrées au moment de chaque opération. Consultez une date sans réouvrir les éléments traités." density="compact" %}
       {% fill "default" %}
-        <div class="space-y-2">
-          {% for item in manager_intelligence.priorities|slice:":3" %}
-            {% if item.level == "high" %}{% component "ui_core.alert" title=item.title message=item.message tone="danger" %}{% endcomponent %}
-            {% elif item.level == "medium" %}{% component "ui_core.alert" title=item.title message=item.message tone="warning" %}{% endcomponent %}
-            {% else %}{% component "ui_core.alert" title=item.title message=item.message tone="info" %}{% endcomponent %}{% endif %}
-          {% empty %}
-            {% component "ui_core.empty_state" title="Aucune priorité immédiate" message="Les flux principaux de l'annexe ne demandent aucune intervention urgente." icon="circle-check" %}{% endcomponent %}
-          {% endfor %}
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <p class="text-sm text-ui-text-muted"><strong class="text-ui-text">{{ today_activity_count|intcomma }}</strong> activité(s) enregistrée(s) aujourd'hui.</p>
+          <a href="?section=rapport&report_period=today" class="ui-focus-ring inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover"><i data-lucide="book-open-check" class="h-4 w-4" aria-hidden="true"></i>Journal financier</a>
         </div>
+        <nav class="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3" aria-label="Historique par domaine">
+          <a href="?section=candidatures&cand_date={{ today|date:'Y-m-d' }}" class="ui-focus-ring rounded-ui-button bg-ui-surface-muted px-3 py-2 text-center text-xs font-semibold text-ui-text hover:bg-ui-surface-hover">Candidatures</a>
+          <a href="?section=inscriptions&ins_date={{ today|date:'Y-m-d' }}" class="ui-focus-ring rounded-ui-button bg-ui-surface-muted px-3 py-2 text-center text-xs font-semibold text-ui-text hover:bg-ui-surface-hover">Inscriptions</a>
+          <a href="?section=caisse&cash_date={{ today|date:'Y-m-d' }}" class="ui-focus-ring rounded-ui-button bg-ui-surface-muted px-3 py-2 text-center text-xs font-semibold text-ui-text hover:bg-ui-surface-hover">Caisse</a>
+        </nav>
       {% endfill %}
     {% endcomponent %}
 
-    {% component "ui_core.panel" title="Situation de la période" subtitle=report_period.label density="compact" %}
-      {% fill "default" %}
-        <div class="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
-          {% component "ui_core.stat_card" label="Recettes" value=period_summary.total_revenue|intcomma unit="FCFA" icon="trending-up" tone="success" description="Paiements scolaires et boutique" compact=True %}{% endcomponent %}
-          {% component "ui_core.stat_card" label="Charges payées" value=period_summary.charges_paid|intcomma unit="FCFA" icon="trending-down" tone="danger" description="Dépenses, salaires et honoraires" compact=True %}{% endcomponent %}
-          {% if period_summary.net_result < 0 %}{% component "ui_core.stat_card" label="Résultat net" value=period_summary.net_result|intcomma unit="FCFA" icon="scale" tone="danger" description="Avant engagements restants" compact=True %}{% endcomponent %}
-          {% else %}{% component "ui_core.stat_card" label="Résultat net" value=period_summary.net_result|intcomma unit="FCFA" icon="scale" tone="primary" description="Avant engagements restants" compact=True %}{% endcomponent %}{% endif %}
-          {% component "ui_core.stat_card" label="Taux de collecte" value=period_summary.collection_rate unit="%" icon="gauge" tone="info" description="Part des montants attendus déjà encaissés" compact=True %}{% endcomponent %}
-        </div>
-      {% endfill %}
-    {% endcomponent %}
-
-    {% component "ui_core.panel" title="Alertes et risques" subtitle="Contrôles automatiques sur le périmètre autorisé" density="compact" %}
+    {% component "ui_core.panel" title="Alertes à surveiller" subtitle="Uniquement les contrôles qui demandent une intervention." density="compact" %}
       {% fill "default" %}
         <div class="space-y-2">
           {% for alert in manager_intelligence.alerts|slice:":3" %}
             {% if alert.level == "danger" %}{% component "ui_core.alert" title="À traiter immédiatement" message=alert.message tone="danger" %}{% endcomponent %}
             {% else %}{% component "ui_core.alert" title="Suivi recommandé" message=alert.message tone="warning" %}{% endcomponent %}{% endif %}
           {% empty %}
-            {% component "ui_core.empty_state" title="Aucune alerte active" message="Aucun risque opérationnel ou financier n'est signalé pour cette annexe." icon="shield-check" %}{% endcomponent %}
+            {% component "ui_core.empty_state" title="Aucune alerte active" message="Aucun risque opérationnel ou financier n'est signalé pour cette annexe." icon="shield-check" compact=True %}{% endcomponent %}
           {% endfor %}
         </div>
       {% endfill %}

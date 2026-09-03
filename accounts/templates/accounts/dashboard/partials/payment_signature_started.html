@@ -1,0 +1,21 @@
+{% load humanize %}
+<div class="space-y-4 rounded-2xl border border-violet-200 bg-violet-50 p-5" data-payment-signature-session="{{ session.pk }}">
+  <div class="flex items-start gap-3">
+    <div class="mt-1 rounded-full bg-violet-600 p-2 text-white">✍</div>
+    <div>
+      <h3 class="font-semibold text-violet-950">Signature de {{ session.snapshot.label|lower }} requise</h3>
+      <p class="mt-1 text-sm text-violet-800">Ouvrez ce lien unique sur la tablette. Le bénéficiaire vérifie le récapitulatif et signe. Il expire dans {{ expires_minutes }} minutes et ne peut être utilisé qu'une seule fois.</p>
+    </div>
+  </div>
+  <div class="rounded-xl border border-violet-200 bg-white p-3 text-sm">
+    <div class="flex justify-between"><span>Bénéficiaire</span><strong>{{ session.snapshot.employee_name }}</strong></div>
+    <div class="flex justify-between"><span>Montant</span><strong>{{ session.amount|intcomma }} FCFA</strong></div>
+    <div class="flex justify-between"><span>Période</span><strong>{{ session.snapshot.period_label }}</strong></div>
+  </div>
+  <div class="flex flex-col gap-2 sm:flex-row">
+    <input readonly value="{{ tablet_link }}" class="min-w-0 flex-1 rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs text-slate-700" onclick="this.select()">
+    <button type="button" class="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white" onclick="navigator.clipboard?.writeText('{{ tablet_link|escapejs }}'); this.textContent='Lien copié'">Copier le lien</button>
+    <a href="{{ tablet_link }}" target="_blank" rel="noopener" class="rounded-xl border border-violet-300 bg-white px-4 py-2 text-center text-sm font-semibold text-violet-800">Ouvrir la tablette</a>
+  </div>
+  <p class="text-xs text-violet-700">Après la signature, rechargez cette fiche : le bouton « Approuver et payer » apparaîtra avec la trace de signature.</p>
+</div>

@@ -7,11 +7,11 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from django.urls import reverse
 
-from academics.models import AcademicClass, AcademicEnrollment, AcademicScheduleEvent, AcademicYear, EC, Semester, UE
+from academics.models import AcademicClass, AcademicDiplomaAward, AcademicEnrollment, AcademicScheduleEvent, AcademicYear, EC, Semester, UE
 from academics.services.academic_years import get_current_academic_year_name
 from admissions.models import Candidature
 from branches.models import Branch
@@ -37,6 +37,9 @@ from students.services.attendance_service import (
     mark_teacher_attendance,
 )
 from students.services.create_student import create_student_after_first_payment
+from portal.student.widgets.academics import get_student_academic_snapshot
+from portal.student.widgets.finance import get_finance_widget
+from portal.student.profile_service import update_editable_fields
 
 
 User = get_user_model()
@@ -508,11 +511,76 @@ class ReenrollmentPhaseOneTests(TestCase):
         })
         self.assertEqual(candidates[0]["financial_status"]["status"], "debt")
 
-    def test_validated_transition_creates_new_inscription_and_enrollment(self):
-        actor = User.objects.create_user(username="reenrollment_actor", password="pass1234", is_staff=True)
-        actor.profile.position = "branch_manager"
+    def test_automatic_non_admis_mapping_can_be_academically_validated(self):
+        """The annual-rule vocabulary must be mapped before workflow validation."""
+        actor = User.objects.create_user(
+            username="reenrollment_academic_mapping_actor",
+            password="pass1234",
+            is_staff=True,
+        )
+        actor.profile.position = "director_of_studies"
         actor.profile.branch = self.branch
         actor.profile.save(update_fields=["position", "branch", "updated_at"])
+        Payment.objects.create(
+            inscription=self.inscription,
+            amount=self.inscription.amount_due,
+            method=Payment.METHOD_CASH,
+            status=Payment.STATUS_VALIDATED,
+        )
+        self.inscription.update_financial_state()
+
+        decision = propose_student_decision(
+            student=self.student,
+            source_enrollment=self.enrollment,
+            target_academic_year=self.target_year,
+            proposed_by=actor,
+        )
+
+        self.assertEqual(decision.decision, StudentYearDecision.DECISION_REPEATED)
+        self.assertEqual(decision.target_class, self.target_l1)
+        validate_student_decision_academic(decision=decision, actor=actor)
+        decision.refresh_from_db()
+        self.assertEqual(
+            decision.workflow_status,
+            StudentYearDecision.WORKFLOW_ACADEMIC_VALIDATED,
+        )
+
+    def test_proposal_rejects_target_class_from_another_branch(self):
+        actor = User.objects.create_user(
+            username="reenrollment_target_scope_actor",
+            password="pass1234",
+            is_staff=True,
+        )
+        actor.profile.position = "director_of_studies"
+        actor.profile.branch = self.branch
+        actor.profile.save(update_fields=["position", "branch", "updated_at"])
+        other_branch = Branch.objects.create(
+            name="Annexe cible interdite",
+            code="RINX",
+            slug="annexe-cible-interdite",
+        )
+        wrong_target = AcademicClass.objects.create(
+            programme=self.programme,
+            branch=other_branch,
+            academic_year=self.target_year,
+            level="L1",
+            study_level="LICENCE",
+            validation_threshold=Decimal("10.00"),
+            is_active=True,
+        )
+
+        with self.assertRaisesMessage(ValidationError, "meme annexe"):
+            propose_student_decision(
+                student=self.student,
+                source_enrollment=self.enrollment,
+                target_academic_year=self.target_year,
+                target_class=wrong_target,
+                decision=StudentYearDecision.DECISION_REPEATED,
+                proposed_by=actor,
+            )
+        self.assertFalse(StudentYearDecision.objects.filter(source_enrollment=self.enrollment).exists())
+
+    def _create_settled_transition_decision(self, actor):
         Payment.objects.create(
             inscription=self.inscription,
             amount=100000,
@@ -536,22 +604,367 @@ class ReenrollmentPhaseOneTests(TestCase):
         actor.profile.position = "branch_manager"
         actor.profile.save(update_fields=["position", "updated_at"])
         validate_student_decision_finance(decision=decision, actor=actor)
-        applied = apply_student_decision(decision=decision, actor=actor)
+        return decision
+
+    def test_validated_transition_prepares_target_inscription_without_archiving_history(self):
+        actor = User.objects.create_user(username="reenrollment_actor", password="pass1234", is_staff=True)
+        actor.profile.position = "branch_manager"
+        actor.profile.branch = self.branch
+        actor.profile.save(update_fields=["position", "branch", "updated_at"])
+        decision = self._create_settled_transition_decision(actor)
+        prepared = apply_student_decision(decision=decision, actor=actor)
 
         self.student.refresh_from_db()
         self.enrollment.refresh_from_db()
-        self.assertEqual(applied.workflow_status, StudentYearDecision.WORKFLOW_APPLIED)
-        self.assertEqual(self.enrollment.status, AcademicEnrollment.STATUS_ARCHIVED)
-        self.assertEqual(self.student.current_academic_enrollment, applied.target_enrollment)
-        self.assertEqual(applied.target_enrollment.student, self.user)
-        self.assertEqual(applied.target_enrollment.academic_class, self.target_l2)
+        self.assertEqual(prepared.workflow_status, StudentYearDecision.WORKFLOW_FINANCE_VALIDATED)
+        self.assertEqual(prepared.target_inscription.status, Inscription.STATUS_AWAITING_PAYMENT)
+        self.assertIsNone(prepared.target_enrollment)
+        self.assertEqual(self.enrollment.status, AcademicEnrollment.STATUS_ACTIVE)
+        self.assertEqual(self.student.current_academic_enrollment, self.enrollment)
         self.assertEqual(self.student.matricule, "MAT-RIN-001")
+        self.assertFalse(
+            AcademicEnrollment.objects.filter(
+                student=self.user,
+                academic_year=self.target_year,
+            ).exists()
+        )
         self.assertTrue(
             SupportAuditLog.objects.filter(
                 action_type=SupportAuditLog.ACTION_REENROLLMENT_APPLIED,
                 target_user=self.user,
             ).exists()
         )
+
+    @patch("payments.models.send_payment_confirmation_email")
+    @patch("payments.models.send_student_credentials_email")
+    def test_target_payment_activates_reenrollment_without_duplicate_identity(self, _send_credentials, _send_confirmation):
+        actor = User.objects.create_user(username="reenrollment_activation_actor", password="pass1234", is_staff=True)
+        actor.profile.position = "branch_manager"
+        actor.profile.branch = self.branch
+        actor.profile.save(update_fields=["position", "branch", "updated_at"])
+        decision = self._create_settled_transition_decision(actor)
+        prepared = apply_student_decision(decision=decision, actor=actor)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            Payment.objects.create(
+                inscription=prepared.target_inscription,
+                amount=prepared.target_inscription.amount_due,
+                method=Payment.METHOD_CASH,
+                status=Payment.STATUS_VALIDATED,
+            )
+
+        decision.refresh_from_db()
+        self.student.refresh_from_db()
+        self.enrollment.refresh_from_db()
+        self.assertEqual(decision.workflow_status, StudentYearDecision.WORKFLOW_APPLIED)
+        self.assertEqual(decision.target_enrollment.student, self.user)
+        self.assertEqual(decision.target_enrollment.academic_class, self.target_l2)
+        self.assertEqual(self.enrollment.status, AcademicEnrollment.STATUS_ARCHIVED)
+        self.assertEqual(self.student.current_academic_enrollment, decision.target_enrollment)
+        self.assertEqual(Student.objects.filter(user=self.user).count(), 1)
+        self.assertEqual(Student.objects.count(), 1)
+
+        from academic_cycle.models import AcademicReEnrollment, StudentAccessPolicy, StudentFinancialPosition
+
+        cycle_reenrollment = AcademicReEnrollment.objects.get(
+            student=self.student,
+            target_academic_year=self.target_year,
+        )
+        self.assertEqual(cycle_reenrollment.status, AcademicReEnrollment.STATUS_ACTIVATED)
+        financial_position = StudentFinancialPosition.objects.get(
+            student=self.student,
+            academic_year=self.target_year,
+        )
+        self.assertEqual(financial_position.current_year_due_amount, prepared.target_inscription.amount_due)
+        self.assertEqual(financial_position.current_year_paid_amount, prepared.target_inscription.amount_due)
+        self.assertEqual(
+            StudentAccessPolicy.objects.get(
+                student=self.student,
+                academic_year=self.target_year,
+            ).access_level,
+            "full",
+        )
+
+        source_snapshot = get_student_academic_snapshot(self.user, academic_year_id=self.source_year.id)
+        target_snapshot = get_student_academic_snapshot(self.user, academic_year_id=self.target_year.id)
+        self.assertEqual(source_snapshot["academic_enrollment"], self.enrollment)
+        self.assertEqual(target_snapshot["academic_enrollment"], decision.target_enrollment)
+        self.assertTrue(source_snapshot["is_historical_context"])
+        self.assertEqual(
+            get_finance_widget(self.user, academic_year_id=self.source_year.id)["total_paid"],
+            Decimal("100000"),
+        )
+        self.assertEqual(
+            get_finance_widget(self.user, academic_year_id=self.target_year.id)["total_paid"],
+            prepared.target_inscription.amount_due,
+        )
+
+    @patch("payments.models.send_payment_confirmation_email")
+    @patch("payments.models.send_student_credentials_email")
+    def test_partial_target_payment_activates_only_the_target_year(self, _send_credentials, _send_confirmation):
+        actor = User.objects.create_user(username="reenrollment_partial_actor", password="pass1234", is_staff=True)
+        actor.profile.position = "branch_manager"
+        actor.profile.branch = self.branch
+        actor.profile.save(update_fields=["position", "branch", "updated_at"])
+        decision = self._create_settled_transition_decision(actor)
+        prepared = apply_student_decision(decision=decision, actor=actor)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            Payment.objects.create(
+                inscription=prepared.target_inscription,
+                amount=25000,
+                method=Payment.METHOD_CASH,
+                status=Payment.STATUS_VALIDATED,
+            )
+
+        decision.refresh_from_db()
+        self.enrollment.refresh_from_db()
+        prepared.target_inscription.refresh_from_db()
+        self.assertEqual(decision.workflow_status, StudentYearDecision.WORKFLOW_APPLIED)
+        self.assertEqual(prepared.target_inscription.status, Inscription.STATUS_PARTIAL)
+        self.assertEqual(decision.target_enrollment.academic_year, self.target_year)
+        self.assertEqual(self.enrollment.status, AcademicEnrollment.STATUS_ARCHIVED)
+        self.assertEqual(
+            get_finance_widget(self.user, academic_year_id=self.source_year.id)["total_paid"],
+            Decimal("100000"),
+        )
+        self.assertEqual(
+            get_finance_widget(self.user, academic_year_id=self.target_year.id)["total_paid"],
+            Decimal("25000"),
+        )
+
+    @patch("payments.models.send_payment_confirmation_email")
+    @patch("payments.models.send_student_credentials_email")
+    def test_student_dashboard_selected_year_changes_the_server_context(self, _send_credentials, _send_confirmation):
+        actor = User.objects.create_user(username="reenrollment_dashboard_context_actor", password="pass1234", is_staff=True)
+        actor.profile.position = "branch_manager"
+        actor.profile.branch = self.branch
+        actor.profile.save(update_fields=["position", "branch", "updated_at"])
+        decision = self._create_settled_transition_decision(actor)
+        prepared = apply_student_decision(decision=decision, actor=actor)
+        with self.captureOnCommitCallbacks(execute=True):
+            Payment.objects.create(
+                inscription=prepared.target_inscription,
+                amount=prepared.target_inscription.amount_due,
+                method=Payment.METHOD_CASH,
+                status=Payment.STATUS_VALIDATED,
+            )
+
+        decision.refresh_from_db()
+        self.user.profile.role = "student"
+        self.user.profile.save(update_fields=["role", "updated_at"])
+        self.client.force_login(self.user)
+
+        source_response = self.client.get(
+            reverse("portal_student:dashboard"),
+            {"academic_year_id": self.source_year.id},
+        )
+        target_response = self.client.get(
+            reverse("portal_student:dashboard"),
+            {"academic_year_id": self.target_year.id},
+        )
+
+        self.assertEqual(source_response.status_code, 200)
+        self.assertEqual(target_response.status_code, 200)
+        self.assertEqual(source_response.context["enrollment"], self.enrollment)
+        self.assertEqual(target_response.context["enrollment"], decision.target_enrollment)
+        self.assertEqual(source_response.context["selected_academic_year_id"], self.source_year.id)
+        self.assertEqual(target_response.context["selected_academic_year_id"], self.target_year.id)
+        self.assertContains(source_response, 'id="student-academic-year-mobile"')
+
+    def test_prepared_decision_cannot_be_modified_or_rejected(self):
+        actor = User.objects.create_user(username="reenrollment_locked_actor", password="pass1234", is_staff=True)
+        actor.profile.position = "branch_manager"
+        actor.profile.branch = self.branch
+        actor.profile.save(update_fields=["position", "branch", "updated_at"])
+        decision = self._create_settled_transition_decision(actor)
+        prepared = apply_student_decision(decision=decision, actor=actor)
+
+        with self.assertRaises(ValidationError):
+            propose_student_decision(
+                student=self.student,
+                source_enrollment=self.enrollment,
+                target_academic_year=self.target_year,
+                target_class=self.target_l1,
+                decision=StudentYearDecision.DECISION_REPEATED,
+                annual_average=Decimal("8.00"),
+                proposed_by=actor,
+            )
+        with self.assertRaises(ValidationError):
+            reject_student_decision(decision=prepared, actor=actor, reason="Annulation tardive")
+
+        decision.refresh_from_db()
+        self.assertEqual(decision.workflow_status, StudentYearDecision.WORKFLOW_FINANCE_VALIDATED)
+        self.assertEqual(decision.target_inscription, prepared.target_inscription)
+
+    def test_existing_target_inscription_with_payment_is_not_hijacked(self):
+        actor = User.objects.create_user(username="reenrollment_existing_target_actor", password="pass1234", is_staff=True)
+        actor.profile.position = "branch_manager"
+        actor.profile.branch = self.branch
+        actor.profile.save(update_fields=["position", "branch", "updated_at"])
+        decision = self._create_settled_transition_decision(actor)
+        target_candidature = Candidature.objects.create(
+            programme=self.programme,
+            branch=self.branch,
+            academic_year=self.target_year.name,
+            entry_year=2,
+            first_name=self.candidature.first_name,
+            last_name=self.candidature.last_name,
+            birth_date=self.candidature.birth_date,
+            birth_place=self.candidature.birth_place,
+            gender=self.candidature.gender,
+            phone=self.candidature.phone,
+            email=self.candidature.email,
+            status="accepted",
+        )
+        target_inscription = Inscription.objects.create(
+            candidature=target_candidature,
+            academic_class=self.target_l2,
+            amount_due=100000,
+            status=Inscription.STATUS_AWAITING_PAYMENT,
+        )
+        Payment.objects.create(
+            inscription=target_inscription,
+            amount=25000,
+            method=Payment.METHOD_CASH,
+            status=Payment.STATUS_VALIDATED,
+        )
+
+        with self.assertRaises(ValidationError):
+            apply_student_decision(decision=decision, actor=actor)
+
+        decision.refresh_from_db()
+        self.assertIsNone(decision.target_inscription)
+
+    def test_historical_profile_context_cannot_overwrite_source_candidature(self):
+        actor = User.objects.create_user(username="reenrollment_history_profile_actor", password="pass1234", is_staff=True)
+        actor.profile.position = "branch_manager"
+        actor.profile.branch = self.branch
+        actor.profile.save(update_fields=["position", "branch", "updated_at"])
+        decision = self._create_settled_transition_decision(actor)
+        prepared = apply_student_decision(decision=decision, actor=actor)
+        with self.captureOnCommitCallbacks(execute=True):
+            Payment.objects.create(
+                inscription=prepared.target_inscription,
+                amount=prepared.target_inscription.amount_due,
+                method=Payment.METHOD_CASH,
+                status=Payment.STATUS_VALIDATED,
+            )
+
+        with self.assertRaises(ValidationError):
+            update_editable_fields(
+                self.user,
+                {"email": "historique-modifie@example.com", "phone": "71111111"},
+                academic_year_id=self.source_year.id,
+            )
+
+        self.candidature.refresh_from_db()
+        self.assertEqual(self.candidature.email, "awa.reinscription@example.com")
+        self.assertEqual(self.candidature.phone, "70000002")
+
+    @override_settings(ROOT_URLCONF="config.urls")
+    def test_legacy_student_reenrollment_endpoint_cannot_advance_portal_projection(self):
+        actor = User.objects.create_user(username="reenrollment_projection_actor", password="pass1234", is_staff=True)
+        actor.profile.position = "branch_manager"
+        actor.profile.branch = self.branch
+        actor.profile.save(update_fields=["position", "branch", "updated_at"])
+        propose_student_decision(
+            student=self.student,
+            source_enrollment=self.enrollment,
+            target_academic_year=self.target_year,
+            target_class=self.target_l2,
+            decision=StudentYearDecision.DECISION_PROMOTED,
+            annual_average=Decimal("13.00"),
+            proposed_by=actor,
+        )
+        from academic_cycle.models import AcademicReEnrollment
+
+        tracker = AcademicReEnrollment.objects.get(
+            student=self.student,
+            target_academic_year=self.target_year,
+        )
+        self.user.profile.role = "student"
+        self.user.profile.save(update_fields=["role", "updated_at"])
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("academic_cycle:student_reenrollment", args=[tracker.token]),
+        )
+
+        tracker.refresh_from_db()
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(tracker.status, AcademicReEnrollment.STATUS_PREPARED)
+
+    @patch("payments.models.send_payment_confirmation_email")
+    @patch("payments.models.send_student_credentials_email")
+    def test_diplomas_partial_respects_selected_academic_year(self, _send_credentials, _send_confirmation):
+        actor = User.objects.create_user(username="reenrollment_diploma_actor", password="pass1234", is_staff=True)
+        actor.profile.position = "branch_manager"
+        actor.profile.branch = self.branch
+        actor.profile.save(update_fields=["position", "branch", "updated_at"])
+        decision = self._create_settled_transition_decision(actor)
+        prepared = apply_student_decision(decision=decision, actor=actor)
+        with self.captureOnCommitCallbacks(execute=True):
+            Payment.objects.create(
+                inscription=prepared.target_inscription,
+                amount=prepared.target_inscription.amount_due,
+                method=Payment.METHOD_CASH,
+                status=Payment.STATUS_VALIDATED,
+            )
+        decision.refresh_from_db()
+        source_award = AcademicDiplomaAward.objects.create(
+            student=self.student,
+            enrollment=self.enrollment,
+            academic_year=self.source_year,
+            academic_class=self.source_class,
+            branch=self.branch,
+            programme=self.programme,
+            diploma=self.diploma,
+            status=AcademicDiplomaAward.STATUS_READY,
+        )
+        target_award = AcademicDiplomaAward.objects.create(
+            student=self.student,
+            enrollment=decision.target_enrollment,
+            academic_year=self.target_year,
+            academic_class=self.target_l2,
+            branch=self.branch,
+            programme=self.programme,
+            diploma=self.diploma,
+            status=AcademicDiplomaAward.STATUS_READY,
+        )
+        self.user.profile.role = "student"
+        self.user.profile.save(update_fields=["role", "updated_at"])
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            reverse("portal_student:diplomas_partial"),
+            {"academic_year_id": self.source_year.id},
+        )
+
+        self.assertContains(response, source_award.reference)
+        self.assertNotContains(response, target_award.reference)
+
+    def test_proposal_is_rejected_outside_actor_branch_scope(self):
+        other_branch = Branch.objects.create(
+            name="Annexe Hors Perimetre",
+            code="RIN2",
+            slug="annexe-hors-perimetre",
+        )
+        actor = User.objects.create_user(username="reenrollment_other_branch", password="pass1234", is_staff=True)
+        actor.profile.position = "branch_manager"
+        actor.profile.branch = other_branch
+        actor.profile.save(update_fields=["position", "branch", "updated_at"])
+
+        with self.assertRaises(ValidationError):
+            propose_student_decision(
+                student=self.student,
+                source_enrollment=self.enrollment,
+                target_academic_year=self.target_year,
+                target_class=self.target_l2,
+                decision=StudentYearDecision.DECISION_PROMOTED,
+                annual_average=Decimal("13.00"),
+                proposed_by=actor,
+            )
 
     def test_finance_validation_requires_academic_validation(self):
         actor = User.objects.create_user(username="reenrollment_finance_guard", password="pass1234", is_staff=True)
@@ -661,6 +1074,234 @@ class ReenrollmentPhaseOneTests(TestCase):
         self.assertEqual(self.inscription.status, Inscription.STATUS_COMPLETED)
         self.assertIsNone(self.student.current_academic_enrollment)
         self.assertTrue(self.student.is_active)
+
+
+class ReenrollmentPhaseTwoDashboardTests(ReenrollmentPhaseOneTests):
+    """Exercise the three operational surfaces against the Phase 1 engine."""
+
+    def setUp(self):
+        super().setUp()
+        self.director = User.objects.create_user(
+            username="phase2_director", password="pass1234", is_staff=True,
+        )
+        self.director.profile.position = "director_of_studies"
+        self.director.profile.branch = self.branch
+        self.director.profile.save(update_fields=["position", "branch", "updated_at"])
+        self.manager = User.objects.create_user(
+            username="phase2_manager", password="pass1234", is_staff=True,
+        )
+        self.manager.profile.position = "branch_manager"
+        self.manager.profile.branch = self.branch
+        self.manager.profile.save(update_fields=["position", "branch", "updated_at"])
+        self.finance = User.objects.create_user(
+            username="phase2_finance", password="pass1234", is_staff=True,
+        )
+        self.finance.profile.position = "finance_manager"
+        self.finance.profile.branch = self.branch
+        self.finance.profile.save(update_fields=["position", "branch", "updated_at"])
+        self.foreign_branch = Branch.objects.create(
+            name="Annexe Phase 2 Exterieure", code="P2X", slug="annexe-phase2-exterieure",
+        )
+        self.foreign_manager = User.objects.create_user(
+            username="phase2_foreign_manager", password="pass1234", is_staff=True,
+        )
+        self.foreign_manager.profile.position = "branch_manager"
+        self.foreign_manager.profile.branch = self.foreign_branch
+        self.foreign_manager.profile.save(update_fields=["position", "branch", "updated_at"])
+        self.executive = User.objects.create_user(
+            username="phase2_executive", password="pass1234", is_staff=True,
+        )
+        self.executive.profile.position = "executive_director"
+        self.executive.profile.branch = self.branch
+        self.executive.profile.save(update_fields=["position", "branch", "updated_at"])
+
+    def _settle_source_inscription(self):
+        with self.captureOnCommitCallbacks(execute=True):
+            Payment.objects.create(
+                inscription=self.inscription,
+                amount=self.inscription.amount_due,
+                method=Payment.METHOD_CASH,
+                status=Payment.STATUS_VALIDATED,
+            )
+        self.inscription.refresh_from_db()
+
+    def _decision_through_operational_endpoints(self):
+        self._settle_source_inscription()
+        candidate = build_reenrollment_candidates(
+            source_year=self.source_year,
+            source_class=self.source_class,
+            branch=self.branch,
+            target_year=self.target_year,
+        )[0]
+        self.client.force_login(self.director)
+        proposal = self.client.post(
+            reverse("accounts_portal:reenrollment_propose"),
+            {
+                "surface": "director",
+                "enrollment_id": self.enrollment.id,
+                "source_year": self.source_year.id,
+                "target_year": self.target_year.id,
+                "target_class": candidate["proposed_target_class"].id,
+                "decision": candidate["proposed_decision"],
+            },
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(proposal.status_code, 200)
+        decision = StudentYearDecision.objects.get(source_enrollment=self.enrollment)
+        academic = self.client.post(
+            reverse("accounts_portal:reenrollment_decision_action"),
+            {"surface": "director", "decision_id": decision.id, "action": "academic_validate"},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(academic.status_code, 200)
+        self.assertEqual(academic.context["toast"]["level"], "success", academic.context["toast"])
+        decision.refresh_from_db()
+        self.assertEqual(decision.workflow_status, StudentYearDecision.WORKFLOW_ACADEMIC_VALIDATED)
+        return decision
+
+    def _prepare_target_inscription(self):
+        decision = self._decision_through_operational_endpoints()
+        self.client.force_login(self.finance)
+        finance = self.client.post(
+            reverse("accounts_portal:reenrollment_decision_action"),
+            {"surface": "manager", "decision_id": decision.id, "action": "finance_validate"},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(finance.status_code, 200)
+        finance_apply = self.client.post(
+            reverse("accounts_portal:reenrollment_decision_action"),
+            {"surface": "manager", "decision_id": decision.id, "action": "apply"},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(finance_apply.status_code, 200)
+        decision.refresh_from_db()
+        self.assertIsNone(decision.target_inscription)
+
+        self.client.force_login(self.manager)
+        prepare = self.client.post(
+            reverse("accounts_portal:reenrollment_decision_action"),
+            {"surface": "manager", "decision_id": decision.id, "action": "apply"},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(prepare.status_code, 200)
+        decision.refresh_from_db()
+        self.assertIsNotNone(decision.target_inscription)
+        self.assertIsNone(decision.target_enrollment)
+        self.assertEqual(decision.target_inscription.status, Inscription.STATUS_AWAITING_PAYMENT)
+        return decision
+
+    def test_manager_dashboard_search_permissions_and_foreign_scope(self):
+        self.client.force_login(self.manager)
+        response = self.client.get(
+            reverse("accounts_portal:portal_annex_manager"),
+            {"section": "reenrollment", "source_year": self.source_year.id, "target_year": self.target_year.id, "q": "Awa"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["active_section"], "reenrollment")
+        self.assertEqual(response.context["reenrollment_metrics"]["not_started"], 1)
+        self.assertContains(response, "MAT-RIN-001")
+        self.assertContains(response, "Réinscriptions")
+        no_match = self.client.get(
+            reverse("accounts_portal:portal_annex_manager"),
+            {"section": "reenrollment", "source_year": self.source_year.id, "q": "inconnu"},
+        )
+        self.assertNotContains(no_match, "MAT-RIN-001")
+
+        forbidden_proposal = self.client.post(
+            reverse("accounts_portal:reenrollment_propose"),
+            {
+                "surface": "manager", "enrollment_id": self.enrollment.id,
+                "target_year": self.target_year.id, "target_class": self.target_l1.id,
+                "decision": StudentYearDecision.DECISION_REPEATED,
+            },
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(forbidden_proposal.status_code, 200)
+        self.assertFalse(StudentYearDecision.objects.filter(source_enrollment=self.enrollment).exists())
+
+        self.client.force_login(self.foreign_manager)
+        foreign = self.client.get(
+            reverse("accounts_portal:portal_annex_manager"),
+            {"section": "reenrollment", "source_year": self.source_year.id, "q": "Awa"},
+        )
+        self.assertEqual(foreign.status_code, 200)
+        self.assertNotContains(foreign, "MAT-RIN-001")
+
+    def test_director_manager_payment_activation_and_dg_pilotage(self):
+        director_view = self.client
+        director_view.force_login(self.director)
+        director_workspace = director_view.get(
+            reverse("accounts_portal:director_evaluations_subcontent"),
+            {"view": "reenrollments", "source_year": self.source_year.id, "target_year": self.target_year.id},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(director_workspace.status_code, 200)
+        self.assertContains(director_workspace, "Intervention académique")
+        self.assertNotContains(director_workspace, "Vérifier le solde source")
+
+        decision = self._prepare_target_inscription()
+        self.client.force_login(self.foreign_manager)
+        cross_branch = self.client.post(
+            reverse("accounts_portal:reenrollment_decision_action"),
+            {"surface": "manager", "decision_id": decision.id, "action": "apply"},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(cross_branch.status_code, 404)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            Payment.objects.create(
+                inscription=decision.target_inscription,
+                amount=decision.target_inscription.amount_due,
+                method=Payment.METHOD_CASH,
+                status=Payment.STATUS_VALIDATED,
+            )
+        decision.refresh_from_db()
+        self.student.refresh_from_db()
+        self.enrollment.refresh_from_db()
+        self.assertEqual(decision.workflow_status, StudentYearDecision.WORKFLOW_APPLIED)
+        self.assertEqual(self.student.user_id, self.user.id)
+        self.assertEqual(self.student.current_academic_enrollment_id, decision.target_enrollment_id)
+        self.assertEqual(self.enrollment.status, AcademicEnrollment.STATUS_ARCHIVED)
+        self.assertEqual(
+            AcademicEnrollment.objects.filter(
+                academic_class=decision.target_class,
+                academic_year=self.target_year,
+                status=AcademicEnrollment.STATUS_ACTIVE,
+            ).count(),
+            1,
+        )
+
+        self.client.force_login(self.executive)
+        dg = self.client.get(
+            reverse("accounts_portal:dg_section", kwargs={"section": "reenrollments"}),
+            {"source_year": self.source_year.id, "target_year": self.target_year.id},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(dg.status_code, 200)
+        self.assertEqual(dg.context["reenrollment_metrics"]["active"], 1)
+        self.assertContains(dg, "Pilotage uniquement")
+        self.assertContains(dg, "Actifs")
+        self.assertNotContains(dg, "Démarrer la réinscription")
+        active_only = self.client.get(
+            reverse("accounts_portal:dg_section", kwargs={"section": "reenrollments"}),
+            {
+                "source_year": self.source_year.id,
+                "target_year": self.target_year.id,
+                "finance_state": "active",
+            },
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(active_only.status_code, 200)
+        self.assertEqual(active_only.context["finance_state"], "active")
+        self.assertEqual(active_only.context["reenrollment_metrics"]["active"], 1)
+        self.assertContains(active_only, "MAT-RIN-001")
+        direct_operational_workspace = self.client.get(reverse("accounts_portal:reenrollment_workspace"))
+        self.assertEqual(direct_operational_workspace.status_code, 403)
+        direct_operational_action = self.client.post(
+            reverse("accounts_portal:reenrollment_decision_action"),
+            {"decision_id": decision.id, "action": "apply"},
+        )
+        self.assertEqual(direct_operational_action.status_code, 403)
 
 
 class AttendanceServiceTests(TestCase):

@@ -4,7 +4,7 @@ import logging
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 
-from academics.models import AcademicDebt, AcademicEnrollment, AcademicYear
+from academics.models import AcademicDebt, AcademicEnrollment, AcademicYear, ECGrade
 from academics.services.grading import resolve_threshold
 from academics.services.semester import compute_semester_result
 from students.models import Student
@@ -179,7 +179,7 @@ def create_academic_debts(enrollment, semester_result):
     return created
 
 
-def compute_annual_result(enrollment):
+def compute_annual_result(enrollment, *, semesters=None, grades_by_ec_id=None):
     """
     Consolide les resultats des semestres sans calculer de moyenne annuelle.
 
@@ -188,8 +188,24 @@ def compute_annual_result(enrollment):
     - moyenne S2, credits S2
     - decision : VALIDE / ADMISSIBLE / NON ADMIS
     """
-    semesters = list(enrollment.academic_class.semesters.all().order_by("number"))
-    semester_numbers = {semester.number for semester in semesters}
+    # The pair is defined by the curriculum attached to this class.  It can
+    # therefore be S1/S2, S3/S4, S5/S6, or another configured pair.
+    if semesters is None:
+        semesters = list(
+            enrollment.academic_class.semesters.all()
+            .prefetch_related("ues__ecs")
+            .order_by("number", "id")
+        )
+    else:
+        semesters = list(semesters)
+    if grades_by_ec_id is None:
+        grades_by_ec_id = {
+            grade.ec_id: grade
+            for grade in ECGrade.objects.filter(
+                enrollment=enrollment,
+                ec__ue__semester__in=semesters,
+            ).select_related("ec")
+        }
     total_credits = Decimal("0.00")
     credits_obtained = Decimal("0.00")
     missing_grades = 0
@@ -197,7 +213,11 @@ def compute_annual_result(enrollment):
     blocking_reasons = []
 
     for semester in semesters:
-        result = compute_semester_result(semester, enrollment)
+        result = compute_semester_result(
+            semester,
+            enrollment,
+            grades_by_ec_id=grades_by_ec_id,
+        )
         semester_results.append(result)
         credit_required = Decimal(str(result.get("credit_required") or "0"))
         credit_obtained_sem = Decimal(str(result.get("credit_obtained") or "0"))
@@ -207,13 +227,15 @@ def compute_annual_result(enrollment):
         for reason in result.get("blocking_reasons", []):
             blocking_reasons.append(f"S{semester.number}: {reason}")
 
-    has_required_semesters = semester_numbers == {1, 2} and len(semesters) == 2
+    has_required_semesters = len(semesters) == 2
     all_semesters_complete = bool(semester_results) and all(
         result.get("is_complete") for result in semester_results
     )
     is_complete = missing_grades == 0 and has_required_semesters and all_semesters_complete
     if not has_required_semesters:
-        blocking_reasons.append("Les semestres S1 et S2 sont obligatoires pour la decision annuelle.")
+        blocking_reasons.append(
+            "La maquette annuelle exige exactement deux semestres pour la decision annuelle."
+        )
     for result in semester_results:
         if not result.get("is_complete") and not result.get("missing_grades"):
             blocking_reasons.append(
@@ -240,7 +262,7 @@ def compute_annual_result(enrollment):
     }
 
 
-def compute_annual_decision(enrollment):
+def compute_annual_decision(enrollment, *, semesters=None, grades_by_ec_id=None):
     """
     Determine la decision annuelle : VALIDE / ADMISSIBLE / NON_ADMIS.
 
@@ -251,7 +273,11 @@ def compute_annual_decision(enrollment):
 
     La marge d'admissibilite est lue depuis AcademicClass.admissibility_gap.
     """
-    annual_result = compute_annual_result(enrollment)
+    annual_result = compute_annual_result(
+        enrollment,
+        semesters=semesters,
+        grades_by_ec_id=grades_by_ec_id,
+    )
     academic_class = enrollment.academic_class
     threshold = resolve_threshold(enrollment)
     gap = _decimal_or_none(academic_class.admissibility_gap) or Decimal("2.00")
@@ -278,7 +304,7 @@ def compute_annual_decision(enrollment):
             decision = DECISION_VALIDE
             rule_code = RULE_ALL_SEMESTERS_VALIDATED
             reasons = ["Tous les semestres sont valides."]
-        elif len(validated) >= 1:
+        elif len(validated) == 1 and len(non_validated) == 1:
             failed_semester = non_validated[0]
             failed_avg = _decimal_or_none(failed_semester.get("average"))
             is_near = (
@@ -305,7 +331,7 @@ def compute_annual_decision(enrollment):
         else:
             decision = DECISION_NON_ADMIS
             rule_code = RULE_NO_SEMESTER_VALIDATED
-            reasons.append("Aucun semestre valide.")
+            reasons.append("Aucun semestre valide selon la maquette annuelle.")
 
     logger.info(
         f"Decision annuelle: enrollment={enrollment.id}, "
@@ -357,13 +383,14 @@ def compute_year_result(student, academic_year):
     if enrollment is None:
         raise Http404("Aucune inscription active trouvée pour cet étudiant sur cette année académique.")
 
-    semesters = {
-        semester.number: semester
-        for semester in enrollment.academic_class.semesters.all().order_by("number")
-    }
+    semesters = list(enrollment.academic_class.semesters.all().order_by("number", "id"))
+    semester_by_number = {semester.number: semester for semester in semesters}
+    semester_results = [compute_semester_result(semester, enrollment) for semester in semesters]
 
-    s1_result = compute_semester_result(semesters[1], enrollment) if 1 in semesters else None
-    s2_result = compute_semester_result(semesters[2], enrollment) if 2 in semesters else None
+    # Legacy report templates still consume S1/S2.  The canonical dynamic
+    # collection below is used by new callers and supports S3/S4 naturally.
+    s1_result = compute_semester_result(semester_by_number[1], enrollment) if 1 in semester_by_number else None
+    s2_result = compute_semester_result(semester_by_number[2], enrollment) if 2 in semester_by_number else None
     annual_decision = compute_annual_decision(enrollment)
 
     s1_validated = bool(s1_result and s1_result.get("is_validated"))
@@ -376,14 +403,14 @@ def compute_year_result(student, academic_year):
         "academic_year": academic_year_obj,
         "enrollment": enrollment,
         "S1": {
-            "semester": semesters.get(1),
+            "semester": semester_by_number.get(1),
             "result": s1_result,
             "average_display": _format_decimal(s1_result.get("average")) if s1_result else "0,00",
             "status": "VALIDÉ" if s1_validated else "NON VALIDÉ",
             "is_validated": s1_validated,
         },
         "S2": {
-            "semester": semesters.get(2),
+            "semester": semester_by_number.get(2),
             "result": s2_result,
             "average_display": _format_decimal(s2_result.get("average")) if s2_result else "0,00",
             "status": "VALIDÉ" if s2_validated else "NON VALIDÉ",
@@ -391,4 +418,13 @@ def compute_year_result(student, academic_year):
         },
         "annual_decision": annual_decision,
         "decision": decision_code,
+        "semester_results": [
+            {
+                "semester": result["semester"],
+                "result": result,
+                "average_display": _format_decimal(result.get("average")),
+                "is_validated": bool(result.get("is_validated")),
+            }
+            for result in semester_results
+        ],
     }

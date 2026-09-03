@@ -1,0 +1,51 @@
+{% load component_tags %}
+<section class="min-w-0 space-y-5">
+  {% component "ui_core.page_header" eyebrow="Périmètre de l'annexe" title="Paramètres de l'annexe" subtitle="Gérez les coordonnées opérationnelles partagées par les modules de votre annexe." %}
+    {% fill "actions" %}
+      <span class="inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-xs font-semibold text-ui-text">
+        <i data-lucide="building-2" class="h-4 w-4 text-ui-primary" aria-hidden="true"></i>
+        {{ branch.code }}
+      </span>
+    {% endfill %}
+  {% endcomponent %}
+
+  <div class="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
+    {% component "ui_core.panel" title="Coordonnées de l'annexe" subtitle="Ces informations sont communes. Elles ne modifient ni les règles académiques ni les résultats." %}
+      <form method="post"
+            hx-post="{% url 'accounts_portal:director_branch_settings_save' %}"
+            hx-target="#director-workspace"
+            hx-swap="innerHTML"
+            hx-disabled-elt="button[type=submit]"
+            class="space-y-4"
+            novalidate>
+        {% csrf_token %}
+        {% if director_branch_settings_form.non_field_errors %}
+          {% component "ui_core.alert" title="Informations à corriger" message=director_branch_settings_form.non_field_errors.0 tone="danger" %}{% endcomponent %}
+        {% endif %}
+        <div class="grid min-w-0 gap-4 md:grid-cols-2">
+          <div class="md:col-span-2">{% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=director_branch_settings_form.address %}</div>
+          {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=director_branch_settings_form.city %}
+          {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=director_branch_settings_form.phone %}
+          <div class="md:col-span-2">{% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=director_branch_settings_form.email %}</div>
+        </div>
+        <div class="flex justify-end border-t border-ui-border pt-4">
+          <button type="submit" class="ui-focus-ring inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong disabled:opacity-50">
+            <i data-lucide="save" class="h-4 w-4" aria-hidden="true"></i>Enregistrer
+          </button>
+        </div>
+      </form>
+    {% endcomponent %}
+
+    <div class="min-w-0 space-y-4">
+      {% component "ui_core.panel" title="Identité système" subtitle="Gérée au niveau central pour éviter les doublons." %}
+        <dl class="space-y-3 text-sm">
+          <div class="flex items-center justify-between gap-3"><dt class="text-ui-text-muted">Annexe</dt><dd class="text-right font-semibold text-ui-text">{{ branch.name }}</dd></div>
+          <div class="flex items-center justify-between gap-3"><dt class="text-ui-text-muted">Code</dt><dd class="font-mono font-semibold text-ui-text">{{ branch.code }}</dd></div>
+          <div class="flex items-center justify-between gap-3"><dt class="text-ui-text-muted">Statut</dt><dd>{% component "ui_core.status_badge" label=branch.is_active|yesno:"Active,Inactive" tone=branch.is_active|yesno:"success,danger" %}{% endcomponent %}</dd></div>
+        </dl>
+      {% endcomponent %}
+
+      {% component "ui_core.alert" title="Règles académiques" message="Les seuils, crédits, coefficients et semestres se règlent dans Maquettes académiques, au niveau de la classe concernée. Cette séparation protège le calcul des notes." tone="info" %}{% endcomponent %}
+    </div>
+  </div>
+</section>

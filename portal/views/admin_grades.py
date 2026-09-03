@@ -4,18 +4,20 @@ from decimal import Decimal, InvalidOperation
 from django.utils.text import slugify
 
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.db.models import Prefetch
 from django.http import HttpResponse, HttpResponseForbidden
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import get_object_or_404, render
 from django.template.loader import render_to_string
 
 from academic_cycle.models import GradeModificationRequest
 from academic_cycle.services.grade_modifications import (
+    APPROVER_POSITIONS,
     GradeModificationError,
     confirm_grade_modification,
     request_grade_modification,
 )
-from academics.models import AcademicEnrollment, EC, ECGrade, Semester
+from academics.models import AcademicEnrollment, EC, ECGrade, Semester, UE
 from academics.services.grading import apply_ec_grade, compute_ec_status, resolve_ec_threshold, resolve_threshold
 from academics.services.semester import compute_semester_result
 from academics.services.ue import compute_ue_result
@@ -26,6 +28,15 @@ from portal.services.it_support_service import log_support_action
 from portal.models import SupportAuditLog
 from portal.services.notes_workflow import can_edit_retake_grade
 from secretary.permissions import is_secretary
+
+
+def _has_branch_access(user, branch) -> bool:
+    """Apply the canonical scope to legacy grade endpoints as well."""
+    scope = get_user_scope(user)
+    if scope.get("is_global"):
+        return True
+    user_branch = get_user_branch(user)
+    return bool(user_branch and branch and user_branch.pk == branch.pk)
 
 
 def get_post_login_portal_url(user):
@@ -77,6 +88,9 @@ def admin_grade_dashboard(request):
         )
         .order_by("academic_class__level", "student__student_profile__inscription__candidature__last_name")
     )
+    if not get_user_scope(request.user).get("is_global"):
+        branch = get_user_branch(request.user)
+        enrollments = enrollments.filter(branch=branch) if branch is not None else enrollments.none()
 
     return render(
         request,
@@ -99,6 +113,8 @@ def load_student_results(request, enrollment_id):
         ),
         pk=enrollment_id,
     )
+    if not _has_branch_access(request.user, enrollment.branch):
+        return HttpResponseForbidden("Action hors annexe refusee.")
 
     semesters = enrollment.academic_class.semesters.all().order_by("number")
     results = [compute_semester_result(semester, enrollment) for semester in semesters]
@@ -125,10 +141,14 @@ def load_grades_table(request, enrollment_id, semester_id):
         ),
         pk=enrollment_id,
     )
+    if not _has_branch_access(request.user, enrollment.branch):
+        return HttpResponseForbidden("Action hors annexe refusee.")
     semester = get_object_or_404(
         Semester.objects.select_related("academic_class"),
         pk=semester_id,
     )
+    if semester.academic_class_id != enrollment.academic_class_id:
+        return HttpResponse("Semestre hors classe.", status=400)
 
     ues = semester.ues.prefetch_related("ecs").order_by("id")
 
@@ -214,12 +234,16 @@ def _get_notes_grid_ues(semester):
     """
 
     return list(
-        semester.ues.prefetch_related(
+        semester.ues.exclude(structure_status=UE.STRUCTURE_ARCHIVED)
+        .prefetch_related(
             Prefetch(
                 "ecs",
-                queryset=EC.objects.order_by("id"),
+                queryset=EC.objects.exclude(
+                    structure_status=EC.STRUCTURE_ARCHIVED
+                ).order_by("id"),
             )
-        ).order_by("id")
+        )
+        .order_by("id")
     )
 
 
@@ -368,7 +392,11 @@ def _build_excel_row(enrollment, semester, ues, index, active_session_type="norm
 
     ue_blocks = []
     ue_results_by_id = {
-        ue.id: compute_ue_result(ue, enrollment)
+        ue.id: compute_ue_result(
+            ue,
+            enrollment,
+            grades_by_ec_id=grades_by_ec_id,
+        )
         for ue in ues
     }
 
@@ -441,7 +469,11 @@ def _build_excel_row(enrollment, semester, ues, index, active_session_type="norm
             "total_coefficients": ue_result["total_coefficients"],
         })
 
-    semester_result = compute_semester_result(semester, enrollment)
+    semester_result = compute_semester_result(
+        semester,
+        enrollment,
+        grades_by_ec_id=grades_by_ec_id,
+    )
     report_lock_reason = ""
     if not permissions["can_generate_reports"]:
         if semester.status == Semester.STATUS_FINALIZED:
@@ -497,6 +529,7 @@ RETAKE_CLOSED_STATUSES = {
 
 
 @login_required
+@transaction.atomic
 def save_grade(request):
     if request.method != "POST":
         return HttpResponse("Methode non autorisee", status=405)
@@ -513,7 +546,7 @@ def save_grade(request):
     raw_note = request.POST.get("note", "").strip().replace(",", ".")
 
     enrollment = get_object_or_404(
-        AcademicEnrollment.objects.select_related(
+        AcademicEnrollment.objects.select_for_update(of=("self",)).select_related(
             "student__student_profile__inscription__candidature",
             "academic_class",
             "academic_class__branch",
@@ -526,11 +559,9 @@ def save_grade(request):
         EC.objects.select_related("ue", "ue__semester", "ue__semester__academic_class"),
         pk=ec_id,
     )
-    semester = ec.ue.semester
-    if is_it_support:
-        user_branch = get_user_branch(request.user)
-        if user_branch is None or enrollment.branch_id != user_branch.id or semester.academic_class.branch_id != user_branch.id:
-            return HttpResponseForbidden("Action hors annexe refusee.")
+    semester = Semester.objects.select_for_update().get(pk=ec.ue.semester_id)
+    if not _has_branch_access(request.user, enrollment.branch):
+        return HttpResponseForbidden("Action hors annexe refusee.")
     if ec.ue.semester.academic_class_id != enrollment.academic_class_id:
         return HttpResponse("EC hors classe.", status=400)
 
@@ -709,12 +740,22 @@ def save_grade_confirm_otp(request):
     if request.method != "POST":
         return HttpResponse("Methode non autorisee", status=405)
 
-    is_it_support = get_user_position(request.user) == "it_support"
-    if not can_access(request.user, "view_portal", "dashboard") and not is_it_support:
+    position = get_user_position(request.user)
+    is_approver = request.user.is_superuser or position in APPROVER_POSITIONS
+    if not can_access(request.user, "view_portal", "dashboard") and not is_approver:
         return HttpResponseForbidden("Acces refuse.")
+    if not is_approver:
+        return HttpResponseForbidden(
+            "Seul le Directeur des etudes ou la direction executive peut valider cette correction."
+        )
 
     otp_request_id = request.POST.get("otp_request_id")
     otp_code = (request.POST.get("otp_code") or "").strip()
+    otp_request = GradeModificationRequest.objects.select_related("branch").filter(pk=otp_request_id).first()
+    if otp_request is None:
+        return HttpResponse("Demande introuvable.", status=404)
+    if not _has_branch_access(request.user, otp_request.branch):
+        return HttpResponseForbidden("Action hors annexe refusee.")
 
     def _apply(otp_request):
         grade = otp_request.ec_grade
@@ -763,32 +804,12 @@ def save_grade_confirm_otp(request):
 def publish_semester_view(request, enrollment_id, semester_id):
     if request.method != "POST":
         return HttpResponse("Methode non autorisee", status=405)
-
-    if not can_access(request.user, "view_portal", "dashboard"):
-        return HttpResponseForbidden("Acces refuse.")
-
-    enrollment = get_object_or_404(
-        AcademicEnrollment.objects.select_related("academic_class", "academic_year"),
-        pk=enrollment_id,
+    # This legacy URL used to publish a semester directly. Publication remains
+    # an auditable Director of Studies workflow and must not bypass
+    # ``director_results_action``.
+    return HttpResponseForbidden(
+        "La publication doit etre effectuee depuis le workflow du Directeur des etudes."
     )
-    semester = get_object_or_404(
-        Semester.objects.select_related("academic_class"),
-        pk=semester_id,
-    )
-
-    permissions = get_semester_permissions(semester)
-    class_enrollments = list(_get_class_enrollments(enrollment.academic_class, enrollment.academic_year))
-
-    if not permissions["can_publish"]:
-        return HttpResponse("La publication n'est pas autorisee a ce stade.", status=403)
-
-    if not can_publish_semester(semester, class_enrollments):
-        return HttpResponse("Toutes les notes doivent etre renseignees avant publication.", status=400)
-
-    semester.status = Semester.STATUS_PUBLISHED
-    semester.save(update_fields=["status"])
-
-    return redirect("accounts_portal:excel_grade_view", enrollment_id=enrollment.pk, semester_id=semester.pk)
 
 
 @login_required
@@ -811,6 +832,8 @@ def excel_grade_view(request, enrollment_id, semester_id):
         ),
         pk=enrollment_id,
     )
+    if not _has_branch_access(request.user, enrollment.branch):
+        return HttpResponseForbidden("Action hors annexe refusee.")
 
     semester = get_object_or_404(
         Semester.objects.select_related(
@@ -820,6 +843,8 @@ def excel_grade_view(request, enrollment_id, semester_id):
     )
 
     academic_class = enrollment.academic_class
+    if semester.academic_class_id != academic_class.id:
+        return HttpResponse("Semestre hors classe.", status=400)
     context = _build_notes_grid_context(
         academic_class=academic_class,
         semester=semester,

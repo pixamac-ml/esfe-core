@@ -1,0 +1,19 @@
+{% load component_tags humanize %}
+<section class="space-y-5" data-dashboard-section="analytics" data-executive-section="analytics">
+  {% component "ui_core.page_header" eyebrow="Gouvernance" title="Analyses et rapports" subtitle="Tendances institutionnelles calculées pour l’annexe et l’année académique actives." %}{% endcomponent %}
+
+  <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    {% component "ui_core.stat_card" label="Candidatures" value=analytics.total_candidatures|intcomma icon="file-text" tone="primary" description="Dossiers reçus dans le contexte actif" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Inscriptions actives" value=analytics.active_inscriptions|intcomma icon="file-check-2" tone="success" description="Dossiers activés dans le contexte actif" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Paiements validés" value=analytics.validated_payments|intcomma icon="circle-dollar-sign" tone="info" description="Opérations validées dans le contexte actif" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Signaux à suivre" value=analytics.risk_total|intcomma icon="triangle-alert" tone="warning" description="Finance, suivi, assiduité et workflow" compact=True %}{% endcomponent %}
+  </div>
+
+  <div class="grid gap-5 xl:grid-cols-2">
+    {% component "ui_core.chart_panel" id="dg-analytics-monthly" title="Évolution récente" description="Candidatures et paiements validés par mois." chart_type="bar" labels=analytics_monthly_labels datasets=analytics_monthly_datasets %}{% endcomponent %}
+    {% component "ui_core.chart_panel" id="dg-analytics-admissions" title="Statut des candidatures" description="Répartition des dossiers du contexte actif." chart_type="doughnut" labels=analytics_admission_labels datasets=analytics_admission_datasets %}{% endcomponent %}
+  </div>
+
+  {% component "ui_core.data_table" id="dg-analytics-months" caption="Données mensuelles" headers=analytics_monthly_headers rows=analytics_monthly_rows result_count=analytics_monthly_rows|length density="compact" empty_title="Aucune donnée mensuelle" empty_message="Aucune activité ne correspond au contexte sélectionné." %}{% endcomponent %}
+  {% component "ui_core.data_table" id="dg-analytics-branches" caption="Vigilance par annexe" headers=analytics_branch_headers rows=analytics_branch_rows result_count=analytics_branch_rows|length density="compact" empty_title="Aucune annexe à analyser" empty_message="Le périmètre sélectionné ne contient aucune annexe exploitable." %}{% endcomponent %}
+</section>

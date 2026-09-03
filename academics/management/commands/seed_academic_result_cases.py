@@ -1,13 +1,25 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.utils import timezone
 
-from academics.models import AcademicClass, AcademicEnrollment, AcademicYear, EC, ECGrade, Semester, UE
+from academics.models import (
+    AcademicCalendar,
+    AcademicCalendarEntry,
+    AcademicClass,
+    AcademicEnrollment,
+    AcademicScheduleEvent,
+    AcademicYear,
+    EC,
+    ECGrade,
+    Semester,
+    UE,
+)
 from admissions.models import Candidature
 from branches.models import Branch
 from formations.models import Cycle, Diploma, Fee, Filiere, Programme, ProgrammeYear
@@ -26,8 +38,16 @@ class Command(BaseCommand):
         parser.add_argument("--branch-code", default="TRESULT")
         parser.add_argument("--year", default="2036-2037")
         parser.add_argument("--level", default="L3", help="L3 par defaut pour montrer le cas Cycle termine.")
+        parser.add_argument(
+            "--pilot-moribabougou",
+            action="store_true",
+            help="Complete de facon idempotente le scenario annuel reel PILOTE ISMI - L1 (2099-2100).",
+        )
 
     def handle(self, *args, **options):
+        if options["pilot_moribabougou"]:
+            self._seed_pilot_moribabougou()
+            return
         branch_code = options["branch_code"].upper()
         year_name = options["year"]
         level = options["level"].upper()
@@ -322,3 +342,291 @@ class Command(BaseCommand):
                 "retake_score": retake_score,
             },
         )
+
+    def _seed_pilot_moribabougou(self):
+        """Raccorde le cas pilote existant sans toucher a son historique S1.
+
+        Cette variante vit dans la commande institutionnelle deja destinee aux
+        cas de resultats : elle ne cree ni identite etudiante ni maquette.
+        Les ecritures de notes utilisent ECGrade (source de saisie) puis les
+        transitions IT/DE existantes afin que les snapshots et releves restent
+        produits par le workflow normal.
+        """
+        from accounts.models import Profile
+        from academic_cycle.services.activation_service import activate_academic_year_for_branch
+        from academics.services.calendar_service import (
+            create_calendar,
+            create_calendar_entry,
+            publish_calendar,
+            submit_calendar,
+            validate_calendar,
+        )
+        from academics.services.schedule_service import create_schedule_event, create_weekly_schedule_slot
+        from academics.services.teacher_assignment_service import create_teacher_assignment
+        from portal.services.notes_workflow import (
+            ACTION_ACTIVATE_RETAKE,
+            ACTION_PUBLISH_NORMAL,
+            ACTION_START,
+            ACTION_SUBMIT_TO_DIRECTOR,
+            apply_notes_workflow_action,
+            get_retake_candidates,
+        )
+        from portal.views.views import director_results_action
+        from django.test.client import RequestFactory
+        from django.contrib.sessions.middleware import SessionMiddleware
+
+        branch = Branch.objects.get(code="MBG")
+        academic_year = AcademicYear.objects.get(name="2099-2100")
+        academic_class = AcademicClass.objects.get(
+            branch=branch,
+            academic_year=academic_year,
+            name="PILOTE ISMI - L1",
+        )
+        director = Profile.objects.select_related("user").get(
+            branch=branch,
+            position="director_of_studies",
+            user__is_active=True,
+        ).user
+        technician = Profile.objects.select_related("user").get(
+            branch=branch,
+            position="it_support",
+            user__is_active=True,
+        ).user
+        teacher = Profile.objects.select_related("user").get(
+            branch=branch,
+            position="teacher",
+            user__is_active=True,
+        ).user
+        semesters = {semester.number: semester for semester in Semester.objects.filter(academic_class=academic_class)}
+        semester_1, semester_2 = semesters[1], semesters[2]
+        enrollments = list(
+            AcademicEnrollment.objects.filter(
+                academic_class=academic_class,
+                academic_year=academic_year,
+                is_active=True,
+            ).order_by("id")
+        )
+        if len(enrollments) != 20:
+            raise CommandError("Le scenario pilote exige exactement les 20 inscriptions academiques existantes.")
+
+        # Le contexte global est explicitement ouvert pour cette annexe. Aucune
+        # autre annee n'est actuellement active dans la base.
+        if not academic_year.is_active:
+            AcademicYear.objects.filter(is_active=True).exclude(pk=academic_year.pk).update(is_active=False)
+            academic_year.is_active = True
+            academic_year.save(update_fields=["is_active"])
+        cycle = activate_academic_year_for_branch(branch, academic_year, director)
+        calendar, calendar_created = self._pilot_calendar(
+            branch=branch,
+            academic_year=academic_year,
+            academic_class=academic_class,
+            semester_1=semester_1,
+            semester_2=semester_2,
+            actor=director,
+            create_calendar=create_calendar,
+            create_calendar_entry=create_calendar_entry,
+            submit_calendar=submit_calendar,
+            validate_calendar=validate_calendar,
+            publish_calendar=publish_calendar,
+        )
+        assignments, course_events, weekly_slots = self._pilot_teaching(
+            academic_class=academic_class,
+            teacher=teacher,
+            actor=director,
+            create_teacher_assignment=create_teacher_assignment,
+            create_schedule_event=create_schedule_event,
+            create_weekly_schedule_slot=create_weekly_schedule_slot,
+        )
+
+        if semester_2.status != Semester.STATUS_PUBLISHED:
+            if semester_2.status == Semester.STATUS_DRAFT:
+                apply_notes_workflow_action(
+                    actor=technician, academic_class=academic_class, semester=semester_2, action=ACTION_START
+                )
+            semester_2.refresh_from_db()
+            if semester_2.status == Semester.STATUS_NORMAL_ENTRY:
+                self._pilot_s2_normal_scores(enrollments=enrollments, semester=semester_2)
+                apply_notes_workflow_action(
+                    actor=technician, academic_class=academic_class, semester=semester_2, action=ACTION_PUBLISH_NORMAL
+                )
+            semester_2.refresh_from_db()
+            candidates = get_retake_candidates(academic_class=academic_class, semester=semester_2)
+            if candidates and semester_2.status == Semester.STATUS_NORMAL_LOCKED:
+                apply_notes_workflow_action(
+                    actor=technician, academic_class=academic_class, semester=semester_2, action=ACTION_ACTIVATE_RETAKE
+                )
+            semester_2.refresh_from_db()
+            if semester_2.status == Semester.STATUS_RETAKE_ENTRY:
+                self._pilot_s2_retake_scores(enrollments=enrollments, semester=semester_2)
+                apply_notes_workflow_action(
+                    actor=technician, academic_class=academic_class, semester=semester_2, action=ACTION_SUBMIT_TO_DIRECTOR
+                )
+            elif semester_2.status == Semester.STATUS_NORMAL_LOCKED:
+                apply_notes_workflow_action(
+                    actor=technician, academic_class=academic_class, semester=semester_2, action=ACTION_SUBMIT_TO_DIRECTOR
+                )
+            semester_2.refresh_from_db()
+            if semester_2.status == Semester.STATUS_READY_FOR_DIRECTOR:
+                self._pilot_director_semester_action(director_results_action, director, semester_2.id, "validate", RequestFactory, SessionMiddleware)
+                self._pilot_director_semester_action(director_results_action, director, semester_2.id, "publish", RequestFactory, SessionMiddleware)
+        semester_2.refresh_from_db()
+        if semester_2.status != Semester.STATUS_PUBLISHED:
+            raise CommandError("S2 n'a pas pu etre publie par le workflow officiel.")
+
+        # Les propositions sont volontaires, revues manuellement et ne sont
+        # jamais finalisees ici. Le DE conserve l'ouverture de la deliberation
+        # et l'envoi de la demande OTP comme actions explicites du dashboard.
+        from academics.services.annual_deliberation import prepare_class_annual_synthesis
+        prepared = prepare_class_annual_synthesis(academic_class=academic_class, actor=director)
+
+        retake_count = sum(len(item.failed_subjects) for item in get_retake_candidates(academic_class=academic_class, semester=semester_2))
+        self.stdout.write(self.style.SUCCESS("Scenario annuel pilote pret."))
+        self.stdout.write(
+            f"cycle={cycle.status}; calendrier={calendar.id} ({'cree' if calendar_created else 'existant'}); "
+            f"affectations={assignments}; seances={course_events}; creneaux={weekly_slots}; "
+            f"S2={semester_2.status}; propositions={len(prepared['prepared'])}; rattrapages_restants={retake_count}"
+        )
+
+    def _pilot_calendar(self, *, branch, academic_year, academic_class, semester_1, semester_2, actor,
+                        create_calendar, create_calendar_entry, submit_calendar, validate_calendar, publish_calendar):
+        calendar = AcademicCalendar.objects.filter(
+            branch=branch, academic_year=academic_year, status=AcademicCalendar.STATUS_PUBLISHED
+        ).first()
+        created = False
+        if calendar is None:
+            calendar = create_calendar(actor=actor, branch=branch, academic_year=academic_year)
+            calendar.official_title = "Calendrier académique pilote ISMI 2099-2100"
+            calendar.administrative_reference = "ESFE-MBG-2099-2100-PILOTE"
+            calendar.general_observations = "Scénario institutionnel de préparation à la délibération annuelle."
+            calendar.updated_by = actor
+            calendar.save()
+            created = True
+        if calendar.status in {AcademicCalendar.STATUS_DRAFT, AcademicCalendar.STATUS_REJECTED}:
+            def at(value):
+                return timezone.make_aware(datetime.combine(value, time(8, 0)))
+            def end(value):
+                return timezone.make_aware(datetime.combine(value, time(17, 0)))
+            timeline = [
+                ("Rentrée académique 2099-2100", "academic_start", date(2099, 10, 1), date(2099, 10, 1), "branch", None, False),
+                ("Enseignements S1", "semester_start", date(2099, 10, 5), date(2099, 10, 5), "semester", semester_1, False),
+                ("Évaluations normales S1", "exam_session", date(2100, 1, 11), date(2100, 1, 20), "semester", semester_1, True),
+                ("Rattrapages S1", "retake_session", date(2100, 2, 1), date(2100, 2, 5), "semester", semester_1, True),
+                ("Publication résultats S1", "result_publication", date(2100, 2, 10), date(2100, 2, 10), "semester", semester_1, True),
+                ("Enseignements S2", "semester_start", date(2100, 2, 15), date(2100, 2, 15), "semester", semester_2, False),
+                ("Évaluations normales S2", "exam_session", date(2100, 6, 10), date(2100, 6, 20), "semester", semester_2, True),
+                ("Saisie et contrôle des notes S2", "other", date(2100, 6, 21), date(2100, 6, 24), "semester", semester_2, False),
+                ("Rattrapages S2", "retake_session", date(2100, 6, 25), date(2100, 6, 29), "semester", semester_2, True),
+                ("Jury et préparation annuelle", "jury", date(2100, 7, 2), date(2100, 7, 3), "class", None, True),
+                ("Publication résultats S2", "result_publication", date(2100, 7, 5), date(2100, 7, 5), "semester", semester_2, True),
+                ("Clôture académique 2099-2100", "academic_end", date(2100, 7, 31), date(2100, 7, 31), "branch", None, False),
+            ]
+            for title, event_type, start_day, end_day, scope, semester, blocking in timeline:
+                if calendar.entries.filter(title=title).exists():
+                    continue
+                data = {
+                    "title": title, "event_type": event_type, "start_datetime": at(start_day),
+                    "end_datetime": end(end_day), "all_day": True, "target_scope": scope,
+                    "is_blocking": blocking, "status": AcademicCalendarEntry.STATUS_DRAFT,
+                }
+                if scope == "semester":
+                    data["semester"] = semester
+                elif scope == "class":
+                    data["academic_class"] = academic_class
+                create_calendar_entry(actor=actor, calendar=calendar, **data)
+            if calendar.status in {AcademicCalendar.STATUS_DRAFT, AcademicCalendar.STATUS_REJECTED}:
+                submit_calendar(calendar, actor=actor)
+            calendar.refresh_from_db()
+            if calendar.status == AcademicCalendar.STATUS_SUBMITTED:
+                validate_calendar(calendar, actor=actor)
+            calendar.refresh_from_db()
+            if calendar.status == AcademicCalendar.STATUS_VALIDATED:
+                publish_calendar(calendar, actor=actor)
+        return calendar, created
+
+    def _pilot_teaching(self, *, academic_class, teacher, actor, create_teacher_assignment,
+                        create_schedule_event, create_weekly_schedule_slot):
+        ecs = list(EC.objects.filter(ue__semester__academic_class=academic_class).select_related("ue", "ue__semester").order_by("ue__semester__number", "ue__code", "id"))
+        assignments = events = slots = 0
+        for index, ec in enumerate(ecs):
+            if not __import__("portal.models", fromlist=["DirectorTeacherAssignment"]).DirectorTeacherAssignment.objects.filter(
+                academic_class=academic_class, ec=ec, teacher=teacher, is_active=True
+            ).exists():
+                create_teacher_assignment(
+                    actor=actor, teacher=teacher, branch=academic_class.branch, academic_class=academic_class,
+                    ec=ec, room_label="Salle pilote ISMI", planned_hours="4", status="active",
+                )
+                assignments += 1
+            weekday = index % 6
+            start_hour = 8 + (index // 6) * 2
+            if not __import__("academics.models", fromlist=["WeeklyScheduleSlot"]).WeeklyScheduleSlot.objects.filter(
+                academic_class=academic_class, ec=ec, teacher=teacher
+            ).exists():
+                create_weekly_schedule_slot(
+                    user=actor, academic_class=academic_class, ec=ec, teacher=teacher,
+                    branch=academic_class.branch, academic_year=academic_class.academic_year,
+                    weekday=weekday, start_time=time(start_hour, 0), end_time=time(start_hour + 1, 30),
+                    room="Salle pilote ISMI", is_active=True,
+                )
+                slots += 1
+            semester_start = date(2099, 10, 12) if ec.ue.semester.number == 1 else date(2100, 2, 22)
+            event_day = semester_start + timedelta(days=index % 14)
+            start = timezone.make_aware(datetime.combine(event_day, time(8 + (index % 4) * 2, 0)))
+            end = start + timedelta(hours=2)
+            if not AcademicScheduleEvent.objects.filter(
+                academic_class=academic_class, ec=ec, start_datetime=start, end_datetime=end
+            ).exists():
+                create_schedule_event(
+                    user=actor, title=f"Cours représentatif — {ec.title}", description="Séance institutionnelle du scénario pilote.",
+                    event_type=AcademicScheduleEvent.EVENT_TYPE_COURSE, academic_class=academic_class, ec=ec,
+                    teacher=teacher, branch=academic_class.branch, academic_year=academic_class.academic_year,
+                    start_datetime=start, end_datetime=end, status=AcademicScheduleEvent.STATUS_COMPLETED,
+                    location="Salle pilote ISMI", is_online=False, is_active=True,
+                )
+                events += 1
+        return assignments, events, slots
+
+    def _pilot_s2_score(self, student_index, ec_index):
+        normal, retake = Decimal("13.00"), None
+        if student_index < 4:
+            normal = Decimal("16.00")
+        elif 8 <= student_index < 12 and ec_index in {0, 3}:
+            normal, retake = Decimal("7.00"), Decimal("14.00")
+        elif 12 <= student_index < 16 and ec_index in {1, 4}:
+            normal = Decimal("7.00")
+            retake = Decimal("13.00") if ec_index == 1 else Decimal("7.00")
+        elif student_index >= 16:
+            normal, retake = Decimal("6.00"), Decimal("7.00")
+        return normal, retake
+
+    def _pilot_s2_normal_scores(self, *, enrollments, semester):
+        ecs = list(EC.objects.filter(ue__semester=semester).order_by("ue__code", "id"))
+        for student_index, enrollment in enumerate(enrollments):
+            for ec_index, ec in enumerate(ecs):
+                normal, _ = self._pilot_s2_score(student_index, ec_index)
+                ECGrade.objects.update_or_create(
+                    enrollment=enrollment,
+                    ec=ec,
+                    defaults={"normal_score": normal, "retake_score": None},
+                )
+
+    def _pilot_s2_retake_scores(self, *, enrollments, semester):
+        ecs = list(EC.objects.filter(ue__semester=semester).order_by("ue__code", "id"))
+        for student_index, enrollment in enumerate(enrollments):
+            for ec_index, ec in enumerate(ecs):
+                _, retake = self._pilot_s2_score(student_index, ec_index)
+                if retake is None:
+                    continue
+                grade = ECGrade.objects.get(enrollment=enrollment, ec=ec)
+                if grade.retake_score == retake:
+                    continue
+                grade.retake_score = retake
+                grade.save(update_fields=["retake_score"])
+
+    def _pilot_director_semester_action(self, view, director, semester_id, action, RequestFactory, SessionMiddleware):
+        request = RequestFactory().post("/portal/director/results/action/", {"semester_id": semester_id, "action": action})
+        SessionMiddleware(lambda current_request: None).process_request(request)
+        request.session.save()
+        request.user = director
+        response = view(request)
+        if response.status_code >= 400:
+            raise CommandError(f"Le workflow DE S2 a echoue lors de '{action}' (HTTP {response.status_code}).")

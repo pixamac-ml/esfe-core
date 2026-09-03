@@ -11,8 +11,8 @@
       <button type="button" class="dg-btn dg-btn-outline" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=alert')">
         <i class="fa-solid fa-filter"></i>Filtrer
       </button>
-      <button type="button" class="dg-btn dg-btn-primary" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=alert')">
-        <i class="fa-solid fa-bell"></i>Nouvelle alerte
+      <button type="button" class="dg-btn dg-btn-primary" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=alert')">
+        <i class="fa-solid fa-bell"></i>Voir les alertes
       </button>
     </div>
   </div>
@@ -24,7 +24,7 @@
     </div>
     <div class="dg-context-main">
       <span class="dg-scope-chip">{{ dashboard_scope_label|default:"Toutes les annexes" }}</span>
-      <span class="dg-scope-chip">{{ dashboard_period_label|default:"Periode courante" }}</span>
+      <span class="dg-scope-chip">{{ selected_academic_year.name|default:"Annee academique" }}</span>
       <span class="dg-scope-chip">{{ open_alerts|default:0|intcomma }} ouvertes</span>
     </div>
   </div>
@@ -100,13 +100,13 @@
               <td>
                 <div style="display:flex; gap:4px; flex-wrap:wrap;">
                   <button type="button" class="dg-btn dg-btn-success" style="font-size:.65rem; height:28px; padding:0 .5rem;" onclick="dgOpenDrawer('{{ alert.drawer_url }}')">
-                    <i class="fa-solid fa-check"></i>Resoudre
+                    <i class="fa-solid fa-eye"></i>Traiter
                   </button>
                   <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=alert&id={{ alert.action_id }}')">
-                    <i class="fa-solid fa-share"></i>Escalader
+                    <i class="fa-solid fa-share"></i>Contexte
                   </button>
                   <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;" onclick="dgOpenDrawer('{{ alert.drawer_url }}')">
-                    <i class="fa-solid fa-phone"></i>Relancer
+                    <i class="fa-solid fa-phone"></i>Voir dossier
                   </button>
                 </div>
               </td>
@@ -132,7 +132,13 @@
       <div class="dg-panel">
         <div class="dg-panel-title">Repartition des risques</div>
         <div style="height:220px; background:#f8fafc; border-radius:8px; padding:12px; margin-bottom:14px;">
-          <canvas id="dgRiskChart"></canvas>
+          <canvas
+            id="dgRiskChart"
+            data-dg-chart="risks"
+            data-ui-chart='{"type":"doughnut","data":{"labels":{{ analytics.risk_labels_json|safe }},"datasets":[{"data":{{ analytics.risk_values_json|safe }},"backgroundColor":["#ef4444","#f97316","#f59e0b","#2563eb"]}]},"options":{"plugins":{"legend":{"position":"bottom"}}}}'
+            role="img"
+            aria-label="Repartition des alertes par domaine"
+          ></canvas>
         </div>
         <div class="dg-bar-item">
           <div class="dg-bar-label"><span>Finance</span><span>{{ analytics.risk_breakdown.0.value|default:0 }}</span></div>
@@ -165,21 +171,21 @@
         <div class="dg-action-grid">
           <div class="dg-action-card" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=alert')">
             <div>
-              <div class="dg-action-label" style="color:#ef4444;"><i class="fa-solid fa-check-circle" style="margin-right:4px;"></i>Resoudre alerte</div>
+              <div class="dg-action-label" style="color:#ef4444;"><i class="fa-solid fa-check-circle" style="margin-right:4px;"></i>Traiter alertes</div>
               <div class="dg-action-sub">{{ open_alerts|default:0 }} a traiter</div>
             </div>
             <span class="dg-action-count" style="background:#fee2e2; color:#ef4444;">{{ open_alerts|default:0 }}</span>
           </div>
           <div class="dg-action-card" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=case')">
             <div>
-              <div class="dg-action-label" style="color:#d97706;"><i class="fa-solid fa-share" style="margin-right:4px;"></i>Escalader cas</div>
+              <div class="dg-action-label" style="color:#d97706;"><i class="fa-solid fa-share" style="margin-right:4px;"></i>Voir les cas</div>
               <div class="dg-action-sub">Cas en attente</div>
             </div>
             <i class="fa-solid fa-chevron-right" style="color:#94a3b8;"></i>
           </div>
           <div class="dg-action-card" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=finance')">
             <div>
-              <div class="dg-action-label" style="color:#16a34a;"><i class="fa-solid fa-credit-card" style="margin-right:4px;"></i>Relancer paiement</div>
+              <div class="dg-action-label" style="color:#16a34a;"><i class="fa-solid fa-credit-card" style="margin-right:4px;"></i>Suivi paiements</div>
               <div class="dg-action-sub">{{ analytics.pending_payments|default:0 }} en attente</div>
             </div>
             <span class="dg-action-count" style="background:#f0fdf4; color:#16a34a;">{{ analytics.pending_payments|default:0 }}</span>

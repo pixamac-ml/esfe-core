@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from io import BytesIO
 from urllib.parse import urlencode
+from uuid import uuid4
 
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
@@ -11,6 +13,7 @@ from django.http import FileResponse, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.utils import timezone
+from django.conf import settings
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import landscape
 from reportlab.lib.units import mm
@@ -18,7 +21,9 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
 from academics.imports.template_service import generate_notes_workbook
-from academics.models import AcademicClass, EC, ECGrade, Semester, UE
+from academics.models import AcademicClass, AcademicYear, EC, ECGrade, Semester, UE
+from academics.selectors.programme_structure_selectors import semester_has_active_ecs
+from accounts.models import AccountSecurityEvent, AccountSessionRecord, CartePersonnel
 from accounts.access import get_user_position
 from accounts.dashboards.helpers import get_user_branch
 from portal.selectors import (
@@ -45,12 +50,22 @@ from portal.services.archive_service import (
     restore_archive_batch,
 )
 from portal.services.notes_workflow import (
+    ACTION_ACTIVATE_RETAKE,
+    ACTION_PUBLISH_NORMAL,
+    ACTION_SUBMIT_TO_DIRECTOR,
     apply_notes_workflow_action,
     get_available_actions,
     get_notes_state,
     get_retake_candidates,
 )
-from portal.services.it_support_service import get_account_support_state, get_scoped_staff_queryset
+from portal.services.it_support_service import (
+    can_manage_user_in_branch,
+    get_account_support_state,
+    get_scoped_staff_queryset,
+    get_scoped_student_queryset,
+    reactivate_account,
+    unblock_account,
+)
 from portal.services.it_support_service import create_temp_password, log_support_action
 from portal.services.informaticien_workflows import (
     build_audit_context,
@@ -69,7 +84,7 @@ from portal.services.informaticien_workflows import (
 )
 from portal.selectors.informaticien import support_tickets_for_branch
 from portal.models import SupportAuditLog, SupportTicket
-from students.models import Student
+from students.models import CarteEtudiant, Student, VerificationLog
 from portal.views.admin_grades import _build_notes_grid_context
 from notifier.models import NotificationMessage
 
@@ -80,6 +95,17 @@ def _require_it_support(request):
     if get_user_branch(request.user) is None:
         return False
     return True
+
+
+@login_required
+def it_restricted_workspace(request, *args, **kwargs):
+    """Ferme les anciennes URLs de gouvernance, sans détruire leurs briques."""
+    if not _require_it_support(request):
+        return HttpResponseForbidden("Acces refuse.")
+    return HttpResponseForbidden(
+        "Cette fonction ne fait plus partie du perimetre de l'informaticien. "
+        "Elle est reservee au role academique ou de direction competent."
+    )
 
 
 def _render_it_section(request, module_key, template_name, context):
@@ -176,7 +202,11 @@ def _build_notes_workflow_context(request, *, toast=None):
         {
             "workflow_module": "notes",
             "state": state,
-            "actions": get_available_actions(state=state),
+            "actions": get_available_actions(state=state, audience="it_support"),
+            "academic_template_ready": bool(
+                context["selected_semester"]
+                and semester_has_active_ecs(context["selected_semester"])
+            ),
             "toast": toast,
         }
     )
@@ -199,7 +229,15 @@ def it_notes_kpi(request):
     semester_id = (request.GET.get("semester_id") or "").strip()
 
     academic_class = get_object_or_404(classes_qs, pk=int(class_id)) if class_id.isdigit() else None
-    semester = get_object_or_404(Semester.objects.select_related("academic_class"), pk=int(semester_id)) if semester_id.isdigit() and academic_class else None
+    semester = (
+        get_object_or_404(
+            Semester.objects.select_related("academic_class"),
+            pk=int(semester_id),
+            academic_class=academic_class,
+        )
+        if semester_id.isdigit() and academic_class
+        else None
+    )
 
     if not academic_class or not semester:
         return HttpResponse("Selection invalide", status=400)
@@ -396,6 +434,17 @@ def it_notes_workflow_action(request):
     successful = False
     try:
         action = (request.POST.get("action") or "").strip()
+        if action not in {
+            "start_saisie",
+            "continue_saisie",
+            "verifier_notes",
+            ACTION_PUBLISH_NORMAL,
+            ACTION_ACTIVATE_RETAKE,
+            ACTION_SUBMIT_TO_DIRECTOR,
+        }:
+            return HttpResponseForbidden(
+                "La validation officielle et la publication des resultats relevent du Directeur des etudes."
+            )
         apply_notes_workflow_action(
             actor=request.user,
             academic_class=context["selected_class"],
@@ -407,6 +456,7 @@ def it_notes_workflow_action(request):
             "verifier_notes": "Controle termine: aucune note manquante bloquante.",
             "publier_session_normale": "Session normale publiee. Le rattrapage peut maintenant etre prepare.",
             "activer_rattrapage": "Rattrapage active. Seules les notes de rattrapage restent modifiables.",
+            ACTION_SUBMIT_TO_DIRECTOR: "Session technique cloturee et transmise au Directeur des etudes.",
             "publier_resultats_finaux": "Resultats finaux publies. Les releves et exports sont deblocables.",
             "generer_decisions_annuelles": "Decisions annuelles generees avec bulletins.",
             "generer_bulletins": "Bulletins semestriels generes.",
@@ -463,6 +513,11 @@ def load_notes_workspace(request):
         return HttpResponse(
             '<div class="workflow-grid-placeholder">Selectionne une classe et un semestre pour afficher la maquette.</div>'
         )
+    if not semester_has_active_ecs(semester):
+        return HttpResponse(
+            '<div class="workflow-grid-placeholder">Cette maquette doit etre completee par le Directeur des etudes avant la saisie des notes.</div>',
+            status=409,
+        )
     if semester.status == Semester.STATUS_DRAFT:
         semester.status = Semester.STATUS_NORMAL_ENTRY
         semester.save(update_fields=["status"])
@@ -482,17 +537,154 @@ def load_notes_workspace(request):
     )
 
 
+def _build_cards_workspace_context(request):
+    selection = _resolve_workflow_selection(request)
+    branch = selection["branch"]
+    cards_view = (request.GET.get("view") or "issue").strip()
+    if cards_view not in {"issue", "students", "staff", "verifications"}:
+        cards_view = "issue"
+    search = (request.GET.get("q") or "").strip()
+    students = []
+    if selection["selected_class"]:
+        students = list(get_it_students_for_class(academic_class=selection["selected_class"])[:80])
+    staff = list(
+        get_scoped_staff_queryset(branch=branch)
+        .filter(profile__employment_status="active")[:100]
+    )
+    common_query = {}
+    if selection["selected_class"]:
+        common_query["class_id"] = selection["selected_class"].id
+    selection.update({
+        "students": students,
+        "staff": staff,
+        "workflow_module": "cards",
+        "cards_view": cards_view,
+        "cards_subnavigation": _it_subnavigation(
+            url_name="accounts_portal:it_cards_workspace",
+            active=cards_view,
+            query=common_query,
+            definitions=(
+                ("issue", "Émission", "badge", {"view": "issue"}),
+                ("students", "Suivi étudiants", "graduation-cap", {"view": "students"}),
+                ("staff", "Suivi personnel", "contact", {"view": "staff"}),
+                ("verifications", "Vérifications QR", "scan-line", {"view": "verifications"}),
+            ),
+        ),
+        "card_search": search,
+    })
+
+    if cards_view == "students":
+        cards = CarteEtudiant.objects.select_related(
+            "etudiant__inscription__candidature",
+        ).filter(etudiant__inscription__candidature__branch=branch)
+        if selection["selected_class"]:
+            cards = cards.filter(
+                etudiant__user__academic_enrollments__academic_class=selection["selected_class"],
+                etudiant__user__academic_enrollments__is_active=True,
+            )
+        if search:
+            cards = cards.filter(
+                Q(etudiant__matricule__icontains=search)
+                | Q(etudiant__inscription__candidature__first_name__icontains=search)
+                | Q(etudiant__inscription__candidature__last_name__icontains=search)
+            )
+        selection["student_cards"] = list(cards.distinct().order_by("-date_emission")[:200])
+    elif cards_view == "staff":
+        cards = CartePersonnel.objects.select_related("profile__user").filter(
+            code_annexe=getattr(branch, "code", ""),
+        )
+        if search:
+            cards = cards.filter(
+                Q(profile__employee_code__icontains=search)
+                | Q(profile__user__first_name__icontains=search)
+                | Q(profile__user__last_name__icontains=search)
+                | Q(profile__user__username__icontains=search)
+            )
+        selection["staff_cards"] = list(cards.order_by("-date_emission")[:200])
+    elif cards_view == "verifications":
+        card_logs = VerificationLog.objects.select_related(
+            "carte__etudiant__inscription__candidature",
+            "staff_card__profile__user",
+        ).filter(
+            Q(carte__etudiant__inscription__candidature__branch=branch)
+            | Q(staff_card__code_annexe=getattr(branch, "code", "")),
+        )
+        selection["card_verifications"] = list(card_logs.order_by("-created_at")[:200])
+    return selection
+
+
 @login_required
 def it_cards_workspace(request):
     if not _require_it_support(request):
         return HttpResponseForbidden("Acces refuse.")
 
-    selection = _resolve_workflow_selection(request)
-    students = []
-    if selection["selected_class"]:
-        students = list(get_it_students_for_class(academic_class=selection["selected_class"])[:80])
-    selection.update({"students": students, "workflow_module": "cards"})
+    selection = _build_cards_workspace_context(request)
     return _render_it_section(request, "cards", "portal/informaticien/workflows/cards_workspace.html", selection)
+
+
+@login_required
+def it_card_status_action(request):
+    if not _require_it_support(request) or request.method != "POST":
+        return HttpResponseForbidden("Acces refuse.")
+    branch = get_user_branch(request.user)
+    scope = (request.POST.get("scope") or "").strip()
+    action = (request.POST.get("action") or "").strip()
+    card_id = (request.POST.get("card_id") or "").strip()
+    if not card_id.isdigit() or scope not in {"student", "staff"}:
+        return HttpResponse("Demande de carte invalide.", status=400)
+
+    if scope == "student":
+        card = get_object_or_404(
+            CarteEtudiant.objects.select_related("etudiant__user", "etudiant__inscription__candidature"),
+            pk=int(card_id),
+            etudiant__inscription__candidature__branch=branch,
+        )
+        target_user = card.etudiant.user
+        label = f"Carte étudiant {card.etudiant.matricule}"
+        view_name = "students"
+    else:
+        card = get_object_or_404(
+            CartePersonnel.objects.select_related("profile__user"),
+            pk=int(card_id),
+            code_annexe=getattr(branch, "code", ""),
+        )
+        target_user = card.profile.user
+        label = f"Carte personnel {card.profile.employee_code or target_user.id}"
+        view_name = "staff"
+
+    if action == "lost":
+        card.statut = "perdue"
+        card.save(update_fields=["statut"])
+        detail = "Carte declaree perdue."
+    elif action == "revoke":
+        card.statut = "revoquee"
+        card.save(update_fields=["statut"])
+        detail = "Carte revoquee."
+    elif action == "reissue":
+        card.public_reference = uuid4()
+        card.statut = "active"
+        if scope == "student":
+            card.token_version = "v2"
+        card.date_expiration = _card_expiration_date()
+        update_fields = ["public_reference", "statut", "date_expiration"]
+        if scope == "student":
+            update_fields.append("token_version")
+        card.save(update_fields=update_fields)
+        detail = "Carte reemise : l'ancien QR est invalide et le nouveau PDF doit etre imprime."
+    else:
+        return HttpResponse("Action de carte invalide.", status=400)
+
+    log_support_action(
+        actor=request.user,
+        branch=branch,
+        action_type=SupportAuditLog.ACTION_STUDENT_CARD_GENERATED,
+        target_user=target_user,
+        target_label=label,
+        details=detail,
+    )
+    request.GET = request.GET.copy()
+    request.GET["view"] = view_name
+    return it_cards_workspace(request)
 
 
 @login_required
@@ -585,7 +777,12 @@ def it_audit_workspace(request):
         request,
         "audit",
         "portal/informaticien/workflows/audit_workspace.html",
-        build_audit_context(branch=get_user_branch(request.user), page=request.GET.get("page")),
+        build_audit_context(
+            branch=get_user_branch(request.user),
+            page=request.GET.get("page"),
+            query=(request.GET.get("q") or "").strip(),
+            action_type=(request.GET.get("action_type") or "").strip(),
+        ),
     )
 
 
@@ -776,6 +973,11 @@ def it_export_notes_excel(request):
         return HttpResponseForbidden("Classe obligatoire.")
     if selected_semester is None:
         return HttpResponseForbidden("Semestre obligatoire.")
+    if not semester_has_active_ecs(selected_semester):
+        return HttpResponse(
+            "Cette maquette doit etre completee par le Directeur des etudes avant l'export des notes.",
+            status=409,
+        )
 
     session_type = (request.GET.get("session") or "normal").strip().lower()
     if session_type not in {"normal", "retake"}:
@@ -1179,19 +1381,31 @@ def it_catalog_action(request):
     return render(request, "portal/informaticien/workflows/catalog_workspace.html", build_catalog_context(toast=toast))
 
 
-def _build_accounts_flow_context(request, *, toast=None):
+def _build_accounts_flow_context(request, *, toast=None, temporary_password=None):
     branch = get_user_branch(request.user)
     query = (request.GET.get("q") or "").strip()
-    users_qs = get_scoped_staff_queryset(branch=branch).filter(profile__branch=branch) if branch else get_scoped_staff_queryset(branch=branch).none()
+    staff_qs = get_scoped_staff_queryset(branch=branch).filter(profile__branch=branch) if branch else get_scoped_staff_queryset(branch=branch).none()
+    student_qs = get_scoped_student_queryset(branch=branch) if branch else get_scoped_student_queryset(branch=branch).none()
     if query:
-        users_qs = users_qs.filter(
+        staff_qs = staff_qs.filter(
             Q(username__icontains=query)
             | Q(email__icontains=query)
             | Q(first_name__icontains=query)
             | Q(last_name__icontains=query)
         )
+        student_qs = student_qs.filter(
+            Q(matricule__icontains=query)
+            | Q(user__username__icontains=query)
+            | Q(user__email__icontains=query)
+            | Q(inscription__candidature__first_name__icontains=query)
+            | Q(inscription__candidature__last_name__icontains=query)
+        )
     rows = []
-    for user in users_qs.select_related("profile")[:40]:
+    seen_user_ids = set()
+    for user in staff_qs.select_related("profile")[:80]:
+        if user.pk == request.user.pk:
+            continue
+        seen_user_ids.add(user.pk)
         state = get_account_support_state(user)
         if state.is_suspended:
             account_state = "suspendu"
@@ -1201,13 +1415,37 @@ def _build_accounts_flow_context(request, *, toast=None):
             account_state = "actif"
         else:
             account_state = "inactif"
-        rows.append({"user": user, "support_state": state, "account_state": account_state})
+        rows.append({"user": user, "support_state": state, "account_state": account_state, "kind": "Personnel"})
+    for student in student_qs[:80]:
+        user = student.user
+        if user.pk in seen_user_ids or user.pk == request.user.pk:
+            continue
+        state = get_account_support_state(user)
+        if state.is_suspended:
+            account_state = "suspendu"
+        elif state.is_blocked:
+            account_state = "bloque"
+        elif user.is_active:
+            account_state = "actif"
+        else:
+            account_state = "inactif"
+        rows.append({
+            "user": user,
+            "student": student,
+            "support_state": state,
+            "account_state": account_state,
+            "kind": "Étudiant",
+        })
+    rows.sort(key=lambda row: ((row["user"].get_full_name() or row["user"].username).lower(), row["user"].id))
+    rows_page = _paginate_items(rows, request.GET.get("page"), per_page=20)
 
     return {
         "branch": branch,
         "query": query,
-        "rows": rows,
+        "rows": rows_page.object_list,
+        "rows_page": rows_page,
         "toast": toast,
+        "temporary_password": temporary_password,
     }
 
 
@@ -1231,14 +1469,12 @@ def it_accounts_flow_action(request):
         return HttpResponseForbidden("Methode non autorisee.")
 
     branch = get_user_branch(request.user)
-    target_user = get_object_or_404(
-        get_scoped_staff_queryset(branch=branch).filter(profile__branch=branch),
-        pk=request.POST.get("target_user_id"),
-    )
-    if not _same_branch_or_forbidden(request=request, target_user=target_user):
+    target_user = _get_scoped_it_target_user(branch=branch, user_id=request.POST.get("target_user_id"))
+    if target_user is None or target_user == request.user:
         return HttpResponseForbidden("Action hors annexe refusee.")
     action = (request.POST.get("action") or "").strip()
     toast = None
+    temporary_password = None
 
     if action == "toggle_active":
         target_user.is_active = not target_user.is_active
@@ -1252,6 +1488,12 @@ def it_accounts_flow_action(request):
             details="Action depuis workflow comptes informaticien.",
         )
         toast = {"level": "success", "message": "Etat du compte mis a jour."}
+    elif action == "unblock":
+        unblock_account(actor=request.user, branch=branch, target_user=target_user)
+        toast = {"level": "success", "message": "Compte debloque."}
+    elif action == "reactivate":
+        reactivate_account(actor=request.user, branch=branch, target_user=target_user)
+        toast = {"level": "success", "message": "Compte reactive."}
     elif action == "reset_password":
         temp_password = create_temp_password()
         target_user.set_password(temp_password)
@@ -1266,15 +1508,31 @@ def it_accounts_flow_action(request):
             target_label=target_user.get_full_name() or target_user.username,
             details="Reset mot de passe depuis workflow comptes informaticien.",
         )
-        toast = {"level": "success", "message": f"Mot de passe temporaire: {temp_password}"}
+        # La valeur en clair n'est jamais mise dans SupportAuditLog. Elle est
+        # transmise une seule fois au fragment modal persistant.
+        temporary_password = temp_password
     else:
         toast = {"level": "error", "message": "Action compte inconnue."}
 
-    return render(
+    if temporary_password and request.headers.get("HX-Request") == "true":
+        response = render(
+            request,
+            "portal/informaticien/workflows/temporary_password_modal.html",
+            {"temporary_password": temporary_password},
+        )
+        response["HX-Trigger-After-Settle"] = '{"it-temporary-password-ready": true}'
+        return response
+
+    response = render(
         request,
         "portal/informaticien/workflows/accounts_workspace.html",
-        _build_accounts_flow_context(request, toast=toast),
+        _build_accounts_flow_context(request, toast=toast, temporary_password=temporary_password),
     )
+    if temporary_password:
+        # HTMX déclenche cet évènement après le rendu et les swaps OOB : le
+        # modal certifié reçoit donc déjà le mot de passe temporaire.
+        response["HX-Trigger-After-Settle"] = '{"it-temporary-password-ready": true}'
+    return response
 
 
 @login_required
@@ -1283,20 +1541,10 @@ def it_user_modal(request, user_id):
         return HttpResponseForbidden("Acces refuse.")
 
     branch = get_user_branch(request.user)
-    target_user = get_object_or_404(
-        get_scoped_staff_queryset(branch=branch).filter(profile__branch=branch).select_related("profile"),
-        pk=user_id,
-    )
-    if not _same_branch_or_forbidden(request=request, target_user=target_user):
+    target_user = _get_scoped_it_target_user(branch=branch, user_id=user_id)
+    if target_user is None:
         return HttpResponseForbidden("Action hors annexe refusee.")
-    return render(
-        request,
-        "portal/informaticien/workflows/user_modal.html",
-        {
-            "target_user": target_user,
-            "profile": target_user.profile,
-        },
-    )
+    return render(request, "portal/informaticien/workflows/user_modal.html", _build_it_user_modal_context(target_user=target_user))
 
 
 @login_required
@@ -1307,13 +1555,9 @@ def it_user_modal_save(request, user_id):
         return HttpResponseForbidden("Methode non autorisee.")
 
     branch = get_user_branch(request.user)
-    target_user = get_object_or_404(
-        get_scoped_staff_queryset(branch=branch).filter(profile__branch=branch).select_related("profile"),
-        pk=user_id,
-    )
-    if not _same_branch_or_forbidden(request=request, target_user=target_user):
+    target_user = _get_scoped_it_target_user(branch=branch, user_id=user_id)
+    if target_user is None or target_user == request.user:
         return HttpResponseForbidden("Action hors annexe refusee.")
-    profile = target_user.profile
 
     target_user.first_name = (request.POST.get("first_name") or "").strip()
     target_user.last_name = (request.POST.get("last_name") or "").strip()
@@ -1330,15 +1574,29 @@ def it_user_modal_save(request, user_id):
         details="Modification utilisateur depuis modal informaticien.",
     )
 
-    return render(
-        request,
-        "portal/informaticien/workflows/user_modal.html",
-        {
-            "target_user": target_user,
-            "profile": profile,
-            "toast": {"level": "success", "message": "Utilisateur mis a jour."},
-        },
+    context = _build_it_user_modal_context(target_user=target_user)
+    context["toast"] = {"level": "success", "message": "Utilisateur mis a jour."}
+    return render(request, "portal/informaticien/workflows/user_modal.html", context)
+
+
+@login_required
+def it_user_sessions(request, user_id):
+    """Historique de connexions paginé, strictement limité à l'utilisateur scopé."""
+    if not _require_it_support(request):
+        return HttpResponseForbidden("Acces refuse.")
+    branch = get_user_branch(request.user)
+    target_user = _get_scoped_it_target_user(branch=branch, user_id=user_id)
+    if target_user is None:
+        return HttpResponseForbidden("Action hors annexe refusee.")
+    sessions_page = _paginate_items(
+        AccountSessionRecord.objects.filter(user=target_user).order_by("-started_at"),
+        request.GET.get("page"),
+        per_page=10,
     )
+    return render(request, "portal/informaticien/workflows/user_sessions.html", {
+        "target_user": target_user,
+        "sessions_page": sessions_page,
+    })
 
 
 @login_required
@@ -1396,11 +1654,18 @@ def it_notes_retake_modal(request):
     if not _require_it_support(request):
         return HttpResponseForbidden("Acces refuse.")
 
-    return render(
-        request,
-        "portal/informaticien/workflows/retake_modal.html",
-        _build_retake_modal_context(request),
-    )
+    context = _build_retake_modal_context(request)
+    academic_class = context["academic_class"]
+    semester = context["semester"]
+    state = context["state"]
+    if academic_class is None or semester is None:
+        return HttpResponse("Selection classe/semestre invalide.", status=400)
+    if state is None or not state.retake_ready:
+        return HttpResponse(
+            "Le rattrapage n'est disponible qu'apres cloture de la session normale, pour les etudiants concernes.",
+            status=409,
+        )
+    return render(request, "portal/informaticien/workflows/retake_modal.html", context)
 
 
 @login_required
@@ -1428,18 +1693,6 @@ def it_my_account_save(request):
     request.user.last_name = (request.POST.get("last_name") or "").strip()
     request.user.email = (request.POST.get("email") or "").strip().lower()
     request.user.save(update_fields=["first_name", "last_name", "email"])
-    if request.POST.get("return_settings"):
-        branch = get_user_branch(request.user)
-        return render(
-            request,
-            "portal/informaticien/workflows/branch_settings_workspace.html",
-            {
-                "branch": branch,
-                "settings": get_branch_settings(branch=branch),
-                "profile": getattr(request.user, "profile", None),
-                "toast": {"level": "success", "message": "Profil mis a jour."},
-            },
-        )
     return render(
         request,
         "portal/informaticien/workflows/my_account_workspace.html",
@@ -1464,7 +1717,10 @@ def it_student_card_pdf(request, student_id):
         student_qs = student_qs.filter(inscription__candidature__branch=branch)
     student = get_object_or_404(student_qs, pk=student_id)
 
-    pdf_bytes = _render_student_card_pdf(request, student, branch)
+    try:
+        pdf_bytes = _render_student_card_pdf(request, student, branch)
+    except ValidationError as exc:
+        return HttpResponse(str(exc), status=409)
     buffer = BytesIO(pdf_bytes)
     log_support_action(
         actor=request.user,
@@ -1492,8 +1748,13 @@ def it_class_cards_pdf(request):
     if academic_class is None or academic_class.branch_id != branch.id:
         return HttpResponseForbidden("Classe hors annexe refusee.")
 
-    students = get_it_students_for_class(academic_class=academic_class)
-    pdf_bytes = _render_class_cards_pdf(request, list(students), academic_class, branch)
+    students = get_it_students_for_class(academic_class=academic_class).filter(
+        user__academic_enrollments__is_active=True,
+    )
+    try:
+        pdf_bytes = _render_class_cards_pdf(request, list(students), academic_class, branch)
+    except ValidationError as exc:
+        return HttpResponse(str(exc), status=409)
     buffer = BytesIO(pdf_bytes)
     log_support_action(
         actor=request.user,
@@ -1506,6 +1767,96 @@ def it_class_cards_pdf(request):
         buffer,
         as_attachment=request.GET.get("preview") != "1",
         filename=f"cartes-classe-{academic_class.id}.pdf",
+        content_type="application/pdf",
+    )
+
+
+@login_required
+def it_branch_student_cards_pdf(request):
+    if not _require_it_support(request):
+        return HttpResponseForbidden("Acces refuse.")
+    branch = get_user_branch(request.user)
+    students = list(
+        get_scoped_student_queryset(branch=branch).filter(
+            is_active=True,
+            inscription__is_archived=False,
+            user__academic_enrollments__is_active=True,
+            user__academic_enrollments__is_archived=False,
+        ).distinct()
+    )
+    try:
+        pdf_bytes = _render_class_cards_pdf(request, students, None, branch)
+    except ValidationError as exc:
+        return HttpResponse(str(exc), status=409)
+    log_support_action(
+        actor=request.user,
+        branch=branch,
+        action_type=SupportAuditLog.ACTION_STUDENT_CARD_GENERATED,
+        target_label=f"Cartes etudiants {branch.code or branch.id}",
+        details=f"{len(students)} carte(s) etudiante(s) active(s) generee(s).",
+    )
+    return FileResponse(
+        BytesIO(pdf_bytes),
+        as_attachment=request.GET.get("preview") != "1",
+        filename=f"cartes-etudiants-{branch.code or branch.id}.pdf",
+        content_type="application/pdf",
+    )
+
+
+@login_required
+def it_staff_card_pdf(request, staff_id):
+    if not _require_it_support(request):
+        return HttpResponseForbidden("Acces refuse.")
+    branch = get_user_branch(request.user)
+    staff_user = get_object_or_404(
+        get_scoped_staff_queryset(branch=branch).filter(profile__employment_status="active"),
+        pk=staff_id,
+    )
+    try:
+        pdf_bytes = _render_staff_card_pdf(request, staff_user.profile, branch)
+    except ValidationError as exc:
+        return HttpResponse(str(exc), status=409)
+    log_support_action(
+        actor=request.user,
+        branch=branch,
+        action_type=SupportAuditLog.ACTION_STUDENT_CARD_GENERATED,
+        target_user=staff_user,
+        target_label=f"Carte personnel {staff_user.profile.employee_code or staff_user.id}",
+        details="Carte professionnelle individuelle generee depuis le dashboard informaticien.",
+    )
+    return FileResponse(
+        BytesIO(pdf_bytes),
+        as_attachment=request.GET.get("preview") != "1",
+        filename=f"carte-personnel-{staff_user.profile.employee_code or staff_user.id}.pdf",
+        content_type="application/pdf",
+    )
+
+
+@login_required
+def it_branch_staff_cards_pdf(request):
+    if not _require_it_support(request):
+        return HttpResponseForbidden("Acces refuse.")
+    branch = get_user_branch(request.user)
+    staff = list(
+        get_scoped_staff_queryset(branch=branch)
+        .filter(profile__employment_status="active")
+        .select_related("profile")
+    )
+    try:
+        pdf_bytes = _render_staff_cards_pdf(request, [user.profile for user in staff], branch)
+    except ValidationError as exc:
+        return HttpResponse(str(exc), status=409)
+    log_support_action(
+        actor=request.user,
+        branch=branch,
+        action_type=SupportAuditLog.ACTION_STUDENT_CARD_GENERATED,
+        target_label=f"Cartes personnel {branch.code or branch.id}",
+        details=f"{len(staff)} carte(s) professionnelle(s) generee(s).",
+    )
+    return FileResponse(
+        BytesIO(pdf_bytes),
+        as_attachment=request.GET.get("preview") != "1",
+        filename=f"cartes-personnel-{branch.code or branch.id}.pdf",
         content_type="application/pdf",
     )
 
@@ -1540,21 +1891,76 @@ def _get_or_create_carte(student, branch):
             "statut": "active",
         },
     )
+    if not carte.is_valide:
+        raise ValidationError("Cette carte est perdue, revoquee ou expiree. Reemettez-la apres traitement administratif.")
     return carte
+
+
+def _card_academic_year():
+    academic_year = AcademicYear.objects.filter(is_active=True).order_by("-start_date").first()
+    if academic_year:
+        return academic_year.name
+    today = timezone.localdate()
+    return f"{today.year}-{today.year + 1}"
+
+
+def _card_expiration_date():
+    from datetime import date
+
+    today = timezone.localdate()
+    return date(today.year + 1, 9, 30)
+
+
+def _get_or_create_staff_card(profile, branch):
+    annee = _card_academic_year()
+    code_annexe = getattr(branch, "code", "") or (branch.name[:20] if branch else "ESFE")
+    carte, _ = CartePersonnel.objects.get_or_create(
+        profile=profile,
+        annee=annee,
+        defaults={
+            "code_annexe": code_annexe,
+            "date_expiration": _card_expiration_date(),
+            "statut": "active",
+        },
+    )
+    if not carte.is_valide:
+        raise ValidationError("Cette carte professionnelle est perdue, revoquee ou expiree.")
+    return carte
+
+
+def _public_card_url(*, token, staff=False):
+    route = "students:portail_verify_staff_token" if staff else "students:portail_verify_token"
+    return f"{settings.BASE_URL}{reverse(route, args=[token])}"
+
+
+def _render_card_print_sheets(request, *, cards, card_type):
+    from django.template.loader import render_to_string
+    from weasyprint import HTML
+
+    pages = [cards[index:index + 8] for index in range(0, len(cards), 8)]
+    html_str = render_to_string(
+        "students/cards_print_sheet.html",
+        {"card_pages": pages, "card_type": card_type},
+        request=request,
+    )
+    return HTML(string=html_str, base_url=settings.BASE_URL).write_pdf()
 
 
 def _render_student_card_pdf(request, student, branch=None):
     from weasyprint import HTML
     from django.template.loader import render_to_string
-    from students.services.card_security import signer_carte, generer_code_lisible, generer_qr_png, generer_qr_svg
+    from students.services.card_security import signer_carte_reference, generer_code_lisible, generer_qr_png, generer_qr_svg
     from students.views_carte import _logo_data_uri, _get_classe
 
     if branch is None:
         branch = get_user_branch(request.user)
 
     carte = _get_or_create_carte(student, branch)
-    token = signer_carte(carte.etudiant.matricule, carte.annee, carte.code_annexe)
-    verify_url = request.build_absolute_uri(f"/carte/v/{token}/")
+    token = signer_carte_reference(
+        reference=str(carte.public_reference), annee=carte.annee,
+        annexe=carte.code_annexe, kind="student",
+    )
+    verify_url = _public_card_url(token=token)
 
     ctx = {
         "carte": carte,
@@ -1565,47 +1971,111 @@ def _render_student_card_pdf(request, student, branch=None):
         "code_verification": generer_code_lisible(token),
         "logo_data_uri": _logo_data_uri(),
     }
-    html_str = render_to_string("students/carte_etudiant.html", ctx, request=request)
-    return HTML(string=html_str, base_url=request.build_absolute_uri("/")).write_pdf()
+    ctx["branch_name"] = getattr(branch, "name", "") or carte.code_annexe
+    return _render_card_print_sheets(request, cards=[ctx], card_type="student")
 
 
 def _render_class_cards_pdf(request, students_list, academic_class, branch=None):
-    from weasyprint import HTML
-    from django.template.loader import render_to_string
-    from students.services.card_security import signer_carte, generer_code_lisible, generer_qr_png, generer_qr_svg
-    from students.views_carte import _logo_data_uri
+    from students.services.card_security import signer_carte_reference, generer_code_lisible, generer_qr_png, generer_qr_svg
+    from students.views_carte import _get_classe, _logo_data_uri
 
     if branch is None:
         branch = get_user_branch(request.user)
 
     logo = _logo_data_uri()
-    base_url = request.build_absolute_uri("/")
-    docs = []
+    cards = []
 
     for student in students_list:
         carte = _get_or_create_carte(student, branch)
-        token = signer_carte(carte.etudiant.matricule, carte.annee, carte.code_annexe)
-        verify_url = request.build_absolute_uri(f"/carte/v/{token}/")
-        ctx = {
+        token = signer_carte_reference(
+            reference=str(carte.public_reference), annee=carte.annee,
+            annexe=carte.code_annexe, kind="student",
+        )
+        verify_url = _public_card_url(token=token)
+        cards.append({
             "carte": carte,
             "etudiant": student,
-            "classe": str(academic_class) if academic_class else "",
+            "classe": str(academic_class) if academic_class else _get_classe(carte),
             "qr_png": generer_qr_png(verify_url),
             "qr_svg": generer_qr_svg(verify_url),
             "code_verification": generer_code_lisible(token),
             "logo_data_uri": logo,
-        }
-        html_str = render_to_string("students/carte_etudiant.html", ctx, request=request)
-        docs.append(HTML(string=html_str, base_url=base_url).render())
+            "branch_name": getattr(branch, "name", "") or carte.code_annexe,
+        })
 
-    if not docs:
-        return b""
+    return _render_card_print_sheets(request, cards=cards, card_type="student")
 
-    all_pages = []
-    for doc in docs:
-        all_pages.extend(doc.pages)
-    docs[0].pages = all_pages
-    return docs[0].write_pdf()
+
+def _render_staff_card_pdf(request, profile, branch=None):
+    from students.services.card_security import generer_code_lisible, generer_qr_png, generer_qr_svg, signer_carte_reference
+    from students.views_carte import _logo_data_uri
+
+    carte = _get_or_create_staff_card(profile, branch)
+    token = signer_carte_reference(
+        reference=str(carte.public_reference), annee=carte.annee,
+        annexe=carte.code_annexe, kind="staff",
+    )
+    context = {
+        "carte": carte,
+        "profile": profile,
+        "qr_png": generer_qr_png(_public_card_url(token=token, staff=True)),
+        "qr_svg": generer_qr_svg(_public_card_url(token=token, staff=True)),
+        "code_verification": generer_code_lisible(token),
+        "logo_data_uri": _logo_data_uri(),
+        "branch_name": getattr(branch, "name", "") or carte.code_annexe,
+    }
+    return _render_card_print_sheets(request, cards=[context], card_type="staff")
+
+
+def _get_scoped_it_target_user(*, branch, user_id):
+    if not str(user_id).isdigit():
+        return None
+    target_user = get_user_model().objects.select_related("profile").filter(pk=int(user_id)).first()
+    if target_user is None or not can_manage_user_in_branch(branch=branch, target_user=target_user):
+        return None
+    return target_user
+
+
+def _build_it_user_modal_context(*, target_user):
+    student = Student.objects.select_related(
+        "inscription__candidature__branch",
+        "inscription__candidature__programme",
+    ).filter(user=target_user).first()
+    enrollment = (
+        target_user.academic_enrollments.select_related("academic_class", "programme", "branch")
+        .filter(is_active=True).first()
+        if student else None
+    )
+    return {
+        "target_user": target_user,
+        "profile": getattr(target_user, "profile", None),
+        "student": student,
+        "enrollment": enrollment,
+        "support_state": get_account_support_state(target_user),
+        "security_events": list(AccountSecurityEvent.objects.filter(user=target_user).order_by("-created_at")[:12]),
+        "sessions": list(AccountSessionRecord.objects.filter(user=target_user).order_by("-started_at")[:5]),
+    }
+
+
+def _render_staff_cards_pdf(request, profiles, branch=None):
+    from students.services.card_security import generer_code_lisible, generer_qr_png, generer_qr_svg, signer_carte_reference
+    from students.views_carte import _logo_data_uri
+
+    cards = []
+    for profile in profiles:
+        carte = _get_or_create_staff_card(profile, branch)
+        token = signer_carte_reference(
+            reference=str(carte.public_reference), annee=carte.annee,
+            annexe=carte.code_annexe, kind="staff",
+        )
+        verify_url = _public_card_url(token=token, staff=True)
+        cards.append({
+            "carte": carte, "profile": profile,
+            "qr_png": generer_qr_png(verify_url), "qr_svg": generer_qr_svg(verify_url),
+            "code_verification": generer_code_lisible(token), "logo_data_uri": _logo_data_uri(),
+            "branch_name": getattr(branch, "name", "") or carte.code_annexe,
+        })
+    return _render_card_print_sheets(request, cards=cards, card_type="staff")
 
 
 @login_required

@@ -1,528 +1,487 @@
-MISSION DE RAFFINEMENT — SOUS-FENÊTRES DU DASHBOARD DIRECTEUR DES ÉTUDES
+# MISSION — CORRIGER LE MODULE « EMPLOI DU TEMPS » DU DIRECTEUR DES ÉTUDES
 
-Tu travailles dans le projet ESFE Core existant.
+Je veux que tu fasses d’abord un **audit complet de l’implémentation actuelle de l’emploi du temps**, puis que tu corriges son fonctionnement.
 
-Une première implémentation de sous-fenêtres internes a déjà été réalisée dans
-le dashboard Directeur des Études.
+Ne fais pas uniquement une correction visuelle ou JavaScript/HTMX.
 
-Le concept général est correct :
+Le problème semble toucher la **logique métier, le rattachement temporel des créneaux et les requêtes utilisées pour charger une semaine**.
 
-- la sidebar principale reste inchangée ;
-- la topbar reste inchangée ;
-- les sous-fenêtres sont placées dans la zone de contenu ;
-- une seule sous-page interne est visible à la fois.
+---
 
-Cependant, l’implémentation actuelle manque encore de cohérence métier, de
-fluidité, d’intégration visuelle et de raccordement réel au backend.
+# 1. COMPORTEMENT MÉTIER ATTENDU
 
-Ta mission est de RAFFINER cette implémentation existante.
+Le Directeur des Études doit pouvoir suivre ce parcours très simple :
 
-Ne recommence pas toute l’architecture.
-Ne crée pas une nouvelle démonstration.
-Travaille directement sur la section réelle déjà modifiée.
+1. Ouvrir **Emploi du temps**.
+2. Sélectionner une classe.
+3. Arriver sur la grille hebdomadaire de cette classe.
+4. Voir uniquement les cours appartenant à la semaine affichée.
+5. Ajouter un cours dans un créneau libre.
+6. Modifier un cours existant.
+7. Supprimer un cours existant.
+8. Naviguer vers les semaines précédentes ou suivantes.
+9. Revenir à la semaine courante.
+10. Imprimer l’emploi du temps de la semaine affichée.
 
-======================================================================
-1. CORRIGER D’ABORD LA COHÉRENCE MÉTIER
-======================================================================
+La grille doit donc être une **vue temporelle de données réelles**, et non un planning statique réutilisé artificiellement pour toutes les semaines.
 
-Avant toute modification, inspecter les responsabilités réelles des sections :
+---
 
-- Sessions d’évaluations ;
-- Résultats et notes.
+# 2. BUG PRINCIPAL À CORRIGER
 
-Ne pas supposer que « Résultats et notes » crée les évaluations.
+Exemple concret.
 
-Dans le fonctionnement attendu :
+Je consulte :
 
-- les sessions et la planification des évaluations doivent être rattachées à
-  « Sessions d’évaluations » si c’est bien ainsi que le backend réel fonctionne ;
-- « Résultats et notes » doit rester centré sur les résultats, les notes,
-  les validations, les publications et les bulletins, selon ce qui existe
-  réellement dans le projet.
+**Semaine A : 24 au 29 août 2026**
 
-Vérifier les vues, routes, services, formulaires et modèles existants avant de
-conserver ou déplacer une sous-fenêtre.
+Pour une classe donnée, je programme :
 
-Ne pas inventer de responsabilité métier.
+* lundi : Anatomie ;
+* mardi : Informatique ;
+* mercredi : Physiologie.
 
-Produire un tableau rapide dans le rapport final :
+Ces cours appartiennent à cette semaine.
 
-| Fonction | Section correcte | Vue existante | Action |
-|---|---|---|---|
+Si je navigue ensuite vers :
 
-======================================================================
-2. NE PAS INVENTER DE DONNÉES OU DE CONTEXTE TECHNIQUE
-======================================================================
+**Semaine B : 17 au 22 août 2026**
 
-Le projet concerne une école de santé.
+je ne dois absolument pas retrouver automatiquement Anatomie, Informatique et Physiologie simplement parce qu’ils occupent ces positions dans la grille de la semaine suivante.
 
-Ne pas utiliser d’exemples comme :
+La semaine du 17 doit charger **ses propres données historiques**.
 
-- Algorithmique ;
-- Informatique ;
-- Contrôle de programmation ;
-- Réseaux ;
-- Machine learning.
+Donc :
 
-Utiliser uniquement :
+`Classe + semaine/date` doit déterminer les créneaux affichés.
 
-- les vraies matières présentes dans la base ;
-- les vraies classes ;
-- les vraies filières de santé ;
-- les vraies données du projet.
+Changer de semaine doit provoquer une véritable nouvelle récupération des données correspondant à cette période.
 
-Exemples possibles uniquement si présents réellement :
+---
 
-- Anatomie ;
-- Physiologie ;
-- Pharmacologie ;
-- Biologie médicale ;
-- Santé communautaire ;
-- Soins infirmiers ;
-- Pédiatrie ;
-- Gynécologie ;
-- Pathologie ;
-- Biochimie.
+# 3. AUDIT OBLIGATOIRE AVANT MODIFICATION
 
-Ne pas créer de données fictives supplémentaires.
+Avant de coder, inspecte :
 
-======================================================================
-3. OBJECTIF VISUEL
-======================================================================
+* les modèles Django liés au planning ;
+* les migrations ;
+* les vues ;
+* les formulaires ;
+* les services éventuels ;
+* les URLs ;
+* les templates ;
+* le JavaScript ;
+* les requêtes AJAX/HTMX ;
+* les endpoints utilisés par la grille ;
+* les paramètres transmis lors du changement de semaine ;
+* les filtres ORM utilisés pour récupérer les cours ;
+* la logique d’impression.
 
-Le concept actuel est bon, mais le rendu doit être beaucoup plus propre,
-cohérent et professionnel.
+Détermine précisément comment un créneau est actuellement rattaché :
 
-La sous-navigation interne doit apparaître comme une partie native du dashboard,
-pas comme quatre liens ajoutés rapidement sous le titre.
+* à la classe ;
+* à l’année académique ;
+* au semestre ;
+* au jour ;
+* à l’heure ;
+* à une date réelle ;
+* à une semaine.
 
-Revoir :
+Je veux notamment savoir si le système stocke actuellement uniquement quelque chose comme :
 
-- l’alignement ;
-- les espacements ;
-- les marges ;
-- les bordures ;
-- l’état actif ;
-- les icônes ;
-- la hiérarchie visuelle ;
-- la largeur des blocs ;
-- la cohérence entre le titre, les statistiques, les raccourcis et le contenu.
+`classe + lundi + 08:00 + matière`
 
-Le rendu doit s’inspirer directement des sections du dashboard déjà les plus
-réussies.
+au lieu de stocker une information permettant de savoir que ce cours appartient réellement au :
 
-Inspecter notamment :
+`lundi 24 août 2026 à 08:00`.
 
-- les sections les plus fluides ;
-- les formulaires déjà bien structurés ;
-- les tableaux déjà bien intégrés ;
-- les cartes d’action existantes ;
-- les drawers et contenus HTMX déjà stabilisés ;
-- la gestion du profil et des notifications dans le workspace.
+Si la dimension temporelle est absente ou incorrectement modélisée, corrige l’architecture proprement au lieu de masquer le problème dans le frontend.
 
-Réutiliser les mêmes patterns UI Core.
+---
 
-Ne pas créer un style parallèle.
+# 4. LA SEMAINE DOIT ÊTRE UNE VRAIE DIMENSION DU PLANNING
 
-======================================================================
-4. SOUS-NAVIGATION À RAFFINER
-======================================================================
+Le système doit pouvoir distinguer sans ambiguïté :
 
-La sous-navigation doit :
+* lundi 17 août 2026 ;
+* lundi 24 août 2026 ;
+* lundi 31 août 2026.
 
-- rester sous l’en-tête de la section ;
-- être clairement distincte du contenu ;
-- montrer nettement l’onglet actif ;
-- avoir un état hover ;
-- avoir un état focus clavier ;
-- être compacte ;
-- être responsive ;
-- rester lisible sur mobile ;
-- ne pas créer de scroll horizontal global.
+Ce sont trois journées différentes.
 
-Elle peut suivre cette logique :
+Un cours enregistré le 24 août ne doit donc pas apparaître automatiquement le 17 août.
 
-```text
-Titre de la section
-Résumé court
-Actions principales éventuelles
+La navigation :
 
-[ Vue d’ensemble ] [ Créer ] [ Programmées ] [ Validation ]
+`Semaine précédente | Aujourd’hui / Cette semaine | Semaine suivante`
 
-Contenu actif
+doit modifier la période consultée ET les données récupérées.
 
-Mais les intitulés doivent correspondre aux vraies fonctions du projet.
+Le backend doit recevoir explicitement la semaine/date demandée.
 
-Si certaines sous-fenêtres sont mal placées dans la section actuelle, les
-corriger selon la logique métier réelle.
+Exemple conceptuel :
 
-======================================================================
-5. FLUIDITÉ HTMX OBLIGATOIRE
+`?class=<id>&week=2026-08-24`
 
-L’expérience actuelle paraît trop sèche.
+Puis les requêtes doivent filtrer les créneaux correspondant réellement à cette semaine.
 
-Toutes les interactions internes doivent utiliser les patterns HTMX déjà
-stabilisés dans le projet.
+Ne te contente pas de modifier les dates affichées dans le template.
 
-Les clics sur les sous-fenêtres doivent :
+---
 
-charger uniquement le contenu interne ;
-ne pas recharger toute la page ;
-conserver la sidebar ;
-conserver la topbar ;
-conserver l’en-tête de section ;
-mettre à jour l’état actif ;
-mettre à jour l’URL si cela correspond aux conventions existantes ;
-gérer correctement l’historique navigateur si le projet le fait déjà.
+# 5. HISTORIQUE DES SEMAINES
 
-Utiliser une cible stable, par exemple :
-
-#director-section-subcontent
-
-ou la cible déjà créée si elle est correcte.
-
-Ajouter :
-
-indicateur de chargement discret ;
-gestion des erreurs HTMX ;
-état vide ;
-état de succès ;
-état d’échec ;
-gestion du bouton précédent/suivant du navigateur si compatible avec
-l’architecture existante.
-
-Ne pas faire de JavaScript lourd si HTMX suffit.
-
-======================================================================
-6. PAGINATION HTMX
-
-La pagination actuelle doit être fonctionnelle et fluide.
-
-Le bouton :
-
-Suivant
-
-doit réellement charger la page suivante.
-
-Il ne doit pas :
-
-recharger tout le dashboard ;
-casser la sous-fenêtre active ;
-perdre les filtres ;
-perdre la section ;
-remonter l’utilisateur ailleurs.
-
-La pagination doit cibler uniquement la liste ou la grille concernée.
+Les semaines passées doivent rester consultables.
 
 Exemple :
 
-clic sur Suivant
-→ hx-get vers la page suivante
-→ remplacement uniquement de la liste
-→ conservation des filtres
-→ conservation de la sous-fenêtre active
+Aujourd’hui je suis sur la semaine du 24 août.
 
-Vérifier aussi :
+Je clique sur « semaine précédente ».
 
-Précédent ;
-première page ;
-dernière page ;
-page vide ;
-filtres actifs ;
-résultats triés.
-======================================================================
-7. BOUTONS ET CARTES D’ACTION
+Je dois pouvoir retrouver exactement l’emploi du temps enregistré pour la semaine du 17 août.
 
-Les cartes et boutons actuellement affichés ne doivent pas être décoratifs.
+Je dois également pouvoir avancer vers une semaine future et voir les cours déjà programmés pour cette semaine future.
 
-Chaque bouton doit déclencher une vraie action existante.
+Le changement de semaine ne doit :
 
-Exemples :
+* ni recopier les cours ;
+* ni déplacer les cours ;
+* ni réutiliser les cours de la semaine courante ;
+* ni modifier les données d’une autre semaine.
 
-Planifier
-→ ouvre le vrai formulaire de planification
+---
 
-Programmées
-→ ouvre la vraie liste des éléments programmés
+# 6. MODIFICATION D’UN COURS
 
-Validation
-→ ouvre la vraie vue de validation
+Lorsqu’un cours existe dans une cellule, le Directeur des Études doit pouvoir l’ouvrir et accéder à une action :
 
-Les actions doivent utiliser :
+**Modifier**
 
-les vraies routes ;
-les vraies vues ;
-les vrais services ;
-les vraies permissions ;
-les vrais formulaires ;
-les vraies données.
+Il doit pouvoir corriger notamment :
 
-Aucune action factice.
+* matière / EC ;
+* enseignant ;
+* date ;
+* heure de début ;
+* heure de fin ;
+* salle ;
+* éventuellement les autres informations déjà prévues dans le projet.
 
-Aucun bouton sans effet.
+La modification doit concerner **le créneau sélectionné**, pas tous les cours portant le même nom.
 
-Aucun lien mort.
+Après sauvegarde, la grille doit se rafraîchir correctement.
 
-======================================================================
-8. FORMULAIRES
+---
 
-Les formulaires doivent suivre les patterns déjà réussis dans le projet.
+# 7. SUPPRESSION
 
-Vérifier :
+Ajouter une vraie action :
 
-labels ;
-champs requis ;
-erreurs par champ ;
-erreurs globales ;
-messages de succès ;
-désactivation temporaire du bouton pendant la requête ;
-protection contre les doubles soumissions ;
-conservation des valeurs en cas d’erreur ;
-retour correct après création ;
-mise à jour des statistiques après succès ;
-mise à jour de la liste liée si nécessaire.
+**Supprimer le cours**
 
-Privilégier :
+avec confirmation avant suppression.
 
-POST HTMX
-→ validation backend
-→ rendu des erreurs dans le formulaire
-→ message de succès
-→ mise à jour du contenu utile
+Exemple :
 
-Ne pas contourner les vues ou services existants.
+> Supprimer « Anatomie » du lundi 24 août 2026 de 08h00 à 10h00 ?
 
-======================================================================
-9. VUE D’ENSEMBLE
+Après confirmation :
 
-La vue d’ensemble doit rester courte.
+* supprimer uniquement ce créneau ;
+* ne toucher à aucune autre semaine ;
+* rafraîchir la grille ;
+* conserver une trace d’audit si le projet possède déjà l’infrastructure correspondante.
 
-Elle peut contenir :
+Vérifie également les permissions : seuls les rôles autorisés doivent pouvoir effectuer cette action.
 
-total ;
-à venir ;
-à valider ;
-à publier ;
-alertes importantes ;
-raccourcis utiles.
+---
 
-Elle ne doit pas répéter toutes les listes.
+# 8. GESTION DES CONFLITS ET CHEVAUCHEMENTS
 
-Les cartes de raccourci doivent ouvrir les vraies sous-fenêtres.
+Il ne faut pas autoriser silencieusement deux cours incompatibles.
 
-La vue d’ensemble doit servir à orienter l’utilisateur, pas à recréer une longue
-page.
+Avant création ou déplacement d’un créneau, vérifier au minimum :
 
-======================================================================
-10. LISTES ET GRILLES
+### Conflit de classe
 
-Les listes doivent être mieux agencées.
+Une classe ne peut pas avoir deux cours qui se chevauchent.
 
-Vérifier :
+Exemple interdit :
 
-alignement des colonnes ;
-densité ;
-lisibilité ;
-nombre d’éléments visibles ;
-pagination ;
-filtres ;
-actions ;
-états ;
-badges ;
-responsive ;
-débordements.
+`Anatomie : 08h00–10h00`
 
-Pour les classes ou validations nombreuses :
+et
 
-ne pas tout afficher sans contrôle ;
-utiliser pagination ;
-utiliser filtres ;
-utiliser recherche si elle existe déjà ;
-conserver une hiérarchie visuelle claire.
+`Physiologie : 09h00–11h00`
 
-Les éléments importants doivent être visibles immédiatement :
+pour la même classe et la même date.
 
-classe ;
-filière ;
-matière ;
-session ;
-statut ;
-nombre de notes ;
-actions disponibles.
-======================================================================
-11. CORRIGER LES DÉPASSEMENTS
+### Conflit enseignant
 
-Vérifier précisément :
+Si le même enseignant est déjà affecté ailleurs pendant tout ou partie de cette période, empêcher l’enregistrement et expliquer le conflit.
 
-min-w-0 dans les conteneurs flex/grid ;
-max-w-full ;
-overflow-x-auto uniquement autour des tableaux ;
-grilles adaptatives ;
-textes longs ;
-badges trop larges ;
-boutons qui sortent du conteneur ;
-pagination hors cadre ;
-formulaires trop larges ;
-colonnes qui écrasent les contenus.
+Exemple :
 
-Aucun élément ne doit dépasser la zone centrale.
+> Impossible de programmer ce cours. M. X enseigne déjà en L2 Santé de 08h00 à 10h00.
 
-Le scroll horizontal doit rester local à un tableau si nécessaire.
+### Conflit salle
 
-Le document entier ne doit jamais défiler horizontalement.
+Si les salles sont gérées dans le système, empêcher également l’utilisation simultanée d’une même salle.
 
-======================================================================
-12. S’INSPIRER DES MEILLEURES SECTIONS EXISTANTES
+---
 
-Avant de raffiner, inspecter les sections du dashboard déjà considérées comme
-fluides et professionnelles.
+# 9. PROPOSER LES CRÉNEAUX LIBRES
 
-Comparer :
+Lorsqu’un conflit est détecté, ne te contente pas d’afficher « conflit ».
 
-structure du header ;
-boutons ;
-cartes ;
-tableaux ;
-formulaires ;
-HTMX ;
-modales ;
-drawers ;
-pagination ;
-états vides ;
-retours utilisateur.
+Si les informations disponibles le permettent, aide le Directeur des Études à identifier les créneaux disponibles.
 
-Réutiliser les composants UI Core existants lorsqu’ils répondent au besoin.
+Exemple :
 
-Ne pas dupliquer un composant déjà présent.
+> Ce créneau est déjà occupé.
 
-Ne pas introduire un nouveau design system.
+Puis éventuellement :
 
-======================================================================
-13. TESTS FONCTIONNELS OBLIGATOIRES
+* 10h15–12h15 : disponible
+* 14h00–16h00 : disponible
 
-Tester dans le vrai navigateur :
+L’objectif est que le système aide réellement à construire l’emploi du temps.
 
-connexion Directeur des Études ;
-ouverture de la section ;
-affichage correct de la sous-navigation ;
-changement de sous-fenêtre sans reload complet ;
-retour navigateur ;
-ouverture du formulaire réel ;
-erreurs de formulaire ;
-succès de création ;
-mise à jour des statistiques ;
-ouverture de la liste programmée ;
-pagination Suivant ;
-pagination Précédent ;
-conservation des filtres ;
-ouverture de la validation ;
-actions réelles de validation selon les permissions ;
-responsive desktop ;
-responsive tablette ;
-responsive mobile ;
-absence d’erreur console ;
-absence de débordement global.
-======================================================================
-14. CAPTURES OBLIGATOIRES
+Mais ne crée pas automatiquement un autre créneau sans validation du Directeur des Études.
 
-Créer :
+---
 
-_audit/director_subwindows_refinement/
+# 10. INTERACTION AVEC LA GRILLE
 
-Captures minimales :
+Pour un créneau existant, prévoir une interaction claire permettant au minimum :
 
-01-overview-refined.png
-02-create-refined.png
-03-scheduled-refined.png
-04-validation-refined.png
-05-pagination-page-1.png
-06-pagination-page-2.png
-07-form-errors.png
-08-form-success.png
-09-mobile.png
-10-tablet.png
-======================================================================
-15. TESTS TECHNIQUES
+* consulter ;
+* modifier ;
+* supprimer.
 
-Exécuter au minimum :
+Pour une cellule/créneau libre :
 
-python manage.py check
-python manage.py makemigrations --check --dry-run
-python manage.py test portal.test_director_dashboard_phase2 --settings=config.settings_test_local --keepdb
-python manage.py test ui --settings=config.settings_test_local --keepdb
-npm run build:css
+* permettre « Ajouter un cours ».
 
-Ajouter ou corriger les tests ciblés pour :
+Évite de multiplier les boutons visibles si cela surcharge la grille.
 
-sous-navigation ;
-HTMX ;
-pagination ;
-formulaires ;
-permissions ;
-actions backend ;
-états actifs ;
-données réelles ;
-absence de migration ;
-responsive structurel ;
-absence de liens morts.
-======================================================================
-16. LIMITES STRICTES
+Un clic sur un cours peut ouvrir un drawer/modal propre contenant le détail et les actions.
 
-Ne pas :
+L’interface doit rester cohérente avec le design actuel du dashboard.
 
-modifier la sidebar ;
-modifier la topbar ;
-refaire le dashboard complet ;
-généraliser encore à toutes les sections ;
-inventer de nouvelles fonctions ;
-inventer de nouvelles matières ;
-utiliser des exemples d’école informatique ;
-modifier les modèles sans nécessité absolue ;
-créer une migration ;
-contourner les services métier ;
-remplacer des actions backend par du JavaScript ;
-laisser des boutons décoratifs ;
-laisser une pagination non fonctionnelle ;
-faire un commit ;
-faire un push.
-======================================================================
-17. RAPPORT FINAL
+---
+
+# 11. CLASSE SÉLECTIONNÉE
+
+La classe sélectionnée est essentielle.
+
+Si je consulte :
+
+`L1 Infirmier`
+
+puis semaine du 17 août, je dois obtenir :
+
+`L1 Infirmier + semaine du 17 août`.
+
+Si je passe à la semaine du 24 :
+
+`L1 Infirmier + semaine du 24 août`.
+
+Si je change ensuite pour :
+
+`L2 Infirmier + semaine du 24 août`
+
+le système doit charger les données de cette nouvelle combinaison.
+
+Autrement dit, l’état de la page doit être déterminé au minimum par :
+
+`année académique + annexe + classe + semaine`
+
+et les contraintes temporelles nécessaires.
+
+---
+
+# 12. ANNÉE ACADÉMIQUE
+
+Attention à ne pas mélanger les années académiques.
+
+Les emplois du temps de 2025-2026 doivent rester historiquement accessibles lorsqu’on consulte cette année, mais ne doivent pas contaminer 2026-2027.
+
+Vérifie donc que les requêtes sont correctement rattachées à l’année académique active/consultée.
+
+---
+
+# 13. IMPRESSION
+
+Le bouton Imprimer doit imprimer exactement :
+
+**la classe + la semaine actuellement affichée.**
+
+Si je suis sur :
+
+`L1 Infirmier — semaine du 17 au 22 août 2026`
+
+l’impression ne doit surtout pas récupérer la semaine courante ou une autre semaine.
+
+L’en-tête imprimé doit indiquer clairement la classe et la période.
+
+---
+
+# 14. ATTENTION AUX COURS RÉCURRENTS
+
+Avant de modifier le modèle, vérifie si le projet possède déjà une notion de :
+
+* planning récurrent ;
+* modèle hebdomadaire ;
+* occurrence de cours ;
+* séance réelle.
+
+S'il existe une distinction entre un **modèle hebdomadaire** et les **séances réelles**, conserve cette distinction correctement.
+
+Un modèle peut éventuellement servir à générer une semaine, mais il ne doit pas faire croire que toutes les semaines historiques sont identiques.
+
+Ne détruis pas une architecture existante fonctionnelle sans l’avoir comprise.
+
+---
+
+# 15. TESTS OBLIGATOIRES
+
+Ajoute des tests de régression.
+
+### Test A — isolation des semaines
 
 Créer :
 
-docs/ui/DIRECTOR_SUBWINDOWS_REFINEMENT_REPORT.md
+* Classe L1 ;
+* Anatomie le 24/08/2026.
 
-Le rapport doit contenir :
+Consulter la semaine du 17/08/2026.
 
-cohérence métier vérifiée ;
-fonctions déplacées ou corrigées ;
-section finale retenue ;
-sous-fenêtres finales ;
-composants UI Core réutilisés ;
-interactions HTMX ;
-pagination ;
-formulaires ;
-actions backend ;
-données de santé utilisées ;
-fichiers modifiés ;
-captures ;
-tests ;
-limites ;
-état Git ;
-verdict.
+Résultat :
 
-Le verdict doit être exactement l’un des deux suivants :
+**Anatomie ne doit pas apparaître.**
 
-SOUS-FENÊTRES RAFFINÉES ET PRÊTES POUR VALIDATION VISUELLE
+### Test B — retour historique
 
-ou :
+Créer un cours le 17/08.
 
-SOUS-FENÊTRES ENCORE NON SATISFAISANTES
+Créer un autre cours le 24/08.
 
-Commence par comparer l’implémentation actuelle avec les sections les plus
-fluides du dashboard. Corrige d’abord la cohérence métier entre
-« Sessions d’évaluations » et « Résultats et notes », puis raffine
-l’interface, les actions backend, la pagination et l’expérience HTMX.
+Naviguer entre les deux semaines.
 
+Chaque semaine doit afficher uniquement ses propres cours.
 
-Le but de cette étape est simple : **ne pas encore appliquer partout**. Il doit d’abord transformer cette version
+### Test C — suppression
+
+Supprimer le cours du 24.
+
+Le cours du 17 doit rester intact.
+
+### Test D — modification
+
+Modifier un cours du 24.
+
+Les autres occurrences/semaines ne doivent pas être modifiées accidentellement.
+
+### Test E — chevauchement classe
+
+Créer 08h–10h.
+
+Tenter 09h–11h pour la même classe/date.
+
+Le système doit refuser.
+
+### Test F — conflit enseignant
+
+Affecter un enseignant à une classe de 08h–10h.
+
+Tenter de l’affecter à une autre classe pendant une période qui chevauche ce créneau.
+
+Le système doit refuser.
+
+### Test G — navigation
+
+Tester :
+
+* semaine précédente ;
+* semaine suivante ;
+* retour semaine courante.
+
+Les dates ET les données doivent changer ensemble.
+
+### Test H — impression
+
+Vérifier que l’impression utilise la semaine actuellement sélectionnée.
+
+---
+
+# 16. CONTRAINTE IMPORTANTE
+
+Ne corrige surtout pas ce problème en faisant simplement :
+
+* masquer les cours avec JavaScript ;
+* changer les labels des dates ;
+* dupliquer la grille ;
+* vider artificiellement certaines cellules ;
+* créer une logique frontend parallèle à la base de données.
+
+La source de vérité doit rester le backend Django et la base de données.
+
+La grille n’est qu’une représentation des données filtrées par période.
+
+---
+
+# 17. MÉTHODE DE TRAVAIL DEMANDÉE
+
+Procède dans cet ordre :
+
+1. auditer l’existant ;
+2. identifier précisément la cause du bug ;
+3. me donner un résumé court de la cause ;
+4. proposer la correction architecturale minimale ;
+5. implémenter ;
+6. ajouter/corriger les migrations si nécessaire ;
+7. corriger backend + frontend ;
+8. ajouter les tests de régression ;
+9. exécuter les tests ;
+10. vérifier manuellement la navigation entre plusieurs semaines ;
+11. vérifier modification/suppression/conflits/impression.
+
+Ne réécris pas tout le module si ce n’est pas nécessaire.
+
+Réutilise les composants, conventions, permissions, services et patterns existants du projet.
+
+---
+
+# CRITÈRE FINAL D’ACCEPTATION
+
+Je dois pouvoir prendre une classe et faire ceci :
+
+**Semaine 17–22 août → voir son planning**
+
+→ semaine suivante →
+
+**Semaine 24–29 août → voir un planning différent**
+
+→ modifier Anatomie →
+
+**seul Anatomie du créneau concerné change**
+
+→ supprimer un cours →
+
+**seul ce cours disparaît**
+
+→ essayer de placer un cours sur un horaire occupé →
+
+**le système refuse clairement et permet de rechercher/choisir un créneau libre**
+
+→ revenir à la semaine précédente →
+
+**le planning historique du 17–22 est toujours intact**
+
+→ imprimer →
+
+**seuls la classe et l’emploi du temps de la semaine actuellement affichée sont imprimés.**
+
+Tant que ce scénario complet ne fonctionne pas, considère la fonctionnalité comme non terminée.

@@ -1,18 +1,36 @@
 <label class="hidden items-center gap-2 text-xs font-semibold text-ui-text-muted xl:flex">
-  <span>Annexe</span>
+  <span>Année</span>
+  <select id="dg-academic-year-select" class="rounded-ui-button border border-ui-border bg-ui-surface px-2 py-2 text-sm text-ui-text" onchange="dgHandleAcademicYearChange(this.value)">
+    {% for academic_year in academic_years %}
+      <option value="{{ academic_year.id }}" {% if selected_academic_year_id == academic_year.id|stringformat:"s" %}selected{% endif %}>{{ academic_year.name }}</option>
+    {% empty %}
+      <option value="">Aucune année</option>
+    {% endfor %}
+  </select>
+</label>
+<label class="hidden items-center gap-2 text-xs font-semibold text-ui-text-muted xl:flex">
+  <span>Portée</span>
   <select id="dg-branch-select" class="rounded-ui-button border border-ui-border bg-ui-surface px-2 py-2 text-sm text-ui-text" onchange="dgHandleBranchChange(this.value)">
-    <option value="">Toutes</option>
+    <option value="">Globale : toutes</option>
     {% for branch in all_branches %}
       <option value="{{ branch.id }}" {% if selected_branch_id == branch.id|stringformat:"s" %}selected{% endif %}>{{ branch.name }}</option>
     {% endfor %}
   </select>
 </label>
 <label class="hidden items-center gap-2 text-xs font-semibold text-ui-text-muted lg:flex">
-  <span>Période</span>
+  <span>Veille admissions</span>
   <select id="dg-period-select" class="rounded-ui-button border border-ui-border bg-ui-surface px-2 py-2 text-sm text-ui-text" onchange="dgHandlePeriodChange(this.value)">
     <option value="month" {% if dashboard_period == "month" %}selected{% endif %}>Ce mois</option>
     <option value="today" {% if dashboard_period == "today" %}selected{% endif %}>Aujourd'hui</option>
     <option value="week" {% if dashboard_period == "week" %}selected{% endif %}>Cette semaine</option>
   </select>
 </label>
+<button
+  type="button"
+  class="inline-flex items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-3 py-2 text-sm font-semibold text-ui-text xl:hidden"
+  onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=context')"
+>
+  <i data-lucide="sliders-horizontal" class="h-4 w-4" aria-hidden="true"></i>
+  Contexte
+</button>
 {% include "portal/staff/shared/topbar_actions.html" %}

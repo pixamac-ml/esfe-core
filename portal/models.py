@@ -29,6 +29,8 @@ class SupportAuditLog(models.Model):
     ACTION_ACCOUNT_SUSPENDED = "account_suspended"
     ACTION_ACCOUNT_REACTIVATED = "account_reactivated"
     ACTION_ACCOUNT_UNBLOCKED = "account_unblocked"
+    ACTION_STAFF_ASSIGNED = "staff_assigned"
+    ACTION_MANAGER_NOMINATED = "manager_nominated"
     ACTION_EMAIL_UPDATED = "email_updated"
     ACTION_GRADE_UPDATED = "grade_updated"
     ACTION_GRADES_IMPORTED = "grades_imported"
@@ -54,6 +56,8 @@ class SupportAuditLog(models.Model):
         (ACTION_ACCOUNT_SUSPENDED, "Compte suspendu"),
         (ACTION_ACCOUNT_REACTIVATED, "Compte reactive"),
         (ACTION_ACCOUNT_UNBLOCKED, "Compte debloque"),
+        (ACTION_STAFF_ASSIGNED, "Affectation staff modifiee"),
+        (ACTION_MANAGER_NOMINATED, "Gestionnaire d'annexe nomme"),
         (ACTION_EMAIL_UPDATED, "Email corrige"),
         (ACTION_GRADE_UPDATED, "Note modifiee"),
         (ACTION_GRADES_IMPORTED, "Import notes"),
@@ -841,6 +845,7 @@ class InternalTransfer(models.Model):
     source_level = models.CharField(max_length=20)
     target_level = models.CharField(max_length=20)
     academic_decision_reference = models.CharField(max_length=120, blank=True)
+    effective_date = models.DateField(default=timezone.localdate)
     applied_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
@@ -908,7 +913,13 @@ class IncomingTransfer(models.Model):
         blank=True,
     )
     requested_level = models.CharField(max_length=20)
+    previous_academic_year = models.CharField(max_length=30, blank=True)
+    last_validated_semester = models.CharField(max_length=30, blank=True)
+    external_student_number = models.CharField(max_length=80, blank=True)
     equivalence_notes = models.TextField(blank=True)
+    recognised_equivalences = models.TextField(blank=True)
+    subjects_to_retake = models.TextField(blank=True)
+    academic_reservations = models.TextField(blank=True)
     candidature = models.OneToOneField(
         "admissions.Candidature",
         on_delete=models.SET_NULL,
@@ -928,6 +939,12 @@ def transfer_document_upload_path(instance, filename):
 class TransferDocument(models.Model):
     TYPE_REQUEST = "request"
     TYPE_TRANSCRIPT = "transcript"
+    TYPE_SCHOOL_CERTIFICATE = "school_certificate"
+    TYPE_REPORT_CARD = "report_card"
+    TYPE_LEVEL_CERTIFICATE = "level_certificate"
+    TYPE_DIPLOMA = "diploma"
+    TYPE_BIRTH_CERTIFICATE = "birth_certificate"
+    TYPE_STUDY_PROGRAMME = "study_programme"
     TYPE_CLEARANCE = "clearance"
     TYPE_IDENTITY = "identity"
     TYPE_EQUIVALENCE = "equivalence"
@@ -935,6 +952,12 @@ class TransferDocument(models.Model):
     TYPE_CHOICES = [
         (TYPE_REQUEST, "Demande de transfert"),
         (TYPE_TRANSCRIPT, "Relevé de notes"),
+        (TYPE_SCHOOL_CERTIFICATE, "Certificat de scolarité"),
+        (TYPE_REPORT_CARD, "Bulletin"),
+        (TYPE_LEVEL_CERTIFICATE, "Attestation de niveau"),
+        (TYPE_DIPLOMA, "Diplôme"),
+        (TYPE_BIRTH_CERTIFICATE, "Extrait de naissance"),
+        (TYPE_STUDY_PROGRAMME, "Programme académique suivi"),
         (TYPE_CLEARANCE, "Quitus administratif ou financier"),
         (TYPE_IDENTITY, "Pièce d'identité"),
         (TYPE_EQUIVALENCE, "Décision d'équivalence"),
@@ -943,10 +966,12 @@ class TransferDocument(models.Model):
     STATUS_PENDING = "pending"
     STATUS_VERIFIED = "verified"
     STATUS_REJECTED = "rejected"
+    STATUS_REPLACE = "replace"
     STATUS_CHOICES = [
         (STATUS_PENDING, "À vérifier"),
         (STATUS_VERIFIED, "Vérifié"),
         (STATUS_REJECTED, "Rejeté"),
+        (STATUS_REPLACE, "À remplacer"),
     ]
 
     transfer_request = models.ForeignKey(
@@ -1025,6 +1050,56 @@ class TransferHistory(models.Model):
         indexes = [models.Index(fields=["transfer_request", "created_at"])]
 
 
+class AcademicEnrollmentMovement(models.Model):
+    """Immutable, queryable history of a student's academic placement."""
+
+    TYPE_CLASS_CHANGE = "class_change"
+    TYPE_BRANCH_TRANSFER = "branch_transfer"
+    TYPE_PROGRAMME_CHANGE = "programme_change"
+    TYPE_RECLASSIFICATION = "reclassification"
+    TYPE_CHOICES = [
+        (TYPE_CLASS_CHANGE, "Changement de classe"),
+        (TYPE_BRANCH_TRANSFER, "Transfert inter-annexe"),
+        (TYPE_PROGRAMME_CHANGE, "Changement de filière"),
+        (TYPE_RECLASSIFICATION, "Reclassement académique"),
+    ]
+
+    enrollment = models.ForeignKey(
+        "academics.AcademicEnrollment", on_delete=models.PROTECT,
+        related_name="academic_movements",
+    )
+    transfer_request = models.OneToOneField(
+        TransferRequest, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="academic_movement",
+    )
+    movement_type = models.CharField(max_length=30, choices=TYPE_CHOICES, db_index=True)
+    effective_date = models.DateField(default=timezone.localdate, db_index=True)
+    source_class = models.ForeignKey(AcademicClass, on_delete=models.PROTECT, related_name="academic_movements_from")
+    target_class = models.ForeignKey(AcademicClass, on_delete=models.PROTECT, related_name="academic_movements_to")
+    source_branch = models.ForeignKey(Branch, on_delete=models.PROTECT, related_name="academic_movements_from")
+    target_branch = models.ForeignKey(Branch, on_delete=models.PROTECT, related_name="academic_movements_to")
+    source_programme = models.ForeignKey("formations.Programme", on_delete=models.PROTECT, related_name="academic_movements_from")
+    target_programme = models.ForeignKey("formations.Programme", on_delete=models.PROTECT, related_name="academic_movements_to")
+    source_level = models.CharField(max_length=40)
+    target_level = models.CharField(max_length=40)
+    reason = models.TextField()
+    observation = models.TextField(blank=True)
+    initiated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="initiated_academic_movements")
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="approved_academic_movements")
+    snapshot = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-effective_date", "-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["enrollment", "effective_date"]),
+            models.Index(fields=["source_branch", "effective_date"]),
+        ]
+
+    def __str__(self):
+        return f"{self.enrollment} : {self.source_class} -> {self.target_class}"
+
+
 class AdministrativeDocument(models.Model):
     TYPE_NOTE_SERVICE = "note_service"
     TYPE_AVIS = "avis"
@@ -1032,6 +1107,10 @@ class AdministrativeDocument(models.Model):
     TYPE_CONVOCATION = "convocation"
     TYPE_FICHE_TRANSFERT = "fiche_transfert"
     TYPE_FICHE_FREQUENTATION = "fiche_frequentation"
+    TYPE_ATTESTATION_PREINSCRIPTION = "attestation_preinscription"
+    TYPE_LETTRE_MISE_STAGE = "lettre_mise_stage"
+    TYPE_PRESENCE_EVALUATION = "presence_evaluation"
+    TYPE_PV_DELIBERATION = "pv_deliberation"
 
     TYPE_CHOICES = [
         (TYPE_NOTE_SERVICE, "Note de service"),
@@ -1040,6 +1119,10 @@ class AdministrativeDocument(models.Model):
         (TYPE_CONVOCATION, "Convocation"),
         (TYPE_FICHE_TRANSFERT, "Fiche de transfert"),
         (TYPE_FICHE_FREQUENTATION, "Fiche de frequentation"),
+        (TYPE_ATTESTATION_PREINSCRIPTION, "Attestation de préinscription"),
+        (TYPE_LETTRE_MISE_STAGE, "Lettre de mise en stage"),
+        (TYPE_PRESENCE_EVALUATION, "Fiche de présence à l'évaluation"),
+        (TYPE_PV_DELIBERATION, "Procès-verbal de délibération"),
     ]
 
     STATUS_DRAFT = "draft"

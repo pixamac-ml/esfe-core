@@ -25,6 +25,8 @@ from accounts.models import (
     BranchCashMovement,
     BranchBankTransfer,
     BranchExpense,
+    BranchWallet,
+    BranchWalletEntry,
     BranchMonthlyClosure,
     Donation,
     PayrollEntry,
@@ -33,6 +35,7 @@ from accounts.models import (
 )
 from payments.models import CashPaymentSession, Payment, PaymentAgent
 from accounts.services.manager_intelligence import reconcile_branch_financial_movements
+from accounts.services.wallets import wallet_balance
 
 
 User = get_user_model()
@@ -278,6 +281,32 @@ class ManagerExpenseWorkflowTests(TestCase):
                 source=BranchCashMovement.SOURCE_EXPENSE,
             ).exists()
         )
+
+    def test_expense_pay_consumes_active_expense_wallet(self):
+        self._seed_cash()
+        wallet = BranchWallet.objects.create(
+            branch=self.branch,
+            name="Mini-caisse Dépenses",
+            wallet_type=BranchWallet.TYPE_DISBURSEMENT,
+            category="expense",
+            created_by=self.manager,
+        )
+        BranchWalletEntry.objects.create(
+            wallet=wallet,
+            direction=BranchWalletEntry.DIRECTION_IN,
+            kind=BranchWalletEntry.KIND_ALLOCATION,
+            amount=60000,
+            label="Dotation dépenses",
+            created_by=self.manager,
+        )
+        self.expense.status = BranchExpense.STATUS_APPROVED
+        self.expense.save(update_fields=["status", "updated_at"])
+        response = self.client.post(
+            reverse("accounts:htmx_manager_expense_pay", args=[self.expense.id]),
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(wallet_balance(wallet), 10000)
 
 
 @override_settings(
@@ -590,6 +619,7 @@ class ManagerSalaryWorkflowTests(TestCase):
                 branch=self.branch, source=BranchCashMovement.SOURCE_PAYROLL, amount=100000,
             ).exists()
         )
+        self.assertIn("section=salaires", response.headers["HX-Redirect"])
 
     def test_salary_pay_rejected_when_caisse_insufficient(self):
         entry = PayrollEntry.objects.get(
@@ -599,6 +629,21 @@ class ManagerSalaryWorkflowTests(TestCase):
         entry.save()
         url = reverse("accounts:htmx_manager_salary_pay", args=[entry.id])
         response = self.client.post(url, {"payment_amount": "100000"}, HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 400)
+        entry.refresh_from_db()
+        self.assertEqual(entry.paid_amount, 0)
+
+    def test_salary_payment_requires_a_ready_entry(self):
+        self._seed_cash(500000)
+        entry = PayrollEntry.objects.get(
+            branch=self.branch, employee=self.manager, period_month=self.period_month,
+        )
+        self.assertEqual(entry.status, PayrollEntry.STATUS_DRAFT)
+        response = self.client.post(
+            reverse("accounts:htmx_manager_salary_pay", args=[entry.id]),
+            {"payment_amount": "100000"},
+            HTTP_HX_REQUEST="true",
+        )
         self.assertEqual(response.status_code, 400)
         entry.refresh_from_db()
         self.assertEqual(entry.paid_amount, 0)
@@ -635,6 +680,7 @@ class ManagerSalaryWorkflowTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertIn("salaires_disponibles_1", response.headers["HX-Redirect"])
+        self.assertIn(f"salary_month={self.period_month:%Y-%m}", response.headers["HX-Redirect"])
 
 
 @override_settings(
@@ -695,6 +741,7 @@ class ManagerHonorariumWorkflowTests(TestCase):
                 branch=self.branch, source=BranchCashMovement.SOURCE_HONORARIUM, amount=100000,
             ).exists()
         )
+        self.assertIn("section=honoraires", response.headers["HX-Redirect"])
 
     def test_teacher_honorarium_pay_rejected_when_caisse_insufficient(self):
         entry = TeacherHonorariumEntry.objects.get(
@@ -711,6 +758,39 @@ class ManagerHonorariumWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 400)
         entry.refresh_from_db()
         self.assertEqual(entry.paid_amount, 0)
+
+    def test_teacher_honorarium_payment_requires_a_ready_entry(self):
+        self._seed_cash(500000)
+        entry = TeacherHonorariumEntry.objects.get(
+            branch=self.branch, teacher=self.teacher, period_month=self.period_month,
+        )
+        entry.validated_hours = Decimal("40")
+        entry.save()
+        self.assertEqual(entry.status, TeacherHonorariumEntry.STATUS_DRAFT)
+        response = self.client.post(
+            reverse("accounts:htmx_manager_teacher_honorarium_pay", args=[entry.id]),
+            {"payment_amount": "100000"},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 400)
+        entry.refresh_from_db()
+        self.assertEqual(entry.paid_amount, 0)
+
+    def test_teacher_honorarium_availability_stays_in_honorarium_workspace(self):
+        entry = TeacherHonorariumEntry.objects.get(
+            branch=self.branch, teacher=self.teacher, period_month=self.period_month,
+        )
+        entry.validated_hours = Decimal("40")
+        entry.status = TeacherHonorariumEntry.STATUS_READY
+        entry.save()
+        response = self.client.post(
+            reverse("accounts:htmx_manager_teacher_honorarium_pay_ready_all"),
+            {"period_month": self.period_month.isoformat()},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("section=honoraires", response.headers["HX-Redirect"])
+        self.assertIn(f"salary_month={self.period_month:%Y-%m}", response.headers["HX-Redirect"])
 
 
 @override_settings(
@@ -874,7 +954,6 @@ class ManagerMonthlyClosureWorkflowTests(TestCase):
             HTTP_HX_REQUEST="true",
         )
         self.assertEqual(response.status_code, 400)
-
 
 @override_settings(
     CACHES={"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}},
@@ -1384,6 +1463,14 @@ class ManagerContextualDocumentTests(TestCase):
             period_month=date(2026, 7, 1),
             base_salary=150000,
         )
+        self.teacher = _create_user("teacher_docs", branch=self.branch, position="teacher")
+        self.honorarium = TeacherHonorariumEntry.objects.create(
+            branch=self.branch,
+            teacher=self.teacher,
+            period_month=date(2026, 7, 1),
+            hourly_rate=5000,
+            validated_hours=Decimal("10"),
+        )
         self.donation = Donation.objects.create(
             branch=self.branch,
             donor_name="Partenaire Test",
@@ -1427,6 +1514,15 @@ class ManagerContextualDocumentTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertIn("fiche-paie-2026-07", response["Content-Disposition"])
+
+    @patch("accounts.dashboards.htmx_global.build_teacher_service_sheet_pdf", return_value=b"%PDF service")
+    def test_teacher_service_sheet_is_generated_for_manager_branch(self, _build_pdf):
+        response = self.client.get(
+            reverse("accounts:manager_teacher_service_sheet_pdf", args=[self.honorarium.pk])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertIn("fiche-service-2026-07", response["Content-Disposition"])
 
     @patch("accounts.dashboards.htmx_global.build_donation_receipt", return_value=b"%PDF don")
     def test_donation_receipt_uses_existing_pdf_service(self, _build_pdf):

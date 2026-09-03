@@ -257,7 +257,7 @@ def get_account_support_state(user):
     return state
 
 
-def suspend_account(*, actor, branch, target_user, reason=""):
+def suspend_account(*, actor, branch, target_user, reason="", audit_details=""):
     state = get_account_support_state(target_user)
     state.is_suspended = True
     state.note = (reason or state.note or "").strip()
@@ -271,12 +271,12 @@ def suspend_account(*, actor, branch, target_user, reason=""):
         action_type=SupportAuditLog.ACTION_ACCOUNT_SUSPENDED,
         target_user=target_user,
         target_label=target_user.get_full_name() or target_user.username,
-        details=state.note or "Suspension compte via dashboard IT.",
+        details=audit_details or state.note or "Suspension compte via dashboard IT.",
     )
     return state
 
 
-def reactivate_account(*, actor, branch, target_user):
+def reactivate_account(*, actor, branch, target_user, audit_details=""):
     state = get_account_support_state(target_user)
     state.is_suspended = False
     state.is_blocked = False
@@ -292,7 +292,7 @@ def reactivate_account(*, actor, branch, target_user):
         action_type=SupportAuditLog.ACTION_ACCOUNT_REACTIVATED,
         target_user=target_user,
         target_label=target_user.get_full_name() or target_user.username,
-        details="Reactivation compte via dashboard IT.",
+        details=audit_details or "Reactivation compte via dashboard IT.",
     )
     return state
 

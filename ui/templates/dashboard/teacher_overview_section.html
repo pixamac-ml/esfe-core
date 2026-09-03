@@ -1,19 +1,75 @@
 {% load component_tags %}
 <section id="teacher-panel-overview" data-teacher-section="overview" class="space-y-5">
-  {% component "ui_core.page_header" eyebrow="Espace enseignant" title="Tableau de bord" subtitle="Vos cours, priorités et actions pour votre annexe." %}{% endcomponent %}
-  <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-    {% for card in kpi_cards %}{% component "ui_core.stat_card" label=card.label value=card.value icon=card.icon tone=card.tone|default:"primary" compact=True %}{% endcomponent %}{% endfor %}
-  </div>
-  {% component "ui_core.panel" title="Mes cours aujourd'hui" subtitle="Séances publiées pour la journée." %}
-    {% if today_event_rows %}<div class="space-y-3">{% for row in today_event_rows %}<article class="flex flex-col gap-3 rounded-ui-button border border-ui-border p-3 sm:flex-row sm:items-center sm:justify-between"><div class="min-w-0"><div class="flex flex-wrap items-center gap-2"><strong class="text-sm text-ui-text">{{ row.event.ec.title }}</strong>{% if row.status == 'done' %}{% component "ui_core.status_badge" label="Terminé" tone="success" %}{% endcomponent %}{% elif row.status == 'absent' %}{% component "ui_core.status_badge" label="Absence déclarée" tone="danger" %}{% endcomponent %}{% else %}{% component "ui_core.status_badge" label="À faire" tone="warning" %}{% endcomponent %}{% endif %}</div><p class="mt-1 text-xs text-ui-text-muted">{{ row.event.academic_class.display_name }} · {{ row.event.start_datetime|date:"H:i" }}–{{ row.event.end_datetime|date:"H:i" }} · {{ row.event.location|default:"Salle non précisée" }}</p></div><div class="flex flex-wrap gap-2">{% component "button" label="Cahier" icon="pen-line" variant="outline" size="sm" hx_get=row.lesson_log_url hx_target="#sg-drawer-content" hx_swap="innerHTML" %}{% endcomponent %}{% component "button" label="Support" icon="upload" variant="outline" size="sm" hx_get=row.support_url hx_target="#sg-drawer-content" hx_swap="innerHTML" %}{% endcomponent %}</div></article>{% endfor %}</div>{% else %}{% component "ui_core.empty_state" icon="calendar-check" title="Aucun cours aujourd'hui" message="Votre journée est libre ou aucune séance n'est encore publiée." %}{% endcomponent %}{% endif %}
+  {% component "ui_core.page_header" eyebrow="Mon espace de travail" title="Ma journée d'enseignement" subtitle="Commencez par la séance en cours, puis préparez les suivantes." %}
+    {% fill "actions" %}{% component "ui_core.status_badge" label=teacher_kpis.today_courses|add:" cours aujourd'hui" tone="primary" icon="calendar-check-2" %}{% endcomponent %}{% endfill %}
   {% endcomponent %}
-  <div class="grid gap-5 xl:grid-cols-2">
-    {% component "ui_core.panel" title="À venir" subtitle="Vos prochaines séances." %}
-      {% if upcoming_events %}<div class="space-y-3">{% for event in upcoming_events %}<div class="flex items-center justify-between gap-3 rounded-ui-button border border-ui-border p-3"><div class="min-w-0"><strong class="block text-sm text-ui-text">{{ event.title }}</strong><span class="text-xs text-ui-text-muted">{{ event.class_name }} · {{ event.start_datetime|date:"d/m H:i" }} · {{ event.location|default:"—" }}</span></div>{% component "ui_core.status_badge" label=event.start_datetime|date:"D" tone="info" %}{% endcomponent %}</div>{% endfor %}</div>{% else %}{% component "ui_core.empty_state" icon="calendar" title="Rien de prévu" message="Aucun cours n'est publié pour les prochains jours." compact=True %}{% endcomponent %}{% endif %}
+
+  {% if teacher_next_action %}
+    {% component "ui_core.panel" title="Ma prochaine action" subtitle=teacher_next_action.detail tone="primary" %}
+      {% fill "default" %}
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <strong class="text-base text-ui-text">{{ teacher_next_action.event.ec.title }}</strong>
+              {% if teacher_next_action.status == "returned" %}{% component "ui_core.status_badge" label="Retour demandé" tone="warning" icon="rotate-ccw" %}{% endcomponent %}
+              {% elif teacher_next_action.status == "draft" %}{% component "ui_core.status_badge" label="Brouillon à signer" tone="warning" icon="file-pen-line" %}{% endcomponent %}
+              {% elif teacher_next_action.status == "submitted" %}{% component "ui_core.status_badge" label="Signé · à contrôler" tone="info" icon="signature" %}{% endcomponent %}
+              {% elif teacher_next_action.status == "validated" %}{% component "ui_core.status_badge" label="Cours validé" tone="success" icon="circle-check" %}{% endcomponent %}
+              {% else %}{% component "ui_core.status_badge" label=teacher_next_action.label tone="primary" icon="clock-3" %}{% endcomponent %}{% endif %}
+            </div>
+            <p class="mt-1 text-sm text-ui-text-muted">{{ teacher_next_action.event.academic_class.display_name }} · {{ teacher_next_action.event.start_datetime|date:"H:i" }}–{{ teacher_next_action.event.end_datetime|date:"H:i" }} · {{ teacher_next_action.event.location|default:"Salle non précisée" }}</p>
+          </div>
+          {% component "button" label=teacher_next_action.action_label icon="arrow-right" variant="primary" size="sm" hx_get=teacher_next_action.action_url hx_target="#sg-drawer-content" hx_swap="innerHTML" %}{% endcomponent %}
+        </div>
+      {% endfill %}
     {% endcomponent %}
-    {% component "ui_core.panel" title="Actions rapides" subtitle="Accès direct aux espaces les plus utilisés." %}
-      <div class="grid gap-2 sm:grid-cols-2"><a href="?section=logs" class="rounded-ui-button border border-ui-border px-3 py-2 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">Saisir un cahier</a><a href="?section=supports" class="rounded-ui-button border border-ui-border px-3 py-2 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">Gérer les supports</a><a href="?section=schedule" class="rounded-ui-button border border-ui-border px-3 py-2 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">Voir le planning</a><a href="?section=salary" class="rounded-ui-button border border-ui-border px-3 py-2 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">Consulter mes honoraires</a></div>
+  {% endif %}
+
+  {% if today_event_rows %}
+    {% component "ui_core.panel" title="Mes séances d'aujourd'hui" subtitle="Pour chaque cours : animer, déclarer, signer, puis attendre le contrôle." tone="primary" padding=False %}
+      {% fill "default" %}
+        <div class="divide-y divide-ui-border">
+          {% for row in today_event_rows %}
+            <article class="flex flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                  <strong class="text-base text-ui-text">{{ row.event.ec.title }}</strong>
+                  {% if row.status == "validated" %}{% component "ui_core.status_badge" label="Cours validé" tone="success" icon="circle-check" %}{% endcomponent %}
+                  {% elif row.status == "submitted" %}{% component "ui_core.status_badge" label="Signé · à contrôler" tone="info" icon="signature" %}{% endcomponent %}
+                  {% elif row.status == "returned" %}{% component "ui_core.status_badge" label="Retour demandé" tone="warning" icon="rotate-ccw" %}{% endcomponent %}
+                  {% elif row.status == "draft" %}{% component "ui_core.status_badge" label="Brouillon à signer" tone="warning" icon="file-pen-line" %}{% endcomponent %}
+                  {% elif row.status == "absent" %}{% component "ui_core.status_badge" label="Absence déclarée" tone="danger" icon="circle-x" %}{% endcomponent %}
+                  {% elif row.has_started %}{% component "ui_core.status_badge" label="Cahier à compléter" tone="warning" icon="pen-line" %}{% endcomponent %}
+                  {% else %}{% component "ui_core.status_badge" label="À venir" tone="neutral" icon="clock-3" %}{% endcomponent %}{% endif %}
+                </div>
+                <p class="mt-1 text-sm text-ui-text-muted">{{ row.event.academic_class.display_name }} · {{ row.event.start_datetime|date:"H:i" }}–{{ row.event.end_datetime|date:"H:i" }} · {{ row.event.location|default:"Salle non précisée" }}</p>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                {% if row.has_started and not row.is_absent and row.status != "validated" %}{% component "button" label="Ouvrir le cahier" icon="pen-line" variant="primary" size="sm" hx_get=row.lesson_log_url hx_target="#sg-drawer-content" hx_swap="innerHTML" %}{% endcomponent %}{% endif %}
+                {% component "button" label="Ressources" icon="folder-open" variant="outline" size="sm" hx_get=row.support_url hx_target="#sg-drawer-content" hx_swap="innerHTML" %}{% endcomponent %}
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      {% endfill %}
+    {% endcomponent %}
+  {% else %}
+    {% component "ui_core.empty_state" icon="calendar-check" title="Aucun cours aujourd'hui" message="Profitez-en pour préparer vos supports, compléter vos cahiers ou consulter votre planning." %}{% endcomponent %}
+  {% endif %}
+
+  <div class="grid gap-5 xl:grid-cols-[1.35fr_1fr]">
+    {% component "ui_core.panel" title="Préparer mes prochains cours" subtitle="Vos prochaines séances publiées." %}
+      {% if upcoming_events %}<div class="space-y-3">{% for event in upcoming_events|slice:":4" %}<article class="flex items-center justify-between gap-3 rounded-ui-button border border-ui-border p-3"><div class="min-w-0"><strong class="block truncate text-sm text-ui-text">{{ event.title }}</strong><span class="text-xs text-ui-text-muted">{{ event.class_name }} · {{ event.start_datetime|date:"d/m · H:i" }}</span></div><span class="shrink-0 text-xs font-semibold text-ui-primary">{{ event.location|default:"Salle à confirmer" }}</span></article>{% endfor %}</div>{% else %}{% component "ui_core.empty_state" icon="calendar" title="Aucune séance publiée" message="Votre prochain cours apparaîtra ici dès que le planning sera publié." compact=True %}{% endcomponent %}{% endif %}
+    {% endcomponent %}
+
+    {% component "ui_core.panel" title="Raccourcis utiles" subtitle="Les actions pédagogiques essentielles." %}
+      <div class="grid gap-2">
+        <a href="?section=logs" hx-get="?section=logs" hx-target="#teacher-workspace" hx-swap="innerHTML" hx-push-url="true" class="flex items-center justify-between rounded-ui-button border border-ui-border px-3 py-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover"><span><i data-lucide="pen-line" class="mr-2 inline h-4 w-4 text-ui-primary"></i>Mes cahiers de texte</span><i data-lucide="arrow-right" class="h-4 w-4"></i></a>
+        <a href="?section=supports" hx-get="?section=supports" hx-target="#teacher-workspace" hx-swap="innerHTML" hx-push-url="true" class="flex items-center justify-between rounded-ui-button border border-ui-border px-3 py-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover"><span><i data-lucide="upload" class="mr-2 inline h-4 w-4 text-ui-primary"></i>Déposer une ressource</span><i data-lucide="arrow-right" class="h-4 w-4"></i></a>
+        <a href="?section=classes" hx-get="?section=classes" hx-target="#teacher-workspace" hx-swap="innerHTML" hx-push-url="true" class="flex items-center justify-between rounded-ui-button border border-ui-border px-3 py-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover"><span><i data-lucide="graduation-cap" class="mr-2 inline h-4 w-4 text-ui-primary"></i>Voir mes classes et matières</span><i data-lucide="arrow-right" class="h-4 w-4"></i></a>
+      </div>
     {% endcomponent %}
   </div>
-  {% if teacher_insights %}{% component "ui_core.panel" title="Points d'attention" subtitle="Éléments nécessitant éventuellement une action." %}<div class="space-y-3">{% for insight in teacher_insights %}{% component "ui_core.alert" title=insight.label message=insight.message tone=insight.tone %}{% endcomponent %}{% endfor %}</div>{% endcomponent %}{% endif %}
+
+  {% if teacher_insights %}{% component "ui_core.panel" title="À ne pas oublier" subtitle="Les seules actions qui demandent votre attention." %}<div class="space-y-3">{% for insight in teacher_insights %}{% component "ui_core.alert" title=insight.label message=insight.message tone=insight.tone %}{% endcomponent %}{% endfor %}</div>{% endcomponent %}{% endif %}
 </section>

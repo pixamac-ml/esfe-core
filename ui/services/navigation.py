@@ -95,7 +95,7 @@ def build_supervisor_navigation(
             "Supervision opérationnelle",
             (
                 ("attendance", "Présence étudiants", "list-checks"),
-                ("teachers", "Présence enseignants", "user-check"),
+                ("teachers", "Séances à superviser", "clipboard-check"),
             ),
         ),
         (
@@ -114,6 +114,8 @@ def build_supervisor_navigation(
     )
     dashboard_url = _url("accounts_portal:portal_dashboard")
     workflow_url = _url("accounts_portal:supervisor_workflow_workspace")
+    staff_messaging_url = _url("accounts_portal:staff_messaging")
+    staff_salary_url = _url("accounts_portal:staff_salary")
     navigation = []
 
     for label, sections in groups:
@@ -139,6 +141,39 @@ def build_supervisor_navigation(
                 }
             )
         navigation.append({"label": label, "items": items})
+
+    # Espace personnel : messagerie interne et salaire via les endpoints
+    # génériques staff, échangés dans le workspace superviseur.
+    if staff_messaging_url != "#":
+        personal_items = [
+            {
+                "label": "Messagerie",
+                "url": dashboard_url,
+                "icon": "mail",
+                "active": active_section == "messagerie",
+                "badge": badges.get("messagerie"),
+                "hx_get": f"{staff_messaging_url}?dash=supervisor",
+                "hx_target": "#supervisor-workspace",
+                "hx_swap": "innerHTML",
+                "hx_push_url": dashboard_url,
+                "nav_key": "messagerie",
+            },
+        ]
+        if staff_salary_url != "#":
+            personal_items.append(
+                {
+                    "label": "Mon salaire",
+                    "url": dashboard_url,
+                    "icon": "wallet",
+                    "active": active_section == "salaire",
+                    "hx_get": f"{staff_salary_url}?dash=supervisor",
+                    "hx_target": "#supervisor-workspace",
+                    "hx_swap": "innerHTML",
+                    "hx_push_url": dashboard_url,
+                    "nav_key": "salaire",
+                }
+            )
+        navigation.append({"label": "Espace personnel", "items": personal_items})
     return navigation
 
 
@@ -153,37 +188,66 @@ def build_director_navigation(user, *, active_section="home", badges=None):
     if not authorized:
         return []
 
-    sections = (
-        ("home", "Vue générale", "layout-dashboard"),
-        ("calendrier", "Calendrier", "calendar-days"),
-        ("evaluations_calendar", "Sessions d'évaluations", "clipboard-check"),
-        ("evaluations", "Résultats et notes", "bar-chart-3"),
-        ("enseignants", "Enseignants", "users"),
-        ("transferts", "Transferts", "arrow-left-right"),
-        ("programme", "Programmes et classes", "book-open"),
-        ("planification", "Emploi du temps", "calendar-range"),
-        ("correspondances", "Documents", "mail"),
-        ("messagerie", "Messagerie interne", "messages-square"),
-        ("salaire", "Mon salaire", "badge-dollar-sign"),
+    section_groups = (
+        (
+            "Pilotage",
+            (
+                ("home", "Vue générale", "layout-dashboard"),
+                ("calendrier", "Calendrier académique", "calendar-days"),
+            ),
+        ),
+        (
+            "Organisation académique",
+            (
+                ("programme", "Classes et maquettes", "book-open"),
+                ("planification", "Emplois du temps", "calendar-range"),
+                ("enseignants", "Enseignants", "users"),
+            ),
+        ),
+        (
+            "Évaluations",
+            (
+                ("evaluations_calendar", "Sessions et examens", "clipboard-check"),
+                ("evaluations", "Notes et résultats", "bar-chart-3"),
+            ),
+        ),
+        (
+            "Suivi académique",
+            (
+                ("correspondances", "Documents académiques", "files"),
+                ("transferts", "Transferts", "arrow-left-right"),
+            ),
+        ),
+        (
+            "Espace personnel",
+            (
+                ("messagerie", "Messagerie interne", "messages-square"),
+                ("salaire", "Mon salaire", "badge-dollar-sign"),
+                ("settings", "Paramètres de l'annexe", "settings-2"),
+            ),
+        ),
     )
     dashboard_url = _url("accounts_portal:portal_dashboard")
     workspace_url = _url("accounts_portal:director_workspace")
-    items = []
-    for key, label, icon in sections:
-        query = urlencode({"section": key})
-        items.append(
-            {
-                "label": label,
-                "url": f"{dashboard_url}?{query}",
-                "icon": icon,
-                "active": key == active_section,
-                "badge": badges.get(key),
-                "disabled": dashboard_url == "#" or workspace_url == "#",
-                "hx_get": f"{workspace_url}?{query}",
-                "hx_target": "#director-workspace",
-                "hx_swap": "innerHTML",
-                "hx_push_url": f"{dashboard_url}?{query}",
-                "nav_key": key,
-            }
-        )
-    return [{"label": "Pilotage académique", "items": items}]
+    navigation = []
+    for group_label, sections in section_groups:
+        items = []
+        for key, label, icon in sections:
+            query = urlencode({"section": key})
+            items.append(
+                {
+                    "label": label,
+                    "url": f"{dashboard_url}?{query}",
+                    "icon": icon,
+                    "active": key == active_section,
+                    "badge": badges.get(key),
+                    "disabled": dashboard_url == "#" or workspace_url == "#",
+                    "hx_get": f"{workspace_url}?{query}",
+                    "hx_target": "#director-workspace",
+                    "hx_swap": "innerHTML",
+                    "hx_push_url": f"{dashboard_url}?{query}",
+                    "nav_key": key,
+                }
+            )
+        navigation.append({"label": group_label, "items": items})
+    return navigation

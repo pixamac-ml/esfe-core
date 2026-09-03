@@ -9,7 +9,34 @@
     {% endif %}
   {% endif %}
 
-  {% component "ui_core.panel" title="Sessions officielles" subtitle="Définissez les périodes d'examens et de rattrapage de toute l'annexe." padding=False %}
+  {% component "ui_core.modal" id="open-evaluation-campaign" title="Ouvrir le dossier d'une période officielle" trigger_label="Préparer une session" size="wide" %}
+  {% component "ui_core.panel" title="1. Choisir la période officielle" subtitle="Cette période vient du Calendrier académique. Après votre confirmation, le système crée automatiquement la campagne, les classes et les matières concernées." tone="primary" %}
+    {% if evaluation_campaign_entries %}
+      <form method="post" hx-post="{% url 'accounts_portal:director_exam_session_action' %}" hx-target="#director-session-subcontent" hx-swap="innerHTML" hx-indicator="#director-session-loading" class="grid gap-4">
+        {% csrf_token %}<input type="hidden" name="action" value="create_campaign">
+        <label class="text-sm font-semibold text-ui-text">Période officielle<select required name="calendar_entry_id" class="mt-1 h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text">{% for entry in evaluation_campaign_entries %}<option value="{{ entry.id }}">{{ entry.title }} · du {{ entry.start_datetime|date:"d/m/Y" }} au {{ entry.end_datetime|date:"d/m/Y" }}</option>{% endfor %}</select></label>
+        <div class="rounded-ui-card border border-ui-border bg-ui-surface-muted p-3 text-sm text-ui-text-muted"><strong class="text-ui-text">Le système va préparer automatiquement :</strong> les classes concernées, les matières à évaluer, les échéances de dépôt des sujets et le suivi des copies. Les horaires et les salles seront définis plus tard dans « Planning des épreuves ».</div>
+        <button class="ui-focus-ring h-ui-control justify-self-start rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary">Préparer automatiquement</button>
+      </form>
+    {% else %}
+      {% component "ui_core.alert" title="Aucune période disponible" message="Validez d'abord dans Calendrier un jalon Session d'examens ou Session de rattrapage pour cette annexe." tone="info" %}{% endcomponent %}
+    {% endif %}
+  {% endcomponent %}
+  {% endcomponent %}
+
+  {% if evaluation_campaigns %}
+  {% component "ui_core.panel" title="Campagnes ouvertes" subtitle="Les dossiers issus du calendrier de votre annexe." padding=False %}
+    <div class="divide-y divide-ui-border">{% for campaign in evaluation_campaigns %}<div class="flex flex-wrap items-center gap-3 p-4"><div class="min-w-0 flex-1"><strong class="block text-sm text-ui-text">{{ campaign.title }}</strong><span class="text-xs text-ui-text-muted">{{ campaign.get_kind_display }} · {{ campaign.calendar_entry.start_datetime|date:"d/m/Y" }} au {{ campaign.calendar_entry.end_datetime|date:"d/m/Y" }} · {{ campaign.scopes.count }} classe(s)</span><p class="mt-1 text-xs text-ui-text-muted">{{ campaign.requirements.count }} EC à préparer · {{ campaign.schedule_events.count }} épreuve(s) planifiée(s)</p></div>{% component "ui_core.status_badge" label=campaign.get_status_display tone="info" %}{% endcomponent %}<a href="{% url 'accounts_portal:portal_dashboard' %}?section=evaluations_calendar&view=campaign&campaign_id={{ campaign.id }}" hx-get="{% url 'accounts_portal:director_exam_sessions_subcontent' %}?view=campaign&campaign_id={{ campaign.id }}" hx-target="#director-session-subcontent" hx-swap="innerHTML" hx-push-url="{% url 'accounts_portal:portal_dashboard' %}?section=evaluations_calendar&view=campaign&campaign_id={{ campaign.id }}" hx-indicator="#director-session-loading" class="ui-focus-ring inline-flex h-9 items-center gap-2 rounded-ui-button bg-ui-primary px-3 text-xs font-semibold text-ui-on-primary"><i data-lucide="folder-check" class="h-4 w-4" aria-hidden="true"></i>Ouvrir le dossier</a></div>{% endfor %}</div>
+  {% endcomponent %}
+  {% endif %}
+
+  {% comment %}La création est désormais isolée dans l'onglet « Créer une session ».
+  Cet ancien formulaire reste conservé dans le fichier pour référence, mais ne
+  doit plus être présenté dans la liste et mélangé aux filtres.{% endcomment %}
+  {% comment %}
+  <details class="rounded-ui-card border border-ui-border bg-ui-surface">
+    <summary class="cursor-pointer p-4 text-xs font-semibold text-ui-text-muted">Ancien outil : créer directement un jalon de session <span class="ml-1 font-normal">À utiliser seulement pour reprendre des données existantes.</span></summary>
+  {% component "ui_core.panel" title="Jalon de session" subtitle="La nouvelle méthode consiste à préparer cette période depuis Calendrier." padding=False %}
     <div x-data="{ open: {% if exam_session_form.errors %}true{% else %}false{% endif %} }">
       <button type="button"
               @click="open = !open"
@@ -66,12 +93,15 @@
       </div>
     </div>
   {% endcomponent %}
+  </details>
+  {% endcomment %}
 
   <form method="get"
         hx-get="{% url 'accounts_portal:director_exam_sessions_subcontent' %}"
-        hx-target="#director-session-subcontent"
-        hx-swap="innerHTML"
-        hx-trigger="submit, change from:select"
+        hx-target="#director-session-list-region"
+        hx-select="#director-session-list-region"
+        hx-swap="outerHTML"
+        hx-trigger="submit"
         hx-indicator="#director-session-loading"
         hx-sync="#director-session-subcontent:replace"
         class="grid min-w-0 gap-3 border-y border-ui-border py-4 sm:grid-cols-2 lg:grid-cols-[minmax(12rem,1fr)_12rem_12rem_auto]">

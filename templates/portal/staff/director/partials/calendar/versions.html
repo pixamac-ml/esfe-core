@@ -1,0 +1,26 @@
+{% load component_tags %}
+<div class="space-y-5">
+  {% component "ui_core.panel" title="Versions du calendrier" subtitle="Une version publiée est immuable. Les brouillons peuvent être retirés tant qu'ils ne servent à aucune publication." padding=False %}
+    {% if director_academic_calendars %}
+      <div class="divide-y divide-ui-border">
+        {% for cal in director_academic_calendars %}
+        <article class="flex min-w-0 flex-col gap-3 p-4 lg:flex-row lg:items-center">
+          <span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button {% if cal.status == 'published' %}bg-ui-success-soft text-ui-success{% else %}bg-ui-primary-soft text-ui-primary{% endif %}"><i data-lucide="git-branch" class="h-4 w-4"></i></span>
+          <div class="min-w-0 flex-1"><h3 class="text-sm font-bold text-ui-text">{{ cal.official_title|default:"Calendrier académique" }} · {{ cal.academic_year.name }}</h3><p class="mt-1 text-xs text-ui-text-muted">Version {{ cal.version }} · Créée le {{ cal.created_at|date:"d/m/Y" }}{% if cal.published_at %} · Publiée le {{ cal.published_at|date:"d/m/Y" }}{% endif %}{% if cal.revision_of %} · Révision de V{{ cal.revision_of.version }}{% endif %}</p></div>
+          {% if cal.status == "published" %}{% component "ui_core.status_badge" label="Publiée" tone="success" %}{% endcomponent %}{% elif cal.status == "superseded" %}{% component "ui_core.status_badge" label="Remplacée" tone="neutral" %}{% endcomponent %}{% elif cal.status == "rejected" %}{% component "ui_core.status_badge" label="À corriger" tone="danger" %}{% endcomponent %}{% else %}{% component "ui_core.status_badge" label=cal.get_status_display tone="info" %}{% endcomponent %}{% endif %}
+          <div class="flex shrink-0 items-center gap-2">
+            <form hx-post="{% url 'accounts_portal:director_calendar_action' %}" hx-target="#director-calendar-section" hx-swap="outerHTML" hx-indicator="#director-calendar-loading">{% csrf_token %}<input type="hidden" name="action" value="select_calendar"><input type="hidden" name="calendar_id" value="{{ cal.id }}"><button class="ui-focus-ring grid h-9 w-9 place-items-center rounded-ui-button border border-ui-border bg-ui-surface text-ui-text" title="Ouvrir" aria-label="Ouvrir"><i data-lucide="arrow-up-right" class="h-4 w-4"></i></button></form>
+            {% if cal.status == "published" %}
+            <form hx-post="{% url 'accounts_portal:director_calendar_action' %}" hx-target="#director-calendar-section" hx-swap="outerHTML" hx-indicator="#director-calendar-loading">{% csrf_token %}<input type="hidden" name="action" value="create_revision"><input type="hidden" name="calendar_id" value="{{ cal.id }}"><button class="ui-focus-ring h-9 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-xs font-semibold text-ui-text">Créer une révision</button></form>
+            {% elif cal.status == "draft" or cal.status == "rejected" %}
+            <form hx-post="{% url 'accounts_portal:director_calendar_action' %}" hx-target="#director-calendar-section" hx-swap="outerHTML" hx-indicator="#director-calendar-loading" onsubmit="return window.confirm('Supprimer définitivement ce brouillon ?')">{% csrf_token %}<input type="hidden" name="action" value="delete_calendar"><input type="hidden" name="calendar_id" value="{{ cal.id }}"><button class="ui-focus-ring h-9 rounded-ui-button border border-ui-danger bg-ui-danger-soft px-3 text-xs font-semibold text-ui-danger">Supprimer le brouillon</button></form>
+            {% endif %}
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      {% component "ui_core.empty_state" title="Aucune version" message="La première version apparaîtra lorsque vous créerez le calendrier annuel de cette annexe." icon="git-branch" %}{% endcomponent %}
+    {% endif %}
+  {% endcomponent %}
+</div>

@@ -162,6 +162,14 @@ class StudentYearDecision(TimeStampedModel):
         on_delete=models.PROTECT,
         related_name="cycle_decisions_as_current",
     )
+    source_enrollment = models.ForeignKey(
+        "academics.AcademicEnrollment",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="annual_cycle_decisions",
+        help_text="Inscription académique source de la synthèse annuelle.",
+    )
     target_year = models.ForeignKey(
         "academics.AcademicYear",
         on_delete=models.PROTECT,
@@ -183,6 +191,11 @@ class StudentYearDecision(TimeStampedModel):
         db_index=True,
     )
     reason = models.TextField(blank=True)
+    synthesis_snapshot = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Synthèse calculée des semestres conservée avant la délibération finale.",
+    )
     decided_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -192,6 +205,12 @@ class StudentYearDecision(TimeStampedModel):
     )
     decided_at = models.DateTimeField(default=timezone.now, db_index=True)
     is_final = models.BooleanField(default=False, db_index=True)
+    jury_decision = models.CharField(max_length=40, choices=constants.STUDENT_DECISION_CHOICES, blank=True, db_index=True)
+    jury_reason = models.CharField(max_length=40, blank=True)
+    jury_justification = models.TextField(blank=True)
+    jury_processed = models.BooleanField(default=False, db_index=True)
+    jury_decided_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="jury_year_decisions")
+    jury_decided_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-decided_at", "-id"]
@@ -213,6 +232,40 @@ class StudentYearDecision(TimeStampedModel):
 
     def __str__(self):
         return f"{self.student} - {self.academic_year} - {self.decision}"
+
+
+class ClassDeliberationSession(TimeStampedModel):
+    STATUS_PREPARATION = "preparation"
+    STATUS_IN_SESSION = "in_session"
+    STATUS_READY = "ready"
+    STATUS_CLOSED = "closed"
+    STATUS_TRANSMITTED = "transmitted"
+    STATUS_OFFICIAL = "official"
+    STATUS_CHOICES = [(STATUS_PREPARATION, "Préparation"), (STATUS_IN_SESSION, "En séance"), (STATUS_READY, "Prête à clôturer"), (STATUS_CLOSED, "Clôturée par le DE"), (STATUS_TRANSMITTED, "Transmise au DG"), (STATUS_OFFICIAL, "Officielle")]
+    academic_class = models.OneToOneField("academics.AcademicClass", on_delete=models.PROTECT, related_name="deliberation_session")
+    branch = models.ForeignKey("branches.Branch", on_delete=models.PROTECT, related_name="deliberation_sessions")
+    academic_year = models.ForeignKey("academics.AcademicYear", on_delete=models.PROTECT, related_name="deliberation_sessions")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PREPARATION, db_index=True)
+    normal_threshold = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    session_threshold = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    session_rule_reason = models.TextField(blank=True)
+    opened_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="opened_deliberation_sessions")
+    opened_at = models.DateTimeField(null=True, blank=True)
+    prepared_at = models.DateTimeField(null=True, blank=True)
+    closed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="closed_deliberation_sessions")
+    closed_at = models.DateTimeField(null=True, blank=True)
+    transmitted_at = models.DateTimeField(null=True, blank=True)
+    transmission_snapshot = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["branch", "academic_year", "status"])]
+
+    def clean(self):
+        if self.academic_class_id:
+            if self.branch_id and self.academic_class.branch_id != self.branch_id:
+                raise ValidationError({"branch": "La séance doit appartenir à l'annexe de sa classe."})
+            if self.academic_year_id and self.academic_class.academic_year_id != self.academic_year_id:
+                raise ValidationError({"academic_year": "La séance doit appartenir à l'année de sa classe."})
 
 
 class StudentAcademicDebt(TimeStampedModel):

@@ -112,6 +112,9 @@ def _movement_source_reference_exists(*, branch, source, source_reference):
 
 
 def sync_donation_cash_movement(donation, user=None):
+    from accounts.services.financial_integrity import assert_financial_period_open
+
+    assert_financial_period_open(donation.branch, donation.date)
     with transaction.atomic():
         donation = Donation.objects.select_for_update().select_related("branch").get(pk=donation.pk)
         if donation.branch_id is None:
@@ -141,6 +144,9 @@ def sync_donation_cash_movement(donation, user=None):
 
 
 def sync_bank_transfer_cash_movement(transfer, user=None):
+    from accounts.services.financial_integrity import assert_financial_period_open
+
+    assert_financial_period_open(transfer.branch, transfer.transfer_date)
     with transaction.atomic():
         transfer = (
             BranchBankTransfer.objects
@@ -478,6 +484,16 @@ def _teacher_honorarium_hours(branch, teacher, period_month):
     return Decimal(total_minutes) / Decimal(60)
 
 
+def get_teacher_honorarium_validated_hours(branch, teacher, period_month):
+    """Source unique des heures facturables d'un enseignant.
+
+    La gestionnaire consulte ce total mais ne le saisit jamais : seules les
+    seances marquees ``faites`` et validees dans le workflow academique sont
+    remunerables.
+    """
+    return _teacher_honorarium_hours(branch, teacher, period_month)
+
+
 def refresh_teacher_honorarium_entry(branch, teacher, period_month, user=None):
     """Recalcule la fiche honoraire d'un enseignant pour un mois donné.
 
@@ -517,10 +533,14 @@ def refresh_teacher_honorarium_entry(branch, teacher, period_month, user=None):
             notes="Honoraire pre-calcule automatiquement depuis les cours valides.",
         )
 
-    if entry.status in {TeacherHonorariumEntry.STATUS_PAID, TeacherHonorariumEntry.STATUS_PARTIAL}:
+    if entry.status != TeacherHonorariumEntry.STATUS_DRAFT:
         return entry
 
-    entry.hourly_rate = profile.teacher_hourly_rate
+    # The rate becomes a financial snapshot as soon as the first approved
+    # teaching hour reaches the monthly sheet. A later profile change must not
+    # silently rewrite a period already in preparation for payment.
+    if entry.validated_hours <= 0:
+        entry.hourly_rate = profile.teacher_hourly_rate
     entry.validated_hours = validated_hours
     entry.updated_by = user
     entry.save()
@@ -545,7 +565,7 @@ def prepare_missing_teacher_honorarium_entries(branch, period_month, user):
         if profile.teacher_hourly_rate <= 0:
             skipped_without_rate += 1
             continue
-        validated_hours = _teacher_honorarium_hours(branch, profile.user, period_month)
+        validated_hours = get_teacher_honorarium_validated_hours(branch, profile.user, period_month)
         entry, was_created = TeacherHonorariumEntry.objects.get_or_create(
             branch=branch,
             teacher=profile.user,
@@ -563,7 +583,7 @@ def prepare_missing_teacher_honorarium_entries(branch, period_month, user):
                 "notes": "Honoraire pre-calcule automatiquement depuis les cours valides.",
             },
         )
-        if not was_created:
+        if not was_created and entry.status == TeacherHonorariumEntry.STATUS_DRAFT:
             entry.hourly_rate = profile.teacher_hourly_rate
             entry.validated_hours = validated_hours
             entry.updated_by = user

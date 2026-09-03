@@ -1,5 +1,16 @@
 {% load component_tags %}
 <div class="space-y-5">
+  <header>
+    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-ui-primary">Identité institutionnelle</p>
+    <h1 class="mt-1 text-2xl font-bold tracking-tight text-ui-text">Cartes et vérifications</h1>
+    <p class="mt-1 text-sm text-ui-text-muted">Émettez, contrôlez et sécurisez les cartes de votre annexe.</p>
+  </header>
+  {% component "ui_core.tabs" id="it-cards-subnavigation" items=cards_subnavigation active=cards_view density="compact" subview_event="it-cards-subview" subview_attr="it-cards-subview" %}{% endcomponent %}
+  {% if cards_view == "issue" %}
+  <div class="flex flex-wrap justify-end gap-2">
+    <a class="btn btn-secondary" target="_blank" href="{% url 'accounts_portal:it_branch_student_cards_pdf' %}?preview=1"><i data-lucide="eye" class="h-4 w-4"></i> Prévisualiser tous les étudiants</a>
+    <a class="btn btn-primary" href="{% url 'accounts_portal:it_branch_student_cards_pdf' %}"><i data-lucide="file-down" class="h-4 w-4"></i> Générer tous les étudiants actifs</a>
+  </div>
   {% component "ui_core.page_header" eyebrow="Scolarité" title="Cartes étudiantes" subtitle="Générez les cartes PDF par classe ou par étudiant." %}
     {% if selected_class %}{% fill "actions" %}
       <a class="btn btn-secondary" target="_blank" href="{% url 'accounts_portal:it_class_cards_pdf' %}?class_id={{ selected_class.id }}&preview=1"><i data-lucide="eye" class="h-4 w-4"></i> Prévisualiser</a>
@@ -34,4 +45,30 @@
       {% endfor %}
     </div>
   {% endcomponent %}
+
+  {% component "ui_core.panel" title="Personnel de l'annexe" subtitle="Cartes professionnelles des comptes staff actifs." %}
+    <div class="mb-4 flex flex-wrap gap-2">
+      <a class="btn btn-secondary" target="_blank" href="{% url 'accounts_portal:it_branch_staff_cards_pdf' %}?preview=1"><i data-lucide="eye" class="h-4 w-4"></i> Prévisualiser le personnel</a>
+      <a class="btn btn-primary" href="{% url 'accounts_portal:it_branch_staff_cards_pdf' %}"><i data-lucide="file-down" class="h-4 w-4"></i> Générer tout le personnel</a>
+    </div>
+    <div class="divide-y divide-ui-border">
+      {% for staff_user in staff %}
+        <article class="flex flex-wrap items-center gap-3 py-3 first:pt-0 last:pb-0">
+          <span class="grid h-10 w-10 place-items-center rounded-full bg-ui-primary-soft font-bold text-ui-primary">{{ staff_user.get_full_name|default:staff_user.username|first|upper }}</span>
+          <div class="min-w-0 flex-1"><strong class="block text-ui-text">{{ staff_user.get_full_name|default:staff_user.username }}</strong><span class="text-xs text-ui-text-muted">{{ staff_user.profile.get_position_display|default:"Personnel" }} · {{ staff_user.profile.employee_code|default:"Code à attribuer" }}</span></div>
+          <div class="flex flex-wrap gap-2">
+            <a class="btn btn-secondary" target="_blank" href="{% url 'accounts_portal:it_staff_card_pdf' staff_user.id %}?preview=1"><i data-lucide="eye" class="h-4 w-4"></i> Prévisualiser</a>
+            <a class="btn btn-primary" href="{% url 'accounts_portal:it_staff_card_pdf' staff_user.id %}"><i data-lucide="file-down" class="h-4 w-4"></i> Télécharger PDF</a>
+          </div>
+        </article>
+      {% empty %}
+        <p class="py-3 text-sm text-ui-text-muted">Aucun personnel actif à carte pour cette annexe.</p>
+      {% endfor %}
+    </div>
+  {% endcomponent %}
+  {% elif cards_view == "students" or cards_view == "staff" %}
+    {% include "portal/informaticien/workflows/cards_registry.html" %}
+  {% else %}
+    {% include "portal/informaticien/workflows/cards_verification_log.html" %}
+  {% endif %}
 </div>

@@ -9,11 +9,19 @@
     {% endif %}
   {% endif %}
 
+  {% component "ui_core.alert" title="Ici, vous programmez les épreuves" message="Une épreuve concerne une classe et une matière. La période officielle, elle, est déjà définie dans Calendrier puis ouverte depuis l'onglet Sessions." tone="info" %}{% endcomponent %}
+
+  {% component "ui_core.modal" id="plan-evaluation-modal" title="Programmer une épreuve individuelle" trigger_label="Ajouter une épreuve" size="wide" open=evaluation_form.errors %}
+    {% include "portal/staff/director/partials/evaluation_sessions/create.html" %}
+  {% endcomponent %}
+
+  {% component "ui_core.drawer" id="evaluation-filters-drawer" title="Rechercher une épreuve" trigger_label="Rechercher / filtrer" size="compact" %}
   <form method="get"
         hx-get="{% url 'accounts_portal:director_exam_sessions_subcontent' %}"
-        hx-target="#director-session-subcontent"
-        hx-swap="innerHTML"
-        hx-trigger="submit, change from:select"
+        hx-target="#director-evaluation-list-region"
+        hx-select="#director-evaluation-list-region"
+        hx-swap="outerHTML"
+        hx-trigger="submit"
         hx-indicator="#director-session-loading"
         hx-sync="#director-session-subcontent:replace"
         class="grid min-w-0 gap-3 border-y border-ui-border py-4 sm:grid-cols-2 xl:grid-cols-[minmax(12rem,1fr)_12rem_12rem_minmax(14rem,1fr)_auto]">
@@ -47,6 +55,7 @@
       <i data-lucide="search" class="h-4 w-4" aria-hidden="true"></i>Rechercher
     </button>
   </form>
+  {% endcomponent %}
 
   <div id="director-evaluation-list-region" class="min-w-0">
     {% if eval_events_by_class %}
@@ -89,6 +98,7 @@
                   {% if evt.description %}<p class="mt-2 max-w-3xl break-words text-sm text-ui-text-muted">{{ evt.description }}</p>{% endif %}
                 </div>
               </div>
+              <a href="{% url 'accounts_portal:director_evaluation_attendance_sheet' evt.id %}" target="_blank" class="ui-focus-ring inline-flex h-9 items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover"><i data-lucide="file-signature" class="h-4 w-4" aria-hidden="true"></i>Fiche de présence</a>
               {% if evt.status != 'cancelled' and evt.status != 'completed' %}
               <details class="relative shrink-0">
                 <summary class="ui-focus-ring inline-flex h-9 cursor-pointer list-none items-center gap-2 rounded-ui-button border border-ui-danger/30 bg-ui-danger-soft px-3 text-xs font-semibold text-ui-danger">

@@ -12,6 +12,7 @@ from .views_carte import (
     carte_apercu_view,
     carte_pdf_view,
     portail_verification_view,
+    portail_verify_staff_token_view,
     portail_verify_token_view,
 )
 
@@ -31,6 +32,7 @@ urlpatterns = [
     # Portail de vérification public
     path("carte/verifier/", portail_verification_view, name="portail_verification"),
     path("carte/v/<str:token>/", portail_verify_token_view, name="portail_verify_token"),
+    path("carte/personnel/v/<str:token>/", portail_verify_staff_token_view, name="portail_verify_staff_token"),
 
     # Authentification par carte (HTMX)
     path("carte/scan/verify/", card_scan_verify_view, name="card_scan_verify"),

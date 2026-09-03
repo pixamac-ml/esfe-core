@@ -33,11 +33,11 @@ class StudentProfileContext:
     enrollment: object | None
 
 
-def _get_profile_context(user) -> StudentProfileContext:
-    snapshot = get_student_academic_snapshot(user)
+def _get_profile_context(user, academic_year_id=None) -> StudentProfileContext:
+    snapshot = get_student_academic_snapshot(user, academic_year_id=academic_year_id)
     student = snapshot["student"]
-    candidature = getattr(getattr(student, "inscription", None), "candidature", None) if student else None
     enrollment = snapshot["academic_enrollment"]
+    candidature = getattr(getattr(enrollment, "inscription", None), "candidature", None) if enrollment else None
     return StudentProfileContext(
         student=student,
         candidature=candidature,
@@ -45,8 +45,18 @@ def _get_profile_context(user) -> StudentProfileContext:
     )
 
 
-def get_student_documents(user):
-    context = _get_profile_context(user)
+def _assert_selected_profile_is_editable(context: StudentProfileContext):
+    """Keep annual candidature records immutable while viewed as history."""
+    enrollment = context.enrollment
+    if enrollment is not None and not enrollment.is_active:
+        raise ValidationError(
+            "Les informations du dossier d'une annee historique sont en lecture seule. "
+            "Selectionnez l'annee academique active pour les modifier."
+        )
+
+
+def get_student_documents(user, academic_year_id=None):
+    context = _get_profile_context(user, academic_year_id=academic_year_id)
     candidature = context.candidature
     if candidature is None:
         return []
@@ -88,8 +98,8 @@ def get_student_documents(user):
     return documents
 
 
-def get_missing_fields(user):
-    context = _get_profile_context(user)
+def get_missing_fields(user, academic_year_id=None):
+    context = _get_profile_context(user, academic_year_id=academic_year_id)
     candidature = context.candidature
     enrollment = context.enrollment
     if candidature is None:
@@ -111,14 +121,14 @@ def get_missing_fields(user):
 
     missing.extend(
         f"document:{document['name']}"
-        for document in get_student_documents(user)
+        for document in get_student_documents(user, academic_year_id=academic_year_id)
         if document["status"] == "manquant" and document["is_mandatory"]
     )
     return missing
 
 
-def get_profile_completion(user):
-    context = _get_profile_context(user)
+def get_profile_completion(user, academic_year_id=None):
+    context = _get_profile_context(user, academic_year_id=academic_year_id)
     candidature = context.candidature
     if candidature is None:
         return {
@@ -139,14 +149,14 @@ def get_profile_completion(user):
         bool(context.student and context.student.matricule),
         bool(context.enrollment),
     ]
-    documents = get_student_documents(user)
+    documents = get_student_documents(user, academic_year_id=academic_year_id)
     mandatory_documents = [document for document in documents if document["is_mandatory"]]
     if mandatory_documents:
         checks.extend(document["status"] != "manquant" for document in mandatory_documents)
 
     completed = sum(1 for item in checks if item)
     percent = round((completed / len(checks)) * 100) if checks else 0
-    missing_fields = get_missing_fields(user)
+    missing_fields = get_missing_fields(user, academic_year_id=academic_year_id)
     if percent >= 100:
         alert_level = "success"
         message = "Votre profil est complet."
@@ -165,14 +175,14 @@ def get_profile_completion(user):
     }
 
 
-def get_profile_data(user):
-    snapshot = get_student_academic_snapshot(user)
-    context = _get_profile_context(user)
+def get_profile_data(user, academic_year_id=None):
+    snapshot = get_student_academic_snapshot(user, academic_year_id=academic_year_id)
+    context = _get_profile_context(user, academic_year_id=academic_year_id)
     student = context.student
     candidature = context.candidature
     enrollment = context.enrollment
-    completion = get_profile_completion(user)
-    documents = get_student_documents(user)
+    completion = get_profile_completion(user, academic_year_id=academic_year_id)
+    documents = get_student_documents(user, academic_year_id=academic_year_id)
     profile, _created = Profile.objects.get_or_create(user=user)
     preference, _preference_created = UserPreference.objects.get_or_create(user=user)
     support_state = AccountSupportState.objects.filter(user=user).first()
@@ -210,6 +220,8 @@ def get_profile_data(user):
             "completion": completion,
             "alerts": completion["missing_fields"],
             "account_center": account_center,
+            "selected_academic_year_id": snapshot["selected_academic_year_id"],
+            "is_historical_context": snapshot["is_historical_context"],
         }
 
     return {
@@ -228,7 +240,7 @@ def get_profile_data(user):
             "formation": getattr(candidature.programme, "title", "Non disponible"),
             "classroom": getattr(getattr(enrollment, "academic_class", None), "display_name", "Non disponible") if enrollment else "Non disponible",
             "academic_year": getattr(snapshot["academic_year"], "name", "Non disponible"),
-            "enrollment_status": getattr(getattr(student, "inscription", None), "get_status_display", lambda: "Non disponible")(),
+            "enrollment_status": getattr(getattr(enrollment, "inscription", None), "get_status_display", lambda: "Non disponible")(),
             "academic_status": snapshot["academic_status_message"],
             "annexe": getattr(candidature.branch, "name", "Non disponible"),
         },
@@ -236,14 +248,17 @@ def get_profile_data(user):
         "completion": completion,
         "alerts": completion["missing_fields"],
         "account_center": account_center,
+        "selected_academic_year_id": snapshot["selected_academic_year_id"],
+        "is_historical_context": snapshot["is_historical_context"],
     }
 
 
-def update_editable_fields(user, data):
-    context = _get_profile_context(user)
+def update_editable_fields(user, data, academic_year_id=None):
+    context = _get_profile_context(user, academic_year_id=academic_year_id)
     candidature = context.candidature
     if candidature is None:
         raise ValidationError("Aucun profil etudiant editable n'est disponible.")
+    _assert_selected_profile_is_editable(context)
 
     cleaned = {}
     errors = {}
@@ -279,28 +294,28 @@ def update_editable_fields(user, data):
         profile.save(update_fields=["phone", "updated_at"])
 
     candidature.save(update_fields=["email", "phone", "updated_at"])
-    return get_profile_data(user)
+    return get_profile_data(user, academic_year_id=academic_year_id)
 
 
-def update_account_center(user, data):
+def update_account_center(user, data, academic_year_id=None):
     profile, _created = Profile.objects.get_or_create(user=user)
     cleaned = {field: (data.get(field) or "").strip() for field in EDITABLE_ACCOUNT_FIELDS}
     profile.location = cleaned["location"]
     profile.address = cleaned["address"]
     profile.bio = cleaned["bio"]
     profile.save(update_fields=["location", "address", "bio", "updated_at"])
-    return get_profile_data(user)
+    return get_profile_data(user, academic_year_id=academic_year_id)
 
 
-def update_account_preferences(user, data):
+def update_account_preferences(user, data, academic_year_id=None):
     preference, _created = UserPreference.objects.get_or_create(user=user)
     for field in PREFERENCE_FIELDS:
         setattr(preference, field, data.get(field) == "on")
     preference.save(update_fields=[*PREFERENCE_FIELDS, "updated_at"])
-    return get_profile_data(user)
+    return get_profile_data(user, academic_year_id=academic_year_id)
 
 
-def update_account_password(user, data):
+def update_account_password(user, data, academic_year_id=None):
     old_password = data.get("old_password") or ""
     new_password = data.get("new_password") or ""
     confirm_password = data.get("confirm_password") or ""
@@ -324,14 +339,15 @@ def update_account_password(user, data):
     if support_state and support_state.must_change_password:
         support_state.must_change_password = False
         support_state.save(update_fields=["must_change_password", "updated_at"])
-    return get_profile_data(user)
+    return get_profile_data(user, academic_year_id=academic_year_id)
 
 
-def handle_document_upload(user, file, document_type_id):
-    context = _get_profile_context(user)
+def handle_document_upload(user, file, document_type_id, academic_year_id=None):
+    context = _get_profile_context(user, academic_year_id=academic_year_id)
     candidature = context.candidature
     if candidature is None:
         raise ValidationError("Aucun dossier etudiant disponible pour televersement.")
+    _assert_selected_profile_is_editable(context)
 
     if not file:
         raise ValidationError({"file": "Aucun fichier n'a ete fourni."})
@@ -357,7 +373,7 @@ def handle_document_upload(user, file, document_type_id):
         upload.is_validated = False
         upload.admin_note = ""
         upload.save(update_fields=["file", "is_valid", "is_validated", "admin_note"])
-    return get_profile_data(user)
+    return get_profile_data(user, academic_year_id=academic_year_id)
 
 
 def get_internal_rules_status(user):

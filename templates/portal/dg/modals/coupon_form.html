@@ -1,24 +1,18 @@
-<div class="p-6">
-  <div class="mb-5 flex items-start justify-between gap-4">
-    <div>
-      <p class="text-xs font-black uppercase tracking-[.18em] text-blue-600">Finance / Coupons</p>
-      <h3 class="mt-1 text-2xl font-black text-slate-950">Nouveau coupon de reduction</h3>
-      <p class="mt-2 text-sm font-semibold text-slate-500">Le code sera communique par vos soins a l'etudiant. La gestionnaire l'appliquera ensuite sur l'inscription.</p>
-    </div>
-    <button type="button" class="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50" onclick="dgCloseModal()">
-      <i class="fa-solid fa-xmark"></i>
-    </button>
+<section class="space-y-5" data-overlay-title="Créer un coupon">
+  <div>
+    <p class="text-xs font-bold uppercase tracking-wide text-ui-primary">Finance · coupons</p>
+    <p class="mt-1 text-sm text-ui-text-muted">Le code est appliqué par la gestionnaire sur l’inscription autorisée.</p>
   </div>
 
   {% if form and form.errors %}
-  <div class="mb-4 rounded-xl border border-rose-100 bg-rose-50 p-3 text-sm font-semibold text-rose-700">
+  <div class="rounded-ui-card border border-ui-danger/40 bg-ui-danger-soft p-3 text-sm font-semibold text-ui-danger">
     Merci de corriger les champs signales.
     {% if form.non_field_errors %}<div class="mt-1">{{ form.non_field_errors.0 }}</div>{% endif %}
   </div>
   {% endif %}
 
   {% if form.long_validity_warning %}
-  <div class="mb-4 rounded-xl border border-amber-100 bg-amber-50 p-3 text-sm font-semibold text-amber-700">
+  <div class="rounded-ui-card border border-ui-warning/40 bg-ui-warning-soft p-3 text-sm font-semibold text-ui-warning">
     La duree de validite depasse 30 jours — verifiez que c'est volontaire.
   </div>
   {% endif %}
@@ -27,6 +21,7 @@
     method="post"
     action="{% url 'accounts_portal:dg_coupon_create' %}"
     class="space-y-5"
+    data-dg-interactive-form
     onsubmit="return dgSubmitModalForm(this)"
   >
     {% csrf_token %}
@@ -79,12 +74,12 @@
       </label>
     </div>
 
-    <div class="flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 pt-5">
-      <button type="button" class="dg-action" onclick="dgCloseModal()">Annuler</button>
-      <button type="submit" class="dg-action dg-action-dark">Creer le coupon</button>
+    <div class="flex flex-wrap items-center justify-end gap-3 border-t border-ui-border pt-5">
+      <button type="button" class="inline-flex h-ui-control items-center rounded-ui-button border border-ui-border px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" onclick="dgCloseModal()">Annuler</button>
+      <button type="submit" class="inline-flex h-ui-control items-center rounded-ui-button bg-ui-primary px-3 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus">Créer le coupon</button>
     </div>
   </form>
-</div>
+</section>
 
 <script>
 (() => {

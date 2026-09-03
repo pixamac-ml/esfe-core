@@ -1,18 +1,24 @@
 import json
 
-from django.db import transaction
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.http import FileResponse, Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
-from accounts.forms import BranchCashMovementForm
-from accounts.models import BranchCashMovement
+from accounts.forms import BranchCashMovementForm, BranchWalletForm, CashRegisterCloseForm, CashRegisterOpenForm, WalletAmountForm
+from accounts.models import BranchCashMovement, BranchWallet
 from accounts.services.accounting_documents import (
     create_cash_movement,
     ensure_cash_movement_receipt,
-    finalize_cash_movement_document,
 )
+from accounts.services.financial_integrity import (
+    assert_financial_period_open,
+    close_cash_register_session,
+    open_cash_register_session,
+)
+from accounts.services.wallets import allocate_from_principal, close_wallet, return_to_principal, transfer_between_wallets
 from accounts.services.manager_intelligence import (
     lock_branch_cash_balance,
     reconcile_branch_financial_movements,
@@ -30,6 +36,16 @@ from accounts.dashboards.htmx_utils import (
     manager_section_notice_redirect_response,
     manager_section_redirect_response,
 )
+
+
+def _wallet_error_response(message: str) -> HttpResponse:
+    """Keep the current workspace visible and report an actionable wallet error."""
+    response = HttpResponse("")
+    response["HX-Reswap"] = "none"
+    response["HX-Trigger"] = json.dumps(
+        {"showToast": {"message": message, "type": "error"}}
+    )
+    return response
 
 
 @manager_finance_required("manage_cash_sessions")
@@ -280,6 +296,10 @@ def cash_movement_create(request: HttpRequest) -> HttpResponse:
         )
         response.status_code = 400
         return response
+    try:
+        assert_financial_period_open(request.branch, form.cleaned_data["movement_date"])
+    except ValidationError as exc:
+        return HttpResponse(" ".join(exc.messages), status=400)
 
     with transaction.atomic():
         _locked_branch, available_cash = lock_branch_cash_balance(request.branch)
@@ -298,13 +318,143 @@ def cash_movement_create(request: HttpRequest) -> HttpResponse:
             )
             response.status_code = 400
             return response
-        movement.branch = request.branch
-        movement.created_by = request.user
-        movement.save()
-        finalize_cash_movement_document(movement)
+        create_cash_movement(
+            branch=request.branch,
+            movement_type=movement.movement_type,
+            source=movement.source,
+            amount=movement.amount,
+            label=movement.label,
+            movement_date=movement.movement_date,
+            notes=movement.notes,
+            created_by=request.user,
+        )
     response = manager_section_redirect_response("caisse")
     response["HX-Trigger"] = json.dumps({"cashBalanceUpdated": True, "dashboardStatsUpdated": True})
     return response
+
+
+@manager_required
+@require_POST
+def cash_register_open(request: HttpRequest) -> HttpResponse:
+    form = CashRegisterOpenForm(request.POST)
+    if not form.is_valid():
+        return HttpResponse("Comptage d'ouverture invalide.", status=400)
+    try:
+        _session, created = open_cash_register_session(
+            branch=request.branch,
+            actor=request.user,
+            opening_amount=form.cleaned_data["opening_amount"],
+            notes=form.cleaned_data["opening_notes"],
+        )
+    except ValidationError as exc:
+        return HttpResponse(" ".join(exc.messages), status=400)
+    return manager_section_notice_redirect_response(
+        "caisse",
+        "caisse_ouverte" if created else "caisse_deja_ouverte",
+    )
+
+
+@manager_required
+@require_POST
+def cash_register_close(request: HttpRequest) -> HttpResponse:
+    form = CashRegisterCloseForm(request.POST)
+    if not form.is_valid():
+        return HttpResponse("Comptage de fermeture invalide.", status=400)
+    try:
+        session = close_cash_register_session(
+            branch=request.branch,
+            actor=request.user,
+            counted_amount=form.cleaned_data["counted_amount"],
+            notes=form.cleaned_data["closing_notes"],
+        )
+    except ValidationError as exc:
+        return HttpResponse(" ".join(exc.messages), status=400)
+    notice = "caisse_fermee_ecart" if session.difference_amount else "caisse_fermee"
+    return manager_section_notice_redirect_response("caisse", notice)
+
+
+@manager_required
+@require_POST
+def wallet_create(request: HttpRequest) -> HttpResponse:
+    form = BranchWalletForm(request.POST)
+    if not form.is_valid():
+        first_error = next(iter(form.errors.values()))[0]
+        return _wallet_error_response(f"Mini-caisse invalide : {first_error}")
+    wallet = form.save(commit=False)
+    form.apply_profile(wallet)
+    wallet.branch = request.branch
+    wallet.created_by = request.user
+    if not wallet.is_favorite and BranchWallet.objects.filter(
+        branch=request.branch,
+        status=BranchWallet.STATUS_ACTIVE,
+        is_favorite=True,
+    ).count() < 4:
+        wallet.is_favorite = True
+    try:
+        wallet.save()
+    except IntegrityError:
+        return _wallet_error_response(
+            "Une mini-caisse porte deja ce nom dans cette annexe."
+        )
+    return manager_section_notice_redirect_response("caisse", "mini_caisse_creee")
+
+
+def _branch_wallet(request, pk):
+    return get_object_or_404(BranchWallet, pk=pk, branch=request.branch)
+
+
+@manager_required
+@require_POST
+def wallet_allocate(request: HttpRequest, pk: int) -> HttpResponse:
+    form = WalletAmountForm(request.POST)
+    if not form.is_valid():
+        return _wallet_error_response("Saisissez un montant d'affectation valide.")
+    try:
+        allocate_from_principal(wallet=_branch_wallet(request, pk), amount=form.cleaned_data["amount"], actor=request.user, notes=form.cleaned_data["notes"])
+    except ValidationError as exc:
+        return _wallet_error_response(" ".join(exc.messages))
+    return manager_section_notice_redirect_response("caisse", "mini_caisse_alimentee")
+
+
+@manager_required
+@require_POST
+def wallet_return(request: HttpRequest, pk: int) -> HttpResponse:
+    form = WalletAmountForm(request.POST)
+    if not form.is_valid():
+        return _wallet_error_response("Saisissez un montant de restitution valide.")
+    try:
+        return_to_principal(wallet=_branch_wallet(request, pk), amount=form.cleaned_data["amount"], actor=request.user, notes=form.cleaned_data["notes"])
+    except ValidationError as exc:
+        return _wallet_error_response(" ".join(exc.messages))
+    return manager_section_notice_redirect_response("caisse", "mini_caisse_restituee")
+
+
+@manager_required
+@require_POST
+def wallet_transfer(request: HttpRequest, pk: int) -> HttpResponse:
+    form = WalletAmountForm(request.POST)
+    target_id = request.POST.get("target_wallet_id")
+    if not form.is_valid() or not target_id:
+        return _wallet_error_response("Choisissez une destination et un montant valide.")
+    try:
+        transfer_between_wallets(source=_branch_wallet(request, pk), target=_branch_wallet(request, int(target_id)), amount=form.cleaned_data["amount"], actor=request.user, notes=form.cleaned_data["notes"])
+    except (ValidationError, ValueError) as exc:
+        return _wallet_error_response(
+            " ".join(exc.messages)
+            if isinstance(exc, ValidationError)
+            else "Destination invalide."
+        )
+    return manager_section_notice_redirect_response("caisse", "mini_caisse_transferee")
+
+
+@manager_required
+@require_POST
+def wallet_close(request: HttpRequest, pk: int) -> HttpResponse:
+    try:
+        close_wallet(wallet=_branch_wallet(request, pk), actor=request.user)
+    except ValidationError as exc:
+        return _wallet_error_response(" ".join(exc.messages))
+    return manager_section_notice_redirect_response("caisse", "mini_caisse_cloturee")
 
 
 @manager_required

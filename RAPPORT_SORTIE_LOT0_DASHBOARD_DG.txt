@@ -1,0 +1,426 @@
+RAPPORT DE SORTIE - LOT 0
+DASHBOARD DIRECTION GENERALE - ESFE CORE
+Date : 28 aout 2026
+Statut : LOT 0 TERMINE. ARRET OBLIGATOIRE AVANT LOT 1.
+
+Ce rapport couvre uniquement les corrections et fondations autorisees par
+instruction.txt. Aucune nouvelle fonctionnalite de cockpit, Audit & Controle
+transverse, finance executive complete ou refonte globale n'a ete lancee.
+
+================================================================
+A. RESUME
+================================================================
+
+Le dashboard DG est stabilise sur les points critiques identifies :
+
+- le shell initial ne calcule plus le mega-contexte DG avant le chargement
+  dynamique de la premiere section ;
+- le planning transmet et conserve correctement week_start et class_id ;
+- les graphiques actifs utilisent maintenant le contrat de graphiques UI Core ;
+- les canvases sans bibliotheque de graphique affichent un message explicite au
+  lieu de rester vides ;
+- la modal d'alerte transmet enfin le type alert au contexte securise ;
+- la suppression d'annee academique n'est plus disponible par l'API DG ;
+- le faux "temps reel" est renomme en "Activite recente" et decrit comme un
+  instantane rafraichi manuellement ;
+- les feedbacks DG passent par le toast UI Core lorsque celui-ci est disponible ;
+- les formulaires DG protegent les doubles soumissions cote interface ;
+- le listener commun de fermeture de modale est enregistre une seule fois ;
+- les contrats de test pointent les deux roles DG vers dashboard_ui_core.html.
+
+Les 25 tests DG cibles passent. Aucun schema de donnees ni migration n'a ete
+cree. Aucun deploiement ni push distant n'a ete effectue.
+
+
+================================================================
+B. FICHIERS MODIFIES PAR LE LOT 0 ET RAISON
+================================================================
+
+1. portal/dg/services.py
+   - ajout du contexte leger build_dg_shell_context pour le premier rendu ;
+   - optimisation des syntheses annexes par agregations groupees ;
+   - budget de requetes fixe pour les KPI par annexe ;
+   - correction du contexte drawer/modal avec kind_override.
+
+2. portal/views/views.py
+   - utilisation du contexte leger pour la page DG et la modal de contexte ;
+   - retrait de delete_academic_year de l'API d'actions executives DG ;
+   - transmission du type de modal aux donnees d'alerte ;
+   - renommage de navigation vers Activite recente.
+
+3. static/src/js/portal/dg_dashboard.js
+   - passage de class_id et week_start au chargement planning ;
+   - preservation des parametres de planning dans l'URL ;
+   - interception DG de navigation afin de conserver le contexte URL ;
+   - rendu/fallback des graphiques UI Core ;
+   - toast UI Core et etat loading/disabled des boutons de soumission.
+
+4. static/src/js/portal/certified_dashboard_shell.js
+   - deplacement du listener certified-dashboard:close-modal hors du listener
+     click : plus de duplication a chaque clic.
+
+5. templates/portal/dg/dashboard_ui_core.html
+   - remplacement du spinner local de workspace par ui_core.loading_overlay.
+
+6. templates/portal/dg/partials/analytics/charts.html
+   - migration des graphiques admissions et mensuels au contrat data-ui-chart.
+
+7. templates/portal/dg/partials/alerts/priority_table.html
+   - migration du graphique de risques au contrat UI Core ;
+   - periode affichee remplacee par l'annee academique reelle.
+
+8. templates/portal/dg/partials/finance/summary.html
+   - migration du graphique finance au contrat UI Core ;
+   - libelles financiers clarifies : cumul de l'annee academique, pas "ce mois".
+
+9. templates/portal/dg/partials/realtime/monitoring.html
+   - renomme et rend honnete : Activite recente / actualisation manuelle ;
+   - retrait du canvas sans serie temporelle fiable.
+
+10. templates/portal/dg/partials/overview.html
+    - le badge de periode devient "Veille admissions : ..." ;
+    - il ne pretend plus scoper tous les KPI du dashboard.
+
+11. templates/portal/dg/partials/topbar_actions.html
+    - "Periode" devient "Veille admissions".
+
+12. templates/portal/dg/modals/context.html
+    - le filtre est clairement appele "Fenetre de veille admissions".
+
+13. portal/test_dg_lot0.py
+    - tests planning, graphiques, modal d'alerte, suppression DG, loader UI
+      Core et budget de requetes.
+
+14. notification_center/tests/test_portal_phase1.py
+    - contrat DG corrige vers dashboard_ui_core.html.
+
+Note importante : plusieurs de ces fichiers contenaient deja des changements
+locaux avant le Lot 0. Les modifications existantes n'ont pas ete ecrasees.
+
+
+================================================================
+C. UI CORE
+================================================================
+
+Composants utilises :
+
+- ui_core.app_shell, sidebar et topbar : deja actifs et conserves ;
+- ui_core.loading_overlay : maintenant utilise par le workspace DG initial ;
+- ui_core.toast : maintenant prioritaire pour les feedbacks DG ;
+- UI Core chart renderer : utilise par les graphiques Analytics, Alertes et
+  Finance avec data-ui-chart.
+
+Composant cree :
+
+- aucun. Le Lot 0 reutilise les primitives existantes.
+
+Composant ameliore :
+
+- aucun composant UI Core n'a ete modifie ; le contrat existant est compose
+  dans le dashboard DG.
+
+
+================================================================
+D. LEGACY
+================================================================
+
+Encore actif :
+
+- templates/portal/dg/dashboard.html ;
+- static/src/css/portal/dg_legacy.css ;
+- static/src/js/portal/dg_dashboard.js ;
+- styles inline et composants historiques des partials DG ;
+- Font Awesome dans les vues historiques.
+
+Remplace pendant Lot 0 :
+
+- spinner de workspace DG par le loading overlay UI Core ;
+- initialiseurs de graphiques historiques par data-ui-chart pour les graphiques
+  visibles et fiables ;
+- feedback local prioritairement par toast UI Core.
+
+Supprime :
+
+- aucune suppression de fichier legacy ;
+- aucun retrait CSS/JS massif.
+
+Dependances decouvertes :
+
+- le JavaScript DG reste necessaire pour la navigation HTMX, les overlays,
+  les actions POST et certains fragments legacy ;
+- le shell certifie est partage par plusieurs dashboards et son JavaScript est
+  donc traite comme une dependance transverse.
+
+
+================================================================
+E. SECURITE
+================================================================
+
+Protections ajoutees ou confirmees :
+
+- delete_academic_year est retire de _DG_EXEC_ACTION_META et de dg_exec_action :
+  un POST DG force sur cette action retourne une erreur et preserve l'annee ;
+- la modal alert appelle desormais build_dg_drawer_context(...,
+  kind_override="alert"), donc un identifiant hors perimetre retourne 403 ;
+- le planning conserve academic_year_id et scope_branch_id via URL/session
+  valides par le backend ;
+- les actions existantes continuent d'etre protegees par role DG, scope
+  annexe, annee academique, transaction et audit selon leur domaine ;
+- les boutons de formulaires DG sont desactives pendant la soumission pour
+  reduire les doubles clics. Le backend reste l'autorite d'integrite.
+
+Tests de securite cibles :
+
+- scope annexe et annee ;
+- drawer hors scope ;
+- export hors scope ;
+- modal executive hors scope ;
+- nomination de manager hors scope ;
+- reaffectation RH hors scope ;
+- modal alert hors scope ;
+- retrait de suppression academique DG.
+
+
+================================================================
+F. PERFORMANCE
+================================================================
+
+Mesures/protections implementee :
+
+- la route /dg/ utilise build_dg_shell_context, pas
+  build_dg_dashboard_context. Le premier HTML affiche le loading UI Core sans
+  recalculer Finance, RH, Planning, Analytics et Annexes avant le GET HTMX de
+  la section.
+
+- _build_branch_summaries passe de requetes repetees par annexe/KPI a sept
+  agregations groupees fixes pour les donnees de synthese. Les listes
+  detaillees (classes, programmes, paiements) ne sont chargees que pour le
+  drawer d'une annexe.
+
+- _build_analytics ne compte plus les paiements en attente dans une requete par
+  annexe : une aggregation groupee est utilisee.
+
+- le test test_branch_summary_uses_a_fixed_query_budget valide un maximum de
+  sept requetes pour deux annexes ; ce budget ne croitra pas avec le nombre
+  d'annexes pour les KPI de base.
+
+Limite connue :
+
+Les sections DG chargees restent encore construites depuis le contexte DG
+historique large. Leur decoupage domaine par domaine reste prevu pour les lots
+ulterieurs, sans lancer de refonte prematuree pendant Lot 0.
+
+
+================================================================
+G. TESTS ET VERIFICATIONS
+================================================================
+
+Commandes executees :
+
+1. python manage.py test --settings=config.settings_test_local
+   portal.test_dg_lot0 portal.test_dg_context portal.test_dg_context_unit
+   portal.test_dg_staff_lifecycle --keepdb -v 1
+   Resultat : 25 tests passes.
+
+2. python manage.py test --settings=config.settings_test_local
+   portal.test_certified_management_dashboards --keepdb -v 1
+   Resultat : 2 tests passes.
+
+3. python manage.py check --settings=config.settings_test_local
+   Resultat : aucune erreur Django.
+
+4. node --check static/src/js/portal/dg_dashboard.js
+   Resultat : syntaxe valide.
+
+5. node --check static/src/js/portal/certified_dashboard_shell.js
+   Resultat : syntaxe valide.
+
+Verification complementaire executee :
+
+- notification_center.tests.test_portal_phase1 avec les tests DG : les deux
+  sous-tests DG sont passes avec le nouveau template.
+- la commande complete conserve trois echecs non-DG preexistants dans son
+  contrat de templates : SECRETARY, MARKETING_MANAGER et SUPER_ADMIN.
+  Ils ne sont pas modifies dans ce Lot 0 pour ne pas etendre le perimetre DG.
+
+Note environnement :
+
+Un essai de deux suites paralleles sur la meme base SQLite preservee a produit
+un verrou database is locked. La relance sequentielle DG est verte. Ce n'est
+pas une erreur applicative.
+
+
+================================================================
+H. MIGRATIONS
+================================================================
+
+Aucune migration creee.
+
+Justification : le Lot 0 ne modifie aucun modele et la politique de non
+suppression DG est appliquee en retirant l'exposition de l'action, sans toucher
+aux donnees existantes ni a la fonction technique distincte de calendrier.
+
+
+================================================================
+I. RECETTE MANUELLE OBLIGATOIRE
+================================================================
+
+A executer avec un compte Directeur General et des donnees representatives.
+
+1. Contexte :
+   - choisir une annee, une annexe, puis retour global ;
+   - verifier que la barre et l'URL conservent section, annee, annexe et veille
+     admissions apres refresh et retour navigateur.
+
+2. Planning :
+   - choisir une classe ;
+   - cliquer Precedent, Suivant, puis Semaine en cours ;
+   - verifier la semaine affichee, la classe conservee et le contenu du
+     planning ;
+   - changer d'annexe puis de classe et verifier qu'aucune classe hors scope
+     n'est accessible.
+
+3. Graphiques :
+   - ouvrir Analytics, Alertes, Finance ;
+   - verifier que chaque graphique est rendu apres chargement HTMX ;
+   - reduire/agrandir la fenetre et verifier le resize ;
+   - verifier les tableaux/detail comme alternative lisible.
+
+4. Alertes :
+   - ouvrir le contexte d'une alerte reelle ;
+   - verifier cible, annexe, action et ouverture du drawer ;
+   - essayer un identifiant d'une autre annexe avec URL modifiee : resultat
+     attendu 403 ou contenu inaccessible.
+
+5. Actions :
+   - valider une cloture de test ;
+   - tester annulation, confirmation, motif et toast ;
+   - double-cliquer sur Confirmer : une seule operation doit etre envoyee ;
+   - verifier l'audit metier associe.
+
+6. Politique destructive :
+   - tenter un POST direct delete_academic_year depuis une session DG de test ;
+   - resultat attendu : erreur 400 et annee toujours presente.
+
+7. Shell transverse :
+   - tester ouverture/fermeture de modal et drawer dans DG, Direction des
+     Etudes et Gestionnaire ;
+   - effectuer plusieurs clics puis une fermeture de modal ;
+   - verifier qu'une fermeture n'est pas declenchee plusieurs fois.
+
+8. Responsive et clavier :
+   - recette a 360 px, 768 px et 1440 px ;
+   - navigation Tab/Shift+Tab des boutons, modales, drawers et planning ;
+   - verifier focus visible et fermeture modale avec le comportement UI Core.
+
+
+================================================================
+J. REGRESSIONS CONNUES OU RISQUES RESTANTS
+================================================================
+
+- Le legacy DG est encore present et plusieurs partials ont des styles inline.
+- Les sections utilisent encore un contexte global large apres leur chargement.
+- La Finance n'est pas encore une console executive complete (banque, caisse,
+  versements, donations, creances et definition metier des sorties).
+- Audit & Controle transverse n'est pas encore construit.
+- La responsivite et l'accessibilite des partials legacy necessitent la recette
+  manuelle ci-dessus et une migration progressive.
+- Les trois contrats templates non-DG echouent encore dans
+  notification_center.tests.test_portal_phase1.
+
+Ces risques sont documentes ; ils ne doivent pas etre masques par une
+presentation visuelle trompeuse.
+
+
+================================================================
+K. ETAT DES P0/P1
+================================================================
+
+P0 - Action destructive DG
+Statut : RESOLU POUR LE DASHBOARD DG.
+La suppression d'annee academique n'est plus exposee par dg_exec_action.
+
+P0 - Isolation multi-annexes des actions sensibles
+Statut : PROTEGEE ET TESTEE DANS LE PERIMETRE DG.
+Les protections existantes et les tests de scope sont conserves/etendus.
+
+P1 - Planning semaine/classe
+Statut : RESOLU ET TESTE.
+
+P1 - Graphiques visibles non initialises
+Statut : RESOLU POUR Analytics, Alertes et Finance.
+Un fallback explicite est affiche si Chart.js est indisponible.
+
+P1 - Canvas temps reel sans serie fiable
+Statut : RESOLU PAR RETRAIT HONNETE.
+La section devient Activite recente et ne promet plus de flux live.
+
+P1 - Periode affichee incoherente avec Finance/Alertes
+Statut : RESOLU PAR CLARIFICATION.
+Le filtre est limite et nomme Veille admissions ; Finance et Alertes affichent
+l'annee academique qui scope effectivement leurs calculs.
+
+P1 - Detail modal d'alerte
+Statut : RESOLU ET TESTE POUR LE TYPE/SCOPE.
+La recette d'une alerte reelle reste obligatoire.
+
+P1 - Double calcul initial et N+1 majeur des annexes
+Statut : PARTIELLEMENT RESOLU.
+Le rendu initial est leger ; les KPI annexes ont un budget fixe. Le
+decoupage complet du mega-contexte de sections est reporté volontairement.
+
+P1 - Finance executive complete
+Statut : OUVERT.
+Decision metier necessaire avant implementation, prevue pour le lot autorise
+ulterieur.
+
+P1 - Audit & Controle transverse
+Statut : OUVERT.
+Fondations d'audit preservees, consolidation reportee.
+
+
+================================================================
+L. PROPOSITION DE DECOUPAGE GIT
+================================================================
+
+Commit 1 - fix(dg): stabiliser contexte, planning et securite
+
+- portal/dg/services.py
+- portal/views/views.py
+- portal/test_dg_lot0.py
+
+Commit 2 - fix(ui): normaliser feedback, graphiques et activite DG
+
+- static/src/js/portal/dg_dashboard.js
+- templates/portal/dg/dashboard_ui_core.html
+- templates/portal/dg/partials/analytics/charts.html
+- templates/portal/dg/partials/alerts/priority_table.html
+- templates/portal/dg/partials/finance/summary.html
+- templates/portal/dg/partials/realtime/monitoring.html
+- templates/portal/dg/partials/overview.html
+- templates/portal/dg/partials/topbar_actions.html
+- templates/portal/dg/modals/context.html
+
+Commit 3 - fix(shell): eviter le listener modal duplique
+
+- static/src/js/portal/certified_dashboard_shell.js
+- portal/test_certified_management_dashboards.py (deja vert ; pas de
+  modification obligatoire dans ce Lot).
+
+Commit 4 - test(notification): corriger le contrat de template DG
+
+- notification_center/tests/test_portal_phase1.py
+
+Les fichiers ayant deja des changements locaux avant le Lot 0 doivent etre
+relus avec un diff selectif avant tout commit. Aucun commit, push ou deploiement
+n'a ete execute.
+
+
+================================================================
+DECISION SUIVANTE
+================================================================
+
+LOT 0 EST TERMINE.
+
+L'implementation est arretee conformement a instruction.txt.
+Attendre une validation explicite avant tout Lot 1.

@@ -43,9 +43,19 @@ def _signing_key() -> bytes:
 # -------------------------------------------------------------------
 
 def signer_carte(matricule: str, annee: str, annexe: str) -> str:
+    """Signature v1 conservée pour les cartes déjà imprimées."""
     payload = f"{matricule}|{annee}|{annexe}".encode()
     sig = hmac.new(_signing_key(), payload, hashlib.sha256).digest()
     return f"v1.{_b64(payload)}.{_b64(sig)}"
+
+
+def signer_carte_reference(*, reference: str, annee: str, annexe: str, kind: str) -> str:
+    """Signe une carte récente sans exposer matricule ou code employé."""
+    if kind not in {"student", "staff"}:
+        raise ValueError("Type de carte invalide.")
+    payload = f"{kind}|{reference}|{annee}|{annexe}".encode()
+    sig = hmac.new(_signing_key(), payload, hashlib.sha256).digest()
+    return f"v2.{_b64(payload)}.{_b64(sig)}"
 
 
 def verifier_token(token: str) -> dict | None:
@@ -56,15 +66,27 @@ def verifier_token(token: str) -> dict | None:
     """
     try:
         parts = token.split(".")
-        if len(parts) != 3 or parts[0] != "v1":
+        if len(parts) != 3 or parts[0] not in {"v1", "v2"}:
             return None
         payload_bytes = _b64d(parts[1])
         expected_sig = hmac.new(_signing_key(), payload_bytes, hashlib.sha256).digest()
         provided_sig = _b64d(parts[2])
         if not hmac.compare_digest(expected_sig, provided_sig):
             return None
-        matricule, annee, annexe = payload_bytes.decode().split("|")
-        return {"matricule": matricule, "annee": annee, "annexe": annexe}
+        values = payload_bytes.decode().split("|")
+        if parts[0] == "v1" and len(values) == 3:
+            matricule, annee, annexe = values
+            return {
+                "version": "v1", "kind": "student", "matricule": matricule,
+                "annee": annee, "annexe": annexe,
+            }
+        if parts[0] == "v2" and len(values) == 4 and values[0] in {"student", "staff"}:
+            kind, reference, annee, annexe = values
+            return {
+                "version": "v2", "kind": kind, "reference": reference,
+                "annee": annee, "annexe": annexe,
+            }
+        return None
     except Exception:
         return None
 

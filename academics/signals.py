@@ -149,7 +149,7 @@ def _recalculate_teacher_honorarium(lesson_log):
     )
 
 
-def _get_branch_managers(branch):
+def _get_lesson_log_reviewers(branch):
     from django.contrib.auth import get_user_model
 
     User = get_user_model()
@@ -157,7 +157,7 @@ def _get_branch_managers(branch):
         User.objects.filter(
             is_active=True,
             profile__branch=branch,
-            groups__name="gestionnaire",
+            profile__position__in={"academic_supervisor", "director_of_studies"},
         )
         .distinct()
         .select_related("profile")
@@ -165,7 +165,7 @@ def _get_branch_managers(branch):
 
 
 def _notify_managers_lesson_log_submitted(lesson_log):
-    managers = _get_branch_managers(lesson_log.branch)
+    reviewers = _get_lesson_log_reviewers(lesson_log.branch)
     teacher_name = lesson_log.teacher.get_full_name() or lesson_log.teacher.username
     ec_name = str(lesson_log.ec)
     class_name = str(lesson_log.academic_class)
@@ -174,9 +174,9 @@ def _notify_managers_lesson_log_submitted(lesson_log):
         f"{teacher_name} a soumis un cahier de texte pour {ec_name} / {class_name} "
         f"du {date_str}. Il est en attente de validation."
     )
-    for manager in managers:
+    for reviewer in reviewers:
         NotificationBus.notify(
-            recipient=manager,
+            recipient=reviewer,
             actor=lesson_log.teacher,
             event_type="lesson_log_submitted",
             title="Cahier de texte soumis",
@@ -186,6 +186,25 @@ def _notify_managers_lesson_log_submitted(lesson_log):
             legacy_source="lesson_log",
             legacy_object_id=str(lesson_log.pk),
         )
+
+
+def _notify_teacher_lesson_log_returned(lesson_log):
+    reviewer = lesson_log.reviewed_by
+    body = (
+        f"Votre cahier du {lesson_log.date:%d/%m/%Y} pour {lesson_log.ec} a été retourné. "
+        f"Motif : {lesson_log.review_comment or 'Correction demandée.'}"
+    )
+    NotificationBus.notify(
+        recipient=lesson_log.teacher,
+        actor=reviewer,
+        event_type="lesson_log_returned",
+        title="Cahier de texte à corriger",
+        body=body,
+        source_app="academics",
+        priority=NotificationMessage.PRIORITY_HIGH,
+        legacy_source="lesson_log",
+        legacy_object_id=str(lesson_log.pk),
+    )
 
 
 def _notify_teacher_lesson_log_validated(lesson_log):
@@ -229,19 +248,25 @@ def lesson_log_notify_on_save(sender, instance, created, **kwargs):
     old_status = getattr(instance, "_old_status", None)
     old_validated_by_id = getattr(instance, "_old_validated_by_id", None)
 
+    is_submitted = instance.status == LessonLog.STATUS_SUBMITTED
+    became_submitted = is_submitted and (created or old_status != LessonLog.STATUS_SUBMITTED)
+
     is_done = instance.status == LessonLog.STATUS_DONE
-    became_done = is_done and (created or old_status != LessonLog.STATUS_DONE)
-    is_submitted = is_done and instance.validated_by_id is None
-    became_submitted = became_done and is_submitted
 
     was_validated = old_validated_by_id is not None
     is_now_validated = instance.validated_by_id is not None
     became_validated = is_now_validated and not was_validated and is_done
+    became_returned = (
+        instance.status == LessonLog.STATUS_RETURNED
+        and old_status != LessonLog.STATUS_RETURNED
+    )
 
     if became_submitted:
         _notify_managers_lesson_log_submitted(instance)
     if became_validated:
         _notify_teacher_lesson_log_validated(instance)
+    if became_returned:
+        _notify_teacher_lesson_log_returned(instance)
 
 
 @receiver(post_save, sender=LessonLog)

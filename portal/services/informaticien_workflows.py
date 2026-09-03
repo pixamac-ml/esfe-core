@@ -9,7 +9,8 @@ from django.db import transaction
 from django.urls import reverse
 
 from academics.imports.import_service import import_grades
-from academics.models import Language, Profession
+from academics.models import EC, Language, Profession
+from academics.selectors.programme_structure_selectors import semester_has_active_ecs
 from academics.services.workflow import get_semester_permissions
 from portal.models import AccountSupportState
 from portal.models import BranchITSettings, SupportAuditLog, SupportTicket
@@ -56,13 +57,13 @@ class ImportFeedback:
     unknown_columns: list[str] | None = None
 
 
-def _build_import_preview(*, selected_class, selected_semester, ues):
+def _build_import_preview(*, selected_class, selected_semester, preview_ecs, subject_count):
     if not selected_class or not selected_semester:
         return None
-    subject_headers = []
-    for ue in ues:
-        for ec in ue.ecs.all():
-            subject_headers.append(f"NOTE /20 - {ue.code} - {ec.title}")
+    subject_headers = [
+        f"NOTE /20 - {ec.ue.code} - {ec.title}"
+        for ec in preview_ecs
+    ]
     sample_headers = ["ENROLLMENT_ID", "MATRICULE", "NOM", "PRENOM", *subject_headers[:4]]
     sample_row = ["1024", "ESFE-0001", "CAMARA", "BOUBACAR", *(["12,50"] if subject_headers else [])]
     if len(sample_headers) > len(sample_row):
@@ -70,7 +71,7 @@ def _build_import_preview(*, selected_class, selected_semester, ues):
     return {
         "headers": sample_headers,
         "sample_row": sample_row,
-        "subject_count": len(subject_headers),
+        "subject_count": subject_count,
     }
 
 
@@ -157,12 +158,15 @@ def resolve_branch_ticket(*, actor, branch, ticket, resolution=""):
     )
 
 
-def build_audit_context(*, branch, page=1):
-    logs_page = _page_queryset(audit_logs_for_branch(branch=branch), page, per_page=25)
+def build_audit_context(*, branch, page=1, query="", action_type=""):
+    logs_page = _page_queryset(audit_logs_for_branch(branch=branch, query=query, action_type=action_type), page, per_page=25)
     return {
         "branch": branch,
         "logs": list(logs_page.object_list),
         "logs_page": logs_page,
+        "query": query,
+        "action_type": action_type,
+        "action_choices": SupportAuditLog.ACTION_CHOICES,
     }
 
 
@@ -176,7 +180,17 @@ def build_import_context(
     feedback=None,
 ):
     semesters = list(selected_class.semesters.order_by("number")) if selected_class else []
-    ues = list(selected_semester.ues.prefetch_related("ecs").order_by("id")) if selected_semester else []
+    # The import screen only needs a short sample.  Loading every UE and EC
+    # for each class/semester selection made large programmes sluggish.
+    preview_ecs = (
+        list(
+            EC.objects.filter(ue__semester=selected_semester)
+            .select_related("ue")
+            .order_by("ue__code", "title", "id")[:4]
+        )
+        if selected_semester
+        else []
+    )
     student_count = (
         selected_class.enrollments.filter(
             academic_year=selected_class.academic_year,
@@ -185,7 +199,7 @@ def build_import_context(
         if selected_class
         else 0
     )
-    ec_count = sum(ue.ecs.count() for ue in ues)
+    ec_count = EC.objects.filter(ue__semester=selected_semester).count() if selected_semester else 0
     permissions = get_semester_permissions(selected_semester) if selected_semester else None
     active_session_type = (
         "retake"
@@ -199,7 +213,6 @@ def build_import_context(
         "selected_class": selected_class,
         "semesters": semesters,
         "selected_semester": selected_semester,
-        "ues": ues,
         "student_count": student_count,
         "ec_count": ec_count,
         "workflow_permissions": permissions,
@@ -208,7 +221,8 @@ def build_import_context(
         "import_preview": _build_import_preview(
             selected_class=selected_class,
             selected_semester=selected_semester,
-            ues=ues,
+            preview_ecs=preview_ecs,
+            subject_count=ec_count,
         ),
         "feedback": feedback,
     }
@@ -220,6 +234,10 @@ def import_notes_file(*, actor, branch, academic_class, semester, file, session_
         raise ValidationError("Classe hors annexe refusee.")
     if semester.academic_class_id != academic_class.id:
         raise ValidationError("Le semestre ne correspond pas a la classe.")
+    if not semester_has_active_ecs(semester):
+        raise ValidationError(
+            "Cette maquette doit etre completee par le Directeur des etudes avant la saisie ou l'import des notes."
+        )
 
     session_type = (session_type or "normal").strip().lower()
     result = import_grades(file, academic_class, semester, session_type=session_type)

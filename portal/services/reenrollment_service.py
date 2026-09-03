@@ -7,13 +7,23 @@ logger = logging.getLogger("esfe.reenrollment")
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from academics.models import AcademicClass, AcademicEnrollment, AcademicYear
-from academics.services.academic_positioning import get_positioning_fee_for_level
+from academic_cycle.models import StudentYearDecision as OfficialAnnualDecision
+from academics.services.academic_positioning import (
+    academic_level_sort_key,
+    get_positioning_fee_for_level,
+)
 from academics.services.year import DECISION_VALIDE, DECISION_ADMISSIBLE, DECISION_NON_ADMIS, carry_forward_debts, compute_annual_decision, compute_annual_result
 from accounts.access import get_user_position
-from accounts.dashboards.helpers import is_executive, is_finance, is_manager
+from accounts.dashboards.helpers import (
+    get_user_branch,
+    is_finance,
+    is_global_viewer,
+    is_manager,
+)
 from admissions.models import Candidature
 from inscriptions.models import Inscription
 from portal.models import SupportAuditLog
@@ -52,15 +62,6 @@ def _decision_from_average(*, academic_class, annual_average):
     return StudentYearDecision.DECISION_REPEATED
 
 
-def _next_level(level):
-    value = str(level or "").upper().strip()
-    ordered = ["L1", "L2", "L3", "M1", "M2"]
-    if value not in ordered:
-        return None
-    index = ordered.index(value)
-    return ordered[index + 1] if index + 1 < len(ordered) else None
-
-
 def _is_terminal_level(level):
     return str(level or "").upper().strip() in {"L3", "M2"}
 
@@ -73,34 +74,65 @@ def _financial_status(inscription):
     return {"status": "paid", "label": "A jour", "balance": 0}
 
 
+def _reenrollment_position(user):
+    return getattr(getattr(user, "profile", None), "position", "") or get_user_position(user)
+
+
+def _reenrollment_role(user):
+    return getattr(getattr(user, "profile", None), "role", "")
+
+
 def can_user_handle_reenrollment(user):
-    position = getattr(getattr(user, "profile", None), "position", "") or get_user_position(user)
-    role = getattr(getattr(user, "profile", None), "role", "")
+    """Return whether an operational user may consult this workflow.
+
+    This deliberately remains broader than each state transition.  The
+    dashboard is shared as a read model, while the transition functions below
+    remain the source of truth for the distinct academic and financial roles.
+    """
+    position = _reenrollment_position(user)
+    role = _reenrollment_role(user)
     return user.is_superuser or position in {
-        "it_support",
         "branch_manager",
+        "annex_manager",
         "finance_manager",
         "payment_agent",
         "director_of_studies",
-        "executive_director",
-        "deputy_executive_director",
-    } or role in {"finance", "executive", "superadmin"} or is_manager(user) or is_finance(user) or is_executive(user)
+    } or role == "finance" or is_manager(user) or is_finance(user)
+
+
+def can_user_propose_reenrollment(user):
+    """Only the Director of Studies may set the academic decision."""
+    return user.is_superuser or _reenrollment_position(user) == "director_of_studies"
+
+
+def can_user_submit_reenrollment_decision(user):
+    """Keep the Phase 1 service compatible with trusted legacy callers.
+
+    The operational HTTP surface below still reserves academic proposal to the
+    DE.  Existing back-office service callers may prepare a decision only when
+    they already hold the manager capability required by the original engine.
+    """
+    return can_user_propose_reenrollment(user) or can_user_apply_reenrollment(user)
+
+
+def can_user_reject_reenrollment(user):
+    """A rejection is an academic decision, not a cash-desk action."""
+    return can_user_propose_reenrollment(user)
 
 
 def can_user_validate_academic(user):
-    position = getattr(getattr(user, "profile", None), "position", "") or get_user_position(user)
-    return user.is_superuser or position in {"director_of_studies", "executive_director", "deputy_executive_director", "it_support"} or is_executive(user)
+    return can_user_propose_reenrollment(user)
 
 
 def can_user_validate_finance(user):
-    position = getattr(getattr(user, "profile", None), "position", "") or get_user_position(user)
-    role = getattr(getattr(user, "profile", None), "role", "")
+    position = _reenrollment_position(user)
+    role = _reenrollment_role(user)
     return user.is_superuser or position in {"branch_manager", "finance_manager", "payment_agent"} or role == "finance" or is_manager(user) or is_finance(user)
 
 
 def can_user_apply_reenrollment(user):
-    position = getattr(getattr(user, "profile", None), "position", "") or get_user_position(user)
-    return user.is_superuser or position in {"it_support", "branch_manager", "director_of_studies", "executive_director", "deputy_executive_director"} or is_manager(user) or is_executive(user)
+    position = _reenrollment_position(user)
+    return user.is_superuser or position in {"branch_manager", "annex_manager"} or is_manager(user)
 
 
 def _decision_target_label(decision):
@@ -116,6 +148,42 @@ def _audit_decision(*, decision, actor, action_type, details):
         target_label=_decision_target_label(decision),
         details=details,
     )
+
+
+def _assert_actor_branch_scope(*, actor, branch):
+    """Keep service calls safe when they are not initiated by the HTMX view."""
+    if actor is None or is_global_viewer(actor) or actor.is_superuser:
+        return
+    actor_branch = get_user_branch(actor)
+    if actor_branch is None or actor_branch.pk != branch.pk:
+        raise ValidationError("Cette operation est hors du perimetre de votre annexe.")
+
+
+def _sync_cycle_reenrollment(*, decision, status):
+    """Expose the authoritative portal workflow in the academic-cycle tracker.
+
+    ``AcademicReEnrollment`` already powers the student pre-rentree and access
+    policies.  It must therefore be a projection of this workflow, never a
+    competing enrollment path.
+    """
+    if decision.target_academic_year_id is None:
+        return None
+
+    from academic_cycle.models import AcademicReEnrollment
+
+    reenrollment, _created = AcademicReEnrollment.objects.update_or_create(
+        student=decision.student,
+        target_academic_year=decision.target_academic_year,
+        defaults={
+            "source_academic_year": decision.source_academic_year,
+            "source_class": decision.source_class,
+            "target_class": decision.target_class,
+            "branch": decision.source_enrollment.branch,
+            "status": status,
+            "prepared_by_system": True,
+        },
+    )
+    return reenrollment
 
 
 DECISION_MAP_NEW_TO_OLD = {
@@ -167,6 +235,37 @@ def _decision_payload_from_rule(annual_decision):
     }
 
 
+def _official_annual_decision_for_enrollment(enrollment):
+    """Return the immutable DE deliberation outcome for this exact year."""
+    return (
+        OfficialAnnualDecision.objects.filter(
+            source_enrollment=enrollment,
+            academic_year=enrollment.academic_year,
+            current_class=enrollment.academic_class,
+            is_final=True,
+        )
+        .exclude(synthesis_snapshot={})
+        .first()
+    )
+
+
+def _decision_payload_from_official_deliberation(official_decision):
+    synthesis = official_decision.synthesis_snapshot or {}
+    return {
+        "rule_source": "official_annual_deliberation",
+        "official_decision_id": official_decision.id,
+        "academic_decision": synthesis.get("academic_decision"),
+        "rule_code": synthesis.get("rule_code"),
+        "rule_label": synthesis.get("rule_label"),
+        "threshold": str(synthesis.get("threshold") or ""),
+        "admissibility_gap": str(synthesis.get("admissibility_gap") or ""),
+        "requires_academic_debt": bool(synthesis.get("requires_academic_debt")),
+        "debt_subjects": synthesis.get("debt_subjects", []),
+        "reasons": synthesis.get("reasons", []),
+        "semester_results": synthesis.get("semesters", []),
+    }
+
+
 def _decision_payload_from_manual_average(*, academic_class, annual_average):
     threshold = academic_class.validation_threshold or Decimal("10.00")
     return {
@@ -184,8 +283,17 @@ def _assert_decision_matches_academic_rules(decision):
         return
     if decision.decision_payload.get("rule_source") == "manual_average":
         return
+    if decision.decision_payload.get("rule_source") == "official_annual_deliberation":
+        expected = _map_decision(decision.decision_payload.get("academic_decision"))
+        if decision.decision != expected:
+            raise ValidationError("La décision de réinscription ne correspond plus à la délibération annuelle officielle.")
+        return
     automatic = compute_annual_decision(decision.source_enrollment)
-    expected = automatic["decision"]
+    # ``compute_annual_decision`` and ``StudentYearDecision`` deliberately use
+    # different vocabularies.  Compare values in the re-enrollment domain;
+    # otherwise a legitimate ``NON_ADMIS`` result is rejected as it is stored
+    # as the yearly ``repeated`` decision.
+    expected = _map_decision(automatic["decision"])
     if decision.decision != expected:
         expected_label = dict(StudentYearDecision.DECISION_CHOICES).get(expected, expected)
         raise ValidationError(
@@ -209,9 +317,12 @@ def _validate_decision_ready(decision):
         raise ValidationError("La classe cible doit rester dans le meme programme.")
     if decision.target_class.branch_id != decision.source_enrollment.branch_id:
         raise ValidationError("La classe cible doit rester dans la meme annexe.")
+    if decision.target_academic_year.start_date <= decision.source_academic_year.start_date:
+        raise ValidationError("L'annee cible doit etre posterieure a l'annee source.")
 
 
-def build_reenrollment_candidates(*, source_year=None, source_class=None, branch=None):
+def build_reenrollment_candidates(*, source_year=None, source_class=None, branch=None, branch_ids=None, programme=None, search="", target_year=None):
+    """Build the real source-year population without one decision query per row."""
     queryset = AcademicEnrollment.objects.select_related(
         "student",
         "student__student_profile",
@@ -233,15 +344,66 @@ def build_reenrollment_candidates(*, source_year=None, source_class=None, branch
         queryset = queryset.filter(academic_class=source_class)
     if branch is not None:
         queryset = queryset.filter(branch=branch)
+    if branch_ids is not None:
+        queryset = queryset.filter(branch_id__in=branch_ids)
+    if programme is not None:
+        queryset = queryset.filter(programme=programme)
+    if search:
+        queryset = queryset.filter(
+            Q(student__student_profile__matricule__icontains=search)
+            | Q(student__first_name__icontains=search)
+            | Q(student__last_name__icontains=search)
+            | Q(student__username__icontains=search)
+        )
 
+    enrollments = list(queryset.order_by("academic_class__level", "student__last_name", "student__first_name"))
+    decisions_by_enrollment = {
+        decision.source_enrollment_id: decision
+        for decision in StudentYearDecision.objects.filter(
+            source_enrollment_id__in=[enrollment.id for enrollment in enrollments],
+        ).select_related(
+            "target_class",
+            "target_academic_year",
+            "target_inscription",
+            "target_enrollment",
+        )
+    }
+    official_by_enrollment = {
+        decision.source_enrollment_id: decision
+        for decision in OfficialAnnualDecision.objects.filter(
+            source_enrollment_id__in=[enrollment.id for enrollment in enrollments],
+            is_final=True,
+        ).exclude(synthesis_snapshot={})
+    }
     candidates = []
-    for enrollment in queryset.order_by("academic_class__level", "student__last_name", "student__first_name"):
+    for enrollment in enrollments:
         student = getattr(enrollment.student, "student_profile", None)
-        annual_decision = compute_annual_decision(enrollment)
-        annual_result = annual_decision["annual_result"]
-        annual_average = annual_decision.get("annual_average")
+        official_decision = official_by_enrollment.get(enrollment.id)
+        if official_decision is None:
+            # No final collective deliberation: this enrollment is deliberately
+            # ineligible and must not enter the re-enrollment queue.
+            continue
+        synthesis = official_decision.synthesis_snapshot or {}
+        annual_decision = {
+            "decision": synthesis.get("academic_decision"),
+            "rule_code": synthesis.get("rule_code"),
+            "rule_label": synthesis.get("rule_label"),
+            "requires_academic_debt": synthesis.get("requires_academic_debt"),
+            "debt_subjects": synthesis.get("debt_subjects", []),
+            "semesters": synthesis.get("semesters", []),
+        }
+        annual_result = {"semester_results": synthesis.get("semesters", [])}
+        annual_average = None
         proposed_decision = _map_decision(annual_decision["decision"])
         proposed_decision_label = dict(StudentYearDecision.DECISION_CHOICES).get(proposed_decision, proposed_decision)
+        year_decision = decisions_by_enrollment.get(enrollment.id)
+        proposed_target_class = None
+        if target_year is not None and proposed_decision in TARGET_DECISIONS:
+            proposed_target_class = _resolve_target_class(
+                source_enrollment=enrollment,
+                target_academic_year=target_year,
+                decision=proposed_decision,
+            )
         candidates.append(
             {
                 "student": student,
@@ -254,25 +416,94 @@ def build_reenrollment_candidates(*, source_year=None, source_class=None, branch
                 "annual_average": annual_average,
                 "annual_result": annual_result,
                 "annual_decision": annual_decision,
+                "official_annual_decision": official_decision,
                 "financial_status": _financial_status(enrollment.inscription),
                 "proposed_decision": proposed_decision,
                 "proposed_decision_label": proposed_decision_label,
-                "year_decision": StudentYearDecision.objects.filter(
-                    student=student,
-                    source_enrollment=enrollment,
-                ).first() if student else None,
+                "proposed_target_class": proposed_target_class,
+                "year_decision": year_decision,
             }
         )
     return candidates
 
 
-def get_reenrollment_dashboard_context(*, branch, source_year=None, source_class=None, target_year=None, actor=None, toast=None):
+def _decision_financial_state(decision):
+    if decision.workflow_status == StudentYearDecision.WORKFLOW_APPLIED:
+        return "active"
+    if decision.target_inscription_id:
+        if decision.target_inscription.status == Inscription.STATUS_PARTIAL:
+            return "partial_payment"
+        return "awaiting_payment"
+    if decision.workflow_status == StudentYearDecision.WORKFLOW_FINANCE_VALIDATED:
+        return "ready"
+    return "not_started"
+
+
+def _filter_decisions_by_finance_state(queryset, finance_state):
+    """Translate the dashboard's derived financial state into SQL filters.
+
+    This keeps the dashboard KPIs exact without materialising an arbitrary
+    number of decisions in Python.  It intentionally mirrors
+    ``_decision_financial_state`` so the queue and its counters cannot drift.
+    """
+    if finance_state == "active":
+        return queryset.filter(workflow_status=StudentYearDecision.WORKFLOW_APPLIED)
+    if finance_state == "partial_payment":
+        return queryset.exclude(
+            workflow_status=StudentYearDecision.WORKFLOW_APPLIED,
+        ).filter(target_inscription__status=Inscription.STATUS_PARTIAL)
+    if finance_state == "awaiting_payment":
+        return queryset.exclude(
+            workflow_status=StudentYearDecision.WORKFLOW_APPLIED,
+        ).filter(target_inscription__isnull=False).exclude(
+            target_inscription__status=Inscription.STATUS_PARTIAL,
+        )
+    if finance_state == "ready":
+        return queryset.filter(
+            workflow_status=StudentYearDecision.WORKFLOW_FINANCE_VALIDATED,
+            target_inscription__isnull=True,
+        )
+    if finance_state == "not_started":
+        return queryset.exclude(
+            workflow_status__in=(
+                StudentYearDecision.WORKFLOW_APPLIED,
+                StudentYearDecision.WORKFLOW_FINANCE_VALIDATED,
+            ),
+        ).filter(target_inscription__isnull=True)
+    return queryset
+
+
+def get_reenrollment_dashboard_context(
+    *,
+    branch,
+    branch_ids=None,
+    source_year=None,
+    source_class=None,
+    target_year=None,
+    target_class=None,
+    programme=None,
+    decision_value="",
+    workflow_status="",
+    finance_state="",
+    search="",
+    actor=None,
+    toast=None,
+    surface="manager",
+    workspace_target="#reenrollment-workspace",
+):
+    """Return the shared operational read model for each authorized surface.
+
+    A campaign is deliberately derived from source/target years and the
+    authoritative annual decisions.  No parallel campaign table is needed.
+    """
     academic_years = AcademicYear.objects.all().order_by("-start_date")
     classes = AcademicClass.objects.select_related("academic_year", "programme", "branch").filter(
         is_archived=False,
     )
     if branch is not None:
         classes = classes.filter(branch=branch)
+    if branch_ids is not None:
+        classes = classes.filter(branch_id__in=branch_ids)
     classes = classes.order_by("-academic_year__start_date", "programme__title", "level")
     target_classes = AcademicClass.objects.select_related("academic_year", "programme", "branch").filter(
         is_active=True,
@@ -280,9 +511,15 @@ def get_reenrollment_dashboard_context(*, branch, source_year=None, source_class
     )
     if branch is not None:
         target_classes = target_classes.filter(branch=branch)
+    if branch_ids is not None:
+        target_classes = target_classes.filter(branch_id__in=branch_ids)
     target_classes = target_classes.order_by("-academic_year__start_date", "programme__title", "level")
     if target_year is not None:
         target_classes = target_classes.filter(academic_year=target_year)
+    if programme is not None:
+        target_classes = target_classes.filter(programme=programme)
+    elif source_class is not None:
+        target_classes = target_classes.filter(programme=source_class.programme)
 
     candidate_filters_required = source_year is None and source_class is None
     candidates = []
@@ -291,6 +528,10 @@ def get_reenrollment_dashboard_context(*, branch, source_year=None, source_class
             source_year=source_year,
             source_class=source_class,
             branch=branch,
+            branch_ids=branch_ids,
+            programme=programme,
+            search=search,
+            target_year=target_year,
         )
     decisions = StudentYearDecision.objects.select_related(
         "student",
@@ -302,26 +543,120 @@ def get_reenrollment_dashboard_context(*, branch, source_year=None, source_class
         "target_academic_year",
         "target_inscription",
         "target_enrollment",
+        "source_enrollment__programme",
+        "source_enrollment__branch",
     )
     if branch is not None:
         decisions = decisions.filter(source_enrollment__branch=branch)
-    decisions = decisions.order_by("-created_at")[:80]
+    if branch_ids is not None:
+        decisions = decisions.filter(source_enrollment__branch_id__in=branch_ids)
+    if source_year is not None:
+        decisions = decisions.filter(source_academic_year=source_year)
+    if source_class is not None:
+        decisions = decisions.filter(source_class=source_class)
+    if target_year is not None:
+        decisions = decisions.filter(target_academic_year=target_year)
+    if target_class is not None:
+        decisions = decisions.filter(target_class=target_class)
+    if programme is not None:
+        decisions = decisions.filter(source_enrollment__programme=programme)
+    if decision_value in dict(StudentYearDecision.DECISION_CHOICES):
+        decisions = decisions.filter(decision=decision_value)
+    else:
+        decision_value = ""
+    if workflow_status in dict(StudentYearDecision.WORKFLOW_STATUS_CHOICES):
+        decisions = decisions.filter(workflow_status=workflow_status)
+    else:
+        workflow_status = ""
+    if search:
+        decisions = decisions.filter(
+            Q(student__matricule__icontains=search)
+            | Q(student__user__first_name__icontains=search)
+            | Q(student__user__last_name__icontains=search)
+            | Q(student__user__username__icontains=search)
+        )
+    valid_finance_states = {"not_started", "ready", "awaiting_payment", "partial_payment", "active"}
+    if finance_state in valid_finance_states:
+        decisions = _filter_decisions_by_finance_state(decisions, finance_state)
+    else:
+        finance_state = ""
+    decisions = decisions.order_by("-created_at", "-id")
+    decision_total = decisions.count()
+    all_decisions = list(decisions[:160])
+
+    # A candidate with an existing decision must never return to the
+    # "non demarree" bucket simply because it is beyond the queue page limit.
+    candidate_enrollment_ids = [item["enrollment"].id for item in candidates]
+    decision_ids = set(
+        StudentYearDecision.objects.filter(
+            source_enrollment_id__in=candidate_enrollment_ids,
+        ).values_list("source_enrollment_id", flat=True)
+    )
+    unstarted_candidates = [
+        item for item in candidates
+        if item["enrollment"].id not in decision_ids and item["proposed_decision"] in TARGET_DECISIONS
+    ]
+    active_count = decisions.filter(
+        workflow_status=StudentYearDecision.WORKFLOW_APPLIED,
+        target_enrollment__isnull=False,
+    ).count()
+    awaiting_payment_count = decisions.exclude(
+        workflow_status=StudentYearDecision.WORKFLOW_APPLIED,
+    ).filter(target_inscription__isnull=False).count()
+    ready_count = decisions.filter(
+        workflow_status=StudentYearDecision.WORKFLOW_FINANCE_VALIDATED,
+        target_inscription__isnull=True,
+    ).count()
+    academic_pending_count = decisions.filter(
+        workflow_status=StudentYearDecision.WORKFLOW_DRAFT,
+    ).count()
+    blocked_count = decisions.filter(
+        Q(workflow_status=StudentYearDecision.WORKFLOW_REJECTED)
+        | Q(decision__in=TARGET_DECISIONS, target_class__isnull=True)
+    ).count()
+    eligible_count = len(unstarted_candidates) + decisions.filter(
+        decision__in=TARGET_DECISIONS,
+    ).count()
+    reenrollment_metrics = {
+        "eligible": eligible_count,
+        "not_started": len(unstarted_candidates),
+        "academic_pending": academic_pending_count,
+        "ready": ready_count,
+        "awaiting_payment": awaiting_payment_count,
+        "active": active_count,
+        "blocked": blocked_count,
+        "rate": round((active_count / eligible_count) * 100) if eligible_count else 0,
+    }
     return {
         "branch": branch,
         "source_year": source_year,
         "source_class": source_class,
         "target_year": target_year,
+        "target_class": target_class,
+        "programme": programme,
+        "decision_value": decision_value,
+        "workflow_status": workflow_status,
+        "finance_state": finance_state,
+        "search": search,
         "academic_years": academic_years,
         "classes": classes,
         "target_classes": target_classes,
         "candidates": candidates,
         "candidate_filters_required": candidate_filters_required,
-        "decisions": decisions,
+        "decisions": all_decisions,
+        "decision_total": decision_total,
+        "reenrollment_metrics": reenrollment_metrics,
+        "programme_choices": classes.values_list("programme__id", "programme__title").distinct().order_by("programme__title"),
         "decision_choices": StudentYearDecision.DECISION_CHOICES,
+        "workflow_status_choices": StudentYearDecision.WORKFLOW_STATUS_CHOICES,
         "target_decision_values": TARGET_DECISIONS,
+        "can_propose": can_user_propose_reenrollment(actor) if actor else False,
         "can_academic_validate": can_user_validate_academic(actor) if actor else False,
         "can_finance_validate": can_user_validate_finance(actor) if actor else False,
         "can_apply": can_user_apply_reenrollment(actor) if actor else False,
+        "can_reject": can_user_reject_reenrollment(actor) if actor else False,
+        "surface": surface,
+        "reenrollment_workspace_target": workspace_target,
         "dashboard_type": "reenrollment",
         "toast": toast,
     }
@@ -364,16 +699,20 @@ def _resolve_target_class(*, source_enrollment, target_academic_year, decision, 
             is_archived=False,
         ).first()
     if decision in {StudentYearDecision.DECISION_PROMOTED, StudentYearDecision.DECISION_PROMOTED_WITH_DEBT} and target_academic_year is not None:
-        next_level = _next_level(source_enrollment.academic_class.level)
-        if next_level:
-            return AcademicClass.objects.filter(
-                programme=source_enrollment.programme,
-                branch=source_enrollment.branch,
-                academic_year=target_academic_year,
-                level=next_level,
-                is_active=True,
-                is_archived=False,
-            ).first()
+        source_key = academic_level_sort_key(source_enrollment.academic_class.level)
+        candidates = AcademicClass.objects.filter(
+            programme=source_enrollment.programme,
+            branch=source_enrollment.branch,
+            academic_year=target_academic_year,
+            is_active=True,
+            is_archived=False,
+        )
+        eligible = [
+            candidate
+            for candidate in candidates
+            if academic_level_sort_key(candidate.level) > source_key
+        ]
+        return min(eligible, key=lambda candidate: academic_level_sort_key(candidate.level), default=None)
 
     return None
 
@@ -393,27 +732,38 @@ def propose_student_decision(
     if not isinstance(student, Student):
         student = Student.objects.select_related("user").get(pk=student)
 
-    if not isinstance(source_enrollment, AcademicEnrollment):
-        source_enrollment = AcademicEnrollment.objects.select_related(
-            "academic_class",
-            "academic_year",
-            "programme",
-            "branch",
-        ).get(pk=source_enrollment)
+    source_enrollment_id = (
+        source_enrollment.pk
+        if isinstance(source_enrollment, AcademicEnrollment)
+        else source_enrollment
+    )
+    # The source enrollment is the serialization point for the whole yearly
+    # decision.  Lock it before looking up or creating the unique decision so
+    # two simultaneous DE submissions cannot race through ``update_or_create``.
+    source_enrollment = AcademicEnrollment.objects.select_for_update().select_related(
+        "academic_class",
+        "academic_year",
+        "programme",
+        "branch",
+    ).get(pk=source_enrollment_id)
 
     if source_enrollment.student_id != student.user_id:
         raise ValidationError("L'inscription academique source ne correspond pas a l'etudiant.")
+    if proposed_by is not None:
+        if not can_user_submit_reenrollment_decision(proposed_by):
+            raise ValidationError("Vous ne pouvez pas proposer cette transition.")
+        _assert_actor_branch_scope(actor=proposed_by, branch=source_enrollment.branch)
 
-    provided_average = annual_average is not None
-    annual_average = annual_average if provided_average else _annual_average(source_enrollment)
-    annual_decision = compute_annual_decision(source_enrollment)
-    decision_from_rule = _map_decision(annual_decision["decision"])
-    decision = decision or (
-        _decision_from_average(academic_class=source_enrollment.academic_class, annual_average=annual_average)
-        if provided_average
-        else decision_from_rule
-    )
-    if decision in ACADEMIC_RULE_DECISIONS and decision != decision_from_rule and not provided_average:
+    if annual_average is not None:
+        raise ValidationError("La réinscription ne peut pas être décidée depuis une moyenne annuelle saisie manuellement.")
+    official_decision = _official_annual_decision_for_enrollment(source_enrollment)
+    if official_decision is None:
+        raise ValidationError("La réinscription est bloquée tant que la délibération annuelle officielle n'est pas validée.")
+    annual_decision = official_decision.synthesis_snapshot or {}
+    annual_average = None
+    decision_from_rule = _map_decision(annual_decision.get("academic_decision"))
+    decision = decision or decision_from_rule
+    if decision in ACADEMIC_RULE_DECISIONS and decision != decision_from_rule:
         expected_label = dict(StudentYearDecision.DECISION_CHOICES).get(decision_from_rule, decision_from_rule)
         raise ValidationError(
             "La decision academique doit suivre le calcul automatique. "
@@ -435,10 +785,20 @@ def propose_student_decision(
     if target_class is not None and target_academic_year is None:
         target_academic_year = target_class.academic_year
 
+    if (
+        target_academic_year is not None
+        and target_academic_year.start_date <= source_enrollment.academic_year.start_date
+    ):
+        raise ValidationError("L'annee cible doit etre posterieure a l'annee source.")
+
     if target_class and (not target_class.is_active or target_class.is_archived):
         raise ValidationError("La classe cible doit etre active et non archivee.")
     if target_class and target_class.academic_year_id != target_academic_year.id:
         raise ValidationError("La classe cible ne correspond pas a l'annee cible.")
+    if target_class and target_class.programme_id != source_enrollment.programme_id:
+        raise ValidationError("La classe cible doit rester dans le meme programme.")
+    if target_class and target_class.branch_id != source_enrollment.branch_id:
+        raise ValidationError("La classe cible doit rester dans la meme annexe.")
     if decision in TARGET_DECISIONS and (
         target_class is None or target_academic_year is None
     ):
@@ -450,6 +810,11 @@ def propose_student_decision(
     existing = StudentYearDecision.objects.filter(student=student, source_enrollment=source_enrollment).first()
     if existing and existing.workflow_status == StudentYearDecision.WORKFLOW_APPLIED:
         raise ValidationError("Cette decision est deja appliquee et ne peut plus etre modifiee.")
+    if existing and existing.target_inscription_id:
+        raise ValidationError(
+            "Cette decision possede deja une inscription cible. "
+            "Elle ne peut plus etre modifiee."
+        )
 
     decision_obj, _created = StudentYearDecision.objects.update_or_create(
         student=student,
@@ -461,14 +826,7 @@ def propose_student_decision(
             "target_class": target_class,
             "decision": decision,
             "annual_average": annual_average,
-            "decision_payload": (
-                _decision_payload_from_manual_average(
-                    academic_class=source_enrollment.academic_class,
-                    annual_average=annual_average,
-                )
-                if provided_average
-                else _decision_payload_from_rule(annual_decision)
-            ),
+            "decision_payload": _decision_payload_from_official_deliberation(official_decision),
             "note": note,
             "proposed_by": proposed_by,
             "workflow_status": StudentYearDecision.WORKFLOW_DRAFT,
@@ -491,6 +849,11 @@ def propose_student_decision(
                 f"Source: {source_enrollment.academic_class} | Cible: {target_class or '-'}"
             ),
         )
+    if decision_obj.target_academic_year_id:
+        _sync_cycle_reenrollment(
+            decision=decision_obj,
+            status="prepared",
+        )
     return decision_obj
 
 
@@ -506,6 +869,7 @@ def validate_student_decision_academic(*, decision, actor):
         "target_class",
         "target_academic_year",
     ).select_for_update(of=("self",)).get(pk=decision_pk)
+    _assert_actor_branch_scope(actor=actor, branch=decision.source_enrollment.branch)
     if decision.workflow_status != StudentYearDecision.WORKFLOW_DRAFT:
         raise ValidationError("Seule une decision en brouillon peut etre validee pedagogiquement.")
     _validate_decision_ready(decision)
@@ -522,6 +886,8 @@ def validate_student_decision_academic(*, decision, actor):
         action_type=SupportAuditLog.ACTION_REENROLLMENT_VALIDATED,
         details="Validation pedagogique enregistree.",
     )
+    if decision.target_academic_year_id:
+        _sync_cycle_reenrollment(decision=decision, status="started")
     return decision
 
 
@@ -538,10 +904,14 @@ def validate_student_decision_finance(*, decision, actor):
         "target_class",
         "target_academic_year",
     ).select_for_update(of=("self",)).get(pk=decision_pk)
+    _assert_actor_branch_scope(actor=actor, branch=decision.source_enrollment.branch)
     if decision.workflow_status != StudentYearDecision.WORKFLOW_ACADEMIC_VALIDATED:
         raise ValidationError("La decision doit d'abord etre validee par la direction des etudes.")
     _validate_decision_ready(decision)
-    balance = decision.source_enrollment.inscription.balance
+    source_inscription = Inscription.objects.select_for_update().get(
+        pk=decision.source_enrollment.inscription_id,
+    )
+    balance = source_inscription.balance
     if balance > 0 and decision.decision in FINANCE_CLEARANCE_REQUIRED_DECISIONS:
         raise ValidationError(f"Solde restant sur l'ancienne inscription: {balance} FCFA.")
     decision.workflow_status = StudentYearDecision.WORKFLOW_FINANCE_VALIDATED
@@ -559,7 +929,7 @@ def validate_student_decision_finance(*, decision, actor):
 
 @transaction.atomic
 def reject_student_decision(*, decision, actor, reason=""):
-    if not can_user_handle_reenrollment(actor):
+    if not can_user_reject_reenrollment(actor):
         raise ValidationError("Vous ne pouvez pas rejeter cette decision.")
     decision_pk = decision.pk if isinstance(decision, StudentYearDecision) else decision
     decision = StudentYearDecision.objects.select_related(
@@ -567,8 +937,14 @@ def reject_student_decision(*, decision, actor, reason=""):
         "student__user",
         "source_enrollment",
     ).select_for_update(of=("self",)).get(pk=decision_pk)
+    _assert_actor_branch_scope(actor=actor, branch=decision.source_enrollment.branch)
     if decision.workflow_status == StudentYearDecision.WORKFLOW_APPLIED:
         raise ValidationError("Une decision appliquee ne peut pas etre rejetee.")
+    if decision.target_inscription_id:
+        raise ValidationError(
+            "Une decision avec inscription cible preparee ne peut plus etre rejetee. "
+            "Annulez d'abord cette inscription par le workflow financier approprie."
+        )
     decision.workflow_status = StudentYearDecision.WORKFLOW_REJECTED
     decision.rejected_by = actor
     decision.rejected_at = timezone.now()
@@ -580,6 +956,8 @@ def reject_student_decision(*, decision, actor, reason=""):
         action_type=SupportAuditLog.ACTION_REENROLLMENT_REJECTED,
         details=decision.rejection_reason or "Decision rejetee.",
     )
+    if decision.target_academic_year_id:
+        _sync_cycle_reenrollment(decision=decision, status="cancelled")
     return decision
 
 
@@ -655,6 +1033,7 @@ def apply_student_decision(*, decision, actor):
         "target_class",
         "target_academic_year",
     ).get(pk=decision_pk)
+    _assert_actor_branch_scope(actor=actor, branch=decision.source_enrollment.branch)
 
     if decision.workflow_status == StudentYearDecision.WORKFLOW_APPLIED:
         return decision
@@ -667,6 +1046,10 @@ def apply_student_decision(*, decision, actor):
         raise ValidationError("L'inscription source n'est plus active.")
     if decision.decision in ADMINISTRATIVE_DECISIONS:
         return _finalize_source_enrollment(decision=decision, actor=actor)
+    if decision.target_inscription_id:
+        _sync_cycle_reenrollment(decision=decision, status="pending_payment")
+        return decision
+
     existing_target = AcademicEnrollment.objects.filter(
         student=decision.student.user,
         programme=source_enrollment.programme,
@@ -714,28 +1097,95 @@ def apply_student_decision(*, decision, actor):
     if candidature.branch_id != source_enrollment.branch_id:
         raise ValidationError("La candidature cible existe deja dans une autre annexe.")
 
-    inscription, _created = Inscription.objects.get_or_create(
+    inscription, inscription_created = Inscription.objects.get_or_create(
         candidature=candidature,
         defaults={
             "academic_class": decision.target_class,
             "academic_level": decision.target_class.level,
             "amount_due": amount_due,
-            "status": Inscription.STATUS_ACTIVE,
+            "status": Inscription.STATUS_AWAITING_PAYMENT,
         },
     )
+    # An existing paid/assigned inscription has already entered another
+    # financial or academic workflow.  Attaching it retroactively would both
+    # bypass the payment-triggered activation and risk merging identities.
+    inscription = Inscription.objects.select_for_update().get(pk=inscription.pk)
+    if not inscription_created and (
+        inscription.payments.exists()
+        or AcademicEnrollment.objects.filter(inscription=inscription).exists()
+    ):
+        raise ValidationError(
+            "Une inscription cible deja financee ou affectee existe pour cette annee. "
+            "Elle ne peut pas etre rattachee a cette decision de reinscription."
+        )
+    if decision.target_inscription_id and decision.target_inscription_id != inscription.id:
+        raise ValidationError("La decision pointe deja vers une autre inscription cible.")
     if inscription.academic_class_id != decision.target_class_id:
+        if inscription.payments.exists():
+            raise ValidationError("L'inscription cible a deja des paiements et ne peut plus etre repositionnee.")
         inscription.academic_class = decision.target_class
         inscription.academic_level = decision.target_class.level
-        inscription.status = Inscription.STATUS_ACTIVE
         inscription.amount_due = amount_due
-        inscription.save(update_fields=["academic_class", "academic_level", "status", "amount_due", "updated_at"])
-    elif inscription.status != Inscription.STATUS_ACTIVE:
-        inscription.status = Inscription.STATUS_ACTIVE
+        inscription.save(update_fields=["academic_class", "academic_level", "amount_due", "updated_at"])
+    elif not inscription.payments.exists() and inscription.status == Inscription.STATUS_CREATED:
+        inscription.status = Inscription.STATUS_AWAITING_PAYMENT
         inscription.save(update_fields=["status", "updated_at"])
 
-    archive_enrollment_for_transition(enrollment=source_enrollment)
+    decision.target_inscription = inscription
+    decision.save(update_fields=["target_inscription", "updated_at"])
+    _sync_cycle_reenrollment(decision=decision, status="pending_payment")
+    _audit_decision(
+        decision=decision,
+        actor=actor,
+        action_type=SupportAuditLog.ACTION_REENROLLMENT_APPLIED,
+        details=(
+            f"Inscription cible preparee vers {decision.target_class} "
+            f"({decision.target_academic_year}); paiement cible attendu."
+        ),
+    )
+    return decision
+
+
+@transaction.atomic
+def activate_reenrollment_from_payment(*, inscription):
+    """Activate the target annual enrollment after its first validated payment.
+
+    The ordinary payment workflow calls this function after updating the
+    target ``Inscription``.  It keeps the permanent ``Student`` / ``User``
+    identity and only then archives the source annual enrollment.
+    """
+    from payments.models import Payment
+
+    inscription_pk = inscription.pk if isinstance(inscription, Inscription) else inscription
+    decision = (
+        StudentYearDecision.objects.select_for_update(of=("self",))
+        .select_related(
+            "student",
+            "student__user",
+            "source_enrollment",
+            "source_enrollment__inscription",
+            "target_class",
+            "target_academic_year",
+            "finance_validated_by",
+        )
+        .filter(target_inscription_id=inscription_pk)
+        .first()
+    )
+    if decision is None:
+        return None
+    if decision.workflow_status == StudentYearDecision.WORKFLOW_APPLIED:
+        return decision
+    if decision.workflow_status != StudentYearDecision.WORKFLOW_FINANCE_VALIDATED:
+        raise ValidationError("La reinscription cible n'est pas prete pour activation.")
+
+    target_inscription = Inscription.objects.select_for_update().get(pk=inscription_pk)
+    if not target_inscription.payments.filter(status=Payment.STATUS_VALIDATED).exists():
+        raise ValidationError("Un paiement valide est requis pour activer la reinscription.")
+    _validate_decision_ready(decision)
+
+    source_enrollment = decision.source_enrollment
     target_enrollment, _created = AcademicEnrollment.objects.get_or_create(
-        inscription=inscription,
+        inscription=target_inscription,
         defaults={
             "student": decision.student.user,
             "programme": source_enrollment.programme,
@@ -754,34 +1204,41 @@ def apply_student_decision(*, decision, actor):
         or target_enrollment.academic_class_id != decision.target_class_id
     ):
         raise ValidationError("L'inscription academique cible existante ne correspond pas a la decision.")
-    if target_enrollment.status != AcademicEnrollment.STATUS_ACTIVE or not target_enrollment.is_active or target_enrollment.is_archived:
+    if target_enrollment.status != AcademicEnrollment.STATUS_ACTIVE or not target_enrollment.is_active:
         target_enrollment.status = AcademicEnrollment.STATUS_ACTIVE
-        target_enrollment.is_active = True
-        target_enrollment.is_archived = False
-        target_enrollment.archived_at = None
-        target_enrollment.save(update_fields=["status", "is_active", "is_archived", "archived_at"])
+        target_enrollment.save(update_fields=["status"])
+
+    if source_enrollment.status == AcademicEnrollment.STATUS_ACTIVE and source_enrollment.is_active:
+        archive_enrollment_for_transition(enrollment=source_enrollment)
+    elif source_enrollment.status != AcademicEnrollment.STATUS_ARCHIVED:
+        raise ValidationError("L'inscription academique source ne peut plus etre archivee pour cette transition.")
 
     _carry_forward_debts(source_enrollment, target_enrollment)
-
     decision.student.current_academic_enrollment = target_enrollment
     decision.student.save(update_fields=["current_academic_enrollment"])
-    decision.target_inscription = inscription
     decision.target_enrollment = target_enrollment
     decision.workflow_status = StudentYearDecision.WORKFLOW_APPLIED
-    decision.applied_by = actor
+    decision.applied_by = decision.finance_validated_by
     decision.applied_at = timezone.now()
     decision.save(update_fields=[
-        "target_inscription",
         "target_enrollment",
         "workflow_status",
         "applied_by",
         "applied_at",
         "updated_at",
     ])
-    _audit_decision(
-        decision=decision,
-        actor=actor,
-        action_type=SupportAuditLog.ACTION_REENROLLMENT_APPLIED,
-        details=f"Transition appliquee vers {decision.target_class} ({decision.target_academic_year}).",
-    )
+    _sync_cycle_reenrollment(decision=decision, status="activated")
+    from academic_cycle.services.dashboard_access_service import compute_student_access_policy
+
+    compute_student_access_policy(decision.student, decision.target_academic_year)
+    if decision.applied_by_id:
+        _audit_decision(
+            decision=decision,
+            actor=decision.applied_by,
+            action_type=SupportAuditLog.ACTION_REENROLLMENT_APPLIED,
+            details=(
+                f"Reinscription activee apres paiement cible vers {decision.target_class} "
+                f"({decision.target_academic_year})."
+            ),
+        )
     return decision

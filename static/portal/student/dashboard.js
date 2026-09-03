@@ -3,6 +3,21 @@
   const studentMessageReadUrlTemplate = studentDashboardConfig.messageReadUrlTemplate || '';
   const studentMessageUnreadUrlTemplate = studentDashboardConfig.messageUnreadUrlTemplate || '';
   const studentMessagesReadAllUrl = studentDashboardConfig.messagesReadAllUrl || '';
+  const studentAcademicYearId = String(studentDashboardConfig.academicYearId || '').trim();
+
+  function withStudentAcademicYear(url, extraParams = {}) {
+    if (!url) return url;
+    const parsed = new URL(url, window.location.origin);
+    if (studentAcademicYearId) {
+      parsed.searchParams.set('academic_year_id', studentAcademicYearId);
+    }
+    Object.entries(extraParams).forEach(([key, value]) => {
+      if (value !== null && value !== undefined && value !== '') {
+        parsed.searchParams.set(key, String(value));
+      }
+    });
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  }
 
   function getCsrfToken() {
     const match = document.cookie.match(/csrftoken=([^;]+)/);
@@ -10,7 +25,9 @@
   }
 
   async function updateStudentContentProgress(contentId, payload) {
-    const progressUrl = studentContentProgressUrlTemplate.replace("/0/", `/${contentId}/`);
+    const progressUrl = withStudentAcademicYear(
+      studentContentProgressUrlTemplate.replace("/0/", `/${contentId}/`)
+    );
     const response = await fetch(progressUrl, {
       method: "POST",
       headers: {
@@ -440,7 +457,7 @@
       refreshSection(elementId) {
         const el = document.getElementById(elementId);
         if (!el || !window.htmx) return;
-        const url = el.dataset.sectionUrl;
+        const url = withStudentAcademicYear(el.dataset.sectionUrl);
         if (!url) return;
         el.dataset.sectionLoaded = "loading";
         window.htmx.ajax("GET", url, `#${elementId}`);
@@ -523,7 +540,7 @@
           if (!el) return;
           if (el.dataset.sectionLoaded === "1") return;
           if (el.dataset.sectionLoaded === "loading") return;
-          const url = el.dataset.sectionUrl;
+          const url = withStudentAcademicYear(el.dataset.sectionUrl);
           if (!url || !window.htmx) return;
           el.dataset.sectionLoaded = "loading";
           const request = window.htmx.ajax("GET", url, `#${elementId}`);
@@ -540,7 +557,7 @@
         });
       },
       openCourseDetail(url, title) {
-        this.courseDetailUrl = `${url}?partial=1`;
+        this.courseDetailUrl = withStudentAcademicYear(url, { partial: '1' });
         this.courseDetailTitle = title || "Detail du cours";
         this.courseDetailMode = "reader";
         this.mobileMenu = false;
@@ -561,7 +578,7 @@
         });
       },
       openCoursePreview(url, title) {
-        this.courseDetailUrl = url;
+        this.courseDetailUrl = withStudentAcademicYear(url);
         this.courseDetailTitle = title || "Apercu du cours";
         this.courseDetailMode = "preview";
         this.mobileMenu = false;

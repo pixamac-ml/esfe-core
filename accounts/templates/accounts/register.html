@@ -1,70 +1,123 @@
 {% extends "base.html" %}
-{% load component_tags %}
+{% load static %}
+
+{% block title %}Créer un compte | ESFE{% endblock %}
+
+{% block extra_head %}
+<style>
+  .auth-glass-orb {
+    will-change: transform;
+    background: linear-gradient(145deg, rgba(255,255,255,.17), rgba(255,255,255,.035));
+    border: 1px solid rgba(255,255,255,.22);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,.28), inset 0 -10px 24px rgba(8,48,78,.12), 0 22px 55px rgba(3,29,51,.18);
+    backdrop-filter: blur(28px) saturate(145%);
+    -webkit-backdrop-filter: blur(28px) saturate(145%);
+    filter: blur(.35px);
+    animation: authGlassDrift 15s cubic-bezier(.42, 0, .58, 1) infinite;
+  }
+  .auth-glass-orb--two { animation-duration: 19s; animation-delay: -6s; }
+  .auth-glass-orb--three { animation-duration: 17s; animation-delay: -11s; }
+  .auth-glass-orb--four { animation-duration: 22s; animation-delay: -15s; }
+  @keyframes authGlassDrift {
+    0%, 100% { transform: translate3d(-34px, -22px, 0) scale(1); }
+    35% { transform: translate3d(54px, 25px, 0) scale(1.06); }
+    70% { transform: translate3d(8px, 58px, 0) scale(.98); }
+  }
+  @media (prefers-reduced-motion: reduce) { .auth-glass-orb { animation: none; } }
+</style>
+{% endblock %}
+
+{% block public_navbar %}{% endblock %}
+{% block public_floating_widget %}{% endblock %}
+{% block public_footer %}{% endblock %}
+
 {% block content %}
-
-<section class="pt-24 pb-10 bg-gradient-to-br from-primary-700 via-primary-600 to-primary-800 text-white">
-  <div class="max-w-5xl mx-auto px-4 sm:px-6">
-    <a href="{% url 'community:topic_list' %}" class="inline-flex items-center gap-2 text-sm text-primary-100 hover:text-white transition mb-6">
-      {% component "icon" name="arrow-left" %}{% endcomponent %}
-      Retour a la communaute
-    </a>
-
-    <div class="rounded-2xl border border-white/20 bg-white/10 backdrop-blur p-6 md:p-8">
-      <p class="text-xs uppercase tracking-widest text-primary-200">Onboarding ESFE</p>
-      <h1 class="text-3xl font-bold mt-2">Creer un compte</h1>
-      <p class="text-primary-100 mt-2 text-sm max-w-2xl">Rejoignez l'espace communautaire et commencez a contribuer aux echanges academiques.</p>
+<section class="min-h-screen bg-white lg:flex">
+  <aside class="relative hidden overflow-hidden bg-gradient-to-br from-primary-900 via-primary-800 to-primary-700 text-white lg:flex lg:w-[58%] lg:flex-col lg:justify-between lg:p-12 xl:p-20">
+    <div class="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+      <div class="auth-glass-orb absolute left-[10%] top-[15%] h-36 w-36 rounded-full opacity-45"></div>
+      <div class="auth-glass-orb auth-glass-orb--two absolute right-[12%] top-[26%] h-52 w-52 rounded-full opacity-35"></div>
+      <div class="auth-glass-orb auth-glass-orb--three absolute bottom-[16%] left-[22%] h-28 w-28 rounded-full opacity-40"></div>
+      <div class="auth-glass-orb auth-glass-orb--four absolute bottom-[8%] right-[28%] h-20 w-20 rounded-full opacity-30"></div>
     </div>
-  </div>
-</section>
 
-<section class="bg-soft pb-16">
-  <div class="max-w-5xl mx-auto px-4 sm:px-6 -mt-4">
-    <div class="grid lg:grid-cols-5 gap-6">
-      <aside class="lg:col-span-2 bg-white rounded-2xl border border-primary-100 shadow-sm p-6">
-        <h2 class="font-semibold text-primary-700 mb-3">Pourquoi creer un compte ?</h2>
-        <ul class="space-y-2 text-sm text-gray-600">
-          <li>{% component "icon" name="check" class_str="text-secondary mr-2" %}{% endcomponent %}Suivre vos discussions et notifications</li>
-          <li>{% component "icon" name="check" class_str="text-secondary mr-2" %}{% endcomponent %}Publier des sujets et repondre</li>
-          <li>{% component "icon" name="check" class_str="text-secondary mr-2" %}{% endcomponent %}Construire votre reputation academique</li>
-        </ul>
-      </aside>
+    <div class="relative">
+      <a href="{% url 'core:home' %}" class="inline-flex items-center gap-3 text-sm font-semibold text-white/80 transition hover:text-white">
+        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        Retour au site ESFE
+      </a>
+    </div>
 
-      <div class="lg:col-span-3 bg-white rounded-2xl border border-primary-100 shadow-xl p-5 sm:p-6 md:p-8">
-        <form method="post" class="space-y-5 [&_input]:w-full [&_input]:rounded-xl [&_input]:border [&_input]:border-gray-300 [&_input]:bg-white [&_input]:px-4 [&_input]:py-3 [&_input]:text-sm [&_input]:focus:outline-none [&_input]:focus:ring-2 [&_input]:focus:ring-primary-200 [&_input]:focus:border-primary-500">
-          {% csrf_token %}
+    <div class="relative max-w-2xl pb-12">
+      <p class="text-lg font-semibold tracking-wide text-secondary">Un premier pas vers votre parcours</p>
+      <h1 class="mt-4 text-5xl font-bold leading-[1.08] tracking-tight xl:text-6xl">Votre vocation mérite un espace à votre mesure.</h1>
+      <p class="mt-8 max-w-xl text-lg leading-relaxed text-white/85">Créez votre accès personnel pour retrouver les informations et les outils utiles à votre parcours au sein de l’ESFE.</p>
+      <div class="mt-9 max-w-lg border-l-2 border-secondary pl-5 text-base leading-relaxed text-white/75">Grandir dans les sciences de la santé, c’est apprendre à transformer ses connaissances en attention pour les autres.</div>
+    </div>
 
-          {% if form.non_field_errors %}
-          <div class="bg-red-50 border border-red-200 text-red-600 p-3 rounded-xl text-sm">{{ form.non_field_errors }}</div>
-          {% endif %}
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Nom d'utilisateur</label>
-            {{ form.username }}
-            {% if form.username.errors %}<p class="text-red-600 text-xs mt-1.5">{{ form.username.errors.0 }}</p>{% endif %}
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Mot de passe</label>
-            {{ form.password1 }}
-            {% if form.password1.errors %}<p class="text-red-600 text-xs mt-1.5">{{ form.password1.errors.0 }}</p>{% endif %}
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">Confirmation du mot de passe</label>
-            {{ form.password2 }}
-            {% if form.password2.errors %}<p class="text-red-600 text-xs mt-1.5">{{ form.password2.errors.0 }}</p>{% endif %}
-          </div>
-
-          <button type="submit" class="w-full bg-gradient-to-r from-primary-600 to-primary-700 text-white py-3.5 rounded-xl font-semibold hover:opacity-95 transition shadow-lg">Creer mon compte</button>
-        </form>
-
-        <div class="mt-6 pt-5 border-t border-gray-100 text-center text-sm text-gray-500">
-          Deja un compte ?
-          <a href="{% url 'accounts:login' %}{% if request.GET.next %}?next={{ request.GET.next }}{% endif %}" class="text-primary-700 font-semibold hover:underline">Se connecter</a>
-        </div>
+    <div class="relative grid grid-cols-3 gap-8 border-t border-white/15 pt-8 text-white/75">
+      <div>
+        <svg class="h-9 w-9 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 5v14M5 12h14"/></svg>
+        <p class="mt-3 text-sm font-medium">Un accès personnel</p>
+      </div>
+      <div>
+        <svg class="h-9 w-9 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 15v2m-6 2h12a2 2 0 0 0 2-2v-5a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-10 0v3H6a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2Z"/></svg>
+        <p class="mt-3 text-sm font-medium">Vos données protégées</p>
+      </div>
+      <div>
+        <svg class="h-9 w-9 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="m7 12 3 3 7-7M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z"/></svg>
+        <p class="mt-3 text-sm font-medium">Une inscription simple</p>
       </div>
     </div>
+  </aside>
+
+  <div class="flex min-h-screen w-full items-center justify-center px-5 py-10 sm:px-8 lg:w-[42%] lg:px-12">
+    <div class="w-full max-w-md">
+      <div class="relative mb-10 flex min-h-12 items-center justify-center">
+        <a href="{% url 'core:home' %}" class="absolute left-0 inline-flex items-center gap-2 text-sm font-semibold text-primary-700 lg:hidden">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+          Site ESFE
+        </a>
+        <img src="{% static 'images/logo-esfe.png' %}" alt="École de Santé Félix Houphouët-Boigny" class="h-auto w-44 sm:w-48">
+      </div>
+
+      <div class="mb-8">
+        <p class="text-sm font-semibold uppercase tracking-[0.18em] text-secondary">Nouveau compte</p>
+        <h2 class="mt-3 text-3xl font-bold tracking-tight text-primary-900">Créer votre compte</h2>
+        <p class="mt-3 text-base leading-relaxed text-slate-500">Choisissez vos identifiants pour accéder à votre espace personnel.</p>
+      </div>
+
+      <form method="post" class="space-y-5">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+        <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div>
+          <label for="{{ form.username.id_for_label }}" class="mb-2 block text-sm font-semibold text-primary-900">Nom d’utilisateur <span class="text-secondary">*</span></label>
+          {{ form.username }}
+          {% if form.username.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.username.errors.0 }}</p>{% endif %}
+        </div>
+
+        <div>
+          <label for="{{ form.password1.id_for_label }}" class="mb-2 block text-sm font-semibold text-primary-900">Mot de passe <span class="text-secondary">*</span></label>
+          {{ form.password1 }}
+          {% if form.password1.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.password1.errors.0 }}</p>{% endif %}
+        </div>
+
+        <div>
+          <label for="{{ form.password2.id_for_label }}" class="mb-2 block text-sm font-semibold text-primary-900">Confirmer le mot de passe <span class="text-secondary">*</span></label>
+          {{ form.password2 }}
+          {% if form.password2.errors %}<p class="mt-1.5 text-xs text-red-600">{{ form.password2.errors.0 }}</p>{% endif %}
+        </div>
+
+        <p class="rounded-xl bg-primary-50 px-4 py-3 text-xs leading-relaxed text-primary-700">Utilisez un mot de passe d’au moins 8 caractères. Évitez les informations faciles à deviner.</p>
+        <button type="submit" class="w-full rounded-xl bg-primary-900 px-5 py-3.5 font-semibold text-white shadow-sm transition duration-200 hover:bg-primary-800 hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-primary-200">Créer mon compte</button>
+      </form>
+
+      <p class="mt-7 border-t border-slate-200 pt-6 text-center text-sm text-slate-500">Vous avez déjà un compte ? <a href="{% url 'accounts:login' %}{% if request.GET.next %}?next={{ request.GET.next }}{% endif %}" class="font-semibold text-primary-700 transition hover:text-secondary">Se connecter</a></p>
+    </div>
   </div>
 </section>
-
 {% endblock %}

@@ -1,15 +1,24 @@
 {% load component_tags %}
-{% if selected_class and schedule %}
-  <div class="flex flex-wrap items-center justify-between gap-3 rounded-ui-card border border-ui-border bg-ui-surface p-4">
-    <div class="flex items-center gap-2"><a class="ui-focus-ring grid h-ui-control w-ui-control place-items-center rounded-ui-button border border-ui-border text-ui-text" href="{{ supervisor_dashboard_base_url }}?section=schedule&view=week&class_id={{ selected_class.id }}&week_start={{ prev_week_start|date:'Y-m-d' }}" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=schedule&view=week&fragment=subcontent&class_id={{ selected_class.id }}&week_start={{ prev_week_start|date:'Y-m-d' }}" hx-target="#supervisor-section-content" hx-push-url="{{ supervisor_dashboard_base_url }}?section=schedule&view=week&class_id={{ selected_class.id }}&week_start={{ prev_week_start|date:'Y-m-d' }}"><i data-lucide="chevron-left" class="h-4 w-4"></i></a><strong class="px-2 text-sm text-ui-text">Semaine du {{ schedule.week_start|date:"d F Y" }}</strong><a class="ui-focus-ring grid h-ui-control w-ui-control place-items-center rounded-ui-button border border-ui-border text-ui-text" href="{{ supervisor_dashboard_base_url }}?section=schedule&view=week&class_id={{ selected_class.id }}&week_start={{ next_week_start|date:'Y-m-d' }}" hx-get="{% url 'accounts_portal:supervisor_workflow_workspace' %}?section=schedule&view=week&fragment=subcontent&class_id={{ selected_class.id }}&week_start={{ next_week_start|date:'Y-m-d' }}" hx-target="#supervisor-section-content" hx-push-url="{{ supervisor_dashboard_base_url }}?section=schedule&view=week&class_id={{ selected_class.id }}&week_start={{ next_week_start|date:'Y-m-d' }}"><i data-lucide="chevron-right" class="h-4 w-4"></i></a></div>
-    {% component "ui_core.status_badge" label="Lecture seule" tone="neutral" icon="lock" %}{% endcomponent %}
-  </div>
-  <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{% component "ui_core.stat_card" label="Seances publiees" value=schedule_week_total icon="calendar-days" tone="primary" compact=True %}{% endcomponent %}{% component "ui_core.stat_card" label="Planifiees" value=schedule_week_planned icon="clock-3" tone="info" compact=True %}{% endcomponent %}{% component "ui_core.stat_card" label="Terminees" value=schedule_week_completed icon="circle-check-big" tone="success" compact=True %}{% endcomponent %}{% component "ui_core.stat_card" label="Jours sans cours" value=schedule_empty_days_count icon="calendar-x" tone="neutral" compact=True %}{% endcomponent %}</div>
-  {% component "ui_core.panel" title=selected_class.display_name subtitle="Planning publie par le Directeur des etudes" padding=False %}
-    {% if schedule.events %}<div class="grid gap-px bg-ui-border sm:grid-cols-2 xl:grid-cols-3">{% for event in schedule.events %}<article class="bg-ui-surface p-4"><div class="flex items-start justify-between gap-3"><div><span class="text-xs font-bold uppercase tracking-wide text-ui-primary">{{ event.start_datetime|date:"l d/m" }}</span><h3 class="mt-1 text-sm font-bold text-ui-text">{{ event.title }}</h3></div>{% component "ui_core.status_badge" label=event.status_label tone="info" %}{% endcomponent %}</div><dl class="mt-4 space-y-2 text-xs text-ui-text-muted"><div class="flex gap-2"><i data-lucide="clock-3" class="h-4 w-4"></i><span>{{ event.time_range }}</span></div><div class="flex gap-2"><i data-lucide="user-round" class="h-4 w-4"></i><span>{{ event.teacher_name }}</span></div><div class="flex gap-2"><i data-lucide="map-pin" class="h-4 w-4"></i><span>{{ event.location }}</span></div></dl></article>{% endfor %}</div>{% else %}<div class="p-5">{% component "ui_core.empty_state" icon="calendar-x" title="Semaine sans seance" message="Aucun cours publie pour cette classe pendant cette semaine." %}{% endcomponent %}</div>{% endif %}
-    {% include "portal/staff/supervisor/partials/_pagination.html" with page_obj=schedule_events_page page_param="schedule_page" %}
+{% if selected_class %}
+  {% component "ui_core.panel" title="Grille hebdomadaire publiée" subtitle=selected_class.display_name padding=False %}
+    {% fill "header" %}
+      <div class="flex flex-wrap items-center gap-2">
+        {% component "ui_core.status_badge" label="Référence DE" tone="primary" icon="calendar-range" %}{% endcomponent %}
+        {% component "ui_core.status_badge" label="Lecture seule" tone="neutral" icon="lock" %}{% endcomponent %}
+      </div>
+    {% endfill %}
+    {% fill "default" %}
+      <div class="border-y border-ui-border bg-ui-surface-muted/40 px-4 py-3 text-center">
+        <p class="text-sm font-bold text-ui-text">Du {{ supervisor_timetable_grid.week_start|date:"d/m/Y" }} au {{ supervisor_timetable_grid.week_end|date:"d/m/Y" }}</p>
+        <p class="mt-1 text-xs text-ui-text-muted">{{ supervisor_timetable_grid.slots|length }} cours configuré(s) · {{ supervisor_timetable_grid.total_hours }} h / semaine</p>
+      </div>
+      {% include "portal/staff/director/partials/timetable/_grid.html" with timetable_grid=supervisor_timetable_grid editable=0 %}
+    {% endfill %}
   {% endcomponent %}
-  {% component "ui_core.alert" title="Planning non modifiable" message="Toute modification d'horaire releve exclusivement du Directeur des etudes." tone="neutral" %}{% endcomponent %}
+  {% if not supervisor_timetable_grid.slots %}
+    {% component "ui_core.empty_state" icon="calendar-x" title="Grille non configurée" message="Le Directeur des études n'a pas encore publié de créneau hebdomadaire pour cette classe." %}{% endcomponent %}
+  {% endif %}
+  {% component "ui_core.alert" title="Planning officiel en lecture seule" message="Cette grille est exactement celle configurée par le Directeur des études. Pour toute modification, transmettez un signalement plutôt que de modifier les créneaux." tone="neutral" %}{% endcomponent %}
 {% else %}
-  {% component "ui_core.empty_state" icon="school" title="Selectionnez une classe" message="Choisissez une classe dans la barre superieure pour consulter son planning publie." %}{% endcomponent %}
+  {% component "ui_core.empty_state" icon="school" title="Sélectionnez une classe" message="Choisissez une classe dans la barre supérieure pour afficher sa grille hebdomadaire officielle." %}{% endcomponent %}
 {% endif %}

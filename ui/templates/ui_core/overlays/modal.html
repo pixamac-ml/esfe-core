@@ -11,7 +11,7 @@
   <section x-ref="dialog" tabindex="-1" @keydown.tab="trap($event)" class="max-h-ui-overlay w-full {{ size_class }} overflow-auto rounded-ui-modal bg-ui-surface shadow-ui-modal focus:outline-none" @click.outside="close()">
     <header class="flex items-center justify-between border-b border-ui-border px-5 py-4">
       <h2 id="{{ modal_id }}-title" class="text-base font-bold">{{ title|default:"Fenêtre" }}</h2>
-      <button type="button" @click="close()" class="grid h-9 w-9 place-items-center rounded-ui-button hover:bg-ui-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" aria-label="Fermer"><i data-lucide="x" class="h-4 w-4"></i></button>
+      <button type="button" @click="{% if has_form %}if (document.querySelector('#{{ modal_id }}-content form') && document.querySelector('#{{ modal_id }}-content form').dataset.dirty === 'true') { if (!confirm('Des modifications non enregistrées seront perdues. Voulez-vous continuer ?')) return; }{% endif %}close()" class="grid h-9 w-9 place-items-center rounded-ui-button hover:bg-ui-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" aria-label="Fermer"><i data-lucide="x" class="h-4 w-4"></i></button>
     </header>
     <div id="{{ modal_id }}-content" class="relative min-h-20 p-5">{% slot "default" %}{% endslot %}</div>
     {% if component_vars.is_filled.footer %}<footer class="border-t border-ui-border px-5 py-4">{% slot "footer" %}{% endslot %}</footer>{% endif %}

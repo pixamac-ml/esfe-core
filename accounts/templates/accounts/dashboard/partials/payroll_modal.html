@@ -1,6 +1,6 @@
 {% load component_tags %}
 {% load humanize %}
-<div class="space-y-0">
+<div class="space-y-5" data-ui-core="manager-payroll-workflow">
 <div class="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between">
             <div>
                 <h2 class="text-xl font-bold text-slate-900">Paie employe</h2>
@@ -12,7 +12,7 @@
     </div>
 </div>
 
-    <div class="p-6 space-y-6">
+    <div class="space-y-5">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4">
                     <p class="text-xs uppercase tracking-wide text-slate-400">Employe</p>
@@ -32,16 +32,18 @@
             </div>
 
             {% if payroll_entry %}
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div class="rounded-2xl bg-emerald-50 border border-emerald-100 p-4"><p class="text-xs uppercase tracking-wide text-emerald-700">Net</p><p class="mt-2 text-xl font-bold text-slate-900">{{ payroll_entry.net_salary|intcomma }}</p></div>
-                <div class="rounded-2xl bg-blue-50 border border-blue-100 p-4"><p class="text-xs uppercase tracking-wide text-blue-700">Paye</p><p class="mt-2 text-xl font-bold text-slate-900">{{ payroll_entry.paid_amount|intcomma }}</p></div>
-                <div class="rounded-2xl bg-rose-50 border border-rose-100 p-4"><p class="text-xs uppercase tracking-wide text-rose-700">Reste</p><p class="mt-2 text-xl font-bold text-slate-900">{{ payroll_entry.remaining_salary|intcomma }}</p></div>
-                <div class="rounded-2xl bg-violet-50 border border-violet-100 p-4"><p class="text-xs uppercase tracking-wide text-violet-700">Etat</p><p class="mt-2 text-sm font-bold text-slate-900">{{ payroll_entry.get_status_display }}</p></div>
+            <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+              {% component "ui_core.stat_card" label="Net à payer" value=payroll_entry.net_salary|intcomma unit="FCFA" icon="wallet" tone="primary" compact=True %}{% endcomponent %}
+              {% component "ui_core.stat_card" label="Déjà versé" value=payroll_entry.paid_amount|intcomma unit="FCFA" icon="circle-check" tone="success" compact=True %}{% endcomponent %}
+              {% component "ui_core.stat_card" label="Reste" value=payroll_entry.remaining_salary|intcomma unit="FCFA" icon="banknote" tone="warning" compact=True %}{% endcomponent %}
+              {% component "ui_core.stat_card" label="État" value=payroll_entry.get_status_display icon="file-check" tone="info" compact=True %}{% endcomponent %}
             </div>
             {% endif %}
 
             <!-- ETAPE 1 : FICHE DE PAIE -->
-            <div class="rounded-3xl border border-slate-200 p-5 space-y-4">
+            {% component "ui_core.panel" title="1. Contrôler la fiche" subtitle="Vérifiez les éléments du mois avant de rendre la paie disponible." tone="primary" %}
+            {% fill "default" %}
+            <div class="space-y-4">
                 <div class="flex items-start gap-3">
                     <span class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-slate-900 text-white text-sm font-bold">1</span>
                     <div>
@@ -50,7 +52,9 @@
                     </div>
                 </div>
 
-                {% if otp_request_id %}
+                {% if approval_pending %}
+                <div class="rounded-2xl border border-violet-200 bg-violet-50 p-5 text-sm text-violet-800"><strong>Demande envoyee a la direction.</strong> La correction sera appliquee uniquement lorsque le DG ou la DGA l'aura approuvee depuis son propre compte.</div>
+                {% elif otp_request_id %}
                 <div class="rounded-2xl border border-violet-200 bg-violet-50 p-5 space-y-4">
                     <div>
                         <h3 class="text-sm font-semibold uppercase tracking-wide text-violet-800">Validation DG / DGA requise</h3>
@@ -138,9 +142,13 @@
                 </form>
                 {% endif %}
             </div>
+            {% endfill %}
+            {% endcomponent %}
 
             <!-- ETAPE 2 : PAIEMENT -->
-            <div class="rounded-3xl border border-slate-200 p-5 space-y-4">
+            {% component "ui_core.panel" title="2. Enregistrer le paiement" subtitle="Chaque versement sort de la caisse de l'annexe et crée une pièce numérotée." tone="success" %}
+            {% fill "default" %}
+            <div class="space-y-4">
                 <div class="flex items-start gap-3">
                     <span class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white text-sm font-bold">2</span>
                     <div>
@@ -149,7 +157,16 @@
                     </div>
                 </div>
                 {% if payroll_entry %}
-                    {% if payroll_entry.remaining_salary > 0 %}
+                    {% if payment_signature_session %}
+                    <div class="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-900">
+                      {% if payment_signature_session.status == "signed" %}
+                      <p class="font-semibold">Signature reçue pour {{ payment_signature_session.amount|intcomma }} FCFA.</p>
+                      <p class="mt-1">Le décaissement n'est pas encore effectué. Vérifiez le récapitulatif signé puis approuvez.</p>
+                      <img src="{{ payment_signature_session.signature_data }}" alt="Signature électronique du bénéficiaire" class="mt-3 h-20 max-w-xs rounded-lg border border-violet-200 bg-white object-contain p-2">
+                      <button type="button" hx-post="{% url 'accounts:htmx_manager_payment_signature_approve' payment_signature_session.id %}" hx-target="body" hx-swap="beforeend" hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' class="mt-3 inline-flex items-center rounded-xl bg-emerald-600 px-4 py-2 font-semibold text-white">Approuver et payer</button>
+                      {% else %}<p class="font-semibold">Lien de signature envoyé à la tablette.</p><p class="mt-1">Attendez la signature du bénéficiaire avant de valider le paiement.</p>{% endif %}
+                    </div>
+                    {% elif payroll_entry.remaining_salary > 0 and payroll_entry.status == "ready" or payroll_entry.remaining_salary > 0 and payroll_entry.status == "partial" %}
                     <form
                         hx-post="{% url 'accounts:htmx_manager_salary_pay' payroll_entry.id %}"
                         hx-target="#manager-modal-content"
@@ -170,8 +187,12 @@
                             {% component "icon" name="banknote" %}{% endcomponent %}
                             Enregistrer le retrait
                         </button>
-                        <p class="text-xs text-slate-500">Ce versement met immediatement a jour le montant "Paye" et le statut visibles dans le dashboard de l'employe.</p>
+                        <p class="text-xs text-slate-500">Un bordereau de retrait numéroté est généré automatiquement pour ce versement.</p>
                     </form>
+                    {% elif payroll_entry.remaining_salary > 0 %}
+                    <div class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-5 text-sm text-amber-800">
+                        Vérifiez puis rendez d'abord cette fiche disponible. Aucun retrait n'est autorisé sur une fiche « À vérifier ».
+                    </div>
                     {% else %}
                     <div class="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-6 text-center text-sm text-emerald-700">
                         {% component "icon" name="circle-check" class_str="mr-2" %}{% endcomponent %}Salaire entierement paye pour ce mois.
@@ -183,10 +204,42 @@
                 </div>
                 {% endif %}
             </div>
+            {% endfill %}
+            {% endcomponent %}
+
+            {% if payroll_entry %}
+            {% component "ui_core.panel" title="Documents de paie" subtitle="Fiche mensuelle et pièces de caisse associées." density="compact" %}
+            {% fill "default" %}
+            <div>
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h3 class="text-sm font-semibold text-slate-900">Documents de paie</h3>
+                        <p class="mt-1 text-sm text-slate-500">La fiche récapitule les éléments de la paie ; chaque versement produit sa propre pièce de caisse.</p>
+                    </div>
+                    <a href="{% url 'accounts:manager_payroll_sheet_pdf' payroll_entry.pk %}" target="_blank" rel="noopener" class="inline-flex h-ui-control items-center rounded-ui-button border border-ui-border px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">Ouvrir la fiche de paie</a>
+                </div>
+                {% if withdrawal_documents %}
+                <div class="mt-4 space-y-2">
+                    {% for movement in withdrawal_documents %}
+                    <a href="{% url 'accounts:htmx_manager_cash_movement_receipt' movement.pk %}" target="_blank" rel="noopener" class="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-sm hover:bg-slate-50">
+                        <span><strong class="text-slate-900">{{ movement.receipt_number|default:movement.reference }}</strong><span class="ml-2 text-slate-500">{{ movement.created_at|date:"d/m/Y H:i" }}</span></span>
+                        <span class="font-semibold text-slate-900">{{ movement.amount|intcomma }} FCFA · Ouvrir</span>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="mt-4 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">Aucune pièce de caisse pour le moment : elle sera créée automatiquement à chaque versement effectif.</p>
+                {% endif %}
+            </div>
+            {% endfill %}
+            {% endcomponent %}
+            {% endif %}
 
             <!-- ETAPE 3 : AVANCE SUR SALAIRE (cas particulier) -->
             {% if not payroll_entry or payroll_entry.status == "draft" %}
-            <div class="rounded-3xl border border-amber-100 bg-amber-50 p-5 space-y-4">
+            {% component "ui_core.panel" title="Avance sur salaire" subtitle="Cas particulier : elle est déduite du net final et reste tracée en caisse." tone="warning" collapsible=True open=False %}
+            {% fill "default" %}
+            <div class="space-y-4">
                 <div class="flex items-start gap-3">
                     <span class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-amber-500 text-white text-sm font-bold">3</span>
                     <div>
@@ -215,6 +268,8 @@
                     </button>
                 </form>
             </div>
+            {% endfill %}
+            {% endcomponent %}
             {% endif %}
     </div>
 </div>

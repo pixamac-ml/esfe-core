@@ -9,7 +9,7 @@ from academics.models import AcademicClass, AcademicScheduleEvent, EC, LessonLog
 from academics.services.schedule_service import get_published_class_week_schedule
 from academics.services.session_service import get_supervisor_today_course_rows
 from academics.services.timetable_service import build_timetable_view_payload
-from students.models import Student, StudentAttendance, TeacherAttendance
+from students.models import AttendanceRollSheet, Student, StudentAttendance, TeacherAttendance
 from students.services.attendance_service import get_branch_attendance_anomalies, list_students_for_schedule_event
 from students.services.attendance_workflow import build_attendance_workflow_payload, is_roll_locked_for_event
 from students.services.case_service import count_open_cases
@@ -90,10 +90,10 @@ def build_home_section_context(*, branch, selected_class=None):
     }
 
 
-def build_teachers_section_context(*, branch, page_number=1):
-    """Build one operational observation row per published session of the day."""
-    today = timezone.localdate()
-    events = list(
+def build_teachers_section_context(*, branch, academic_class=None, session_date=None, page_number=1):
+    """Build operational teacher observations for the active class and work date."""
+    today = session_date or timezone.localdate()
+    events_qs = (
         AcademicScheduleEvent.objects.select_related("teacher", "ec", "academic_class")
         .filter(
             branch=branch,
@@ -109,15 +109,23 @@ def build_teachers_section_context(*, branch, page_number=1):
         )
         .order_by("start_datetime")
     )
+    if academic_class is not None:
+        events_qs = events_qs.filter(academic_class=academic_class)
+    events = list(events_qs)
     event_ids = [e.id for e in events]
     attendance_map = {
         row.schedule_event_id: row
         for row in TeacherAttendance.objects.filter(branch=branch, date=today, schedule_event_id__in=event_ids)
     }
+    lesson_map = {
+        row.schedule_event_id: row
+        for row in LessonLog.objects.filter(branch=branch, date=today, schedule_event_id__in=event_ids)
+    }
     sessions = []
     for event in events:
         teacher = event.teacher
         attendance = attendance_map.get(event.id)
+        lesson_log = lesson_map.get(event.id)
         local_start = timezone.localtime(event.start_datetime)
         local_end = timezone.localtime(event.end_datetime)
         sessions.append(
@@ -134,6 +142,8 @@ def build_teachers_section_context(*, branch, page_number=1):
                 "attendance": attendance,
                 "status": attendance.status if attendance else "pending",
                 "course_delivered": attendance.course_delivered if attendance else None,
+                "lesson_log": lesson_log,
+                "lesson_status": lesson_log.status if lesson_log else "missing",
             }
         )
 

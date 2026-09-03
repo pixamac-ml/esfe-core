@@ -1,0 +1,385 @@
+PLAN DE FINALISATION DU DASHBOARD GESTIONNAIRE
+RAPPORTS AUDITABLES ET POINTAGE ENSEIGNANT
+Version de travail - 23/08/2026
+
+OBJECTIF
+========
+Rendre le dashboard présentable dans un environnement professionnel : chaque
+période doit être contrôlable, exportable, imprimable, auditable et rapprochée
+avec la caisse. Le pointage enseignant doit alimenter les honoraires sans créer
+un deuxième système parallèle.
+
+1. DEFINITION D'UN RAPPORT
+==========================
+Un rapport est un état daté, filtré, rattaché à une annexe et reproductible.
+Il doit indiquer la période, l'annexe, les filtres, le générateur, la date de
+génération, les données incluses, les anomalies, les totaux et une référence
+unique. Un rapport ne modifie jamais les écritures métier.
+
+2. CONTENU DU RAPPORT FINANCIER
+===============================
+RECETTES : paiements étudiants validés, ventes boutique, dons, ajustements,
+nombre d'opérations et total par source.
+
+SORTIES : salaires payés, honoraires payés, dépenses approuvées puis payées,
+versements bancaires, ajustements et autres sorties.
+
+CONTROLE : total des entrées, total des sorties, résultat net, solde théorique,
+solde disponible, réserve de caisse, mini-caisses, paiements partiels, restes à
+payer, écritures orphelines et statut de clôture.
+
+Le rapport existant possède déjà une base utile : périodes, sources,
+mouvements, synthèse, graphiques, export Excel et export PDF. On l'enrichit ;
+on ne crée pas un second module financier.
+
+3. SORTIES A GARANTIR
+=====================
+Chaque rapport doit proposer :
+
+- aperçu écran ;
+- PDF imprimable ;
+- Excel détaillé ;
+- impression directe ;
+- téléchargement des justificatifs ;
+- export des mouvements ;
+- export synthétique pour le DG.
+
+Le PDF doit contenir l'en-tête officiel, l'annexe, la période, les filtres, les
+totaux, les anomalies, le générateur, la date et la référence du rapport.
+L'Excel doit contenir au minimum les onglets Synthèse, Recettes, Sorties,
+Mouvements, Mini-caisses et Anomalies.
+
+4. CONTROLE D'AUDIT
+===================
+Avant de marquer un rapport certifié, contrôler que :
+
+- chaque sortie possède un mouvement de caisse ;
+- chaque mouvement appartient à la bonne annexe ;
+- chaque salaire/honoraire payé correspond à un paiement réel ;
+- aucune dépense payée n'est restée non approuvée ;
+- les totaux par source correspondent aux mouvements ;
+- les mini-caisses ne sont pas comptées deux fois ;
+- les clôtures et périodes sont cohérentes.
+
+Une anomalie bloque le statut certifié mais reste exportable dans un rapport
+de contrôle destiné à la correction.
+
+5. HISTORIQUE DE GENERATION
+===========================
+Si un modèle est nécessaire, ajouter un objet léger de génération : référence,
+annexe, période, type, filtres JSON, générateur, date, empreinte du fichier et
+statut. Cet objet sert uniquement à retrouver et auditer un export. Il ne
+remplace ni BranchCashMovement, ni PayrollEntry, ni TeacherHonorariumEntry, ni
+BranchExpense.
+
+6. POINTAGE ENSEIGNANT : BRIQUES EXISTANTES
+===========================================
+Le projet possède déjà les éléments à réutiliser :
+
+- TeacherAttendance : présent, absent, retard, heure d'arrivée, cours assuré,
+  observation, agent et annexe ;
+- AcademicScheduleEvent : séance planifiée, classe, EC et enseignant ;
+- LessonLog : cahier de texte, durée réelle, statut et validation ;
+- get_teacher_honorarium_validated_hours : source actuelle des heures payables.
+
+Il ne faut pas créer un nouveau modèle concurrent de présence enseignant.
+
+7. WORKFLOW DU POINTAGE
+=======================
+ETAPE A - Séance du jour : afficher les séances de l'annexe, l'enseignant,
+la classe, l'EC et l'heure prévue ; statut initial « à pointer ».
+
+ETAPE B - Saisie : Présent, En retard avec heure, Absent avec justification,
+cours assuré ou non, observation facultative.
+
+ETAPE C - Contrôle : verrouiller le pointage validé, autoriser uniquement les
+corrections tracées, générer les alertes d'absences/retards et rapprocher la
+présence du cahier de texte.
+
+ETAPE D - Validation pédagogique : valider les séances réellement effectuées,
+exclure les séances annulées ou avec enseignant absent, puis calculer les
+heures validées par enseignant, EC et période.
+
+ETAPE E - Honoraires : la Gestionnaire ne saisit pas les heures. Elle contrôle
+le relevé validé ; le système applique heures validées x tarif officiel et
+continue le workflow d'honoraire existant.
+
+8. ECRANS A FINALISER
+=====================
+Gestionnaire : Rapport financier, rapport salaires/honoraires, rapport
+dépenses/mini-caisses, anomalies, justificatifs et état de clôture.
+
+Surveillant ou responsable pédagogique : pointage du jour, séances non
+pointées, retards/absences, validation des séances, rapports hebdomadaire et
+mensuel.
+
+Enseignant : consultation de ses séances, présence, cahier de texte, heures
+validées retenues pour l'honoraire et contestation encadrée sans modification
+directe des heures validées.
+
+9. ORDRE D'IMPLEMENTATION
+=========================
+1. Stabiliser le contrat du rapport financier et ses filtres.
+2. Ajouter les contrôles de cohérence et les anomalies auditables.
+3. Harmoniser Excel, PDF et impression avec les mêmes totaux.
+4. Ajouter la référence et l'historique de génération.
+5. Finaliser le pointage par séance avec les modèles existants.
+6. Ajouter validation, correction tracée et rapport de régularité.
+7. Connecter uniquement les heures validées au calcul d'honoraires.
+8. Tester par annexe, période, rôle, paiement partiel et clôture.
+9. Faire une recette DG avec données réelles anonymisées.
+
+10. REGLES ABSOLUES
+===================
+- aucune visibilité inter-annexes ;
+- aucune heure non validée dans un honoraire ;
+- aucun paiement sur une période fermée ;
+- aucun doublon de mouvement de caisse ;
+- aucune suppression d'historique ;
+- aucune modification directe d'une écriture clôturée ;
+- aucun export ne doit modifier les données métier.
+
+11. CRITERES DE FINITION
+=======================
+Le module sera présenté comme prêt lorsque le même rapport peut être régénéré
+avec les mêmes filtres, que PDF/Excel/impression ont les mêmes totaux, que toute
+ligne possède son justificatif, que les anomalies sont explicables, et qu'un
+pointage présent, absent, retard, séance annulée ou corrigé est entièrement
+auditable avant d'alimenter les honoraires.
+
+DECISION PROPOSEE
+=================
+Un seul module financier « Rapports » et un seul système de pointage
+enseignant. Nous enrichissons les briques existantes au lieu de créer des
+modules parallèles. Le modèle documentaire unifié sera branché ensuite sur
+les rapports et mouvements sans changer les calculs financiers.
+
+12. SIGNATURE OBLIGATOIRE DE L'ENSEIGNANT AU PAIEMENT
+=====================================================
+Le paiement ne doit pas passer directement de « disponible » à « payé ».
+Il doit suivre trois états distincts :
+
+1. DISPONIBLE : les heures validées, le tarif et le montant sont figés.
+2. EN ATTENTE DE SIGNATURE : la Gestionnaire prépare le versement et le
+   système réserve le montant sans encore comptabiliser la sortie définitive.
+3. PAYE ET SIGNE : l'enseignant a accepté le relevé, la sortie de caisse est
+   créée et le reçu définitif est généré.
+
+13. WORKFLOW RECOMMANDE DE SIGNATURE
+====================================
+ETAPE 1 - Préparer
+- la Gestionnaire ouvre la fiche d'honoraire disponible ;
+- elle choisit le montant total ou le montant partiel ;
+- le système affiche heures validées, tarif, retenues, avances, net, payé et
+  reste ;
+- une intention de paiement est créée avec une référence unique et une copie
+  immuable des montants.
+
+ETAPE 2 - Faire relire
+- l'enseignant reçoit une notification ;
+- il ouvre une page sécurisée depuis son propre compte ;
+- il voit la période, les séances retenues, le montant, le mode de paiement et
+  le reste après versement ;
+- aucune valeur ne peut être modifiée par l'enseignant.
+
+ETAPE 3 - Signer
+- signature électronique depuis le compte authentifié ;
+- confirmation par code à usage unique envoyé au canal enregistré ;
+- signature manuscrite sur écran tactile si le paiement est effectué au guichet ;
+- la signature est horodatée et liée à l'enseignant, à l'intention, au montant,
+  à l'annexe, à l'adresse IP/appareil et à la version du document.
+
+ETAPE 4 - Finaliser
+- le système vérifie que l'intention n'est ni expirée ni déjà utilisée ;
+- la caisse et la mini-caisse sont verrouillées ;
+- le mouvement réel est créé une seule fois ;
+- la fiche passe à « Retrait partiel » ou « Retiré » ;
+- le reçu/bordereau définitif contient la signature et la référence unique ;
+- l'enseignant et la Gestionnaire peuvent télécharger le document.
+
+14. SOLUTION DE SECOURS
+=======================
+Si l'enseignant n'a pas accès à son compte ou à un appareil :
+
+- imprimer le bordereau d'intention ;
+- recueillir la signature manuscrite ;
+- numériser ou photographier le document ;
+- faire valider l'enregistrement par la Gestionnaire avec un témoin ;
+- joindre la pièce au paiement avant la clôture.
+
+Le paiement ne doit pas être marqué « signé » par simple clic de la
+Gestionnaire. Une signature de secours doit conserver le fichier et l'identité
+du témoin.
+
+15. CAS PARTICULIERS
+====================
+- paiement partiel : une signature et un reçu pour chaque versement ;
+- correction après paiement : aucune écriture existante n'est écrasée ; la
+  correction exige le contrôle DG/OTP et une nouvelle signature si le montant
+  change ;
+- refus ou contestation : l'intention reste en attente, la caisse ne bouge pas,
+  l'enseignant peut laisser un motif ;
+- expiration : une intention non signée est annulée automatiquement après un
+  délai défini, sans mouvement de caisse ;
+- clôture : aucune intention non finalisée ne peut être transformée en paiement
+  après la fermeture de la période.
+
+16. DONNEES A PREVOIR DANS LE MODELE DOCUMENTAIRE UNIFIE
+=========================================================
+Pour une pièce de paiement signée, prévoir au minimum : type de document,
+référence, annexe, période, bénéficiaire, objet lié, montant brut/net, montant
+versé, reste, statut de signature, signataire, date/heure de signature, méthode
+de signature, empreinte du document, fichier de signature ou scan, témoin
+éventuel et date de génération.
+
+La date du rapport doit toujours distinguer :
+
+- période couverte par le rapport ;
+- date et heure de génération ;
+- date de l'opération financière ;
+- date et heure de signature.
+
+Cette séparation rend les audits historiques fiables même si le rapport est
+regénéré plusieurs mois plus tard.
+
+17. PARCOURS TABLETTE PROPOSE POUR LE PAIEMENT
+===============================================
+Le bouton « Payer » de la Gestionnaire doit ouvrir la modale certifiée de
+confirmation, et non créer immédiatement une sortie de caisse.
+
+PHASE 1 - INITIATION PAR LA GESTIONNAIRE
+- clic sur « Payer » ;
+- modale de confirmation : « Voulez-vous initier ce paiement ? » ;
+- création d'une intention de paiement temporaire ;
+- aucun mouvement de caisse et aucun statut « payé » à ce stade.
+
+PHASE 2 - RECAPITULATIF AVANT SIGNATURE
+- nouvelle modale de contrôle ;
+- bénéficiaire, annexe, période et référence ;
+- heures validées, tarif, ajustements, retenues, avances ;
+- montant brut, montant net, montant de ce versement et reste ;
+- caisse ou mini-caisse qui sera utilisée ;
+- bouton « Ouvrir la signature enseignant » ;
+- génération d'un lien de signature unique, court et expirant.
+
+Le lien n'est pas un lien de paiement bancaire. C'est un lien sécurisé vers une
+vue de signature. Il ne doit jamais exposer les informations financières dans
+l'URL. Le jeton doit être aléatoire, à usage unique, lié à l'intention et
+invalide après expiration ou annulation.
+
+PHASE 3 - SIGNATURE SUR TABLETTE
+- vue tactile dédiée, sans navigation inutile ;
+- récapitulatif identique à celui de la Gestionnaire ;
+- zone de signature manuscrite électronique ;
+- case « J'ai vérifié les informations » ;
+- bouton « Enregistrer et soumettre » ;
+- confirmation OTP ou authentification de l'enseignant selon le niveau de
+  sécurité retenu ;
+- stockage de la signature, de son empreinte, de la date, du compte, de
+  l'appareil et de l'intention signée ;
+- statut : « Signature reçue ».
+
+PHASE 4 - RETOUR A LA GESTIONNAIRE
+- la vue tablette se ferme ou affiche « Signature enregistrée » ;
+- la Gestionnaire reçoit une notification de retour ;
+- le bouton de paiement affiche désormais le récapitulatif et la signature ;
+- la Gestionnaire peut refuser, annuler ou approuver le versement ;
+- aucune approbation n'est possible sans signature valide et non expirée.
+
+PHASE 5 - APPROBATION ET PAIEMENT FINAL
+- verrouillage de l'intention, de la fiche, de la caisse et de la mini-caisse ;
+- nouvelle vérification du montant et de la période ouverte ;
+- création atomique d'un seul mouvement de caisse ;
+- consommation de la mini-caisse concernée si elle existe ;
+- passage à « Retrait partiel » ou « Retiré » ;
+- génération automatique de la pièce de paiement signée et du reçu ;
+- rattachement des documents au mouvement et à l'intention ;
+- notification dans le compte de l'enseignant et envoi par e-mail.
+
+18. ETATS A PREVOIR
+===================
+Une intention doit utiliser des états explicites :
+
+- initiated : paiement initié ;
+- awaiting_signature : signature attendue ;
+- signed : signature reçue ;
+- approved : paiement approuvé ;
+- completed : mouvement créé et paiement finalisé ;
+- refused : signature ou paiement refusé ;
+- expired : lien arrivé à expiration ;
+- cancelled : intention annulée.
+
+Une intention signée ne doit pas être réutilisable. Un double clic, un retour
+réseau ou une deuxième validation doit retrouver l'intention existante et ne
+doit jamais produire une deuxième sortie de caisse.
+
+19. PRECISION DOCUMENTAIRE
+==========================
+Pour un salaire ou un honoraire, le document principal est une fiche de paie
+ou un bordereau de paiement signé. Le reçu de caisse prouve le versement. Le
+terme « facture » doit rester réservé aux ventes ou aux dépenses fournisseurs
+si le modèle documentaire unifié le prévoit. Les documents ne doivent pas être
+confondus dans l'audit.
+
+20. VERSION TABLETTE SIMPLIFIEE A RETENIR
+=========================================
+La tablette devient une station de signature, pas une deuxième caisse et pas
+un deuxième dashboard.
+
+La Gestionnaire voit une seule action : « Initier la signature ».
+La tablette voit une seule action : « Vérifier et signer ».
+La Gestionnaire voit ensuite une seule action : « Approuver et payer ».
+
+ETAT VISIBLE DANS LE DASHBOARD
+- À initier ;
+- Signature attendue ;
+- Signature reçue ;
+- Payé.
+
+Le bouton « Payé » reste impossible tant que la signature reçue n'est pas
+valide. Les états techniques (expiré, refusé, annulé) sont affichés seulement
+comme motifs d'exception.
+
+21. SESSION TABLETTE INSPIREE DE LA CAISSE ESPECES
+==================================================
+Le mécanisme reprend les garanties déjà présentes dans CashPaymentSession :
+
+- session temporaire ;
+- lien unique à usage unique ;
+- expiration courte ;
+- régénération possible ;
+- annulation possible ;
+- verrouillage lors de la finalisation ;
+- impossibilité de réutiliser une session consommée.
+
+La session tablette doit être liée à une seule intention de paiement et ne doit
+pas afficher les informations financières dans l'URL. Le lien contient
+seulement un jeton aléatoire temporaire.
+
+22. PARCOURS QUOTIDIEN EN CINQ CLICS
+====================================
+1. Gestionnaire : ouvre la fiche et clique « Initier la signature ».
+2. Gestionnaire : vérifie le récapitulatif et ouvre le lien unique sur la
+   tablette.
+3. Enseignant ou salarié : vérifie, signe et clique « Soumettre ».
+4. Gestionnaire : voit « Signature reçue », ouvre le bordereau et clique
+   « Approuver et payer ».
+5. Système : débite la bonne caisse, génère les documents et envoie la
+   notification.
+
+Le retour de la tablette affiche uniquement : « Signature enregistrée. Vous
+pouvez rendre la tablette. » La Gestionnaire conserve le contrôle du paiement.
+
+23. SECURITE SANS COMPLEXITE
+============================
+- authentification du bénéficiaire ou OTP sur son canal enregistré ;
+- aperçu identique sur tablette et dashboard ;
+- signature liée à un montant figé ;
+- expiration automatique ;
+- signature refusée si la fiche ou la période a changé ;
+- transaction atomique pour caisse, mini-caisse, statut et documents ;
+- journal de l'initiation, de la signature et de l'approbation.
+
+La signature dessinée seule ne suffit pas : elle doit être liée à l'identité,
+à la session et au document. Une signature papier numérisée reste le secours
+prévu lorsque la tablette ou le compte de l'enseignant est indisponible.

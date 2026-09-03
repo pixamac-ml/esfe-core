@@ -18,8 +18,10 @@ MANAGER_SECTIONS = frozenset(
         "overview",
         "candidatures",
         "inscriptions",
+        "reenrollment",
         "paiements",
         "salaires",
+        "honoraires",
         "depenses",
         "caisse",
         "rapport",
@@ -162,7 +164,7 @@ def resolve_manager_workspace_access(user, *, request=None):
             position=normalized_position,
             branch=branch,
             default_section="paiements",
-            allowed_sections=frozenset({"paiements", "settings"}),
+            allowed_sections=frozenset({"paiements", "reenrollment", "settings"}),
             capabilities=capabilities,
         )
 

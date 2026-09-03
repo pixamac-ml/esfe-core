@@ -6,69 +6,70 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from accounts.models import Profile
-from accounts.position_registry import get_position_definition
+from accounts.position_registry import POSITION_REGISTRY, get_position_definition
 from branches.models import Branch
 from coupons.models import Coupon
-from formations.models import Programme
+from formations.models import Cycle, Diploma, Filiere, Programme
+
+
+DG_RECRUITMENT_EXCLUDED_POSITIONS = {
+    "student",
+    "executive_director",
+    "deputy_executive_director",
+    "super_admin",
+}
+DG_RECRUITMENT_POSITION_CHOICES = [
+    (code, definition.label)
+    for code, definition in POSITION_REGISTRY.items()
+    if code not in DG_RECRUITMENT_EXCLUDED_POSITIONS
+]
 
 
 class DgRecruitmentForm(forms.Form):
-    POSITION_CHOICES = [
-        ("branch_manager", "Gestionnaire annexe"),
-        ("academic_supervisor", "Surveillant academique"),
-        ("it_support", "Informaticien"),
-        ("finance_manager", "Responsable finance"),
-        ("admissions", "Admissions"),
-        ("secretary", "Secretaire"),
-        ("other", "Autre poste"),
-    ]
+    # Le registre institutionnel est l'unique nomenclature de rôles. Les
+    # fonctions exécutives protégées et le profil étudiant ne sont pas des
+    # recrutements RH ordinaires.
+    POSITION_CHOICES = DG_RECRUITMENT_POSITION_CHOICES
 
-    first_name = forms.CharField(max_length=80)
-    last_name = forms.CharField(max_length=80)
-    personal_email = forms.EmailField(required=False)
-    professional_email = forms.EmailField(required=False)
-    phone = forms.CharField(max_length=30, required=False)
-    branch = forms.ModelChoiceField(queryset=Branch.objects.filter(is_active=True), required=False)
-    position = forms.ChoiceField(choices=POSITION_CHOICES)
-    salary_base = forms.IntegerField(min_value=0, required=False)
-    generate_access = forms.BooleanField(required=False, initial=True)
-    send_access_email = forms.BooleanField(required=False, initial=True)
-    business_description = forms.CharField(required=False, widget=forms.Textarea)
-    responsibilities = forms.CharField(required=False, widget=forms.Textarea)
-    expected_dashboard = forms.CharField(required=False, widget=forms.Textarea)
-    required_permissions = forms.CharField(required=False, widget=forms.Textarea)
-    concerned_branches = forms.CharField(required=False, widget=forms.Textarea)
-
-    def __init__(self, *args, **kwargs):
+    first_name = forms.CharField(max_length=80, label="Prénom")
+    last_name = forms.CharField(max_length=80, label="Nom")
+    personal_email = forms.EmailField(required=False, label="Email personnel")
+    professional_email = forms.EmailField(required=False, label="Email professionnel")
+    phone = forms.CharField(max_length=30, required=False, label="Téléphone")
+    branch = forms.ModelChoiceField(queryset=Branch.objects.filter(is_active=True), required=False, label="Annexe (facultative)")
+    position = forms.ChoiceField(choices=POSITION_CHOICES, label="Poste")
+    salary_base = forms.IntegerField(min_value=0, required=False, label="Salaire de base")
+    teacher_hourly_rate = forms.IntegerField(min_value=0, required=False, label="Tarif horaire enseignant")
+    generate_access = forms.BooleanField(required=False, initial=True, label="Activer un accès au portail")
+    send_access_email = forms.BooleanField(required=False, initial=True, label="Envoyer le lien sécurisé par email")
+    def __init__(self, *args, allowed_branch_ids=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["branch"].queryset = Branch.objects.filter(is_active=True).order_by("name")
-        self.fields["branch"].widget.attrs.update(
-            {"class": "mt-1 h-12 w-full rounded-xl border border-slate-200 px-3 text-sm font-bold"}
-        )
+        branches = Branch.objects.filter(is_active=True)
+        if allowed_branch_ids is not None:
+            branches = branches.filter(id__in=allowed_branch_ids)
+        self.fields["branch"].queryset = branches.order_by("name")
 
     def clean(self):
         cleaned = super().clean()
-        position = cleaned.get("position")
-        definition = get_position_definition(position)
-        if definition and definition.branch_required and not cleaned.get("branch"):
-            self.add_error("branch", "Une annexe est obligatoire pour ce poste.")
-        if position == "other":
-            required = [
-                "business_description",
-                "responsibilities",
-                "expected_dashboard",
-                "required_permissions",
-                "concerned_branches",
-            ]
-            for field in required:
-                if not (cleaned.get(field) or "").strip():
-                    self.add_error(field, "Champ obligatoire pour un autre poste.")
+        generate_access = bool(cleaned.get("generate_access"))
+        send_access_email = bool(cleaned.get("send_access_email"))
+        has_email = bool((cleaned.get("professional_email") or cleaned.get("personal_email") or "").strip())
+        if generate_access and not has_email:
+            self.add_error("professional_email", "Un email est obligatoire pour remettre un accès sécurisé.")
+        if generate_access and not send_access_email:
+            self.add_error("send_access_email", "La remise d'accès doit passer par le lien sécurisé envoyé par email.")
+        if send_access_email and not generate_access:
+            self.add_error("send_access_email", "Activez d'abord la génération d'accès ou décochez l'envoi d'email.")
+        email = (cleaned.get("professional_email") or cleaned.get("personal_email") or "").strip()
+        if email:
+            from django.contrib.auth import get_user_model
+
+            if get_user_model().objects.filter(email__iexact=email).exists():
+                self.add_error("professional_email", "Un compte utilise déjà cette adresse email.")
         return cleaned
 
     def profile_position(self):
         position = self.cleaned_data["position"]
-        if position == "other":
-            return ""
         return position
 
     def profile_role(self):
@@ -78,8 +79,220 @@ class DgRecruitmentForm(forms.Form):
         return compatibility_role_for_position(self.profile_position())
 
 
+class DgStaffLifecycleForm(forms.Form):
+    ACTION_SUSPEND = "suspend"
+    ACTION_REACTIVATE = "reactivate"
+    ACTION_REVOKE = "revoke"
+    ACTION_REASSIGN = "reassign"
+    ACTION_UPDATE_ASSIGNMENT = "update_assignment"
+
+    ACTION_CHOICES = [
+        (ACTION_SUSPEND, "Suspendre l'accès"),
+        (ACTION_REACTIVATE, "Réactiver l'accès"),
+        (ACTION_REVOKE, "Révoquer l'accès"),
+        (ACTION_REASSIGN, "Changer l'affectation"),
+        (ACTION_UPDATE_ASSIGNMENT, "Modifier le rôle et l'affectation"),
+    ]
+
+    profile_id = forms.IntegerField(min_value=1)
+    action = forms.ChoiceField(choices=ACTION_CHOICES)
+    reason = forms.CharField(max_length=500, required=False, label="Motif de la décision", widget=forms.Textarea)
+    branch = forms.ModelChoiceField(queryset=Branch.objects.none(), required=False, label="Annexe")
+    position = forms.ChoiceField(choices=DgRecruitmentForm.POSITION_CHOICES, required=False, label="Rôle institutionnel")
+
+    def __init__(self, *args, allowed_branch_ids=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        branches = Branch.objects.filter(is_active=True)
+        if allowed_branch_ids is not None:
+            branches = branches.filter(id__in=allowed_branch_ids)
+        self.fields["branch"].queryset = branches.order_by("name")
+
+    def clean(self):
+        cleaned = super().clean()
+        action = cleaned.get("action")
+        reason = (cleaned.get("reason") or "").strip()
+        if action in {
+            self.ACTION_SUSPEND,
+            self.ACTION_REVOKE,
+            self.ACTION_REASSIGN,
+            self.ACTION_UPDATE_ASSIGNMENT,
+        } and not reason:
+            self.add_error("reason", "Un motif est obligatoire pour cette décision DG.")
+        if action == self.ACTION_REASSIGN and not cleaned.get("branch"):
+            self.add_error("branch", "Sélectionnez l'annexe de destination.")
+        if action == self.ACTION_UPDATE_ASSIGNMENT and not cleaned.get("position"):
+            self.add_error("position", "Sélectionnez un rôle institutionnel.")
+        cleaned["reason"] = reason
+        return cleaned
+
+
+class DgBranchForm(forms.ModelForm):
+    """Thin DG adapter over the authoritative Branch model."""
+
+    class Meta:
+        model = Branch
+        fields = [
+            "name",
+            "code",
+            "slug",
+            "address",
+            "city",
+            "phone",
+            "email",
+            "manager",
+            "is_active",
+            "accepts_online_registration",
+        ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["manager"].queryset = (
+            Profile.objects.filter(
+                user__is_active=True,
+                user_type="staff",
+                position__in={"annex_manager", "branch_manager"},
+            )
+            .select_related("user")
+            .order_by("user__first_name", "user__last_name", "user__username")
+            .values_list("user_id", flat=True)
+        )
+        from django.contrib.auth import get_user_model
+
+        self.fields["manager"].queryset = get_user_model().objects.filter(
+            id__in=self.fields["manager"].queryset
+        ).order_by("first_name", "last_name", "username")
+
+    def clean_code(self):
+        return (self.cleaned_data.get("code") or "").strip().upper()
+
+
+class DgProgrammeForm(forms.ModelForm):
+    """Adaptateur DG sur le catalogue institutionnel existant."""
+
+    class Meta:
+        model = Programme
+        fields = [
+            "title", "filiere", "cycle", "diploma_awarded", "duration_years",
+            "short_description", "description", "is_active", "is_public",
+            "admissions_open",
+        ]
+        labels = {
+            "title": "Intitulé de la formation",
+            "filiere": "Filière",
+            "cycle": "Cycle",
+            "diploma_awarded": "Diplôme délivré",
+            "duration_years": "Durée de la formation",
+            "short_description": "Présentation courte",
+            "description": "Description détaillée",
+            "is_active": "Formation active",
+            "is_public": "Visible sur le site public",
+            "admissions_open": "Admissions ouvertes",
+        }
+        help_texts = {
+            "duration_years": "Indiquez la durée en années, par exemple 3 ans.",
+            "short_description": "Texte court affiché dans les listes et aperçus.",
+            "description": "Présentez le contenu et les objectifs de la formation.",
+        }
+        widgets = {
+            "duration_years": forms.NumberInput(attrs={"min": 1, "inputmode": "numeric", "placeholder": "Ex. 3"}),
+            "description": forms.Textarea(attrs={"rows": 6}),
+        }
+
+    IDENTITY_FIELDS = {
+        "title", "filiere", "cycle", "diploma_awarded", "duration_years",
+        "short_description", "description",
+    }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["filiere"].queryset = Filiere.objects.filter(is_active=True).order_by("name")
+        self.fields["cycle"].queryset = Cycle.objects.filter(is_active=True).order_by("min_duration_years", "name")
+        self.fields["diploma_awarded"].queryset = Diploma.objects.order_by("name")
+
+    def clean(self):
+        cleaned = super().clean()
+        cycle = cleaned.get("cycle")
+        duration = cleaned.get("duration_years")
+        if cycle and duration and not cycle.min_duration_years <= duration <= cycle.max_duration_years:
+            self.add_error(
+                "duration_years",
+                f"La durée doit être comprise entre {cycle.min_duration_years} et {cycle.max_duration_years} ans pour ce cycle.",
+            )
+        if cleaned.get("admissions_open") and (not cleaned.get("is_active") or not cleaned.get("is_public")):
+            self.add_error("admissions_open", "Les admissions exigent une formation active et publiée.")
+        if not self.instance.pk and all(cleaned.get(name) for name in ("title", "filiere", "cycle", "diploma_awarded")):
+            duplicate = Programme.objects.filter(
+                title__iexact=cleaned["title"].strip(),
+                filiere=cleaned["filiere"],
+                cycle=cleaned["cycle"],
+                diploma_awarded=cleaned["diploma_awarded"],
+            ).exists()
+            if duplicate:
+                self.add_error("title", "Cette formation existe déjà pour cette filière, ce cycle et ce diplôme.")
+        return cleaned
+
+
+class _DgReferenceBaseForm(forms.ModelForm):
+    """Petite administration DG des référentiels déjà détenus par formations."""
+
+    def clean_name(self):
+        name = " ".join((self.cleaned_data.get("name") or "").split())
+        model_class = self._meta.model
+        duplicate = model_class.objects.filter(name__iexact=name)
+        if self.instance.pk:
+            duplicate = duplicate.exclude(pk=self.instance.pk)
+        if duplicate.exists():
+            raise ValidationError("Ce référentiel existe déjà.")
+        return name
+
+
+class DgFiliereForm(_DgReferenceBaseForm):
+    class Meta:
+        model = Filiere
+        fields = ["name", "description", "is_active"]
+        labels = {
+            "name": "Nom de la filière",
+            "description": "Description",
+            "is_active": "Filière active",
+        }
+        widgets = {"description": forms.Textarea(attrs={"rows": 3})}
+
+
+class DgCycleForm(_DgReferenceBaseForm):
+    class Meta:
+        model = Cycle
+        fields = ["name", "min_duration_years", "max_duration_years", "description", "is_active"]
+        labels = {
+            "name": "Nom du cycle",
+            "min_duration_years": "Durée minimale (années)",
+            "max_duration_years": "Durée maximale (années)",
+            "description": "Description",
+            "is_active": "Cycle actif",
+        }
+        widgets = {
+            "min_duration_years": forms.NumberInput(attrs={"min": 1}),
+            "max_duration_years": forms.NumberInput(attrs={"min": 1}),
+            "description": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def clean(self):
+        cleaned = super().clean()
+        minimum = cleaned.get("min_duration_years")
+        maximum = cleaned.get("max_duration_years")
+        if minimum and maximum and minimum > maximum:
+            self.add_error("max_duration_years", "La durée maximale doit être supérieure ou égale à la durée minimale.")
+        return cleaned
+
+
+class DgDiplomaForm(_DgReferenceBaseForm):
+    class Meta:
+        model = Diploma
+        fields = ["name", "level"]
+        labels = {"name": "Intitulé du diplôme", "level": "Niveau d'enseignement"}
+
+
 class DgCouponForm(forms.Form):
-    INPUT_CLASS = "mt-1 h-12 w-full rounded-xl border border-slate-200 px-3 text-sm font-bold"
+    INPUT_CLASS = "h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text focus:border-ui-focus focus:ring-ui-focus"
     DATETIME_FORMAT = "%Y-%m-%dT%H:%M"
 
     code = forms.CharField(
@@ -135,9 +348,12 @@ class DgCouponForm(forms.Form):
         widget=forms.NumberInput(attrs={"class": INPUT_CLASS}),
     )
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, allowed_branch_ids=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["branches"].queryset = Branch.objects.filter(is_active=True).order_by("name")
+        branches = Branch.objects.filter(is_active=True)
+        if allowed_branch_ids is not None:
+            branches = branches.filter(id__in=allowed_branch_ids)
+        self.fields["branches"].queryset = branches.order_by("name")
         self.fields["valid_from"].initial = timezone.now()
 
         selected_branch_ids = []

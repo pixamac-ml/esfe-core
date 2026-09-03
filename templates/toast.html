@@ -1,14 +1,18 @@
-{% load component_tags %}
+<div
+  id="ui-toast-region"
+  class="pointer-events-none fixed bottom-4 left-4 right-4 z-ui-skip flex flex-col gap-2 sm:left-auto sm:w-full sm:max-w-sm"
+  aria-live="polite"
+  aria-label="Notifications"
+></div>
 {% if messages %}
-<script id="esfe-toast-bootstrap" type="application/json">
+<script id="ui-toast-bootstrap" type="application/json">
 [
 {% for message in messages %}
   {
     "message": "{{ message|escapejs }}",
-    "type": "{% if message.tags == 'error' %}error{% elif message.tags == 'warning' %}warning{% elif message.tags == 'success' %}success{% else %}info{% endif %}"
+    "tone": "{% if message.tags == 'error' %}danger{% elif message.tags == 'warning' %}warning{% elif message.tags == 'success' %}success{% else %}info{% endif %}"
   }{% if not forloop.last %},{% endif %}
 {% endfor %}
 ]
 </script>
 {% endif %}
-{% component "toast" position="top-center" %}{% endcomponent %}

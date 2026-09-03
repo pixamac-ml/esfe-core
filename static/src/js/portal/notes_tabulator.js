@@ -87,6 +87,7 @@
   function saveCell(root, payload, cell, ecId) {
     const row = cell.getRow();
     const data = row.getData();
+    markCell(cell, "saving");
     const proxy = document.createElement("button");
     proxy.type = "button";
     proxy.hidden = true;
@@ -130,6 +131,19 @@
     });
   }
 
+  function scheduleCellSave(root, payload, cell, ecId) {
+    const row = cell.getRow();
+    const key = `${row.getData().enrollmentId}:${ecId}`;
+    root._notesSaveTimers = root._notesSaveTimers || new Map();
+    const previousTimer = root._notesSaveTimers.get(key);
+    if (previousTimer) window.clearTimeout(previousTimer);
+
+    root._notesSaveTimers.set(key, window.setTimeout(() => {
+      root._notesSaveTimers.delete(key);
+      saveCell(root, payload, cell, ecId);
+    }, 140));
+  }
+
   function gradeColumn(payload, ec) {
     const field = `note_${ec.id}`;
     return {
@@ -143,7 +157,7 @@
       editable: (cell) => payload.canEdit && cell.getRow().getData()[`editable_${ec.id}`] !== false,
       cellEdited: (cell) => {
         recalculate(cell.getRow(), payload);
-        saveCell(cell.getTable().element.closest("[data-notes-tabulator-root]"), payload, cell, ec.id);
+        scheduleCellSave(cell.getTable().element.closest("[data-notes-tabulator-root]"), payload, cell, ec.id);
       },
     };
   }

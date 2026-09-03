@@ -132,6 +132,8 @@ def start_daily_roll(
     schedule_event_id: int | None = None,
 ) -> AttendanceRollSheet:
     branch = _normalize_branch(branch)
+    if roll_date > timezone.localdate():
+        raise ValidationError("La feuille d'appel ne peut pas être ouverte avant le jour de la séance.")
     academic_class = AcademicClass.objects.get(pk=academic_class_id, branch=branch, is_active=True)
     sheet = get_roll_sheet(
         branch=branch,
@@ -200,6 +202,8 @@ def assert_roll_allows_editing(
     roll_date: date,
     schedule_event_id: int | None = None,
 ) -> None:
+    if roll_date > timezone.localdate():
+        raise ValidationError("La présence ne peut pas être saisie avant le jour de la séance.")
     sheet = get_roll_sheet(
         branch=branch,
         academic_class_id=academic_class_id,
@@ -220,6 +224,8 @@ def touch_roll_after_bulk_save(
     schedule_event: AcademicScheduleEvent,
 ) -> AttendanceRollSheet:
     branch = _normalize_branch(branch)
+    if roll_date > timezone.localdate():
+        raise ValidationError("La présence ne peut pas être saisie avant le jour de la séance.")
     sheet, _created = AttendanceRollSheet.objects.get_or_create(
         branch=branch,
         academic_class=academic_class,

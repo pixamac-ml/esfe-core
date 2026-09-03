@@ -1,0 +1,527 @@
+AUDIT DE PREPARATION OPERATIONNELLE - DASHBOARD DIRECTEUR GENERAL
+Date : 27 aout 2026
+Perimetre : portail /portal/dg/ (DG et DGA), et ses services, actions,
+templates, exports et tests associes.
+
+VERDICT
+=======
+
+Le dashboard DG dispose maintenant d'une fondation serieuse et d'actions
+reelles. Il est demonstrable, mais n'est pas encore pret pour une exploitation
+institutionnelle sans reserve.
+
+Le principal risque n'est pas graphique : c'est la fiabilite du contexte
+"annee academique + annexe" et la tracabilite de certaines decisions
+executives. Ces deux sujets doivent etre fermes avant de presenter le cockpit
+comme une source de verite ou d'autoriser des operations sensibles au quotidien.
+
+Niveaux de priorite utilises dans ce document :
+
+- P0 : a corriger avant mise en exploitation ou demonstration avec actions.
+- P1 : a traiter juste apres, avant generalisation a toutes les annexes.
+- P2 : evolution utile, non bloquante pour une premiere livraison stabilisee.
+- DECISION : choix metier a valider par la Direction ; il ne faut pas l'inventer.
+
+
+1. CE QUI EST BIEN PRESENT AUJOURD'HUI
+=======================================
+
+1.1 Acces et shell
+
+- Route principale : /portal/dg/.
+- Acces serveur reserve aux positions executive_director et
+  deputy_executive_director. Les routes des sections, drawers, modales,
+  exports et actions repetent ce controle.
+- Le dashboard DG reutilise le shell certifie de la Direction des Etudes :
+  templates/portal/staff/director_dashboard.html et
+  portal.services.certified_dashboard_shell.
+- Navigation structuree par Pilotage, Operations, Ressources et Finance.
+- Sections chargeables dynamiquement : alertes, passages/reinscriptions,
+  planning, annexes, finance, coupons, RH, analytics et monitoring.
+- Drawers et modales sont deja en place pour ne pas exposer des CRUD bruts.
+
+1.2 Contexte DG
+
+- Le contexte est centralise dans portal/dg/context.py.
+- Annee academique, annexe et mode global/annexe sont resolves cote serveur,
+  valides et memorises en session.
+- Une annexe demandee doit etre active ; une annee demandee doit exister.
+- Le DG peut consulter toutes les annexes ou basculer sur une annexe precise.
+- Les selecteurs canoniques de portal/dg/selectors.py filtrent deja de nombreux
+  indicateurs par annexe et par annee : classes, inscriptions, candidatures,
+  paiements, depenses, clotures, alertes, cas et decisions de passage.
+- Trois tests couvrent la persistance et le filtrage de contexte ; quatre
+  tests unitaires couvrent sa resolution et les regles du formulaire RH.
+
+1.3 Donnees de pilotage reelles
+
+- KPI institutionnels, syntheses par annexe, alertes d'assiduite et cas
+  etudiants, candidatures, inscriptions, paiements et resultats financiers.
+- Vue de workflow de passage/reinscription et preparation des diplomes.
+- Planning, charge enseignants, cahiers de cours manquants et appels.
+- Comparaison inter-annexes, analytics mensuelles, risques et listes de
+  paiements recentes.
+- Exports CSV et XLSX : annexes, finance, alertes, etudiants, paiements,
+  personnel et journal support.
+- Les donnees viennent des modules existants ; aucune statistique centrale
+  n'est construite a partir de donnees fictives.
+
+1.4 Actions DG deja reelles
+
+- RH : recrutement, changement d'affectation, suspension, reactivation et
+  revocation fonctionnelle d'un membre du personnel.
+- RH : les actions sensibles exigent un motif (sauf reactivation), utilisent
+  une transaction et protegent le DG contre sa propre modification ainsi que
+  les fonctions executive_director, deputy_executive_director et super_admin.
+- La revocation ne supprime pas le profil : le compte est desactive et
+  l'historique reste exploitable.
+- Comptes : la suspension/reactivation reutilise le mecanisme de securite
+  existant (AccountSupportState) et deconnecte l'acces via user.is_active.
+- Pilotage : resolution d'alertes, escalation/resolution de cas et creation
+  d'un ticket de suivi finance.
+- Direction : nomination de gestionnaire, arbitrage de decision de passage,
+  validation de cloture mensuelle, transition de cycle et delivrance de
+  diplomes sont exposes par les actions DG.
+- Coupons : creation, consultation et activation/desactivation sont presentes.
+
+1.5 Tracabilite et securite deja reutilisables
+
+- SupportAuditLog : journal des actions de support, RH et certaines actions
+  DG ; indexes par annexe, acteur, action et date.
+- AccountSecurityEvent : journal de securite des comptes ; visible dans la
+  fiche individuelle d'un membre du personnel.
+- AcademicAuditLog : journal academique avec acteur, annexe, annee, objet,
+  ancien/nouvel etat, motif, IP et user agent.
+- FinancialAuditLog et SensitiveActionRequest : mecanisme existant pour les
+  operations financieres sensibles et leur double validation/OTP.
+- Les actions RH DG nouvellement ajoutees laissent un SupportAuditLog avec
+  acteur, cible, annexe et motif ; deux tests de service couvrent le cycle
+  suspendre/reactiver/revoquer et la reassignment.
+
+
+2. MATRICE DES POUVOIRS DG ACTUELS
+===================================
+
+Legende : OUI = operationnel dans le cockpit ; PARTIEL = disponible mais
+incomplet/non unifie ; NON = absent du cockpit ; DECISION = regle metier a
+valider avant implementation.
+
+DOMAINE                  VOIR       CREER      MODIFIER     DESACTIVER/   VALIDER/      AUDITER
+                                                               REVOQUER      REFUSER
+RH / personnel           OUI        OUI        PARTIEL       OUI            NON           PARTIEL
+Comptes staff            PARTIEL    OUI        PARTIEL       OUI            NON           PARTIEL
+Etudiants                PARTIEL    NON        NON           NON            Cas : PARTIEL  NON
+Admissions/inscriptions  PARTIEL    NON        NON           NON            NON           NON
+Academique               PARTIEL    NON        NON           PARTIEL(*)     PARTIEL        PARTIEL
+Finance                  OUI        NON        NON           NON            Clotures : OUI NON
+Coupons                  OUI        OUI        NON           OUI            N/A           PARTIEL
+Documents                NON        NON        NON           NON            NON           NON
+Communication            PARTIEL    NON        NON           NON            N/A           NON
+Rapports/exports         OUI        N/A        N/A           N/A            N/A           PARTIEL
+Audit transversal        PARTIEL    N/A        N/A           N/A            N/A           PARTIEL
+
+(*) Une suppression physique d'annee academique est techniquement accessible
+par une action DG. Elle est confirmee textuellement et bloquee si des
+dependances existent, mais elle doit rester exceptionnelle et relever d'une
+politique institutionnelle explicite.
+
+Interpretation importante : cette matrice ne recommande pas de donner toutes
+les cases NON au DG. Elle rend visible ce qui est deja livre et ce qui doit
+etre decide au regard des prerogatives de la Direction generale.
+
+
+3. ECARTS P0 - A TRAITER AVANT EXPLOITATION
+============================================
+
+P0-1. Completer le filtrage par annee academique partout
+---------------------------------------------------------
+
+Constat : le selecteur central est bien filtre par annee, mais plusieurs
+chemins contournent ce filtre.
+
+- _build_schedule() charge classes, evenements, cahiers, presences, appels,
+  prochains evenements et creneaux sans filtrer explicitement
+  academic_year=selected_academic_year.
+- La liste des classes terminales et des diplomes dans dg_section(workflows)
+  ne respecte ni l'annee ni l'annexe active.
+- build_dg_drawer_context() charge directement un etudiant, paiement,
+  evenement, profil, alerte, cas ou workflow par ID ; plusieurs de ces requetes
+  ne sont ni filtres par l'annee selectionnee ni rattachees au perimetre de
+  lecture courant.
+- Les exports etudiants et paiements reprennent l'annexe mais ignorent
+  l'annee selectionnee. L'export doit etre exactement conforme aux KPI vus.
+- Les analytics utilisent les douze derniers mois calendaires. Une annee
+  historique selectionnee n'obtiendra pas une lecture historique fiable.
+
+Impact : le DG peut croire consulter 2025-2026 alors que le planning, un
+drawer ou un export affiche des elements d'une autre annee. C'est incompatible
+avec le contexte central annonce.
+
+Correction attendue : faire passer l'annee dans chaque selector/service,
+appliquer un filtre relationnel adequat a chaque objet, interdire les objets
+hors contexte dans les drawers et les actions, puis ajouter des tests avec
+deux annees et deux annexes pour chaque route critique.
+
+P0-2. Auditer toutes les actions executives, pas seulement la RH
+-----------------------------------------------------------------
+
+Constat : portal/dg/executive_actions.py applique les actions suivantes sans
+creer de trace DG dediee dans SupportAuditLog, AcademicAuditLog ou
+FinancialAuditLog : nomination d'un gestionnaire, delivrance de diplomes,
+validation de cloture, arbitrage de decision et transition de cycle.
+
+Impact : il est impossible depuis un journal unique de reconstituer qui a
+pris une decision DG, avec quel motif, sur quelle annexe et dans quel etat
+avant/apres. Ceci concerne precisement les decisions les plus sensibles.
+
+Correction attendue : une fonction de journalisation commune appelee dans la
+meme transaction que l'action. Elle doit enregistrer au minimum acteur,
+action, cible, annexe, annee, ancien et nouvel etat, date/heure et motif.
+Les erreurs ne doivent jamais produire une trace d'action reussie.
+
+P0-3. Confirmation et motifs pour les decisions irreversibles
+---------------------------------------------------------------
+
+Constat : certaines validations se font par un POST immediat depuis un bouton
+(validation de cloture, delivrance de diplomes, arbitrage de passage). La
+rejection peut arriver sans motif explicite. La confirmation robuste est
+inconsistente selon les ecrans.
+
+Impact : risque de clic accidentel et de decision insuffisamment justifiee.
+
+Correction attendue : modale de confirmation, recapitulatif de la cible,
+motif obligatoire pour refus/revocation/annulation, et conservation de ce
+motif dans l'audit. Les actions deja idempotentes doivent le rester.
+
+P0-4. Securiser et finaliser le recrutement RH
+------------------------------------------------
+
+Constat : le formulaire contient "generate_access", mais
+create_staff_from_recruitment() cree toujours un compte actif avec mot de
+passe temporaire. L'envoi d'e-mail est fail_silently=True : un echec de mail
+peut passer inapercu alors que le compte a ete cree. Le mot de passe temporaire
+est envoye en clair par e-mail et aucun parcours "premiere connexion / changement
+obligatoire" n'est impose par ce flux.
+
+Impact : incoherence fonctionnelle, risque de divulgation d'identifiants et
+risque de creer un membre du personnel sans remise controlee de son acces.
+
+Correction attendue : honorer generate_access, utiliser le parcours existant
+de reinitialisation/activation de mot de passe (lien a duree limitee), rendre
+le resultat d'envoi explicite et audite, et definir les champs RH minimaux
+obligatoires (annexe, date d'embauche, fonction, responsable de rattachement).
+
+P0-5. Ne plus presenter une vue rafraichie comme du "temps reel"
+-----------------------------------------------------------------
+
+Constat : la section "Temps reel" s'appuie sur le chargement HTTP et sur une
+horloge JavaScript. Aucun flux WebSocket/SSE ni polling automatique n'alimente
+les donnees. system_status vaut literalement "operationnel". Les courbes ont
+des valeurs de secours a zero. En outre today_inscriptions et today_payments
+filtrent depuis period_start et non necessairement depuis aujourd'hui.
+
+Impact : les libelles LIVE et "jour" peuvent etre trompeurs, notamment avec
+la periode mensuelle par defaut.
+
+Correction attendue : soit renommer la section "Suivi actualise" et afficher
+l'heure de derniere requete, soit brancher un vrai abonnement aux evenements
+notifier/Channels. Les compteurs "jour" doivent utiliser les bornes du jour.
+L'etat systeme doit provenir d'un controle reel ou ne pas etre affiche.
+
+P0-6. Contexte utilisable sur mobile/tablette
+----------------------------------------------
+
+Constat : les selecteurs annee et portee de la topbar sont caches sous le
+breakpoint xl ; le selecteur de periode est cache sous lg. Lorsque le shell
+certifie est actif, l'ancienne topbar DG qui contenait des alternatives est
+elle-meme cachee.
+
+Impact : sur un ecran tablette/mobile, le contexte central peut etre affiche
+mais non modifiable : le cockpit devient fonctionnellement incomplet.
+
+Correction attendue : proposer une barre de contexte responsive ou une modale
+"Filtrer" toujours accessible, puis tester les largeurs mobile et tablette.
+
+P0-7. Fermer les fausses actions de l'interface
+------------------------------------------------
+
+Constat : plusieurs boutons annoncent une operation qui n'est pas implementee
+dans le flux ouvert. Exemple : "Nouvelle alerte" ouvre la modale de detail,
+et certaines actions "Escalader" ou "Relancer" ouvrent un detail au lieu de
+declencher ou preparer l'operation decrite. Le selecteur 6m/12m/annee dans les
+analytics ne transmet pas sa valeur au backend, dont les periodes autorisees
+sont aujourd'hui, semaine, mois, trimestre ou annee.
+
+Impact : perte de confiance et risque que la demonstration promette une
+capacite inexistante.
+
+Correction attendue : implementer l'action avec sa regle metier, ou renommer
+le bouton en "Voir le detail"/"Preparer une relance". Raccorder les filtres
+analytics a un contrat backend reel.
+
+
+4. ECARTS P1 - A TRAITER POUR UNE VERSION INSTITUTIONNELLE SOLIDE
+===================================================================
+
+P1-1. Centre d'audit transversal
+---------------------------------
+
+Le dashboard affiche et exporte aujourd'hui SupportAuditLog seulement. Les
+journaux academiques (AcademicAuditLog), financiers (FinancialAuditLog), de
+securite (AccountSecurityEvent) et les demandes sensibles (SensitiveActionRequest)
+existent mais ne sont pas consolides pour le DG.
+
+A construire sans recreer les logs : un selector qui normalise les entrees
+existantes en une timeline unique, puis des filtres par date/annee, annexe,
+acteur, role, domaine, action, cible et criticite. L'export doit reprendre les
+memes filtres et etre audite comme export DG.
+
+P1-2. Finance de direction et circuit de validation
+----------------------------------------------------
+
+Existe : lecture consolidee, paiements, depenses, solde, clotures et
+validation de cloture.
+
+Manque : file DG des SensitiveActionRequest, visualisation du FinancialAuditLog,
+versements bancaires par annexe, paie/salaires, honoraires enseignants,
+depenses a arbitrer, refus motive et rapport financier de direction. Ces
+sources existent dans les modules metier et doivent etre reutilisees.
+
+DECISION : preciser quelles operations financieres le DG valide directement,
+lesquelles passent par OTP/double validation, et lesquelles restent reservees
+au gestionnaire/finance.
+
+P1-3. Academique : supervision complete mais actions bornees
+-------------------------------------------------------------
+
+Existe : planning, charge, cahiers manquants, appels, workflow de passage,
+preparation/delivrance de diplomes et transition de cycle.
+
+Manque dans le cockpit : calendrier academique, classes et programmes en
+detail, enseignants/affectations, evaluations, notes, resultats, publication,
+documents et liens de drill-down vers les espaces etablis de la Direction des
+Etudes.
+
+DECISION : definir pour chaque action si le DG dispose d'une intervention
+directe, d'une approbation exceptionnelle, ou d'un simple acces en lecture.
+Le DG ne doit pas dupliquer le poste de Directeur des Etudes ; il doit pouvoir
+superviser et intervenir selon une regle institutionnelle explicite.
+
+P1-4. Personnel : dossier RH complet et affectations historisees
+-----------------------------------------------------------------
+
+Existe : liste staff, recrutement basique, statut d'emploi, affectation,
+suspension/reactivation/revocation et trace support.
+
+Manque : fiche RH editable complete, date de debut/fin, contrat/documents,
+historique d'affectation, historique de poste, responsable, capacites et
+workflow de nomination. La nomination d'un gestionnaire modifie Branch.manager
+sans verifier explicitement que le candidat a la fonction admissible ni
+harmoniser son profil/annexe.
+
+Correction : reutiliser le registre de positions et ajouter une validation
+metier de candidature a la gestion d'annexe, avec audit avant/apres.
+
+P1-5. Recherche transversale reelle
+------------------------------------
+
+La recherche actuelle cherche dans le texte deja present dans le DOM de la
+section chargee. Elle est utile comme raccourci visuel mais ne retrouve pas un
+etudiant, paiement, personnel ou document absent de l'ecran.
+
+Prevoir un endpoint de recherche securise et pagine, avec resultats types
+(etudiant, staff, paiement, classe, document) et links vers drawer/detail.
+Ne pas bloquer la premiere demonstration sur ce point, mais ne pas l'appeler
+"recherche globale" avant sa livraison.
+
+P1-6. Performances et export a grand volume
+--------------------------------------------
+
+- La construction de la page calcule beaucoup de sections cachees des le
+  chargement initial.
+- La synthese parcourt les annexes et appelle plusieurs agregats/listes par
+  annexe : le cout croit rapidement avec le nombre d'annexes.
+- Les exports etudiants, paiements et staff chargent toutes les lignes en
+  memoire ; CSV/XLSX peuvent devenir lourds.
+- Les filtres __date utilises pour certains compteurs empechent une bonne
+  utilisation des indexes datetime.
+
+Correction : mesurer le nombre de requetes par page, agregations groupees par
+annexe, chargement paresseux des sections, pagination/cursor pour les listes,
+export par iterator ou tache asynchrone pour les gros volumes, et filtres de
+bornes datetime indexes.
+
+P1-7. Exports coherents et tracables
+-------------------------------------
+
+Les formats CSV/XLSX existent. Il faut encore garantir que chaque export
+respecte annee + annexe + periode, ajoute les metadonnees de contexte dans le
+fichier, journalise son declenchement et protege la taille/temps de generation.
+
+P1-8. Communication et documents
+---------------------------------
+
+La messagerie interne est proposee seulement si le profil DG a une annexe,
+ce qui est surprenant pour une fonction globale. Il n'y a pas de veritable
+centre DG pour les documents institutionnels, communications, validations ou
+archives. Reutiliser les modules deja existants apres decision sur les droits.
+
+
+5. ECARTS P2 - QUALITE, UX ET EVOLUTIONS
+==========================================
+
+- Extraire progressivement le tres grand CSS/JavaScript inline de
+  templates/portal/dg/dashboard.html vers les assets du projet. Le dashboard
+  respecte le shell certifie, mais garde une implementation visuelle lourde
+  et partiellement parallele a UI Core.
+- Uniformiser les icones et composants (UI Core/Lucide plutot que melange de
+  styles legacy) apres la stabilisation fonctionnelle.
+- Ajouter les etats vides, erreurs, chargements et droits insuffisants a tous
+  les drawers/modales, plus des messages distinguant une action reussie d'une
+  action deja appliquee.
+- Ameliorer accessibilite clavier/focus des modales et drawers, puis tester
+  les lecteurs d'ecran et les ecrans etroits.
+- Ajouter pagination, tri et filtres cote serveur aux grandes listes.
+- Ajouter un tableau de bord de sante technique distinct des indicateurs
+  metier, et ne jamais donner au DG des commandes infrastructure/secrets.
+
+
+6. ETAT DE L'HISTORISATION
+===========================
+
+Correctement ou majoritairement lie a l'annee dans les selecteurs DG :
+
+- classes et inscriptions ;
+- candidatures (champ d'annee textuel) ;
+- paiements et depenses (bornes de dates plus candidature) ;
+- clotures mensuelles ;
+- alertes/cas (bornes de dates) ;
+- decisions de passage (annee de l'inscription source).
+
+Partiel ou a verifier/corriger avant promesse historique :
+
+- planning, creneaux hebdomadaires, presences, cahiers et evenements a cause
+  du P0-1 ;
+- drawers et exports qui contournent le selector central ;
+- analytics basees sur les douze derniers mois calendaires ;
+- RH : le statut actuel et l'annexe sont visibles, mais les affectations et
+  changements de poste ne sont pas un historique RH structure par annee ;
+- nomination de gestionnaire : pas d'historique metier explicite actuellement.
+
+
+7. PLAN D'IMPLEMENTATION RECOMMANDE
+====================================
+
+LOT 0 - Stabilisation immediate (P0, priorite absolue)
+
+1. Centraliser un objet de scope DG (annee, annexes autorisees, mode) dans les
+   services et l'imposer dans sections, drawers, exports et actions.
+2. Corriger planning, diplome/workflow, analytics et exports pour respecter ce
+   scope ; refuser proprement les IDs hors scope de consultation.
+3. Ecrire les tests de regression : deux annees, deux annexes, un objet hors
+   scope, un export et un drawer. Tester globale et annexe.
+4. Ajouter confirmation/motif/audit transactionnel aux actions executives.
+5. Corriger le recrutement et supprimer les promesses "temps reel" ou
+   "nouvelle alerte" qui ne sont pas encore reellement fournies.
+6. Rendre les filtres de contexte accessibles sur mobile.
+
+LOT 1 - Direction operationnelle (P1)
+
+1. Construire le centre d'audit transversal a partir des logs existants.
+2. Ajouter la file de validations financieres et les vues de controle finance.
+3. Completer le dossier RH et la nomination de gestionnaire.
+4. Ajouter les drill-down academiques, etudiants et documents en reutilisant
+   les services/espaces existants plutot que de les reimplementer.
+5. Mettre en place recherche transversale, pagination et performance queries.
+
+LOT 2 - Industrialisation (P2)
+
+1. Reelle diffusion live si elle apporte une valeur mesurable (Channels/Redis
+   deja presents dans le projet), sinon refresh explicite fiable.
+2. Exports asynchrones et notification de disponibilite pour les gros volumes.
+3. Consolidation UI Core, accessibilite, monitoring de performance et tests
+   navigateur/responsive.
+
+
+8. TESTS A AJOUTER AVANT OUVERTURE LARGE
+==========================================
+
+- Autorisation : non-DG = 403 sur toutes les routes DG et endpoints POST.
+- Scope : aucun drawer, export ou action ne peut echapper a l'annee/annexe
+  choisie sans decision explicite de bascule globale.
+- Actions : confirmation, motif obligatoire, idempotence, transaction et
+  audit pour cloture, diplome, arbitrage, cycle et nomination.
+- RH : generate_access oui/non, absence/echec d'e-mail, premiere connexion,
+  revocation, reactivation, auto-protection et changement d'affectation.
+- Finance : validation/refus, OTP si requis, audit financier et isolation des
+  annexes.
+- Verite des chiffres : controles de coherence entre KPI, drawer et export.
+- UX : changement annee/annexe/period, rechargement de section, tablette et
+  mobile, clavier, erreurs reseau et rafraichissement.
+- Performance : budget de requetes en mode global avec plusieurs annexes et
+  test d'export volumineux.
+
+Tests deja executes lors de la stabilisation recente :
+
+- python manage.py test --settings=config.settings_test_local --keepdb
+  portal.test_dg_context_unit portal.test_dg_context
+  -> 8 tests passes.
+- python manage.py check --settings=config.settings_test_local
+  -> aucune erreur de configuration.
+
+Les avertissements de dates naive dans les donnees de test existent encore ;
+ils ne font pas echouer les tests mais doivent etre traites lors du nettoyage
+de la suite de tests.
+
+
+9. CRITERES DE "PRET ET OPERATIONNEL"
+======================================
+
+Le dashboard pourra etre considere pret pour une premiere exploitation lorsque :
+
+[ ] la meme annee et la meme annexe produisent les memes donnees dans KPI,
+    section, drawer et export ;
+[ ] chaque action sensible affiche une confirmation, requiert le motif quand
+    necessaire et laisse une trace complete ;
+[ ] aucune action d'interface ne promet une capacite inexistante ;
+[ ] la RH cree un acces de maniere sure et controlable ;
+[ ] le role "temps reel" est honnete et les compteurs jour sont exacts ;
+[ ] le contexte est modifiable sur ordinateur, tablette et mobile ;
+[ ] les tests de permission, isolation, audit et actions critiques passent ;
+[ ] les actions financieres et academiques exposees ont une matrice de droits
+    DG validee par la Direction ;
+[ ] une recette avec de vraies donnees de deux annexes et deux annees a ete
+    signee par DG/DGA, Direction des Etudes et Finance.
+
+
+10. FICHIERS PRINCIPAUX A CONSERVER / FAIRE EVOLUER
+====================================================
+
+A conserver et etendre :
+
+- portal/dg/context.py : contrat de contexte persistant.
+- portal/dg/selectors.py : source canonique des requetes DG scopees.
+- portal/dg/services.py : assemblage des donnees de pilotage ; y reduire les
+  requetes directes hors selectors.
+- portal/dg/rh_service.py : actions RH transactionnelles.
+- portal/dg/actions_service.py et portal/dg/executive_actions.py : actions
+  metier, a brancher sur une journalisation commune.
+- portal/services/certified_dashboard_shell.py et
+  templates/portal/staff/director_dashboard.html : shell certifie commun.
+- accounts.services.sensitive_actions, AcademicAuditLog, FinancialAuditLog,
+  SupportAuditLog et AccountSecurityEvent : briques d'audit deja disponibles.
+
+A faire evoluer en priorite :
+
+- portal/views/views.py : validation de scope/action et controles POST DG.
+- templates/portal/dg/dashboard.html : contexte responsive, libelles honnetes,
+  separation progressive CSS/JS.
+- templates/portal/dg/partials/* : boutons, confirmations et filtres reels.
+- portal/test_dg_context.py, portal/test_dg_context_unit.py et
+  portal/test_dg_staff_lifecycle.py : point de depart de la couverture DG.
+
+Conclusion : la fondation est bonne, les services metier existants sont
+reutilisables et le DG n'est plus un simple lecteur. La prochaine etape ne
+doit pas etre d'ajouter beaucoup de cartes : il faut d'abord rendre chaque
+chiffre coherent avec son contexte et chaque decision DG explicable,
+reversible lorsque le metier le permet, et entierement auditabile.

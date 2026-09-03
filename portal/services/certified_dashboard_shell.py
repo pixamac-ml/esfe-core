@@ -40,6 +40,7 @@ class CertifiedDashboardShell:
     notifications_url: str
     show_notifications_button: bool
     drawer_title: str
+    drawer_size: str
     modal_title: str
     empty_drawer_message: str
     empty_modal_message: str
@@ -97,6 +98,7 @@ def build_certified_dashboard_shell(
     notifications_url="",
     show_notifications_button=False,
     drawer_title="Détail",
+    drawer_size="wide",
     modal_title="Gestion",
     empty_drawer_message="Sélectionnez un élément pour afficher ses détails.",
     empty_modal_message="Sélectionnez une action pour ouvrir le formulaire.",
@@ -126,6 +128,11 @@ def build_certified_dashboard_shell(
         notifications_url=str(notifications_url or "").strip(),
         show_notifications_button=bool(show_notifications_button),
         drawer_title=str(drawer_title).strip(),
+        drawer_size=(
+            str(drawer_size or "wide").strip().lower()
+            if str(drawer_size or "wide").strip().lower() in {"sm", "compact", "md", "lg", "xl", "wide", "full"}
+            else "wide"
+        ),
         modal_title=str(modal_title).strip(),
         empty_drawer_message=str(empty_drawer_message).strip(),
         empty_modal_message=str(empty_modal_message).strip(),
@@ -244,7 +251,9 @@ def build_role_dashboard_shell(
         script_path=script_path,
         stylesheet_path=stylesheet_path,
         notifications_url=reverse("notification_center:notifications"),
-        show_notifications_button=True,
+        # The shared topbar template owns the notification bell (with its
+        # in-dashboard preview dropdown) for every role shell.
+        show_notifications_button=False,
         drawer_title=drawer_title,
         modal_title=modal_title,
     )

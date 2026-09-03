@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from datetime import date
 from typing import Any
+from urllib.parse import urlencode
 
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
@@ -133,6 +134,20 @@ def manager_salary_redirect_response(period_month: date) -> HttpResponse:
     return response
 
 
+def manager_honorarium_redirect_response(period_month: date) -> HttpResponse:
+    """Return to the dedicated honorarium workspace after a mutation.
+
+    Honoraria have their own workflow and must never send the manager back to
+    monthly closure merely because the two areas share a reference month.
+    """
+
+    response = HttpResponse("")
+    response["HX-Redirect"] = (
+        f"{reverse('accounts:manager_dashboard')}?section=honoraires&salary_month={period_month.strftime('%Y-%m')}"
+    )
+    return response
+
+
 def manager_closure_redirect_response(period_month: date) -> HttpResponse:
     response = HttpResponse("")
     response["HX-Redirect"] = (
@@ -147,7 +162,15 @@ def manager_section_redirect_response(section: str) -> HttpResponse:
     return response
 
 
-def manager_section_notice_redirect_response(section: str, message: str) -> HttpResponse:
+def manager_section_notice_redirect_response(
+    section: str,
+    message: str,
+    **query_params: str,
+) -> HttpResponse:
+    """Redirect to a manager section while preserving contextual filters."""
+
     response = HttpResponse("")
-    response["HX-Redirect"] = f"{reverse('accounts:manager_dashboard')}?section={section}&notice={message}"
+    query = {"section": section, "notice": message}
+    query.update({key: value for key, value in query_params.items() if value})
+    response["HX-Redirect"] = f"{reverse('accounts:manager_dashboard')}?{urlencode(query)}"
     return response

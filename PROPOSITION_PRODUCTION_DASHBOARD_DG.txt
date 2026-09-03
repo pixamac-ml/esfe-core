@@ -1,0 +1,1313 @@
+PROPOSITION DE MISE A NIVEAU PRODUCTION - DASHBOARD DIRECTION GENERALE
+Date : 28 aout 2026
+
+AMBITION
+========
+
+Oui, je comprends parfaitement l'ambition : le dashboard DG ne doit pas etre
+un simple panneau d'administration fonctionnel. Il doit donner au Directeur
+General la confiance, la vitesse et la clarte d'une plateforme mature :
+informations essentielles immediates, actions sensibles protegees, interface
+coherente, mobile utilisable et aucune surprise en production.
+
+Le bon objectif n'est pas de copier visuellement Facebook, Google, Udemy ou
+tuto.com. Il faut reprendre leurs standards : hierarchie evidente, chargement
+rapide, interactions previsibles, informations fiables, et finition
+irreprochable jusque dans les cas vides ou les erreurs.
+
+ETAT REEL AUJOURD'HUI
+=====================
+
+Le socle est bien parti : shell certifie unique, navigation DG par domaines,
+contexte annee/annexe, page d'accueil modernisee, cartes KPI, priorites,
+modales et drawers. Les actions a risque sont plus surement scopees et
+auditees.
+
+Mais le dashboard n'est pas encore au niveau "production sans retour" :
+
+- seule la vue d'ensemble est vraiment composee avec le Design System UI Core ;
+- plusieurs espaces metier gardent des composants et CSS historiques ;
+- le personnel, les paiements et les listes importantes ne disposent pas
+  encore toutes d'une recherche, pagination et d'etats de chargement
+  uniformes ;
+- la qualite visuelle reelle sur ordinateur, tablette et mobile n'a pas encore
+  ete validee par une recette complete avec des donnees representatives ;
+- les modifications en cours ne sont pas encore isolees dans un commit de
+  livraison propre.
+
+DECISION RECOMMANDEE
+====================
+
+Ne pas mettre le DG actuel en production maintenant. Le bon chemin est une
+livraison fermee, en trois lots courts, avec une recette de sortie obligatoire
+pour chaque lot. On n'ajoute pas de nouvelles fonctions pendant la finition UX
+et la stabilisation : chaque demande nouvelle va dans une liste de version 2.
+
+PRINCIPE DIRECTEUR : UN PRODUIT, PAS UNE COLLECTION D'ECRANS
+=============================================================
+
+Chaque ecran DG doit respecter le meme contrat :
+
+1. Le shell certifie est le seul cadre de navigation.
+2. Tout ecran affiche son contexte actif : annee, portee globale ou annexe,
+   et periode lorsque celle-ci influence les chiffres.
+3. Toute liste a un titre, un compte de resultats, une recherche, des filtres,
+   une pagination serveur et un etat vide utile.
+4. Toute action irreversible ou a impact metier exige une confirmation claire,
+   un motif lorsque necessaire et une trace d'audit.
+5. Les actions se font dans des drawers ou modales coherents ; jamais via des
+   alertes navigateur, des pages intermediaires confuses ou des formulaires
+   caches.
+6. Chaque interaction offre un retour : chargement, succes, erreur et moyen
+   comprehensible de se corriger.
+
+FEUILLE DE ROUTE RECOMMANDEE
+============================
+
+LOT 1 - FINIR LE COEUR DE PILOTAGE UX
+-------------------------------------
+
+Objectif : rendre l'accueil et la navigation DG dignes d'une direction
+generale, avec des donnees immediatement lisibles et fiables.
+
+- Finaliser la vue d'ensemble : ordre definitif des KPI, libelles metier
+  valides, seuils d'alerte, tendances et date/heure de derniere mise a jour.
+- Uniformiser les cartes, tableaux, badges, boutons, espacements, icones,
+  titres et etats vides avec UI Core.
+- Refaire les vues Alertes, Annexes, Finance, Analyses et Suivi actualisees
+  avec les memes composants. Supprimer progressivement le CSS de compatibilite
+  DG apres migration de chaque fragment.
+- Garantir que le changement annee/annexe/periode conserve l'utilisateur dans
+  sa section et que chaque lien conserve ce contexte.
+- Ajouter des etats de chargement skeleton, un message de reessai et des
+  notifications de succes/erreur accessibles.
+
+Definition de fini : aucun ancien layout DG ne reste visible dans les ecrans
+de pilotage ; mobile, tablette et ordinateur sont valides visuellement.
+
+LOT 2 - ESPACES A FORT IMPACT OPERATIONNEL
+------------------------------------------
+
+Priorite 1 : Personnel (RH)
+
+- Table UI Core avec recherche par nom, fonction et annexe ; filtres de statut
+  et pagination cote serveur.
+- Fiche personnel dans un drawer : identite, poste, annexe, statut d'acces,
+  historique et actions autorisees seulement.
+- Recrutement en parcours explicite : informations, acces compte, verification,
+  confirmation, resultat. Jamais de mot de passe en clair.
+
+Priorite 2 : Finance
+
+- Vue de synthese dirigeant : encaissements, depenses, ecarts, clotures et
+  versements bancaires par annexe.
+- Drill-down depuis chaque chiffre vers une liste filtree, avec export scope.
+- Toute validation ou cloture affiche la consequence, le perimetre, le motif
+  et la preuve d'audit.
+
+Priorite 3 : Etudiants et parcours academique
+
+- Listes recherchees et paginees pour inscriptions, risques, passages et
+  reinscriptions.
+- Une fiche etudiant/actionable dans un drawer, avec contexte d'annee et
+  annexe impossible a contourner.
+
+Definition de fini : les trois parcours sont rapides, comprehensibles sans
+formation longue, et tous les ecrans ont des etats vides/erreurs valides.
+
+LOT 3 - FINITION "PLATEFORME MATURE"
+------------------------------------
+
+- Audit UX detaille a trois largeurs : 360 px, 768 px et 1440 px.
+- Navigation clavier complete, focus visible, contrastes AA, libelles de
+  boutons explicites et lecteurs d'ecran pour les actions critiques.
+- Performance : budget de chargement, requetes SQL mesurees, pagination de
+  toutes les grandes listes, pas de tableaux lourds charges d'un coup.
+- Coherence linguistique : francais professionnel avec accents, vocabulaire
+  stable (annexe, portee, cloture, encaissement), aucune expression technique
+  ou ambiguë exposee au DG.
+- Micro-interactions sobres : hover, focus, chargement et confirmation ; pas
+  d'animations decoratives qui ralentissent le travail.
+- Exports telecharges avec nom, date, annee et portee explicites.
+
+SECURITE ET FIABILITE NON NEGOCIABLES
+=====================================
+
+La finition UX ne doit jamais contourner les garanties deja commencees.
+
+- Filtrage serveur obligatoire par annee academique et annexe sur toutes les
+  lectures, exports, drawers, formulaires et actions POST.
+- Aucun identifiant passe par le navigateur ne doit elargir un perimetre.
+- Les actions executives sensibles restent transactionnelles, confirmees,
+  auditees et idempotentes quand cela est pertinent.
+- Les autorisations sont recontrolees serveur : masquer un bouton ne suffit
+  jamais.
+- Les erreurs doivent etre tracees sans divulguer de donnees ou de details
+  sensibles dans l'interface.
+
+GOUVERNANCE DE LIVRAISON
+========================
+
+Pour eviter une mise en production impossible a corriger :
+
+1. Stabiliser la branche : separer les modifications DG des nombreux travaux
+   paralleles actuellement non commits.
+2. Revoir chaque fichier DG modifie, supprimer les brouillons et ne conserver
+   que les migrations necessaires.
+3. Executer les migrations et les tests dans un environnement de preproduction
+   avec une copie anonymisee de donnees realistes.
+4. Faire une recette metier dirigee par le DG ou son representant : 10 a 15
+   scenarios reels, pas seulement une demonstration.
+5. Faire une recette technique : acces, scope annexe, actions sensibles,
+   exports, mobile, erreurs reseau et retour apres refresh navigateur.
+6. Obtenir un accord de livraison ecrit avec les anomalies classees P0/P1/P2.
+7. Ne produire que si : aucun P0, aucun P1 non accepte, migrations verifiees,
+   sauvegarde testee et plan de restauration connu.
+8. Mettre en ligne dans un creneau choisi, surveiller les logs et les actions
+   DG les premieres heures, puis valider formellement la livraison.
+
+RECETTE MINIMALE AVANT PRODUCTION
+=================================
+
+- Le DG ouvre chaque section sans rupture de navigation ni double sidebar.
+- Le changement d'annee, d'annexe et de periode ne melange jamais les donnees.
+- Chaque KPI ouvre la bonne vue avec le bon contexte.
+- Recherche, filtres et pagination restent rapides avec un volume proche du
+  reel.
+- Les tableaux sans donnees, les chargements lents et les erreurs serveur sont
+  presentables et actionnables.
+- Chaque action critique (cloture, nomination, recrutement, decision) demande
+  confirmation et laisse une trace consultable.
+- Les exports correspondent exactement a l'ecran et au perimetre actifs.
+- Test clavier, mobile et tablette sans element inaccessible ou coupe.
+- `python manage.py check` et la suite de tests ciblee DG sont verts ; les
+  regressions inter-apps touchant le DG sont egalement executees.
+
+ORDRE D'EXECUTION CONCRET
+=========================
+
+1. Valider ensemble la maquette fonctionnelle de l'accueil DG et les priorites
+   de navigation (une courte revue ecran par ecran).
+2. Terminer Lot 1 et te presenter une version clickable en preproduction.
+3. Recueillir une seule vague de retours consolidee ; ne pas corriger a
+   l'aveugle par petits prompts contradictoires.
+4. Terminer Lot 2, puis Lot 3.
+5. Lancer la recette de sortie et seulement ensuite la production.
+
+ENGAGEMENT DE QUALITE
+=====================
+
+Je recommande de viser une interface calme, dense mais respirante, qui donne
+au DG les informations a forte valeur avant les details. Un produit
+professionnel ne se reconnait pas seulement a de belles cartes : il se
+reconnait au fait qu'il reste clair avec zero donnee, performant avec beaucoup
+de donnees et fiable quand une decision importante doit etre prise.
+
+La prochaine action utile est donc de fermer proprement le Lot 1 UX du DG,
+pas d'empiler de nouvelles fonctions. Cela etablira la base de qualite que les
+lots RH, finance et academique pourront reutiliser sans dette visuelle ou
+metier.
+
+
+
+
+# AUDIT ARCHITECTURAL FINAL — DASHBOARD DIRECTION GÉNÉRALE ESFÉ CORE
+
+## 1. CONTEXTE ET OBJECTIF DE CET AUDIT
+
+Nous arrivons à une phase critique de conception et de stabilisation du dashboard de la Direction Générale.
+
+Une première analyse a déjà permis d'établir plusieurs principes pertinents :
+
+* shell DG unique ;
+* navigation par domaines ;
+* contexte année académique / annexe ;
+* vue d'ensemble modernisée ;
+* KPI ;
+* alertes et priorités ;
+* drawers et modales ;
+* sécurisation progressive des actions sensibles ;
+* migration progressive vers UI Core ;
+* nécessité d'une recette production stricte.
+
+Cette orientation est conservée.
+
+Cependant, avant toute nouvelle implémentation importante, nous voulons maintenant réaliser un audit architectural, fonctionnel, UX/UI et technique beaucoup plus profond.
+
+L'objectif n'est PAS de refaire immédiatement le dashboard.
+
+L'objectif est de déterminer précisément :
+
+1. ce qui existe réellement ;
+2. ce qui fonctionne correctement ;
+3. ce qui est incomplet ;
+4. ce qui est legacy ;
+5. ce qui est dupliqué ;
+6. ce qui contourne UI Core ;
+7. ce qui manque dans UI Core ;
+8. ce qui doit être conservé ;
+9. ce qui doit être amélioré ;
+10. ce qui doit être supprimé progressivement ;
+11. ce qui doit être créé ;
+12. dans quel ordre les travaux devront ensuite être exécutés.
+
+Aucune refonte massive ne doit être lancée pendant cet audit.
+
+Nous voulons d'abord une cartographie fiable de l'existant.
+
+---
+
+# 2. POSITIONNEMENT EXACT DU DIRECTEUR GÉNÉRAL
+
+Le Directeur Général ne doit pas être considéré comme un simple utilisateur de consultation.
+
+Il ne doit pas non plus être traité comme un super-administrateur technique Django.
+
+Son rôle doit être compris comme celui d'un :
+
+**SEMI-SUPER-ADMIN MÉTIER / CONSOLE EXÉCUTIVE DE GOUVERNANCE**
+
+Le DG est le premier responsable de l'établissement.
+
+Il doit donc disposer d'une visibilité extrêmement large sur le fonctionnement de l'école.
+
+Le principe général est :
+
+**VOIR → COMPRENDRE → CONTRÔLER → AGIR**
+
+### VOIR
+
+Le DG doit pouvoir consulter pratiquement toutes les informations métier pertinentes :
+
+* annexes ;
+* années académiques ;
+* étudiants ;
+* inscriptions ;
+* réinscriptions ;
+* personnel ;
+* finances ;
+* encaissements ;
+* dépenses ;
+* caisses ;
+* clôtures ;
+* versements ;
+* activités académiques ;
+* classes ;
+* enseignement ;
+* évaluations ;
+* documents ;
+* décisions ;
+* alertes ;
+* événements importants ;
+* activités utilisateurs ;
+* connexions ;
+* audits.
+
+### COMPRENDRE
+
+Les données doivent être transformées en information décisionnelle grâce à :
+
+* KPI ;
+* tendances ;
+* comparaisons ;
+* objectifs ;
+* seuils ;
+* alertes ;
+* analyses ;
+* rapprochements entre annexes ;
+* historique.
+
+### CONTRÔLER
+
+Le DG doit disposer d'outils lui permettant de comprendre :
+
+* qui a effectué une opération ;
+* quand ;
+* dans quelle annexe ;
+* sur quelle ressource ;
+* depuis quelle session lorsque cela est pertinent ;
+* quelle était l'action ;
+* quel en a été le résultat ;
+* quelles modifications sensibles ont été réalisées.
+
+### AGIR
+
+Le DG doit pouvoir effectuer les actions relevant réellement de son autorité :
+
+* décisions ;
+* validations ;
+* recrutements selon les règles métier ;
+* blocages/révocations d'accès autorisés ;
+* approbations ;
+* opérations exécutives ;
+* publications ;
+* autres actions explicitement attribuées à la Direction Générale.
+
+Mais :
+
+**le DG a un droit de regard presque universel sans disposer d'un droit de mutation technique universel.**
+
+Les opérations dangereuses ou purement techniques doivent rester hors de son périmètre :
+
+* suppression physique massive de données ;
+* manipulation directe de la base ;
+* modification arbitraire des permissions Django ;
+* opérations infrastructure ;
+* configurations techniques sensibles ;
+* opérations destructrices sans workflow métier.
+
+---
+
+# 3. LE DASHBOARD DG DOIT ÊTRE UN COCKPIT DE DÉCISION
+
+La page d'accueil DG ne doit pas devenir une accumulation de cartes statistiques.
+
+Elle doit répondre rapidement à quatre questions :
+
+1. Que se passe-t-il actuellement ?
+2. Où se trouve le problème ?
+3. Qu'est-ce qui nécessite l'attention ou la décision du DG ?
+4. La situation s'améliore-t-elle ou se dégrade-t-elle ?
+
+Auditer l'accueil actuel selon cette logique.
+
+## Niveau 1 — Situation générale
+
+Étudier la pertinence d'une bande de contexte indiquant clairement :
+
+* année académique ;
+* portée globale ou annexe ;
+* période ;
+* date/heure de dernière actualisation.
+
+Puis un nombre limité de KPI réellement exécutifs.
+
+Exemples à confirmer selon les données réellement disponibles :
+
+* étudiants actifs ;
+* inscriptions ;
+* encaissements ;
+* dépenses ;
+* taux de recouvrement ;
+* personnel actif ;
+* classes actives ;
+* alertes critiques.
+
+Ne pas multiplier les KPI sans justification métier.
+
+## Niveau 2 — À votre attention
+
+Auditer la possibilité de créer un véritable centre d'attention exécutif.
+
+Exemples :
+
+* anomalie financière ;
+* validation en attente ;
+* recrutement à approuver ;
+* clôture problématique ;
+* annexe sous objectif ;
+* classe sans planning complet ;
+* situation académique critique ;
+* document à valider ;
+* incident de sécurité.
+
+Chaque élément doit pouvoir conduire directement au contexte concerné.
+
+## Niveau 3 — Tendances et comparaison
+
+Un chiffre important ne doit pas rester isolé lorsqu'une comparaison pertinente existe.
+
+Étudier :
+
+* évolution par rapport à la période précédente ;
+* évolution par rapport à l'année précédente ;
+* objectif ;
+* seuil ;
+* tendance ;
+* comparaison inter-annexes.
+
+---
+
+# 4. LES ANNEXES COMME UNITÉS DE PILOTAGE
+
+L'annexe ne doit pas être seulement un filtre.
+
+Elle constitue une unité fondamentale de pilotage.
+
+Auditer la vue Annexes actuelle et déterminer comment permettre :
+
+* vue consolidée ;
+* comparaison inter-annexes ;
+* indicateurs par annexe ;
+* alertes par annexe ;
+* situation financière ;
+* effectifs ;
+* personnel ;
+* activité académique ;
+* incidents ;
+* accès direct au détail.
+
+Étudier un tableau ou composant de comparaison permettant par exemple de rapprocher :
+
+* effectifs ;
+* recouvrement ;
+* dépenses ;
+* personnel ;
+* alertes ;
+* situation générale.
+
+Le clic sur une annexe doit pouvoir faire basculer le contexte du dashboard vers cette annexe sans perdre inutilement la section courante.
+
+---
+
+# 5. MODÈLE D'INTERACTION MÉTIER
+
+Le dashboard doit tendre vers une logique commune :
+
+**OBSERVER → COMPRENDRE → DÉCIDER → VÉRIFIER**
+
+Auditer les parcours existants selon cette chaîne.
+
+Exemple Finance :
+
+indicateur problématique
+→ analyse
+→ drill-down
+→ détail des opérations
+→ décision éventuelle
+→ confirmation
+→ audit
+→ vérification ultérieure.
+
+Identifier les écrans qui interrompent actuellement cette continuité.
+
+---
+
+# 6. ARCHITECTURE DE NAVIGATION À ÉVALUER
+
+Ne pas modifier immédiatement la navigation.
+
+Comparer la navigation existante avec une architecture orientée métier de type :
+
+## Commandement
+
+* Vue d'ensemble
+* Alertes & décisions
+* Analyses principales
+
+## Annexes
+
+* Vue consolidée
+* Comparaison
+* Détail d'une annexe
+
+## Finance
+
+* Synthèse
+* Encaissements
+* Dépenses
+* Créances
+* Clôtures
+* Versements
+* Rapports
+
+## Académique
+
+* Classes
+* Effectifs
+* Planning
+* Évaluations
+* Résultats
+* progression
+
+## Étudiants
+
+* Effectifs
+* inscriptions
+* réinscriptions
+* passages
+* situations particulières
+
+## Personnel
+
+* collaborateurs
+* recrutements
+* affectations
+* statuts
+* accès
+
+## Documents & Direction
+
+* décisions
+* documents
+* publications
+* validations
+
+## Analyses & Rapports
+
+* tendances
+* comparaisons
+* rapports consolidés
+* exports
+
+## Audit & Contrôle
+
+* journal des activités
+* connexions
+* actions sensibles
+* investigations
+* exports d'audit
+
+## Paramètres DG
+
+Uniquement les paramètres réellement accessibles au rôle DG.
+
+IMPORTANT :
+
+La navigation finale doit correspondre au modèle mental du Directeur Général et non à l'organisation interne des apps Django.
+
+---
+
+# 7. AUDIT & CONTRÔLE — DOMAINE PRIORITAIRE
+
+Auditer tout ce qui existe actuellement concernant :
+
+* logs ;
+* audit ;
+* connexions ;
+* historique ;
+* événements ;
+* traces d'actions ;
+* sessions ;
+* sécurité.
+
+Déterminer si une véritable rubrique DG « Audit & Contrôle » peut être construite à partir de l'infrastructure existante.
+
+## Journal métier
+
+Le DG doit disposer d'informations compréhensibles :
+
+* utilisateur ;
+* rôle ;
+* action ;
+* ressource ;
+* annexe ;
+* date ;
+* heure ;
+* résultat ;
+* informations métier pertinentes.
+
+## Connexions
+
+Identifier les informations actuellement disponibles concernant :
+
+* utilisateur ;
+* rôle ;
+* date/heure ;
+* session ;
+* type d'appareil si disponible de manière fiable ;
+* navigateur ;
+* connexion réussie/échouée ;
+* autres informations de sécurité réellement utiles.
+
+Ne pas inventer de données qui ne sont pas actuellement collectées.
+
+Identifier clairement ce qui existe et ce qu'il faudrait implémenter.
+
+## Actions sensibles
+
+Déterminer comment isoler rapidement :
+
+* opérations financières ;
+* RH ;
+* notes/résultats ;
+* comptes ;
+* documents ;
+* sécurité ;
+* décisions ;
+* modifications critiques.
+
+## Investigation
+
+Étudier la possibilité de reconstituer une séquence :
+
+**Utilisateur → Session → Actions → Ressources → Résultats**
+
+afin d'éviter que le DG doive analyser manuellement des milliers de lignes.
+
+## Exports
+
+Auditer la capacité à exporter les journaux filtrés :
+
+* CSV ;
+* Excel ;
+* PDF si pertinent.
+
+Les exports doivent conserver :
+
+* période ;
+* année ;
+* annexe ;
+* filtres ;
+* date de génération ;
+* informations de traçabilité pertinentes.
+
+---
+
+# 8. SÉPARER AUDIT MÉTIER ET LOGS TECHNIQUES
+
+Vérifier que l'architecture ne mélange pas :
+
+### AUDIT MÉTIER
+
+Destiné à la Direction :
+
+« Le gestionnaire X a validé le paiement Y de 125 000 CFA à 14:32. »
+
+### LOGS TECHNIQUES
+
+Destinés à l'administration technique :
+
+* exceptions ;
+* stack traces ;
+* workers ;
+* requêtes ;
+* services ;
+* incidents infrastructure ;
+* informations internes Django.
+
+Le DG peut recevoir un statut d'incident technique lorsque cela est pertinent.
+
+Il ne doit pas être exposé inutilement aux détails techniques internes.
+
+---
+
+# 9. JOURNAL EXÉCUTIF
+
+Étudier également la pertinence d'une vue plus synthétique que l'audit brut :
+
+**Activité récente de la Direction / Journal de gouvernance**
+
+Exemples :
+
+* recrutement validé ;
+* clôture approuvée ;
+* décision publiée ;
+* accès révoqué ;
+* opération importante validée.
+
+Ne pas confondre ce journal exécutif avec les logs techniques ni avec l'audit brut.
+
+---
+
+# 10. AUDIT COMPLET DE UI CORE
+
+Cette partie est prioritaire.
+
+Le dashboard DG ne doit plus multiplier les implémentations locales lorsqu'un composant générique peut appartenir au Design System.
+
+Inspecter complètement UI Core / la bibliothèque de composants Django utilisée par le projet.
+
+Produire l'inventaire :
+
+* composants existants ;
+* variantes ;
+* API ;
+* composants réellement utilisés ;
+* composants inutilisés ;
+* composants partiellement adoptés ;
+* composants legacy ;
+* duplications ;
+* composants insuffisants ;
+* comportements incohérents ;
+* documentation existante ;
+* tests existants.
+
+Pour chaque besoin DG, indiquer :
+
+**EXISTE / À AMÉLIORER / À CRÉER / LEGACY À SUPPRIMER**
+
+---
+
+# 11. GAP ANALYSIS UI CORE
+
+Évaluer notamment les familles suivantes.
+
+## Data & Navigation
+
+* DataTable ;
+* pagination ;
+* recherche ;
+* FilterBar ;
+* DateRange ;
+* ScopeSelector année/annexe ;
+* tabs ;
+* breadcrumbs ;
+* action menu.
+
+## Pilotage
+
+* KPI Card ;
+* Metric Card ;
+* Trend Indicator ;
+* Alert Card ;
+* Progress/Target ;
+* Status Badge ;
+* Comparison Card ;
+* Stat Group.
+
+## Interaction
+
+* Drawer ;
+* Modal ;
+* Confirm Dialog ;
+* Toast ;
+* Dropdown ;
+* Tooltip ;
+* formulaires.
+
+## Loading
+
+* Button Loading ;
+* Spinner ;
+* Inline Loader ;
+* Skeleton ;
+* Loading Overlay.
+
+## États
+
+* Empty State ;
+* No Results ;
+* Error State ;
+* Retry State ;
+* Permission State ;
+* éventuellement Network/Offline State si réellement pertinent.
+
+## Composants métier réutilisables à évaluer
+
+* AuditTimeline ;
+* ActivityFeed ;
+* DecisionCard ;
+* AlertCenter ;
+* EntitySummary ;
+* MetricCard ;
+* FilterBar avancée.
+
+Ne pas créer mécaniquement tous ces composants.
+
+Pour chacun, déterminer si un composant générique est réellement justifié.
+
+---
+
+# 12. AUDIT SPÉCIFIQUE DES LOADERS / SPINNERS
+
+Un problème d'incohérence a été constaté : plusieurs systèmes de loaders/spinners semblent coexister.
+
+Faire une recherche exhaustive dans le projet concernant notamment :
+
+* spinner ;
+* loader ;
+* loading ;
+* animate-spin ;
+* HTMX indicators ;
+* AJAX loaders ;
+* skeletons ;
+* overlays ;
+* boutons loading ;
+* implémentations JavaScript ;
+* implémentations CSS ;
+* composants historiques.
+
+Identifier :
+
+1. combien de systèmes existent réellement ;
+2. où ils sont utilisés ;
+3. lesquels appartiennent à UI Core ;
+4. lesquels sont legacy ;
+5. lesquels provoquent des conflits ;
+6. lesquels doivent disparaître.
+
+OBJECTIF :
+
+**un seul système de loading appartenant à UI Core.**
+
+Ce système peut disposer de plusieurs variantes normalisées :
+
+* button loading ;
+* inline loading ;
+* skeleton ;
+* section loading ;
+* overlay lorsque nécessaire.
+
+Mais aucune nouvelle implémentation locale indépendante ne doit être créée.
+
+---
+
+# 13. AUDIT DU LEGACY
+
+Rechercher dans le dashboard DG :
+
+* anciens CSS ;
+* anciens composants ;
+* anciens templates ;
+* partials redondants ;
+* JavaScript historique ;
+* anciens loaders ;
+* modales historiques ;
+* tables historiques ;
+* boutons historiques ;
+* formulaires historiques ;
+* layouts historiques ;
+* double sidebar éventuelle ;
+* composants contournant UI Core.
+
+Pour chaque élément legacy :
+
+**CONSERVER TEMPORAIREMENT / MIGRER / SUPPRIMER APRÈS MIGRATION / SUPPRIMER IMMÉDIATEMENT SI SÛR**
+
+Ne supprimer aucun élément sans avoir identifié ses dépendances.
+
+---
+
+# 14. AUDIT FRONTEND ET INTERACTIONS
+
+Inspecter :
+
+* HTMX ;
+* AJAX ;
+* JavaScript ;
+* Alpine si utilisé ;
+* événements ;
+* modales ;
+* drawers ;
+* formulaires ;
+* navigation ;
+* rafraîchissements ;
+* changement année/annexe/période ;
+* feedback utilisateur.
+
+Rechercher notamment :
+
+* doubles requêtes ;
+* doubles événements ;
+* spinners concurrents ;
+* composants réinitialisés inutilement ;
+* pertes de contexte ;
+* refresh complet inutile ;
+* états loading bloqués ;
+* erreurs silencieuses ;
+* comportements différents selon les sections.
+
+---
+
+# 15. AUDIT RESPONSIVE
+
+Évaluer réellement le dashboard à :
+
+* 360 px ;
+* 768 px ;
+* 1440 px.
+
+Inspecter notamment :
+
+* sidebar ;
+* header ;
+* filtres ;
+* KPI ;
+* tableaux ;
+* drawers ;
+* modales ;
+* formulaires ;
+* boutons ;
+* menus ;
+* graphiques ;
+* pagination.
+
+Le mobile ne doit pas nécessairement reproduire toute la densité desktop, mais aucune fonction importante ne doit devenir inaccessible.
+
+---
+
+# 16. ACCESSIBILITÉ
+
+Auditer :
+
+* navigation clavier ;
+* focus visible ;
+* contrastes ;
+* labels ;
+* formulaires ;
+* boutons ;
+* actions critiques ;
+* aria lorsque nécessaire ;
+* drawers/modales ;
+* annonces loading/erreur lorsque pertinent.
+
+Objectif : tendre au minimum vers WCAG AA pour les composants critiques.
+
+---
+
+# 17. PERFORMANCE
+
+Auditer :
+
+* grandes listes ;
+* pagination serveur ;
+* requêtes SQL ;
+* N+1 ;
+* select_related ;
+* prefetch_related ;
+* agrégations KPI ;
+* endpoints HTMX ;
+* exports ;
+* chargement initial ;
+* requêtes répétées ;
+* composants lourds ;
+* graphiques.
+
+Identifier les écrans susceptibles de devenir problématiques avec plusieurs milliers d'étudiants et un volume important d'opérations.
+
+---
+
+# 18. FINANCE — VISION EXÉCUTIVE
+
+Auditer la Finance actuelle pour vérifier qu'elle commence par une lecture dirigeant et non par une simple liste de transactions.
+
+Évaluer une synthèse comprenant notamment, selon les données réellement disponibles :
+
+* entrées ;
+* sorties ;
+* solde ;
+* créances ;
+* écarts ;
+* montants à verser ;
+* clôtures ;
+* comparaison par annexe ;
+* comparaison temporelle.
+
+Chaque agrégat important doit pouvoir permettre un drill-down vers les données qui l'expliquent.
+
+---
+
+# 19. SYSTÈME GLOBAL DE PRIORITÉ
+
+Étudier la possibilité d'un vocabulaire commun dans tout le dashboard :
+
+* Information ;
+* À surveiller ;
+* Action requise ;
+* Critique.
+
+Vérifier comment UI Core pourrait normaliser :
+
+* couleurs ;
+* badges ;
+* icônes ;
+* comportement ;
+* ordre de priorité.
+
+Une même criticité doit avoir la même signification dans Finance, RH, Académique, Annexes, Audit, etc.
+
+---
+
+# 20. SÉCURITÉ ET PÉRIMÈTRE
+
+Auditer toutes les vues DG concernant :
+
+* année académique ;
+* annexe ;
+* portée ;
+* permissions ;
+* POST ;
+* exports ;
+* drawers ;
+* endpoints HTMX ;
+* endpoints AJAX.
+
+Vérifier systématiquement que le filtrage est imposé serveur.
+
+Le navigateur ne doit jamais pouvoir élargir un périmètre simplement en modifiant :
+
+* ID ;
+* query string ;
+* formulaire ;
+* payload ;
+* endpoint.
+
+Vérifier également :
+
+* transactions ;
+* audit ;
+* confirmations ;
+* idempotence lorsque pertinente ;
+* protections contre les doubles soumissions ;
+* autorisations backend.
+
+Masquer un bouton n'est jamais considéré comme une protection suffisante.
+
+---
+
+# 21. CONTRAT UX COMMUN DES ÉCRANS DG
+
+Évaluer si chaque écran important respecte ou peut respecter un contrat commun :
+
+* titre clair ;
+* contexte actif ;
+* nombre de résultats lorsque pertinent ;
+* recherche ;
+* filtres ;
+* pagination ;
+* loading ;
+* empty state ;
+* no-results state ;
+* error state ;
+* retry ;
+* actions cohérentes ;
+* confirmations ;
+* feedback succès/erreur ;
+* audit des actions sensibles.
+
+---
+
+# 22. NE PAS SURCHARGER LE DASHBOARD
+
+Le DG doit pouvoir tout voir sans que tout soit affiché simultanément.
+
+La visibilité universelle ne signifie pas densité universelle.
+
+Auditer la hiérarchie de l'information selon trois niveaux :
+
+### Niveau 1
+
+Décision / situation immédiate.
+
+### Niveau 2
+
+Analyse.
+
+### Niveau 3
+
+Détail opérationnel.
+
+Utiliser drill-down, drawers et vues détaillées pour conserver une interface calme malgré la puissance fonctionnelle.
+
+---
+
+# 23. CE QUI NE DOIT PAS ÊTRE FAIT PENDANT CET AUDIT
+
+Ne pas :
+
+* refaire entièrement le dashboard ;
+* réécrire massivement les templates ;
+* supprimer aveuglément le legacy ;
+* introduire une nouvelle bibliothèque UI ;
+* remplacer UI Core ;
+* ajouter des dépendances inutiles ;
+* modifier les règles métier existantes sans justification ;
+* créer des composants avant d'avoir vérifié l'existant ;
+* lancer une refonte de base de données sans nécessité démontrée.
+
+L'audit doit d'abord produire les faits.
+
+---
+
+# 24. LIVRABLE ATTENDU DE CODEX
+
+À la fin de l'audit, produire un rapport structuré contenant obligatoirement :
+
+## A. Résumé exécutif
+
+État réel du dashboard DG et niveau de maturité.
+
+## B. Cartographie architecture
+
+* apps ;
+* routes ;
+* views ;
+* services ;
+* templates ;
+* partials ;
+* JS ;
+* CSS ;
+* HTMX ;
+* composants UI Core ;
+* modèles concernés.
+
+## C. Cartographie fonctionnelle DG
+
+Pour chaque section :
+
+* objectif ;
+* données ;
+* actions ;
+* permissions ;
+* dépendances ;
+* niveau de maturité.
+
+## D. Matrice UI Core
+
+| Besoin | Composant actuel | État | Action recommandée |
+| ------ | ---------------- | ---- | ------------------ |
+
+## E. Inventaire loaders
+
+Tous les loaders/spinners/skeletons et leurs emplacements.
+
+## F. Inventaire legacy
+
+Avec décision proposée pour chaque famille.
+
+## G. Audit sécurité
+
+* scopes ;
+* permissions ;
+* endpoints ;
+* actions sensibles ;
+* exports ;
+* auditabilité.
+
+## H. Audit performance
+
+Problèmes identifiés et niveau de risque.
+
+## I. Audit responsive/accessibilité
+
+Desktop / tablette / mobile.
+
+## J. Gaps fonctionnels
+
+Ce qui manque réellement pour atteindre la cible DG.
+
+## K. Dette technique
+
+Classée :
+
+* critique ;
+* importante ;
+* modérée ;
+* faible.
+
+## L. Risques
+
+Classés P0 / P1 / P2 / P3.
+
+## M. Architecture cible recommandée
+
+Sans implémentation massive.
+
+## N. Roadmap définitive
+
+Proposer :
+
+### LOT 0
+
+Normalisation architecture + UI Core + loading + legacy critique.
+
+### LOT 1
+
+Cockpit DG + navigation + annexes + alertes + contexte.
+
+### LOT 2
+
+Finance + RH + étudiants + académique + documents.
+
+### LOT 3
+
+Audit & Contrôle + analyses avancées + rapports + finition plateforme mature.
+
+L'ordre peut être ajusté SI l'audit technique démontre qu'un autre ordre réduit significativement les risques.
+
+Justifier toute modification.
+
+---
+
+# 25. PRIORISATION
+
+Pour chaque recommandation, attribuer :
+
+**PRIORITÉ**
+
+* P0 — bloquant ;
+* P1 — indispensable ;
+* P2 — important ;
+* P3 — amélioration.
+
+**EFFORT**
+
+* faible ;
+* moyen ;
+* élevé.
+
+**RISQUE DE RÉGRESSION**
+
+* faible ;
+* moyen ;
+* élevé.
+
+**DÉPENDANCES**
+
+Et préciser si la modification doit intervenir :
+
+* avant refonte DG ;
+* pendant Lot 0 ;
+* pendant Lot 1 ;
+* plus tard.
+
+---
+
+# 26. CONTRAINTE FONDAMENTALE
+
+Ne présume rien.
+
+Inspecte réellement le code.
+
+Lorsqu'une fonctionnalité ou un composant est mentionné dans ce document :
+
+* vérifier s'il existe ;
+* vérifier son implémentation ;
+* vérifier son usage réel ;
+* vérifier ses dépendances ;
+* vérifier sa qualité ;
+* vérifier s'il est déjà couvert par UI Core.
+
+Ne crée pas artificiellement un problème parce qu'il figure dans cette demande.
+
+Si quelque chose est déjà correctement implémenté, indique :
+
+**CONFORME — AUCUNE MODIFICATION NÉCESSAIRE.**
+
+Nous voulons améliorer le projet, pas réécrire ce qui fonctionne.
+
+---
+
+# 27. OBJECTIF FINAL
+
+Nous voulons que le futur dashboard DG soit simultanément :
+
+* un cockpit exécutif ;
+* un outil de gouvernance ;
+* un système de contrôle ;
+* un centre décisionnel ;
+* un outil de gestion globale ;
+* un point d'accès transversal aux opérations autorisées ;
+* une console d'audit métier ;
+* une interface rapide et professionnelle ;
+* une plateforme responsive ;
+* un produit cohérent avec UI Core ;
+* un système sécurisé et traçable.
+
+Il doit donner au Directeur Général une vision presque universelle de l'établissement sans lui exposer inutilement les mécanismes techniques dangereux du véritable super-administrateur.
+
+La philosophie finale est :
+
+**Tout voir.
+Comprendre rapidement.
+Détecter les anomalies.
+Décider lorsque nécessaire.
+Agir dans son périmètre.
+Pouvoir vérifier ensuite exactement ce qui s'est passé.**
+
+Commence maintenant par l'audit.
+
+Ne lance pas encore la refonte globale.
+
+À la fin, présente le rapport complet et attends validation avant l'implémentation.

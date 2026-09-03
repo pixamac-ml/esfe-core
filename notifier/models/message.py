@@ -146,3 +146,11 @@ class MessageAttachment(models.Model):
 
     def __str__(self):
         return self.original_name
+
+    @property
+    def is_image(self):
+        """Indique si la pièce jointe peut être prévisualisée sans téléchargement."""
+        content_type = (self.content_type or "").lower()
+        if content_type.startswith("image/"):
+            return True
+        return self.original_name.lower().endswith((".jpg", ".jpeg", ".png"))

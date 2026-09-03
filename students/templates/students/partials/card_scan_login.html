@@ -1,4 +1,5 @@
 <!-- Partial HTMX — mode scan carte (injecté dans la page login) -->
+{% load static %}
 <div id="card-scan-panel" class="space-y-4">
 
   {% if step == "pin" %}
@@ -43,7 +44,9 @@
       <p class="font-semibold mb-1">Carte non valide</p>
       <p>{{ message }}</p>
     </div>
-    <button onclick="demarrerScan()"
+    <button hx-get="{% url 'students:card_scan_verify' %}"
+            hx-target="#card-scan-panel"
+            hx-swap="outerHTML"
             class="w-full border border-gray-300 text-gray-600 py-2.5 rounded-xl text-sm hover:bg-gray-50 transition">
       Réessayer
     </button>
@@ -77,6 +80,7 @@
 </div>
 
 {% if step == "camera" or not step %}
+<script src="{% static 'vendor/jsqr/jsQR.js' %}"></script>
 <script>
   (function () {
     const video = document.getElementById('qr-video');
@@ -88,6 +92,9 @@
     async function demarrerScan() {
       scanning = true;
       try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('camera-unavailable');
+        }
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
         video.srcObject = stream;
         await video.play();
@@ -103,10 +110,12 @@
       if (stream) stream.getTracks().forEach(t => t.stop());
     }
 
-    function extraireToken(url) {
+    function extraireToken(value) {
       try {
-        const m = url.match(/\/carte\/v\/([^/?#]+)/);
-        return m ? m[1] : null;
+        const raw = String(value || '');
+        const m = raw.match(/\/carte\/v\/([^/?#]+)/);
+        if (m) return m[1];
+        return /^v[12]\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(raw) ? raw : null;
       } catch (_) { return null; }
     }
 
@@ -114,8 +123,11 @@
       if (!scanning) return;
 
       // Essai avec BarcodeDetector (Chrome/Edge natif)
-      if ('BarcodeDetector' in window) {
-        const detector = new BarcodeDetector({ formats: ['qr_code'] });
+      if ('BarcodeDetector' in window || window.jsQR) {
+        let detector = null;
+        if ('BarcodeDetector' in window) {
+          try { detector = new BarcodeDetector({ formats: ['qr_code'] }); } catch (_) { detector = null; }
+        }
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
 
@@ -125,7 +137,12 @@
           canvas.height = video.videoHeight;
           ctx.drawImage(video, 0, 0);
           try {
-            const barcodes = await detector.detect(canvas);
+            let barcodes = detector ? await detector.detect(canvas) : [];
+            if (!barcodes.length && window.jsQR) {
+              const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              const decoded = window.jsQR(image.data, image.width, image.height, { inversionAttempts: 'dontInvert' });
+              if (decoded) barcodes = [{ rawValue: decoded.data }];
+            }
             if (barcodes.length > 0) {
               const raw = barcodes[0].rawValue;
               const token = extraireToken(raw);

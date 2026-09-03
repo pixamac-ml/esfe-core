@@ -1,8 +1,12 @@
+import logging
+
 from django.db import transaction
 from django.utils import timezone
 
 from notifier.models import DeliveryAttempt, NotificationMessage, NotificationEvent
 from notifier.services.channels import dispatch_message
+
+logger = logging.getLogger(__name__)
 
 
 class Dispatcher:
@@ -62,7 +66,16 @@ class Dispatcher:
 
     @classmethod
     def dispatch_on_commit(cls, message):
-        transaction.on_commit(lambda: cls.dispatch(message))
+        def deliver():
+            try:
+                cls.dispatch(message)
+            except Exception:
+                # DeliveryAttempt and NotificationMessage are already marked as
+                # failed by dispatch(). A provider outage must not turn a
+                # successfully committed business operation into HTTP 500.
+                logger.exception("Notification delivery failed after commit")
+
+        transaction.on_commit(deliver)
 
 
 def finalize_event_status(event):

@@ -6,10 +6,13 @@ from unittest.mock import Mock, patch
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
+from academic_cycle import constants as academic_cycle_constants
+from academic_cycle.models import BranchAcademicCycle
 from academics.models import (
     AcademicClass,
     AcademicBulletin,
@@ -27,13 +30,24 @@ from academics.models import (
 )
 from academics.services.grading import calculate_ec_grade
 from academics.imports.import_service import import_grades
+from academics.imports.template_service import generate_notes_workbook
 from academics.services.documents import (
     build_bulletin_context,
     generate_annual_bulletin,
     generate_semester_bulletin,
 )
+from academics.services.annual_deliberation import (
+    finalise_class_deliberation,
+    prepare_class_annual_synthesis,
+)
 from academics.services.semester import compute_semester_result
+from academics.services.ue import compute_ue_result
 from academics.services.year import compute_annual_decision, compute_annual_result
+from portal.services.notes_workflow import (
+    ACTION_PUBLISH_NORMAL,
+    get_retake_candidates,
+    get_notes_state,
+)
 from academics.services.lesson_log_service import (
     create_lesson_log,
     get_class_lesson_logs,
@@ -139,6 +153,25 @@ class AcademicResultCalculationTests(TestCase):
             academic_class=self.academic_class,
         )
 
+        self.it_user = User.objects.create_user(username="it_notes", password="pass1234", is_staff=True)
+        self.it_user.profile.position = "it_support"
+        self.it_user.profile.role = "staff"
+        self.it_user.profile.branch = self.branch
+        self.it_user.profile.save(update_fields=["position", "role", "branch", "updated_at"])
+
+    def _official_workbook(self, *, session_type, scores_by_cell):
+        output = generate_notes_workbook(
+            self.academic_class,
+            self.semester,
+            session_type=session_type,
+            scores_by_cell=scores_by_cell,
+        )
+        return SimpleUploadedFile(
+            f"notes-{session_type}.xlsx",
+            output.getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
     def test_ec_below_threshold_gets_no_credit(self):
         result = calculate_ec_grade(
             note=Decimal("8.00"),
@@ -159,6 +192,17 @@ class AcademicResultCalculationTests(TestCase):
         self.assertFalse(result["is_complete"])
         self.assertEqual(result["missing_grades"], 1)
         self.assertEqual(result["status"], "incomplete")
+
+    def test_ue_shows_weighted_provisional_average_when_grade_missing(self):
+        ECGrade.objects.create(enrollment=self.enrollment, ec=self.ec_one, normal_score=Decimal("14.00"))
+
+        result = compute_ue_result(self.ec_one.ue, self.enrollment)
+
+        self.assertEqual(result["average"], Decimal("14.00"))
+        self.assertEqual(result["entered_coefficients"], Decimal("2.00"))
+        self.assertEqual(result["missing_grades"], 1)
+        self.assertTrue(result["is_provisional"])
+        self.assertFalse(result["is_validated"])
 
     def test_semester_requires_all_credits_not_only_average(self):
         ECGrade.objects.create(enrollment=self.enrollment, ec=self.ec_one, normal_score=Decimal("20.00"))
@@ -184,6 +228,126 @@ class AcademicResultCalculationTests(TestCase):
 
         self.assertEqual(result["credit_obtained"], Decimal("6.00"))
         self.assertTrue(result["is_validated"])
+
+    def test_retake_requires_a_normal_score(self):
+        self.semester.status = Semester.STATUS_RETAKE_ENTRY
+        self.semester.save(update_fields=["status"])
+
+        with self.assertRaises(ValidationError):
+            ECGrade.objects.create(
+                enrollment=self.enrollment,
+                ec=self.ec_one,
+                retake_score=Decimal("12.00"),
+            )
+
+    def test_model_rejects_an_out_of_range_source_score(self):
+        with self.assertRaises(ValidationError):
+            ECGrade.objects.create(
+                enrollment=self.enrollment,
+                ec=self.ec_one,
+                normal_score=Decimal("20.01"),
+            )
+
+    def test_import_normal_then_retake_preserves_normal_score_and_opens_retake_modal(self):
+        self.semester.status = Semester.STATUS_NORMAL_ENTRY
+        self.semester.save(update_fields=["status"])
+        normal_file = self._official_workbook(
+            session_type="normal",
+            scores_by_cell={
+                (self.enrollment.id, self.ec_one.id): "14.00",
+                (self.enrollment.id, self.ec_two.id): "8.00",
+            },
+        )
+        normal_result = import_grades(
+            normal_file,
+            academic_class=self.academic_class,
+            semester=self.semester,
+            session_type="normal",
+        )
+        self.assertEqual(normal_result.updated, 2)
+
+        from portal.services.notes_workflow import apply_notes_workflow_action
+
+        apply_notes_workflow_action(
+            actor=self.it_user,
+            academic_class=self.academic_class,
+            semester=self.semester,
+            action=ACTION_PUBLISH_NORMAL,
+        )
+        self.semester.refresh_from_db()
+        self.assertEqual(self.semester.status, Semester.STATUS_NORMAL_LOCKED)
+        self.assertTrue(get_notes_state(academic_class=self.academic_class, semester=self.semester).retake_ready)
+
+        self.client.force_login(self.it_user)
+        modal_response = self.client.get(
+            reverse("accounts_portal:it_notes_retake_modal"),
+            {"class_id": self.academic_class.id, "semester_id": self.semester.id},
+        )
+        self.assertEqual(modal_response.status_code, 200)
+        self.assertContains(modal_response, "Verification avant activation")
+
+        activate_response = self.client.post(
+            reverse("accounts_portal:it_notes_workflow_action"),
+            {
+                "class_id": self.academic_class.id,
+                "semester_id": self.semester.id,
+                "action": "activer_rattrapage",
+                "from_modal": "retake",
+            },
+        )
+        self.assertEqual(activate_response.status_code, 200)
+        self.semester.refresh_from_db()
+        self.assertEqual(self.semester.status, Semester.STATUS_RETAKE_ENTRY)
+
+        retake_file = self._official_workbook(
+            session_type="retake",
+            scores_by_cell={(self.enrollment.id, self.ec_two.id): "12.00"},
+        )
+        retake_result = import_grades(
+            retake_file,
+            academic_class=self.academic_class,
+            semester=self.semester,
+            session_type="retake",
+        )
+        self.assertEqual(retake_result.updated, 1)
+        grade = ECGrade.objects.get(enrollment=self.enrollment, ec=self.ec_two)
+        self.assertEqual(grade.normal_score, Decimal("8.00"))
+        self.assertEqual(grade.retake_score, Decimal("12.00"))
+        self.assertEqual(grade.final_score, Decimal("12.00"))
+        self.assertTrue(compute_semester_result(self.semester, self.enrollment)["is_validated"])
+        self.assertEqual(
+            get_retake_candidates(academic_class=self.academic_class, semester=self.semester),
+            [],
+        )
+
+    def test_import_retake_rejects_a_previously_passing_ec(self):
+        # Defensive case for legacy data: an old retake value must never make
+        # an EC that passed normally eligible for a new retake import.
+        ECGrade.objects.create(
+            enrollment=self.enrollment,
+            ec=self.ec_one,
+            normal_score=Decimal("14.00"),
+            retake_score=Decimal("12.00"),
+        )
+        self.semester.status = Semester.STATUS_RETAKE_ENTRY
+        self.semester.save(update_fields=["status"])
+
+        result = import_grades(
+            self._official_workbook(
+                session_type="retake",
+                scores_by_cell={(self.enrollment.id, self.ec_one.id): "10.00"},
+            ),
+            academic_class=self.academic_class,
+            semester=self.semester,
+            session_type="retake",
+        )
+
+        self.assertEqual(result.updated, 0)
+        self.assertEqual(result.skipped_invalid_scores, 1)
+        self.assertEqual(result.student_issues[0]["reason"], "retake_not_allowed")
+        grade = ECGrade.objects.get(enrollment=self.enrollment, ec=self.ec_one)
+        self.assertEqual(grade.normal_score, Decimal("14.00"))
+        self.assertEqual(grade.retake_score, Decimal("12.00"))
 
     def test_annual_result_reports_incomplete_until_all_semesters_ready(self):
         result = compute_annual_result(self.enrollment)
@@ -244,7 +408,7 @@ class AcademicResultCalculationTests(TestCase):
         self.semester.status = Semester.STATUS_PUBLISHED
         self.semester.save(update_fields=["status"])
 
-        with self.assertRaisesMessage(ValidationError, "exactement les semestres S1 et S2"):
+        with self.assertRaisesMessage(ValidationError, "exactement deux semestres"):
             generate_annual_bulletin(enrollment=self.enrollment, publish=True)
 
     @override_settings(
@@ -321,7 +485,6 @@ class AcademicResultCalculationTests(TestCase):
             academic_class=self.academic_class,
             number=2,
             total_required_credits=Decimal("6.00"),
-            status=Semester.STATUS_PUBLISHED,
         )
         second_ue = UE.objects.create(semester=second_semester, code="RES203", title="Dette")
         ec_three = EC.objects.create(
@@ -342,6 +505,20 @@ class AcademicResultCalculationTests(TestCase):
         ECGrade.objects.create(enrollment=self.enrollment, ec=ec_four, normal_score=Decimal("9.50"))
         self.semester.status = Semester.STATUS_PUBLISHED
         self.semester.save(update_fields=["status"])
+        second_semester.status = Semester.STATUS_PUBLISHED
+        second_semester.save(update_fields=["status"])
+
+        cycle = BranchAcademicCycle.objects.create(
+            branch=self.branch,
+            academic_year=self.academic_year,
+            status=academic_cycle_constants.BRANCH_CYCLE_DELIBERATION,
+        )
+        prepare_class_annual_synthesis(academic_class=self.academic_class, actor=None)
+        finalise_class_deliberation(
+            academic_class=self.academic_class,
+            actor=None,
+            branch_cycle=cycle,
+        )
 
         bulletin = generate_annual_bulletin(enrollment=self.enrollment, publish=True)
 

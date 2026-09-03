@@ -13,20 +13,19 @@
     <section class="overflow-hidden rounded-ui-card border border-ui-border bg-ui-surface shadow-ui-sm">
       <header class="flex flex-col gap-4 border-b border-ui-border px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
         <div class="min-w-0">
-          <p class="text-xs font-semibold text-ui-primary">Grille hebdomadaire récurrente</p>
+          <p class="text-xs font-semibold text-ui-primary">{% if timetable_display_mode == "template" %}Modèle hebdomadaire récurrent{% else %}Séances de la semaine sélectionnée{% endif %}</p>
           <h2 class="mt-1 truncate text-base font-bold text-ui-text">{{ timetable_selected_class.display_name }}</h2>
           <p class="mt-1 text-xs text-ui-text-muted">{{ timetable_selected_class.programme.title }} · {{ timetable_grid.slots|length }} cours · {{ timetable_grid.total_hours }} h/semaine</p>
+          {% if timetable_display_mode == "template" %}
+            <p class="mt-1 text-xs font-semibold text-ui-primary">Vous modifiez le modèle récurrent, y compris les créneaux désactivés signalés dans la grille.</p>
+          {% elif timetable_grid.uses_week_events %}
+            <p class="mt-1 text-xs font-semibold text-ui-success">Séances datées chargées pour cette semaine : {{ timetable_grid.week_event_count }} cours.</p>
+          {% else %}
+            <p class="mt-1 text-xs font-semibold text-ui-warning">Aucune séance datée pour cette semaine : ajoutez un cours ou préparez cette semaine depuis le modèle.</p>
+          {% endif %}
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <button type="button"
-                  title="Ajouter un cours"
-                  hx-get="{% url 'accounts_portal:director_timetable_slot_drawer' %}?class_id={{ timetable_selected_class.id }}&week_start={{ timetable_week_start|date:'Y-m-d' }}"
-                  hx-target="#director-drawer-content"
-                  hx-swap="innerHTML"
-                  class="ui-focus-ring inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong">
-            <i data-lucide="plus" class="h-4 w-4" aria-hidden="true"></i>Ajouter un cours
-          </button>
-          <a href="{% url 'accounts_portal:schedule_class_print' timetable_selected_class.id %}?source=weekly&week_start={{ timetable_week_start|date:'Y-m-d' }}"
+          <a href="{% url 'accounts_portal:schedule_class_print' timetable_selected_class.id %}?source=week&week_start={{ timetable_week_start|date:'Y-m-d' }}"
              target="_blank"
              rel="noopener"
              class="ui-focus-ring inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">
@@ -39,20 +38,7 @@
       {% include "portal/staff/director/partials/timetable/_grid.html" with editable=1 %}
 
       <footer class="flex flex-col gap-3 border-t border-ui-border bg-ui-surface-muted/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-        <p class="text-xs text-ui-text-muted">Les cours créés ici forment la grille officielle réutilisée chaque semaine.</p>
-        <form method="post"
-              hx-post="{% url 'accounts_portal:director_timetable_action' %}"
-              hx-target="#director-timetable-subcontent"
-              hx-swap="innerHTML"
-              hx-disabled-elt="button[type=submit]">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="materialize_month">
-          <input type="hidden" name="class_id" value="{{ timetable_selected_class.id }}">
-          {% if timetable_week_start %}<input type="hidden" name="week_start" value="{{ timetable_week_start|date:'Y-m-d' }}">{% endif %}
-          <button type="submit" class="ui-focus-ring inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover disabled:opacity-50">
-            <i data-lucide="refresh-cw" class="h-4 w-4" aria-hidden="true"></i>Actualiser les 4 prochaines semaines
-          </button>
-        </form>
+        <p class="text-xs text-ui-text-muted">Cette vue affiche uniquement les séances enregistrées pour la semaine sélectionnée. Un clic sur un cours permet de le modifier ou de le supprimer.</p>
       </footer>
     </section>
 

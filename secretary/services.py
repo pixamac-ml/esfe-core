@@ -4,16 +4,26 @@ from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from datetime import datetime, timedelta
 
 from accounts.dashboards.helpers import get_user_branch
 from notifier.models import NotificationMessage
 from notifier.services import NotificationBus
 from academics.services.schedule_service import get_student_week_schedule
 from students.models import StudentAttendance
-from .models import Appointment, DocumentReceipt, RegistryEntry, SecretaryTask, VisitorLog
+from .models import (
+    Appointment,
+    DocumentReceipt,
+    RegistryEntry,
+    SecretaryCall,
+    SecretaryTask,
+    SecretaryTransmission,
+    VisitorLog,
+)
 from .selectors import (
     get_active_students,
     get_active_visits_queryset,
+    get_appointments_queryset,
     get_documents_queryset,
     get_recent_documents_queryset,
     get_recent_registry_entries,
@@ -745,6 +755,12 @@ def get_secretary_dashboard_data(user):
         user=user,
         branch=branch,
     )[:5]
+    calls_queryset = SecretaryCall.objects.filter(branch=branch).select_related("related_student", "created_by")
+    calls_to_follow = calls_queryset.exclude(call_status=SecretaryCall.CALL_PROCESSED)
+    transmissions_queryset = SecretaryTransmission.objects.filter(branch=branch).select_related(
+        "related_student", "created_by", "taken_by"
+    )
+    pending_transmissions = transmissions_queryset.exclude(transmission_status=SecretaryTransmission.STATUS_CLOSED)
 
     return {
         "branch": branch,
@@ -774,6 +790,10 @@ def get_secretary_dashboard_data(user):
             user=user,
             branch=branch,
         ).count(),
+        "calls_count": calls_to_follow.count(),
+        "transmissions_count": pending_transmissions.count(),
+        "calls_rows": list(calls_to_follow[:5]),
+        "transmissions_rows": list(pending_transmissions[:5]),
         "today_appointments_rows": today_appointments[:5],
         "today_visits_rows": today_visits[:5],
         "open_visits_rows": active_visits[:5],
@@ -840,6 +860,42 @@ def _build_mini_calendar_cells(*, today, meetings):
             "event_label": meeting_labels.get(day, ""),
         })
     return cells
+
+
+def build_secretary_week_grid(*, branch, anchor_date=None):
+    """Return a compact, branch-scoped weekly agenda for the secretary UI."""
+    anchor = anchor_date or timezone.localdate()
+    monday = anchor - timedelta(days=anchor.weekday())
+    sunday = monday + timedelta(days=6)
+    start = timezone.make_aware(datetime.combine(monday, datetime.min.time()))
+    end = timezone.make_aware(datetime.combine(sunday, datetime.max.time()))
+    appointments = get_appointments_queryset(
+        {"date_from": monday, "date_to": sunday}, branch=branch
+    ).filter(scheduled_at__range=(start, end)).order_by("scheduled_at")
+    meetings = get_meetings_queryset(branch=branch).filter(scheduled_at__range=(start, end)).order_by("scheduled_at")
+    tasks = get_tasks_queryset(
+        {"archived": False, "active_only": True, "date_from": monday, "date_to": sunday},
+        branch=branch,
+    ).filter(due_date__range=(monday, sunday)).order_by("due_date")
+    by_day = {monday + timedelta(days=i): [] for i in range(7)}
+    for item in appointments:
+        by_day[item.scheduled_at.astimezone(timezone.get_current_timezone()).date()].append({"kind": "Rendez-vous", "pk": item.pk, "title": item.title, "time": item.scheduled_at.strftime("%H:%M"), "tone": "info"})
+    for item in meetings:
+        by_day[item.scheduled_at.astimezone(timezone.get_current_timezone()).date()].append({"kind": "Réunion", "pk": item.pk, "title": item.title, "time": item.scheduled_at.strftime("%H:%M"), "tone": "success"})
+    for item in tasks:
+        by_day[item.due_date].append({"kind": "Tâche", "pk": item.pk, "title": item.title, "time": "À faire", "tone": "warning"})
+    french_days = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
+    return {
+        "week_start": monday,
+        "week_end": sunday,
+        "week_label": f"Du {monday.strftime('%d/%m/%Y')} au {sunday.strftime('%d/%m/%Y')}",
+        "previous_week": monday - timedelta(days=7),
+        "next_week": monday + timedelta(days=7),
+        "days": [
+            {"date": day, "label": french_days[index], "short_label": day.strftime("%d/%m"), "is_today": day == timezone.localdate(), "entries": by_day[day]}
+            for index, day in enumerate(by_day)
+        ],
+    }
 
 
 def get_secretary_unread_messages(user):

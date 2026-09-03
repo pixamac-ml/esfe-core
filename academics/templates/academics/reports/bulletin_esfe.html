@@ -130,8 +130,8 @@
       <img src="{% if pdf_mode %}{{ pdf_logo_uri }}{% else %}{% static 'institution/logo_esfe.png' %}{% endif %}" alt="ESFE" class="header-logo">
       <div class="header-school">École de Santé Félix Houphouët-Boigny</div>
       <div class="header-tagline">Demain, c'est aujourd'hui</div>
-      <div class="header-contact">Djélibougou • BP 00223 • Bamako • Mali</div>
-      <div class="header-contact">Tel : 76-37-88-66 / 66-37-88-66</div>
+      <div class="header-contact">{{ branch_name }}{% if bulletin.branch.address %} • {{ bulletin.branch.address }}{% endif %}</div>
+      {% if bulletin.branch.phone %}<div class="header-contact">Tél. : {{ bulletin.branch.phone }}</div>{% endif %}
     </div>
 
     <div class="report-title">
@@ -157,7 +157,7 @@
       <thead>
         <tr>
           <th colspan="4">Unités d'Enseignement (U.E)</th>
-          <th colspan="7">Matière(s) constitutive(s) de l'unité d'enseignement</th>
+          <th colspan="8">Matière(s) constitutive(s) de l'unité d'enseignement</th>
           <th colspan="4">Résultats obtenus</th>
         </tr>
         <tr>
@@ -169,6 +169,7 @@
           <th style="width:4%">Crédits</th>
           <th style="width:3%">Coef</th>
           <th style="width:5%">Note</th>
+          <th style="width:5%">Session</th>
           <th style="width:6%">Note × Coef</th>
           <th style="width:5%">Crédits</th>
           <th style="width:7%">Moy. UE</th>
@@ -193,6 +194,7 @@
                 <td>{{ ec_row.credit_required_display }}</td>
                 <td>{{ ec_row.ec_coefficient_display }}</td>
                 <td class="{% if ec_row.is_validated %}bg-valid{% else %}bg-fail{% endif %}">{{ ec_row.note_display }}</td>
+                <td>{{ ec_row.session }}</td>
                 <td>{{ ec_row.note_coefficient_display }}</td>
                 <td>{{ ec_row.credit_obtained_display }}</td>
                 {% if forloop.first %}
@@ -208,7 +210,7 @@
         {% endfor %}
         <tr class="total-row">
           <td colspan="4" class="left">Total Semestre {{ semester_result.semester.number }}</td>
-          <td colspan="5"></td>
+          <td colspan="6"></td>
           <td>{{ semester_result.credit_obtained_display }} / {{ semester_result.credit_required_display }}</td>
           <td>{{ semester_result.average_display }}</td>
           <td></td>
@@ -238,7 +240,7 @@
       <tbody>
         {% for item in bulletin.snapshot.semesters %}
           <tr>
-            <td>S{{ forloop.counter }}</td>
+            <td>S{{ item.number|default:forloop.counter }}</td>
             <td>{{ item.average|default:"-" }}</td>
             <td>{{ item.credit_obtained }}</td>
             <td>{{ item.credit_required }}</td>
@@ -261,7 +263,7 @@
         ..................................................................................
       </div>
       <div class="signature-box">
-        <div>San, le ..................................</div>
+        <div>{{ bulletin.branch.city|default:"Bamako" }}, le ..................................</div>
         <div class="line"></div>
         <div><strong>Le Directeur Général</strong></div>
       </div>

@@ -5,5 +5,5 @@ from django_components import component
 class AuditLogTable(component.Component):
     template_name = "informaticien/audit_log_table.html"
 
-    def get_context_data(self, logs, logs_page=None):
-        return {"logs": logs, "logs_page": logs_page}
+    def get_context_data(self, logs, logs_page=None, query="", action_type=""):
+        return {"logs": logs, "logs_page": logs_page, "query": query, "action_type": action_type}

@@ -99,7 +99,6 @@
             <th>Classe actuelle</th>
             <th>Classe prochaine</th>
             <th>Statut</th>
-            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -121,37 +120,10 @@
             <td>
               <span class="dg-badge-sm dg-badge-amber">En attente</span>
             </td>
-            <td>
-              <div style="display:flex; gap:4px;">
-                <form method="post" action="{% url 'accounts_portal:dg_exec_action' %}" class="inline-flex" onsubmit="return dgSubmitAction(this)">
-                  {% csrf_token %}
-                  <input type="hidden" name="action" value="arbitrate_decision">
-                  <input type="hidden" name="decision_id" value="{{ row.id }}">
-                  <input type="hidden" name="approve" value="1">
-                  <input type="hidden" name="reason" value="Valide par le Directeur General">
-                  <button type="submit" class="dg-btn dg-btn-success" style="font-size:.65rem; height:28px; padding:0 .5rem;">
-                    <i class="fa-solid fa-check"></i>Approuver
-                  </button>
-                </form>
-                <form method="post" action="{% url 'accounts_portal:dg_exec_action' %}" class="inline-flex" onsubmit="return dgSubmitAction(this)">
-                  {% csrf_token %}
-                  <input type="hidden" name="action" value="arbitrate_decision">
-                  <input type="hidden" name="decision_id" value="{{ row.id }}">
-                  <input type="hidden" name="approve" value="0">
-                  <button type="submit" class="dg-btn dg-btn-danger" style="font-size:.65rem; height:28px; padding:0 .5rem;">
-                    <i class="fa-solid fa-ban"></i>Rejeter
-                  </button>
-                </form>
-                <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;"
-                  onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=workflow&step=blocked&id={{ row.id }}')">
-                  <i class="fa-solid fa-eye"></i>
-                </button>
-              </div>
-            </td>
           </tr>
           {% empty %}
           <tr>
-            <td colspan="6" class="dg-empty">
+            <td colspan="5" class="dg-empty">
               <div class="dg-empty-icon"><i class="fa-solid fa-check-circle"></i></div>
               <div class="dg-empty-text">Aucun dossier bloque — tous les passages sont a jour</div>
             </td>
@@ -174,9 +146,7 @@
         <div style="font-size:.65rem; color:#b91c1c; font-weight:600;">Action requise pour traitement</div>
       </div>
     </div>
-    <button type="button" class="dg-btn dg-btn-danger" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=workflow&step=blocked')">
-      <i class="fa-solid fa-gavel"></i>Arbitrer les dossiers
-    </button>
+    <span style="font-size:.72rem; font-weight:800; color:#991b1b;">Suivi à traiter par les équipes académiques et administratives.</span>
   </div>
   {% endif %}
 
@@ -216,7 +186,7 @@
                 </button>
               </form>
               {% if row.awards_count %}
-              <form method="post" action="{% url 'accounts_portal:dg_exec_action' %}" class="inline-flex" onsubmit="return dgSubmitAction(this)">
+              <form method="post" action="{% url 'accounts_portal:dg_exec_action' %}" class="inline-flex" onsubmit="return dgConfirmExecutiveAction(this)">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="publish_class_diplomas">
                 <input type="hidden" name="class_id" value="{{ row.class.id }}">

@@ -437,17 +437,7 @@ def dashboard(request):
     context['sidebar_collapsed'] = pref.sidebar_collapsed
 
     dashboard_url = reverse('superadmin:dashboard')
-    context.update(
-        build_role_dashboard_shell(
-            request,
-            role='super_admin',
-            key='superadmin',
-            title='Super administration',
-            subtitle='Centre de pilotage global',
-            active_section='dashboard',
-            dashboard_url=dashboard_url,
-            context_label='Vue globale - Toutes les annexes',
-            groups=[
+    superadmin_groups = [
                 {
                     'label': 'Pilotage',
                     'items': [
@@ -472,7 +462,36 @@ def dashboard(request):
                         {'key': 'settings', 'label': 'Parametres', 'icon': 'settings', 'url': reverse('superadmin:settings')},
                     ],
                 },
-            ],
+    ]
+    if getattr(getattr(request.user, 'profile', None), 'branch', None) is not None:
+        superadmin_groups.append(
+            {
+                'label': 'Espace personnel',
+                'items': [
+                    {
+                        'key': 'messagerie',
+                        'label': 'Messagerie interne',
+                        'icon': 'mail',
+                        'url': dashboard_url,
+                        'hx_get': f"{reverse('accounts_portal:staff_messaging')}?dash=superadmin",
+                        'hx_target': '#superadmin-workspace',
+                        'hx_swap': 'innerHTML',
+                        'hx_push_url': dashboard_url,
+                    },
+                ],
+            }
+        )
+    context.update(
+        build_role_dashboard_shell(
+            request,
+            role='super_admin',
+            key='superadmin',
+            title='Super administration',
+            subtitle='Centre de pilotage global',
+            active_section='dashboard',
+            dashboard_url=dashboard_url,
+            context_label='Vue globale - Toutes les annexes',
+            groups=superadmin_groups,
             modal_title='Administration globale',
         )
     )

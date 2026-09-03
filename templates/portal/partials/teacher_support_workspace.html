@@ -2,7 +2,7 @@
 {% url 'accounts_portal:teacher_support_workspace' as teacher_support_workspace_url %}
 {% with support_target=teacher_support_target|default:'#sg-drawer-content' %}
 <div class="space-y-5" data-teacher-support-workspace>
-  {% component "ui_core.page_header" eyebrow="Pédagogie" title="Supports de cours" subtitle=selected_ec.title|default:"Choisissez une classe puis une matière." %}
+  {% component "ui_core.page_header" eyebrow="Ressources de cours" title="Déposer et organiser" subtitle=selected_ec.title|default:"Étape 1 : choisissez une classe, puis une matière." %}
     {% fill "actions" %}<button type="button" onclick="window.teacherCloseDrawer()" class="rounded-ui-button px-3 py-2 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">Fermer</button>{% endfill %}
   {% endcomponent %}
   {% if toast %}{% component "ui_core.alert" title="Information" message=toast.message tone=toast.level %}{% endcomponent %}{% endif %}
@@ -11,10 +11,10 @@
   {% endcomponent %}
   {% if selected_class %}
     <div class="grid gap-5 lg:grid-cols-2">
-      {% component "ui_core.panel" title="Matières" subtitle=selected_class.display_name %}
+      {% component "ui_core.panel" title="Étape 2 · Matière" subtitle=selected_class.display_name %}
         {% if teacher_support_ecs %}<div class="space-y-2">{% for ec in teacher_support_ecs %}<button type="button" hx-get="{{ teacher_support_workspace_url }}?class_id={{ selected_class.id }}&ec_id={{ ec.id }}&support_target={{ support_target|urlencode }}" hx-target="{{ support_target }}" hx-swap="innerHTML" class="flex w-full items-center justify-between rounded-ui-button border px-3 py-3 text-left {% if selected_ec and selected_ec.id == ec.id %}border-ui-primary bg-ui-primary-soft{% else %}border-ui-border hover:bg-ui-surface-hover{% endif %}"><span><strong class="block text-sm text-ui-text">{{ ec.title }}</strong><span class="text-xs text-ui-text-muted">{{ ec.ue_code|default:"—" }} · {{ ec.chapter_count }} chapitre(s)</span></span>{% component "ui_core.status_badge" label=ec.content_count tone="info" %}{% endcomponent %}</button>{% endfor %}</div>{% else %}{% component "ui_core.empty_state" icon="book-open" title="Aucune matière" message="Aucune matière active n'est rattachée à cette classe." compact=True %}{% endcomponent %}{% endif %}
       {% endcomponent %}
-      {% component "ui_core.panel" title="Déposer un support" subtitle="Fichier, vidéo ou contenu texte." %}
+      {% component "ui_core.panel" title="Étape 3 · Ajouter la ressource" subtitle="Fichier, vidéo ou contenu texte : les étudiants la verront dans cette matière." %}
         {% if selected_ec %}
           <form method="post" enctype="multipart/form-data" hx-post="{{ teacher_support_workspace_url }}" hx-target="{{ support_target }}" hx-swap="innerHTML" hx-encoding="multipart/form-data" class="space-y-4">
             {% csrf_token %}<input type="hidden" name="action" value="{% if editing_content %}edit_content{% else %}create_content{% endif %}">{% if editing_content %}<input type="hidden" name="content_id" value="{{ editing_content.id }}">{% endif %}<input type="hidden" name="support_target" value="{{ support_target }}"><input type="hidden" name="class_id" value="{{ selected_class.id }}"><input type="hidden" name="ec_id" value="{{ selected_ec.id }}">

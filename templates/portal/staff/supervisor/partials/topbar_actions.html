@@ -1,12 +1,13 @@
 {% load component_tags %}
 {% url 'accounts_portal:supervisor_account_panel' as supervisor_account_panel_url %}
 {% url 'accounts:logout' as supervisor_logout_url %}
-{% url 'notification_center:notifications_partial' as supervisor_notifications_preview_url %}
+{% url 'accounts_portal:staff_notifications_preview' as supervisor_notifications_preview_url %}
+{% url 'accounts_portal:staff_messaging' as supervisor_messaging_url %}
 <div class="flex items-center gap-2">
   <label class="flex items-center gap-2" for="supervisor-class-selector" data-supervisor-class-picker>
     <span class="sr-only">Classe active</span><i data-lucide="school" class="hidden h-4 w-4 text-ui-text-muted sm:block"></i>
-    <select id="supervisor-class-selector" name="class_id" class="h-ui-control w-28 rounded-ui-button border border-ui-border bg-ui-surface px-2 text-xs font-semibold text-ui-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus sm:w-44 sm:px-3 sm:text-sm" hx-get="{{ supervisor_class_picker_url }}" hx-target="#supervisor-workspace" hx-include="this" hx-swap="innerHTML" hx-trigger="change" data-workspace-url="{% url 'accounts_portal:supervisor_workflow_workspace' %}" aria-label="Classe active"><option value="">Choisir une classe</option>{% for item in class_picker_items %}<option value="{{ item.id }}" {% if selected_class_id|stringformat:"s" == item.id|stringformat:"s" %}selected{% endif %}>{{ item.label }}</option>{% endfor %}</select>
+    <select id="supervisor-class-selector" name="class_id" class="h-ui-control w-28 rounded-ui-button border border-ui-border bg-ui-surface px-2 text-xs font-semibold text-ui-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus sm:w-44 sm:px-3 sm:text-sm" data-workspace-url="{% url 'accounts_portal:supervisor_workflow_workspace' %}" aria-label="Classe active"><option value="">Choisir une classe</option>{% for item in class_picker_items %}<option value="{{ item.id }}" {% if selected_class_id|stringformat:"s" == item.id|stringformat:"s" %}selected{% endif %}>{{ item.label }}</option>{% endfor %}</select>
   </label>
-  {% component "notifications.bell" unread_count=notification_count preview_url=supervisor_notifications_preview_url preview_target="#notification-dropdown-content" center_url=notifications_url %}{% endcomponent %}
+  {% component "notifications.bell" unread_count=notification_count preview_url=supervisor_notifications_preview_url|add:"?dash=supervisor" preview_target="#notification-dropdown-content" center_url=supervisor_messaging_url|add:"?dash=supervisor" center_target="#supervisor-workspace" %}{% endcomponent %}
   {% component "account.profile_dropdown" user=request.user avatar_url=account_avatar_url display_name=account_display_name role=account_role profile_url=supervisor_account_panel_url|add:"?view=profile" edit_url=supervisor_account_panel_url|add:"?view=edit" security_url=supervisor_account_panel_url|add:"?view=security" preferences_url=supervisor_account_panel_url|add:"?view=preferences" logout_url=supervisor_logout_url drawer_id="supervisor-drawer" %}{% endcomponent %}
 </div>

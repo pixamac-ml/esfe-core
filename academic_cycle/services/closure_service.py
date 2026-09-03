@@ -11,6 +11,11 @@ from academic_cycle.services.readiness_service import generate_closure_report
 def start_deliberation(branch_cycle, actor):
     if not can_close_branch_cycle(actor, branch_cycle):
         raise PermissionDenied("Vous n'etes pas autorise a demarrer la deliberation de cette annexe.")
+    report = generate_closure_report(branch_cycle, actor=actor)
+    if report.status != constants.CLOSURE_REPORT_VALID:
+        raise ValidationError(
+            "La deliberation est impossible : des classes, notes ou bulletins sont incomplets."
+        )
     old_status = branch_cycle.status
     branch_cycle.status = constants.BRANCH_CYCLE_DELIBERATION
     branch_cycle.deliberation_started_at = timezone.now()

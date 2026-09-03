@@ -24,6 +24,7 @@ TEACHER_SECTIONS = (
     "overview",
     "classes",
     "supports",
+    "evaluations",
     "schedule",
     "logs",
     "salary",
@@ -83,6 +84,9 @@ class TeacherPortalSectionTests(TestCase):
 
     def test_htmx_supports(self):
         self.assertEqual(self._get_section_htmx("supports").status_code, 200)
+
+    def test_htmx_evaluations(self):
+        self.assertEqual(self._get_section_htmx("evaluations").status_code, 200)
 
     def test_htmx_schedule(self):
         self.assertEqual(self._get_section_htmx("schedule").status_code, 200)

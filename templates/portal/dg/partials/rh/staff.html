@@ -1,137 +1,24 @@
-{% load humanize %}
-<div class="dg-card dg-card-pad">
-  <div class="dg-section-hero">
-    <div>
-      <div class="dg-section-hero-title">
-        <i class="fa-solid fa-user-group" style="color:#7c3aed; margin-right:8px;"></i>RH / Staff
-      </div>
-      <div class="dg-section-hero-sub">Gestion des ressources humaines · {{ rh.active_staff|default:0 }} staff actifs</div>
-    </div>
-    <div class="dg-section-actions">
-      <button type="button" class="dg-btn dg-btn-outline" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=staff')">
-        <i class="fa-solid fa-eye"></i>Vue detaillee
+{% load component_tags %}
+<div class="space-y-5" data-dashboard-section="rh" data-executive-section="rh">
+  {% component "ui_core.page_header" eyebrow="Ressources humaines" title="Personnel" subtitle="Recherche, contrôles d’accès et décisions RH dans le périmètre DG sélectionné." %}
+    {% fill "actions" %}
+      <button type="button" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=staff')">
+        <i data-lucide="users-round" class="h-4 w-4" aria-hidden="true"></i> Vue synthèse
       </button>
-      <button type="button" class="dg-btn dg-btn-primary" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=recruitment')">
-        <i class="fa-solid fa-user-plus"></i>Recruter
+      <button type="button" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-3 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=recruitment')">
+        <i data-lucide="user-plus" class="h-4 w-4" aria-hidden="true"></i> Recruter
       </button>
-    </div>
-  </div>
+    {% endfill %}
+  {% endcomponent %}
 
-  <div class="dg-context-bar">
-    <div>
-      <div class="dg-context-label">Perimetre RH</div>
-      <div class="dg-context-hint">Le filtre annexe du bandeau limite la liste aux personnels et managers concernés.</div>
-    </div>
-    <div class="dg-context-main">
-      <span class="dg-scope-chip">{{ dashboard_scope_label|default:"Toutes les annexes" }}</span>
-      <span class="dg-scope-chip">{{ rh.active_staff|default:0|intcomma }} staff actifs</span>
-      <span class="dg-scope-chip">{{ rh.branches_without_manager|default:0|intcomma }} annexes sans manager</span>
-    </div>
-  </div>
+  {% component "ui_core.filter_bar" filters=staff_filters action=staff_filter_action method="get" submit_label="Appliquer" reset_url=staff_filter_reset_url target="#executive-workspace" swap="innerHTML" trigger="submit" live_search_name="q" live_search_delay=350 density="compact" active_filters=staff_active_filters hidden_fields=staff_filter_hidden_fields %}{% endcomponent %}
 
-  <!-- Stats row -->
-  <div class="dg-stat-grid" style="margin-bottom:16px;">
-    <div class="dg-stat-box" style="background:#f5f3ff;">
-      <div class="dg-stat-val" style="color:#7c3aed;">{{ rh.active_staff|default:0 }}</div>
-      <div class="dg-stat-lbl">Staff total</div>
-    </div>
-    <div class="dg-stat-box" style="background:#eff6ff;">
-      <div class="dg-stat-val" style="color:#2563eb;">{{ rh.active_staff|default:0 }}</div>
-      <div class="dg-stat-lbl">Enseignants</div>
-    </div>
-    <div class="dg-stat-box" style="background:#f0fdf4;">
-      <div class="dg-stat-val" style="color:#16a34a;">{{ rh.branches_with_manager|default:0 }}</div>
-      <div class="dg-stat-lbl">Managers assignes</div>
-    </div>
-    <div class="dg-stat-box" style="background:#fef3c7;">
-      <div class="dg-stat-val" style="color:#d97706;">{{ rh.branches_without_manager|default:0 }}</div>
-      <div class="dg-stat-lbl">Sans affectation</div>
-    </div>
-  </div>
-
-  <!-- Action filters -->
-  <div style="display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;">
-    <button type="button" class="dg-btn dg-btn-primary" style="background:#7c3aed; border-color:#7c3aed;">
-      <i class="fa-solid fa-list"></i>Tous ({{ rh.active_staff|default:0 }})
-    </button>
-    <button type="button" class="dg-btn dg-btn-outline" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=staff{% if selected_branch_id %}&branch_id={{ selected_branch_id }}{% endif %}')">
-      <i class="fa-solid fa-user-graduate"></i>Fiches RH
-    </button>
-    <button type="button" class="dg-btn dg-btn-outline" onclick="dgShowSection('annexes')">
-      <i class="fa-solid fa-user-tie"></i>Managers par annexe
-    </button>
-    <button type="button" class="dg-btn dg-btn-outline" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=recruitment')">
-      <i class="fa-solid fa-user-plus"></i>Recruter
-    </button>
-  </div>
-
-  <!-- Staff table -->
-  <div class="dg-panel">
-    <div class="dg-table-wrap">
-      <table class="dg-table">
-        <thead>
-          <tr>
-            <th>Nom</th>
-            <th>Poste</th>
-            <th>Annexe</th>
-            <th>Contrat</th>
-            <th>Statut</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for profile in drawer_staff_rows|default:empty_list %}
-          <tr>
-            <td class="font-black">{{ profile.user.get_full_name|default:profile.user.username }}</td>
-            <td>
-              <span class="dg-badge-sm dg-badge-blue">{{ profile.position|default:"Staff" }}</span>
-            </td>
-            <td>{{ profile.branch.name|default:"—" }}</td>
-            <td>
-              <span class="dg-badge-sm {% if profile.contract_type == 'CDI' %}dg-badge-green{% else %}dg-badge-amber{% endif %}">
-                {{ profile.contract_type|default:"—" }}
-              </span>
-            </td>
-            <td>
-              <span class="dg-badge-sm dg-badge-green">Actif</span>
-            </td>
-            <td>
-              <div style="display:flex; gap:4px;">
-                <button type="button" class="dg-btn dg-btn-outline" style="font-size:.65rem; height:28px; padding:0 .5rem;"
-                  onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=staff&id={{ profile.id }}')">
-                  <i class="fa-solid fa-eye"></i>Fiche
-                </button>
-              </div>
-            </td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="6" class="dg-empty">
-              <div class="dg-empty-icon"><i class="fa-solid fa-users"></i></div>
-              <div class="dg-empty-text">Aucun staff active dans le systeme</div>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- Recruit action card -->
-  <div style="margin-top:14px;" class="dg-panel">
-    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
-      <div style="display:flex; align-items:center; gap:10px;">
-        <div class="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-blue-600">
-          <i class="fa-solid fa-user-plus"></i>
-        </div>
-        <div>
-          <div style="font-size:.82rem; font-weight:900; color:#1d4ed8;">Recrutement en cours</div>
-          <div style="font-size:.62rem; color:#64748b; font-weight:600;">Lancez une procedure de recrutement pour un nouveau staff</div>
-        </div>
-      </div>
-      <button type="button" class="dg-btn dg-btn-primary" onclick="dgOpenModal('{% url 'accounts_portal:dg_modal' %}?modal=recruitment')">
-        <i class="fa-solid fa-plus"></i>Nouveau recrutement
-      </button>
-    </div>
-  </div>
+  {% component "ui_core.data_table" id="dg-staff-table" caption="Personnel du périmètre" headers=staff_headers rows=staff_rows result_count=staff_result_count page=staff_page page_count=staff_page_count density="compact" empty_title="Aucun membre du personnel ne correspond aux filtres" empty_message="Modifiez ou réinitialisez les filtres pour élargir la recherche." %}
+    {% fill "footer" %}
+      <nav class="flex items-center gap-2" aria-label="Pagination du personnel">
+        {% if staff_previous_url %}<button type="button" hx-get="{{ staff_previous_url }}" hx-target="#executive-workspace" hx-swap="innerHTML" class="inline-flex h-9 items-center gap-1 rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus"><i data-lucide="chevron-left" class="h-4 w-4" aria-hidden="true"></i> Précédent</button>{% endif %}
+        {% if staff_next_url %}<button type="button" hx-get="{{ staff_next_url }}" hx-target="#executive-workspace" hx-swap="innerHTML" class="inline-flex h-9 items-center gap-1 rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus">Suivant <i data-lucide="chevron-right" class="h-4 w-4" aria-hidden="true"></i></button>{% endif %}
+      </nav>
+    {% endfill %}
+  {% endcomponent %}
 </div>

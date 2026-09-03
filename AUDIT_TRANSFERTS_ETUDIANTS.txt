@@ -1,0 +1,1133 @@
+# MISSION — AUDIT ET REFONTE MÉTIER DU DASHBOARD SECRÉTAIRE ESFé
+
+Tu travailles sur le projet Django **ESFé Core / Félix Santé**.
+
+Ta mission est d’auditer puis de restructurer profondément le dashboard du rôle **Secrétaire**.
+
+Il ne s’agit PAS de simplement refaire l’interface graphique.
+
+Il faut transformer le dashboard actuel en un véritable **poste de travail numérique quotidien du secrétariat**, adapté au fonctionnement réel d’une école supérieure de santé.
+
+---
+
+# 1. PRINCIPE MÉTIER FONDAMENTAL
+
+Le secrétariat ne doit pas être conçu comme une collection de pages indépendantes.
+
+Il doit être considéré comme :
+
+> **le centre opérationnel de réception, d’enregistrement, de circulation, de transmission et de suivi de l’information administrative de l’établissement.**
+
+La secrétaire doit pouvoir utiliser son dashboard toute la journée pour gérer notamment :
+
+* visiteurs ;
+* appels téléphoniques ;
+* rendez-vous ;
+* courriers entrants ;
+* courriers sortants ;
+* documents reçus ;
+* documents à remettre ;
+* transmissions vers les autres services ;
+* recherches d’étudiants ;
+* réunions ;
+* tâches ;
+* suivis ;
+* rappels ;
+* rapports journaliers et périodiques.
+
+Chaque opération importante doit laisser une trace exploitable dans le système.
+
+---
+
+# 2. IMPORTANT — COMMENCER PAR UN AUDIT
+
+Ne commence pas immédiatement à coder.
+
+Inspecte d’abord entièrement ce qui existe actuellement concernant le rôle Secrétaire.
+
+Analyser notamment :
+
+* app `secretary` ;
+* models ;
+* views ;
+* services ;
+* forms ;
+* URLs ;
+* templates ;
+* composants UI ;
+* permissions ;
+* notifications ;
+* modèles de registre ;
+* visiteurs ;
+* rendez-vous ;
+* dépôts/remises ;
+* réunions ;
+* tâches ;
+* rapports ;
+* recherche étudiant ;
+* mécanismes de routage/transmission existants ;
+* exports existants ;
+* historique/audit ;
+* relations avec les autres apps ;
+* composants réutilisables du projet.
+
+Inspecter également les mécanismes transversaux déjà existants dans :
+
+* `communication` ;
+* `core` ;
+* `students` ;
+* `users/accounts` ;
+* notifications ;
+* documents si un module documentaire existe déjà ;
+* autres dashboards utilisant des workflows similaires.
+
+L’objectif est de **réutiliser et consolider l’existant**, pas de créer des doublons.
+
+---
+
+# 3. CE QUI EXISTE DÉJÀ DOIT ÊTRE PRÉSERVÉ
+
+Le projet possède déjà plusieurs briques intéressantes, notamment la notion de registre et différents workflows du secrétariat.
+
+Ne supprime aucune fonctionnalité métier utile uniquement parce que la nouvelle organisation de navigation est différente.
+
+Procéder selon cette logique :
+
+**existant utile → conserver / améliorer**
+
+**existant redondant → fusionner**
+
+**existant mal positionné → déplacer**
+
+**fonctionnalité manquante → ajouter**
+
+**ancienne fonctionnalité devenue inutile → proposer sa suppression avant suppression**
+
+Ne pas casser les données historiques.
+
+Les migrations doivent préserver les données existantes.
+
+---
+
+# 4. VISION DU NOUVEAU DASHBOARD
+
+Le dashboard Secrétaire doit devenir un véritable :
+
+# POSTE DE PILOTAGE DU SECRÉTARIAT
+
+L’écran d’accueil doit répondre immédiatement à trois questions :
+
+1. Que se passe-t-il aujourd’hui ?
+2. Qu’est-ce qui attend une action ?
+3. Que dois-je faire maintenant ?
+
+Éviter les KPI décoratifs et les cartes inutiles.
+
+Afficher uniquement des informations opérationnelles.
+
+---
+
+# 5. ACCUEIL — « AUJOURD’HUI »
+
+Créer/refondre l’accueil autour de la journée courante.
+
+Exemple :
+
+## Aujourd’hui — Mardi 25 août 2026
+
+Afficher des indicateurs opérationnels tels que :
+
+* visiteurs actuellement présents ;
+* rendez-vous du jour ;
+* appels nécessitant un rappel ;
+* transmissions en attente ;
+* documents à remettre ;
+* courriers non traités ;
+* tâches arrivant à échéance ;
+* éventuels éléments urgents ou en retard.
+
+Les compteurs doivent être cliquables et conduire directement aux éléments concernés.
+
+Ne pas surcharger l’interface.
+
+---
+
+# 6. ACTIONS RAPIDES
+
+Les principales opérations quotidiennes doivent être disponibles immédiatement depuis l’accueil.
+
+Prévoir notamment :
+
+* `+ Enregistrer une visite`
+* `+ Enregistrer un appel`
+* `+ Recevoir un courrier/document`
+* `+ Prendre un rendez-vous`
+* `+ Nouvelle transmission`
+* `Rechercher un étudiant`
+
+Selon l’architecture UI existante, utiliser modal, drawer ou écran rapide.
+
+Objectif :
+
+> une opération courante doit nécessiter le minimum possible de navigation.
+
+---
+
+# 7. REGISTRE NUMÉRIQUE CENTRAL
+
+Étudier très sérieusement le modèle `RegistryEntry` existant.
+
+L’objectif est d’en faire, si son architecture le permet, le **registre numérique central du secrétariat**.
+
+Le registre doit permettre de retracer les événements administratifs importants.
+
+Exemples :
+
+| Heure | Type        | Personne   | Objet                | Destination      | État       |
+| ----- | ----------- | ---------- | -------------------- | ---------------- | ---------- |
+| 08:12 | Visite      | M. Traoré  | Voir DE              | Direction études | En cours   |
+| 08:45 | Courrier    | Ministère  | Courrier officiel    | DG               | Transmis   |
+| 09:10 | Appel       | Mme Diallo | Information étudiant | Scolarité        | À rappeler |
+| 09:40 | Document    | Aminata    | Attestation          | Secrétariat      | Prêt       |
+| 10:15 | Réclamation | Parent     | Paiement             | Gestionnaire     | Transmis   |
+
+Le registre doit permettre :
+
+* filtrage par date ;
+* type ;
+* personne ;
+* destination ;
+* statut ;
+* priorité ;
+* service ;
+* recherche textuelle ;
+* consultation historique.
+
+Ne pas dupliquer inutilement les données métiers : le registre peut référencer les objets concernés lorsque cela est préférable.
+
+---
+
+# 8. GESTION DES VISITEURS
+
+Le parcours doit être extrêmement rapide.
+
+Lorsqu’une personne arrive :
+
+1. identifier la personne ;
+2. saisir son téléphone si nécessaire ;
+3. préciser le motif ;
+4. éventuellement rechercher l’étudiant concerné ;
+5. sélectionner la personne/service demandé ;
+6. enregistrer l’heure d’arrivée ;
+7. définir l’état ;
+8. éventuellement notifier le destinataire.
+
+États possibles à adapter à l’existant :
+
+* attendu ;
+* arrivé ;
+* en attente ;
+* reçu ;
+* terminé ;
+* annulé.
+
+Prévoir également :
+
+## Personnes actuellement présentes
+
+Exemple :
+
+**M. Coulibaly**
+Arrivé 09:24
+Attend : Directeur Général
+Temps d’attente : 12 min
+
+La secrétaire doit pouvoir immédiatement savoir qui est encore dans l’établissement.
+
+---
+
+# 9. RENDEZ-VOUS + VISITEURS
+
+Ne pas traiter rendez-vous et visiteurs comme deux systèmes complètement isolés.
+
+Lorsqu’une personne ayant un rendez-vous arrive :
+
+`RDV prévu → Arrivé → En attente → Reçu → Terminé`
+
+Prévoir une action :
+
+**Marquer comme arrivé**
+
+depuis le rendez-vous.
+
+La visite correspondante doit pouvoir être créée ou reliée automatiquement.
+
+---
+
+# 10. AJOUTER UN VRAI REGISTRE DES APPELS
+
+Auditer d’abord si une fonctionnalité équivalente existe.
+
+Sinon, créer un système léger de gestion des appels téléphoniques.
+
+Pour chaque appel :
+
+* date ;
+* heure ;
+* appel entrant/sortant ;
+* nom interlocuteur ;
+* téléphone ;
+* objet ;
+* étudiant concerné optionnel ;
+* destinataire/service concerné ;
+* notes ;
+* priorité ;
+* demande de rappel ;
+* état.
+
+États possibles :
+
+* reçu ;
+* message transmis ;
+* à rappeler ;
+* rappel effectué ;
+* traité.
+
+La saisie doit être très rapide.
+
+Exemple :
+
+> Mme Diallo appelle concernant son enfant en L2.
+> Elle souhaite parler au DE.
+
+La secrétaire enregistre puis transmet.
+
+Le DE reçoit éventuellement une notification :
+
+> Nouveau message téléphonique transmis par le secrétariat.
+
+---
+
+# 11. TRANSMISSIONS INTERSERVICES
+
+Cette fonctionnalité est fondamentale.
+
+Créer ou consolider un système permettant au secrétariat de transmettre une information ou un dossier vers :
+
+* DG ;
+* Directeur des Études ;
+* Gestionnaire ;
+* Informaticien ;
+* Surveillant ;
+* autre service autorisé.
+
+Exemple :
+
+Une réclamation financière arrive.
+
+La secrétaire :
+
+1. enregistre la demande ;
+2. sélectionne `Gestionnaire` ;
+3. transmet.
+
+Le gestionnaire voit :
+
+> Nouvelle transmission du secrétariat
+> Réclamation étudiant XXX
+> Reçue à 10:42
+
+Le destinataire peut :
+
+* prendre en charge ;
+* ajouter éventuellement une observation ;
+* marquer comme traité.
+
+La secrétaire doit ensuite voir :
+
+> Traité par Gestionnaire — 11:17
+
+Prévoir des états cohérents, par exemple :
+
+`À transmettre → Transmis → Pris en charge → Traité → Clos`
+
+Adapter aux modèles existants au lieu de créer arbitrairement une nouvelle machine d’état.
+
+---
+
+# 12. TRAÇABILITÉ DES TRANSMISSIONS
+
+Chaque transmission doit conserver au minimum :
+
+* auteur ;
+* date/heure ;
+* service source ;
+* destination ;
+* objet concerné ;
+* motif ;
+* priorité ;
+* état ;
+* personne ayant pris en charge ;
+* date de prise en charge ;
+* date de traitement ;
+* observations éventuelles.
+
+L’historique ne doit pas être modifiable silencieusement.
+
+---
+
+# 13. COURRIERS ET DOCUMENTS
+
+Le secrétariat doit devenir une porte d’entrée importante du futur système documentaire.
+
+Prévoir deux grands flux.
+
+## A. COURRIER ENTRANT
+
+Workflow cible :
+
+`Réception → Enregistrement → Numérisation/Pièce jointe → Affectation → Transmission → Traitement → Clôture`
+
+Informations possibles :
+
+* numéro registre ;
+* date ;
+* expéditeur ;
+* organisme ;
+* objet ;
+* référence ;
+* document joint ;
+* destinataire ;
+* priorité ;
+* observations ;
+* statut.
+
+## B. COURRIER SORTANT
+
+Workflow :
+
+`Préparation → Validation éventuelle → Signature → Envoi/Remise → Archivage`
+
+Ne pas développer un deuxième moteur documentaire si le projet possède ou prépare déjà un module Documents.
+
+Le secrétariat doit s’intégrer au système documentaire transversal.
+
+---
+
+# 14. DOCUMENTS À REMETTRE
+
+Prévoir une file claire :
+
+## Documents prêts à remettre
+
+Exemple :
+
+**Attestation de scolarité**
+Aminata Coulibaly
+Prête depuis : 24/08
+Téléphone : ...
+Statut : À remettre
+
+Lors de la remise :
+
+* identifier le bénéficiaire ;
+* marquer comme remis ;
+* enregistrer date/heure ;
+* enregistrer l’agent ayant effectué la remise ;
+* éventuellement identité de la personne ayant récupéré le document.
+
+---
+
+# 15. RECHERCHE GLOBALE
+
+La secrétaire doit disposer d’une recherche rapide permanente.
+
+Recherche possible sur :
+
+* étudiant ;
+* matricule ;
+* téléphone ;
+* visiteur ;
+* courrier ;
+* document ;
+* rendez-vous ;
+* transmission.
+
+Lorsqu’un étudiant est trouvé, afficher uniquement les informations utiles au secrétariat et autorisées par ses permissions.
+
+Exemple :
+
+**Aminata Coulibaly**
+Matricule : ESFE-2025-0147
+Classe : L2
+Annexe : Moribabougou
+Statut : Active
+
+Actions contextuelles :
+
+* Enregistrer visite ;
+* Nouveau rendez-vous ;
+* Voir documents accessibles ;
+* Nouvelle transmission.
+
+La secrétaire ne doit pas obtenir des permissions métier qui appartiennent au DE, Gestionnaire ou Informaticien.
+
+---
+
+# 16. AGENDA
+
+Regrouper intelligemment :
+
+* rendez-vous ;
+* réunions ;
+* rappels ;
+* échéances importantes.
+
+Prévoir :
+
+* aujourd’hui ;
+* demain ;
+* semaine ;
+* calendrier.
+
+Ne pas recréer un calendrier académique : il s’agit ici de l’agenda opérationnel du secrétariat.
+
+---
+
+# 17. RAPPORT DE FIN DE JOURNÉE
+
+C’est une fonctionnalité importante.
+
+La secrétaire doit pouvoir obtenir à tout moment un :
+
+# Rapport d’activité du jour
+
+Le rapport doit être généré automatiquement depuis les données du système.
+
+Exemple :
+
+### Activité — 25 août 2026
+
+Visiteurs reçus : 14
+Rendez-vous : 7
+Appels enregistrés : 11
+Appels à rappeler : 2
+Courriers reçus : 4
+Documents remis : 6
+Transmissions créées : 8
+Transmissions encore ouvertes : 3
+
+Puis détail des opérations.
+
+Prévoir export :
+
+* PDF ;
+* Excel ;
+* Word si techniquement pertinent et réellement utile.
+
+Le PDF doit être destiné à la lecture/impression.
+
+Excel doit être destiné à l’exploitation opérationnelle des données.
+
+Word peut être destiné aux rapports administratifs éditables.
+
+---
+
+# 18. CONTINUITÉ DE SERVICE — POINT IMPORTANT
+
+Les exports ne doivent PAS être considérés uniquement comme des rapports statistiques.
+
+Ils doivent également permettre une **continuité minimale du travail en cas d’indisponibilité temporaire de la plateforme ou de connexion Internet**.
+
+Particulièrement pour Excel.
+
+La secrétaire doit pouvoir conserver localement une représentation exploitable de son activité.
+
+---
+
+# 19. EXPORT EXCEL MENSUEL STRUCTURÉ
+
+Créer un véritable classeur mensuel.
+
+Exemple :
+
+`Secretariat_ESFE_Aout_2026.xlsx`
+
+Le classeur doit contenir plusieurs feuilles pertinentes.
+
+Par exemple :
+
+### Feuille 1 — Synthèse
+
+* activité globale ;
+* volumes ;
+* éléments ouverts ;
+* éléments traités ;
+* éléments en retard.
+
+### Feuille 2 — Visiteurs
+
+Colonnes utiles :
+
+* Date
+* Heure arrivée
+* Heure départ
+* Nom
+* Téléphone
+* Motif
+* Étudiant concerné
+* Destination
+* Statut
+* Observation
+
+### Feuille 3 — Appels
+
+* Date
+* Heure
+* Type
+* Nom
+* Téléphone
+* Objet
+* Destinataire
+* À rappeler
+* Statut
+* Observation
+
+### Feuille 4 — Rendez-vous
+
+* Date
+* Heure
+* Personne
+* Téléphone
+* Responsable
+* Objet
+* Statut
+
+### Feuille 5 — Courriers
+
+* Date
+* Référence
+* Type
+* Expéditeur
+* Objet
+* Destinataire
+* Priorité
+* Statut
+
+### Feuille 6 — Documents
+
+* Date
+* Type document
+* Personne
+* Référence
+* Statut
+* Date remise
+
+### Feuille 7 — Transmissions
+
+* Date
+* Objet
+* Source
+* Destination
+* Priorité
+* État
+* Date prise en charge
+* Date traitement
+
+### Feuille 8 — Suivis / À faire
+
+Très importante pour la continuité.
+
+Elle doit reprendre les éléments encore ouverts :
+
+* appels à rappeler ;
+* personnes à contacter ;
+* documents non remis ;
+* transmissions non traitées ;
+* rendez-vous futurs proches ;
+* courriers ouverts ;
+* tâches en attente.
+
+Le classeur doit être lisible, correctement dimensionné, filtrable et utilisable directement dans Excel.
+
+Utiliser `openpyxl` si cohérent avec le projet existant.
+
+---
+
+# 20. EXPORT JOURNALIER
+
+Prévoir également :
+
+`Secretariat_2026-08-25.xlsx`
+
+et :
+
+`Rapport_Secretariat_2026-08-25.pdf`
+
+Le journal quotidien doit contenir les opérations de la journée et surtout les éléments restant à traiter.
+
+Ainsi, même si la plateforme est temporairement inaccessible le lendemain, la secrétaire dispose de sa dernière situation opérationnelle.
+
+---
+
+# 21. ATTENTION : EXPORT ≠ SAUVEGARDE
+
+Ne pas confondre cette fonctionnalité avec la sauvegarde technique de la plateforme.
+
+La base de données et les médias auront leurs propres mécanismes de sauvegarde.
+
+Les exports du secrétariat servent à :
+
+* consultation ;
+* impression ;
+* reporting ;
+* exploitation Excel ;
+* transmission administrative ;
+* continuité opérationnelle.
+
+---
+
+# 22. HISTORIQUE PAR ANNÉE ACADÉMIQUE
+
+Le projet fonctionne avec des années académiques.
+
+Respecter cette architecture.
+
+Les données historiques du secrétariat doivent rester consultables.
+
+Prévoir les filtres pertinents :
+
+* aujourd’hui ;
+* semaine ;
+* mois ;
+* année civile si nécessaire ;
+* année académique ;
+* période personnalisée.
+
+Ne jamais supprimer les anciennes opérations simplement parce qu’une nouvelle année commence.
+
+---
+
+# 23. NAVIGATION CIBLE
+
+La sidebar actuelle doit être auditée et simplifiée.
+
+Éviter une entrée de navigation pour chaque petite fonctionnalité.
+
+Organisation cible indicative :
+
+## ACCUEIL
+
+* Aujourd’hui
+
+## REGISTRE
+
+* Registre général
+* Visiteurs & appels
+
+## AGENDA
+
+* Rendez-vous
+* Réunions
+
+## DOCUMENTS
+
+* Courriers
+* Documents / dépôts / remises
+
+## TRANSMISSIONS
+
+* À traiter / à suivre
+* Historique
+
+## OUTILS
+
+* Tâches
+* Rapports & exports
+
+Puis éléments personnels existants si nécessaires :
+
+* Notifications
+* Mon salaire
+* Paramètres
+
+Cette organisation est indicative.
+
+Après audit du code, proposer la structure finale la plus cohérente en conservant les fonctionnalités utiles.
+
+---
+
+# 24. UX — RÈGLE DES 3 CLICS
+
+Les opérations quotidiennes fréquentes doivent idéalement être accessibles en trois interactions ou moins depuis l’accueil.
+
+Exemple :
+
+Accueil → Nouvelle visite → Enregistrer.
+
+Accueil → Nouvel appel → Transmettre.
+
+Accueil → Recherche étudiant → Créer rendez-vous.
+
+Éviter les parcours administratifs inutilement longs.
+
+---
+
+# 25. DRAWERS / MODALS / HTMX
+
+Le projet utilise notamment Django, HTMX, AJAX, JavaScript et Tailwind.
+
+Réutiliser les conventions existantes.
+
+Pour les actions rapides, privilégier lorsque pertinent :
+
+* drawers ;
+* modals ;
+* formulaires HTMX ;
+* rafraîchissement partiel ;
+* feedback immédiat.
+
+Éviter de recharger entièrement une page pour chaque petite opération si l’architecture actuelle permet proprement HTMX.
+
+---
+
+# 26. STATUTS VISUELS
+
+Les états doivent être immédiatement compréhensibles.
+
+Par exemple :
+
+* À faire
+* En attente
+* En cours
+* Transmis
+* Traité
+* En retard
+* Terminé
+
+Mais ne pas créer 25 badges différents.
+
+Les statuts doivent avoir une vraie signification métier.
+
+---
+
+# 27. PRIORITÉS
+
+Prévoir si pertinent :
+
+* normale ;
+* importante ;
+* urgente.
+
+Une urgence doit ressortir clairement dans la file de travail.
+
+Éviter cependant une UI agressive remplie de couleurs.
+
+---
+
+# 28. NOTIFICATIONS
+
+Réutiliser impérativement le système de notifications transversal existant.
+
+Ne pas créer un système de notifications propre à `secretary`.
+
+Exemples :
+
+* transmission reçue ;
+* transmission traitée ;
+* rendez-vous proche ;
+* document prêt ;
+* courrier urgent ;
+* rappel en retard.
+
+Les notifications doivent conduire vers l’objet concerné.
+
+---
+
+# 29. PERMISSIONS
+
+Appliquer strictement les permissions par rôle et par annexe.
+
+Une secrétaire d’une annexe ne doit pas automatiquement consulter les informations d’une autre annexe.
+
+Auditer les mécanismes existants de scope par annexe.
+
+Respecter également le principe du moindre privilège.
+
+---
+
+# 30. AUDIT / TRAÇABILITÉ
+
+Les opérations importantes doivent laisser une trace :
+
+* création ;
+* modification significative ;
+* transmission ;
+* prise en charge ;
+* clôture ;
+* remise document ;
+* export important si le système d’audit le prévoit.
+
+Ne pas permettre de modifier silencieusement l’historique.
+
+---
+
+# 31. RAPPORTS
+
+Prévoir une section Rapports réellement utile.
+
+Filtres :
+
+* jour ;
+* semaine ;
+* mois ;
+* période personnalisée ;
+* année académique.
+
+Rapports possibles :
+
+* fréquentation visiteurs ;
+* appels ;
+* rendez-vous ;
+* courriers ;
+* documents ;
+* transmissions ;
+* activité globale.
+
+Les rapports doivent provenir des données réelles et non de compteurs dupliqués.
+
+---
+
+# 32. NE PAS SURCHARGER LE DASHBOARD
+
+Le dashboard ne doit pas devenir une mosaïque de 20 cartes.
+
+Principe :
+
+> Montrer d’abord ce qui nécessite une action.
+
+Ordre recommandé :
+
+1. urgences ;
+2. personnes présentes ;
+3. tâches/actions du jour ;
+4. rendez-vous proches ;
+5. transmissions ;
+6. éléments restant à traiter.
+
+Les statistiques historiques appartiennent plutôt à Rapports.
+
+---
+
+# 33. MOBILE / TABLETTE / DESKTOP
+
+Le dashboard doit rester responsive.
+
+Cependant, l’usage principal peut être optimisé pour ordinateur/tablette de bureau.
+
+Tester particulièrement :
+
+* sidebar ;
+* tableaux ;
+* drawers ;
+* formulaires ;
+* recherche ;
+* actions rapides ;
+* exports ;
+* petites résolutions.
+
+Éviter les débordements horizontaux incontrôlés.
+
+---
+
+# 34. PERFORMANCE
+
+Éviter les requêtes N+1.
+
+Utiliser correctement :
+
+* `select_related`
+* `prefetch_related`
+* agrégations
+* pagination
+
+Ne pas charger plusieurs années d’historique sur l’accueil.
+
+L’accueil doit se concentrer sur aujourd’hui et les éléments actifs.
+
+---
+
+# 35. TESTS
+
+Ajouter des tests sur les workflows critiques.
+
+Minimum :
+
+### Visiteur
+
+création → arrivée → attente → reçu → départ.
+
+### Rendez-vous
+
+création → arrivée → liaison visite → terminé.
+
+### Appel
+
+création → transmission → rappel → traité.
+
+### Transmission
+
+création → destination → prise en charge → traitement → retour visible secrétaire.
+
+### Document
+
+création/réception → attente → remise.
+
+### Permissions
+
+une secrétaire ne voit que les données autorisées.
+
+### Export
+
+les données exportées correspondent exactement à la période demandée.
+
+### Historique
+
+les anciennes données restent consultables.
+
+---
+
+# 36. PHASE DE TRAVAIL DEMANDÉE
+
+Procéder impérativement par étapes.
+
+## PHASE 1 — AUDIT
+
+Produire un état des lieux :
+
+* fonctionnalités existantes ;
+* modèles existants ;
+* pages existantes ;
+* workflows ;
+* composants réutilisables ;
+* doublons ;
+* problèmes ;
+* fonctionnalités manquantes.
+
+## PHASE 2 — PLAN DE REFONTE
+
+Présenter :
+
+* architecture proposée ;
+* navigation cible ;
+* modèles à conserver ;
+* modèles à modifier ;
+* éventuels nouveaux modèles ;
+* migrations nécessaires ;
+* interactions avec les autres apps.
+
+## PHASE 3 — IMPLÉMENTATION
+
+Implémenter progressivement :
+
+1. accueil opérationnel ;
+2. registre ;
+3. visiteurs ;
+4. appels ;
+5. agenda/rendez-vous ;
+6. transmissions ;
+7. documents/courriers ;
+8. rapports ;
+9. exports ;
+10. polish UI/UX.
+
+Ne pas entreprendre une réécriture massive incontrôlée.
+
+---
+
+# 37. CONTRAINTE IMPORTANTE — FUTUR MODULE DOCUMENTAIRE
+
+Le projet travaille également sur un système transversal de :
+
+* création de documents depuis modèles ;
+* génération automatique ;
+* publication ;
+* choix des destinataires ;
+* notifications ;
+* transferts interservices ;
+* historique.
+
+Le dashboard Secrétaire doit être conçu pour pouvoir s’intégrer naturellement à cette architecture.
+
+Éviter donc de créer dans `secretary` un système documentaire isolé qui devra ensuite être supprimé.
+
+---
+
+# 38. OBJECTIF FINAL
+
+À terme, lorsqu’une secrétaire ouvre son dashboard à 10h30, elle doit pouvoir comprendre en quelques secondes :
+
+> Qui est actuellement présent ?
+
+> Qui attend quelqu’un ?
+
+> Quels rendez-vous arrivent ?
+
+> Qui dois-je rappeler ?
+
+> Quels documents dois-je remettre ?
+
+> Quels courriers sont arrivés ?
+
+> Qu’ai-je transmis ?
+
+> Qu’est-ce qui n’a toujours pas été traité ?
+
+> Qu’est-ce qui est urgent ?
+
+Et lorsqu’elle termine sa journée :
+
+> Qu’ai-je fait aujourd’hui ?
+
+> Qu’est-ce qui reste ouvert ?
+
+> Que dois-je reprendre demain ?
+
+Elle doit pouvoir exporter cette situation en PDF/Excel et conserver un support de continuité opérationnelle.
+
+---
+
+# 39. PRINCIPE DIRECTEUR
+
+Ne cherche pas à donner plus de fonctionnalités à la secrétaire.
+
+Cherche à lui donner :
+
+> **moins d’écrans, moins de navigation, moins de saisies répétitives, mais davantage de contrôle sur son travail quotidien.**
+
+Le dashboard doit devenir un véritable outil métier.
+
+Il ne doit pas ressembler à un panneau d’administration Django amélioré.
+
+Il doit ressembler au **bureau numérique d’une secrétaire d’établissement d’enseignement supérieur**.
+
+---
+
+# 40. PREMIÈRE RÉPONSE ATTENDUE
+
+Avant toute modification importante du code, commence par me fournir :
+
+1. ce que le dashboard Secrétaire possède actuellement ;
+2. ce qui est réellement utile ;
+3. ce qui est redondant ou mal positionné ;
+4. ce qui manque par rapport à cette spécification ;
+5. les modèles actuels réutilisables ;
+6. les modèles qui doivent évoluer ;
+7. les nouveaux modèles éventuellement nécessaires ;
+8. la navigation finale recommandée ;
+9. le plan d’implémentation par phases ;
+10. les risques de régression ou dépendances avec les autres apps.
+
+Ensuite seulement, commence l’implémentation de manière progressive et testée.
+
+**Ne détruis pas l’existant. Audite, consolide, simplifie, puis enrichis.**

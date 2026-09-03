@@ -78,6 +78,23 @@ main {
     animation: fadeIn 0.35s ease-out;
 }
 
+/* AOS: mouvement court et progressif. Les déplacements de 100 px par défaut
+   donnaient une impression de saut, surtout lors d'un défilement rapide. */
+@media (prefers-reduced-motion: no-preference) {
+    [data-aos] {
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+        transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1) !important;
+    }
+
+    [data-aos="fade-up"] { transform: translate3d(0, 18px, 0); }
+    [data-aos="fade-down"] { transform: translate3d(0, -18px, 0); }
+    [data-aos="fade-left"] { transform: translate3d(18px, 0, 0); }
+    [data-aos="fade-right"] { transform: translate3d(-18px, 0, 0); }
+    [data-aos="zoom-in"] { transform: scale(0.985); }
+    [data-aos="zoom-out"] { transform: scale(1.015); }
+}
+
 /* ================= CK EDITOR ================= */
 .ck-editor__editable {
     min-height: 300px !important;
@@ -265,98 +282,7 @@ main {
   <script defer src="{% static 'vendor/alpinejs/alpine.min.js' %}"></script>
   <script defer src="{% static 'vendor/htmx/htmx.min.js' %}"></script>
   <script defer src="{% static 'vendor/chartjs/chart.umd.min.js' %}"></script>
-
-  <!-- ESFE OPTIMISTIC ENGINE — instant feedback for ALL HTMX actions -->
-  <style>
-    .esfe-overlay{position:absolute;inset:0;z-index:50;background:rgba(255,255,255,0.7);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;border-radius:inherit;opacity:0;transition:opacity .12s ease;pointer-events:none}
-    .esfe-overlay.is-active{opacity:1;pointer-events:auto}
-    .esfe-spinner{width:28px;height:28px;border:3px solid #e2e8f0;border-top-color:#0891b2;border-radius:50%;animation:esfe-spin .6s linear infinite}
-    @keyframes esfe-spin{to{transform:rotate(360deg)}}
-  </style>
-  <script>
-  (function(){
-    'use strict';
-    var reqs={};
-    function q(s){return document.querySelector(s)}
-    function qa(s,p){return(p||document).querySelectorAll(s)}
-    function overlay(el,a){
-      if(!el)return;
-      if(a){
-        if(el.querySelector('.esfe-overlay'))return;
-        var d=document.createElement('div');d.className='esfe-overlay is-active';
-        d.innerHTML='<div class="esfe-spinner"></div>';
-        if(getComputedStyle(el).position==='static')el.style.position='relative';
-        el.appendChild(d);
-      }else{
-        var o=el.querySelector('.esfe-overlay');if(o)o.remove();
-      }
-    }
-    function disable(el){
-      if(!el)return;
-      qa('button,input[type=submit],input[type=reset],.sg-btn,.dg-btn,.btn',el).forEach(function(b){b.disabled=true;b.classList.add('opacity-60','cursor-not-allowed')});
-    }
-    function enable(el){
-      if(!el)return;
-      qa('button,input[type=submit],input[type=reset],.sg-btn,.dg-btn,.btn',el).forEach(function(b){b.disabled=false;b.classList.remove('opacity-60','cursor-not-allowed')});
-    }
-    function toast(msg,t,d){t=t||'info';d=d||3000;window.dispatchEvent(new CustomEvent('esfe:toast',{detail:{message:msg,type:t,duration:d}}))}
-    function path(evt){return(evt.detail.pathInfo&&evt.detail.pathInfo.requestPath)||evt.detail.path||''}
-    function silentGradeSave(el,evt){return!!((el&&el.classList&&el.classList.contains('score-input'))||path(evt).indexOf('/grades/save/')!==-1)}
-    function refresh(p){
-      document.body.dispatchEvent(new CustomEvent('esfe:data-changed',{bubbles:true}));
-      var m={
-        paiement:'payments',payment:'payments',
-        candidature:'candidatures',candidat:'candidatures',
-        caisse:'session',cash:'session',session:'session',
-        depense:'expenses',expense:'expenses',
-        boutique:'shop',shop:'shop',
-        salaire:'salaries',salary:'salaries',
-        inscription:'inscriptions',
-        secretaire:'secretary',secretary:'secretary',
-        enseignant:'teachers',teacher:'teachers'
-      };
-      for(var k in m){if(p.indexOf(k)!==-1){document.body.dispatchEvent(new CustomEvent('esfe:'+m[k]+'-changed',{bubbles:true}));}}
-      if(window.lucide){try{lucide.createIcons()}catch(e){}}
-    }
-
-    document.addEventListener('htmx:beforeRequest',function(evt){
-      var el=evt.detail.elt;if(!el)return;
-      if(silentGradeSave(el,evt))return;
-      var id=el.id||Math.random().toString(36).slice(2);reqs[id]=true;
-      var c=el.closest('form')||el.closest('tr,div[id],.sg-panel')||el;
-      overlay(c,true);disable(c);
-      var v=(evt.detail.requestConfig&&evt.detail.requestConfig.verb)||'';
-      if(['post','put','delete','patch'].indexOf(v)!==-1)toast('Action en cours...','info',2000);
-    });
-
-    document.addEventListener('htmx:afterRequest',function(evt){
-      var el=evt.detail.elt;if(!el)return;delete reqs[el.id||''];
-      if(silentGradeSave(el,evt))return;
-      if(!evt.detail.successful)return;
-      var c=el.closest('form')||el.closest('tr,div[id],.sg-panel')||el;
-      overlay(c,false);enable(c);
-      var v=(evt.detail.requestConfig&&evt.detail.requestConfig.verb)||'';
-      if(['post','put','delete','patch'].indexOf(v)!==-1)toast('Effectué ✓','success',2000);
-      refresh(path(evt));
-    });
-
-    document.addEventListener('htmx:responseError',function(evt){
-      var el=evt.detail.elt;if(!el)return;delete reqs[el.id||''];
-      if(silentGradeSave(el,evt))return;
-      var c=el.closest('form')||el.closest('tr,div[id],.sg-panel')||el;
-      overlay(c,false);enable(c);
-      toast('Erreur '+(evt.detail.xhr?evt.detail.xhr.status:'réseau'),'error',5000);
-    });
-
-    document.addEventListener('htmx:sendError',function(evt){
-      var el=evt.detail.elt;if(!el)return;
-      if(silentGradeSave(el,evt))return;
-      var c=el.closest('form')||el.closest('tr,div[id],.sg-panel')||el;
-      overlay(c,false);enable(c);
-      toast('Erreur réseau - vérifiez votre connexion','error',5000);
-    });
-  })();
-  </script>
+  <script defer src="{% static 'src/js/ui_core/index.js' %}"></script>
 
   <!-- Alpine optimistic component (for templates using x-data="optimistic(...)") -->
   <script>
@@ -397,7 +323,7 @@ main {
 <body class="min-h-screen flex flex-col bg-slate-50 text-slate-800 font-roboto antialiased overflow-x-clip"
       hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
 
-  <!-- ================= GLOBAL TOAST SYSTEM ================= -->
+  <!-- ================= UI CORE TOAST REGION ================= -->
   {% include "toast.html" %}
 
   <script>
@@ -755,29 +681,38 @@ main {
           const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
           const isMobile = window.matchMedia('(max-width: 767px)').matches;
 
-          // Apply lightweight AOS defaults on common UI blocks when not explicitly configured.
+          // Only animate elements explicitly marked by a component.  Animating
+          // each generic section made long pages queue too many effects.
           if (!prefersReducedMotion) {
-              document.querySelectorAll('main section:not([data-aos])').forEach((el) => {
-                  el.setAttribute('data-aos', isMobile ? 'fade-in' : 'fade-up');
-              });
-              document.querySelectorAll('main .card:not([data-aos]), main [class*="rounded-"]:not([data-aos])').forEach((el) => {
-                  if (el.closest('section')) {
-                      el.setAttribute('data-aos', isMobile ? 'fade-in' : 'zoom-in');
-                  }
-              });
-              document.querySelectorAll('main h1:not([data-aos]), main h2:not([data-aos]), main h3:not([data-aos]), main img:not([data-aos])').forEach((el) => {
-                  el.setAttribute('data-aos', isMobile ? 'fade-in' : 'fade-up');
+              // Do not queue content: every marked item starts immediately and
+              // uses the same short duration.
+              document.querySelectorAll('[data-aos]').forEach((el) => {
+                  el.setAttribute('data-aos-delay', '0');
+                  // AOS supports 50 ms increments; keeping those values avoids
+                  // falling back to its slower 400 ms default stylesheet rule.
+                  el.setAttribute('data-aos-duration', isMobile ? '300' : '350');
               });
           }
 
-          AOS.init({
-              duration: isMobile ? 360 : 520,
-              easing: 'ease-out-cubic',
-              once: true,
-              offset: isMobile ? 12 : 24,
-              mirror: false,
-              disable: prefersReducedMotion,
-          });
+          if (window.AOS) {
+              AOS.init({
+                  duration: isMobile ? 300 : 350,
+                  easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+                  once: true,
+                  // Start just before the block reaches the viewport, so the
+                  // animation is visible instead of arriving after the reader.
+                  offset: isMobile ? 96 : 140,
+                  anchorPlacement: 'top-bottom',
+                  throttleDelay: 50,
+                  debounceDelay: 50,
+                  mirror: false,
+                  disable: prefersReducedMotion,
+              });
+
+              // Images and dynamic blocks can change the page height after the
+              // first calculation; refresh their positions once they are ready.
+              window.addEventListener('load', () => window.requestAnimationFrame(() => AOS.refresh()), { once: true });
+          }
       </script>
 
 </body>

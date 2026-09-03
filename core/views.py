@@ -172,7 +172,7 @@ def sitemap(request):
     ]
 
     sitemap_stats = [
-        {"label": "Formations actives", "value": Programme.objects.filter(is_active=True).count()},
+        {"label": "Formations actives", "value": Programme.objects.public().count()},
         {"label": "Annexes actives", "value": Branch.objects.filter(is_active=True).count()},
         {"label": "Actualites publiees", "value": News.objects.filter(status="published").count()},
         {"label": "Sessions de resultats", "value": ResultSession.objects.filter(is_published=True).count()},
@@ -282,9 +282,7 @@ def about(request):
         is_active=True
     ).order_by("-is_featured", "order")
 
-    formations = Programme.objects.filter(
-        is_active=True
-    ).select_related('cycle').order_by('-is_featured', 'title')[:6]
+    formations = Programme.objects.public().select_related('cycle').order_by('-is_featured', 'title')[:6]
 
     branches = Branch.objects.filter(is_active=True).order_by("name")
 
@@ -331,17 +329,29 @@ def home(request):
     site_logo_url = site_configuration.site_logo.url if site_configuration and site_configuration.site_logo else ""
 
     pillars = [
-        {"title": "Sciences de la santé", "description": "Formations spécialisées adaptées aux exigences professionnelles."},
-        {"title": "Encadrement académique", "description": "Corps enseignant qualifié et expérimenté."},
-        {"title": "Exigence académique", "description": "Rigueur pédagogique et suivi personnalisé."},
-        {"title": "Ouverture", "description": "Étudiants nationaux et internationaux."},
+        {
+            "title": "Choisir un métier qui compte",
+            "description": "Nos parcours développent les savoirs et les gestes utiles aux métiers de la santé. Ils donnent une base solide pour servir avec compétence et responsabilité.",
+        },
+        {
+            "title": "Apprendre pour mieux agir",
+            "description": "Les cours, la pratique et les mises en situation se répondent tout au long du parcours. L'apprentissage prend son sens lorsqu'il prépare aux réalités du terrain.",
+        },
+        {
+            "title": "Avancer avec de vrais repères",
+            "description": "Les objectifs et les évaluations sont expliqués à chaque étape. Chacun progresse dans un cadre clair, pensé pour soutenir son parcours.",
+        },
+        {
+            "title": "Donner une direction à son projet",
+            "description": "Les stages et les rencontres avec des professionnels rapprochent la formation du monde du travail. Ils aident à construire un avenir professionnel concret.",
+        },
     ]
 
     formations_home = (
         Programme.objects
         .filter(is_active=True)
         .select_related("cycle", "diploma_awarded")
-        .order_by("cycle__min_duration_years")[:3]
+        .order_by("cycle__min_duration_years", "title")[:4]
     )
 
     stats = list(InstitutionStat.objects.filter(is_active=True).order_by("order"))
@@ -367,31 +377,32 @@ def home(request):
         is_featured=True
     ).order_by("order")[:3]
 
-    branches = Branch.objects.filter(is_active=True).select_related("manager").order_by("name")[:8]
+    branches = list(
+        Branch.objects
+        .filter(is_active=True)
+        .select_related("manager")
+        .order_by("name")
+    )
+    annex_waves = [branches[index:index + 3] for index in range(0, len(branches), 3)]
     annexes_names = list(
         Branch.objects.filter(is_active=True).order_by("name").values_list("name", flat=True)[:8]
     )
 
     why_blocks = [
         {
-            "title": "Formation professionnalisante",
-            "desc": "Programmes alignes sur les besoins du terrain.",
+            "title": "Apprendre par la pratique",
+            "desc": "Les connaissances et les compétences techniques se construisent aussi à travers des situations concrètes.",
             "image_url": site_configuration.home_why_image_1.url if site_configuration and site_configuration.home_why_image_1 else "",
         },
         {
-            "title": "Encadrement de proximite",
-            "desc": "Accompagnement pedagogique et suivi individualise.",
+            "title": "Progresser dans un cadre clair",
+            "desc": "Objectifs, évaluations et étapes du parcours sont présentés pour aider chaque étudiant à avancer.",
             "image_url": site_configuration.home_why_image_2.url if site_configuration and site_configuration.home_why_image_2 else "",
         },
         {
-            "title": "Equipements modernes",
-            "desc": "Plateaux techniques adaptes aux pratiques de sante.",
+            "title": "Préparer l'avenir professionnel",
+            "desc": "Stages, rencontres et liens avec les professionnels rapprochent la formation des réalités du terrain.",
             "image_url": site_configuration.home_why_image_3.url if site_configuration and site_configuration.home_why_image_3 else "",
-        },
-        {
-            "title": "Insertion rapide",
-            "desc": "Competences operationnelles et employabilite renforcee.",
-            "image_url": site_configuration.home_why_image_4.url if site_configuration and site_configuration.home_why_image_4 else "",
         },
     ]
 
@@ -401,35 +412,6 @@ def home(request):
         Q(community_topics__created_at__gte=timezone.now() - timedelta(days=30))
         | Q(community_answers__created_at__gte=timezone.now() - timedelta(days=30))
     ).distinct().count()
-
-    # Fallback: evite une section vide si aucune statistique n'a ete configuree.
-    if not stats:
-        stats = [
-            {
-                "label": "Programmes actifs",
-                "value": Programme.objects.filter(is_active=True).count(),
-                "prefix": "",
-                "suffix": "+",
-            },
-            {
-                "label": "Annexes",
-                "value": Branch.objects.filter(is_active=True).count(),
-                "prefix": "",
-                "suffix": "+",
-            },
-            {
-                "label": "Partenaires",
-                "value": Partner.objects.filter(is_active=True).count(),
-                "prefix": "",
-                "suffix": "+",
-            },
-            {
-                "label": "Membres actifs (30j)",
-                "value": active_members_30d,
-                "prefix": "",
-                "suffix": "+",
-            },
-        ]
 
     context = {
         "institution": institution,
@@ -449,6 +431,7 @@ def home(request):
         "testimonials": testimonials,
         "why_blocks": why_blocks,
         "annexes": branches,
+        "annex_waves": annex_waves,
         "annexes_names": annexes_names,
         **get_institution_context(),
     }

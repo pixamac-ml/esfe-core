@@ -1,0 +1,225 @@
+AUDIT DU DASHBOARD DIRECTEUR DES ETUDES
+Selon instructions.txt — 21 aout 2026
+
+METHODE
+-------
+Audit en lecture seule de l'interface et des services existants. Aucune
+reconstruction ni modification structurelle n'a ete effectuee.
+
+Sources principales verifiees :
+- ui/services/navigation.py
+- portal/views/views.py
+- portal/services/director_dashboard_presentation.py
+- portal/services/director/tasks_center.py
+- templates/portal/staff/director/partials/
+
+VERDICT
+-------
+La base fonctionnelle est solide et doit etre CONSERVEE. Le dashboard n'a pas
+besoin d'une nouvelle architecture ; il doit etre restructure autour des six
+domaines metier demandes et ses workflows existants doivent etre mieux relies.
+
+ETAT PAR DOMAINE METIER
+-----------------------
+
+1. PILOTAGE ACADEMIQUE
+
+CONSERVER
+- Accueil DE, indicateurs, table des classes actives et activite recente.
+- Le service tasks_center : il calcule deja les saisies en cours, enseignants
+  non affectes, semestres prets a valider, documents enseignants a verifier,
+  transferts et anomalies de resultats.
+
+CONNECTER / CORRIGER
+- L'accueil affiche actuellement une alerte generale « Actions prioritaires »
+  avec seulement le premier message. Les taches existent, mais elles ne sont
+  pas rendues comme une liste d'alertes actionnables.
+- Les cibles calculees par tasks_center utilisent encore des noms tels que
+  results, teachers et documents, alors que les sections reelles sont
+  evaluations, enseignants et correspondances. Chaque tache doit conduire a
+  la bonne sous-section HTMX avec le bon filtre.
+- Les six KPI actuels repètent en partie les sections metier. Il faut garder
+  seulement les indicateurs de decision : maquettes a completer, EC sans
+  enseignant, conflits/planifications, notes a controler, resultats a valider
+  ou publier, documents a traiter.
+
+MANQUANT
+- Statut, responsable, echeance et resolution durable pour chaque alerte.
+- Vue synthetique « Ce qui bloque aujourd'hui » par classe.
+
+
+2. STRUCTURE ACADEMIQUE / MAQUETTES
+
+CONSERVER
+- Section Programme, deja renommee « Maquettes academiques » dans l'interface.
+- Sous-sections classes, maquettes et vue d'ensemble.
+- Creation des classes et gestion des UE/EC existantes.
+
+CONNECTER
+- La maquette doit etre clairement affichee et consommée comme la source de
+  verite : Classe -> Semestre -> UE -> EC -> coefficients, credits et volumes.
+- Les etats de maquette doivent alimenter les alertes du Pilotage, la
+  planification, les affectations, la saisie des notes et les calculs.
+
+CORRIGER
+- Rendre les etats visibles et coherents : Brouillon, A completer, Prete,
+  Validee, Active.
+- Bloquer ou versionner les modifications destructrices d'une maquette deja
+  utilisee, plutot que modifier silencieusement l'historique.
+
+MANQUANT
+- Workflow explicite de validation/versionnage de maquette par annee et annexe.
+
+
+3. PLANIFICATION
+
+CONSERVER
+- Calendrier academique existant : brouillon, validation, publication,
+  archivage et entrees rattachees a l'annexe/classe/semestre.
+- Emploi du temps : selection de classe, construction, apercu, impression et
+  detection de conflits.
+
+DEPLACER / REGROUPER
+- Calendrier et Emploi du temps sont aujourd'hui deux entrees principales.
+  Ils doivent devenir deux sous-sections d'un seul domaine « Planification ».
+- Les sessions d'evaluations doivent etre liees dans ce domaine a la
+  planification, tout en restant accessibles depuis Evaluations.
+
+CONNECTER
+- Une maquette prete et les affectations enseignant doivent alimenter la
+  construction des emplois du temps.
+- La publication d'un calendrier ou d'un emploi du temps doit propager les
+  informations vers les profils concernes, selon le workflow existant.
+
+CORRIGER
+- Afficher une progression claire : Brouillon -> Controle -> Valide -> Publie.
+- Rendre les conflits et EC sans enseignant actionnables depuis la grille.
+
+
+4. ENSEIGNANTS
+
+CONSERVER
+- Annuaire, creation, affectations, charges et dossiers enseignants.
+- Les onglets existants : vue d'ensemble, annuaire, affectations et dossiers.
+- Le principe de perimetre par annexe.
+
+CONNECTER
+- Chaine a rendre visible : Enseignant -> Affectation -> Classe -> EC ->
+  volume prevu -> activite realisee.
+- Les cahiers/journaux de cours doivent alimenter le suivi de charge du DE.
+- Les heures academiques validees doivent etre transmises au circuit honoraires
+  sans ressaisie manuelle par la Gestionnaire.
+
+RETIRER DE L'INTERFACE ACADEMIQUE DU DE
+- Le paiement et les honoraires comme operation financiere. Le DE valide la
+  realite academique ; la Gestionnaire traite le paiement.
+
+MANQUANT
+- Vue simple par enseignant : charge prevue, heures realisees, ecarts et
+  documents/decisions associes.
+
+
+5. EVALUATIONS, NOTES ET RESULTATS
+
+CONSERVER
+- Sessions d'evaluations/examens.
+- Controle des notes, anomalies, validation des semestres et publication OTP.
+- Separation deja amorcee entre validation et publication.
+- Les ecrans resultats affichent deja « saisies en cours », « a controler »,
+  « a valider » et « a publier ».
+
+DEPLACER / REGROUPER
+- Les deux entrees actuelles « Sessions d'evaluations » et « Resultats et
+  notes » doivent etre deux sous-sections d'un seul domaine principal
+  « Evaluations, notes et resultats ».
+
+CONNECTER
+- Le DE ne doit pas dupliquer la saisie technique realisee par l'Informaticien.
+  Il doit consommer les donnees saisies et effectuer le controle, le renvoi en
+  correction, la validation puis la publication.
+- Les resultats publies doivent declencher les documents academiques disponibles.
+
+CORRIGER
+- Rendre le cycle visuel et tracable : Saisie en cours -> A controler ->
+  Valide DE -> Publie.
+- Chaque anomalie doit ouvrir le semestre, l'EC ou l'etudiant concerne avec une
+  action de correction motivee.
+
+MANQUANT
+- Parcours directeur complet pour import/controle/audit des notes.
+- PV de deliberation et decisions tracees par classe/session.
+
+
+6. DOCUMENTS ACADEMIQUES
+
+CONSERVER
+- Section Documents, creation, publication et archives des correspondances.
+- Services existants de generation et de documents enseignants.
+
+DEPLACER / REGROUPER
+- Renommer « Correspondances » en « Documents academiques ».
+- Les documents contextuels ne doivent pas etre une liste de boutons isoles :
+  ils doivent etre ouverts depuis l'affectation, la session, le resultat, la
+  classe ou l'enseignant concerne.
+
+CONNECTER
+- Bulletins, releves, PV, decisions et calendriers doivent partir des donnees
+  deja validees, sans ressaisie des notes.
+- La bibliotheque Documents doit servir a rechercher, previsualiser, generer,
+  importer et archiver.
+
+MANQUANT
+- Bibliotheque de modeles institutionnels officiels.
+- Tracabilite complete : type, reference, auteur, annexe, annee, objet metier,
+  version de modele, fichier et statut.
+- Aucun contenu officiel de nouveau document ne doit etre invente avant la
+  reception et l'analyse des documents reels.
+
+
+NAVIGATION ACTUELLE : AJUSTEMENTS NECESSAIRES
+---------------------------------------------
+La navigation actuelle contient : Vue generale, Calendrier, Sessions
+d'evaluations, Resultats et notes, Enseignants, Transferts, Maquettes,
+Emploi du temps, Documents, Messagerie, Parametres de l'annexe et Mon salaire.
+
+Navigation cible recommandee :
+
+1. Pilotage academique
+   - Vue generale / alertes
+2. Structure academique
+   - Classes / Maquettes
+3. Planification
+   - Calendrier / Emploi du temps
+4. Enseignants
+   - Annuaire / Affectations / Suivi / Dossiers
+5. Evaluations, notes et resultats
+   - Sessions / Controle / Validation / Publication
+6. Documents academiques
+   - Bibliotheque / Archives / Generation contextuelle
+
+DEPLACER HORS DES SIX DOMAINES
+- Messagerie : action utilitaire de topbar ou espace secondaire.
+- Parametres de l'annexe : espace compte/parametres, pas une priorite
+  academique quotidienne.
+- Mon salaire : espace personnel, hors du menu academique DE.
+- Transferts : a rattacher a l'enseignant, a l'etudiant ou au dossier metier
+  concerne ; ne pas conserver une entree generale sans contexte clair.
+
+ORDRE DE MISE EN OEUVRE APRES VALIDATION
+----------------------------------------
+1. Transformer l'accueil en centre d'alertes actionnables.
+2. Regrouper la navigation selon les six domaines, sans casser les URLs ni les
+   endpoints HTMX existants.
+3. Fiabiliser les maquettes et leurs etats.
+4. Relier Maquettes -> Affectations -> Planification -> Activite realisee.
+5. Fiabiliser Evaluations -> Controle -> Validation -> Publication.
+6. Connecter Bulletins / Releves / PV puis les modeles documentaires reels.
+7. Tester systematiquement les permissions, l'annexe, l'annee academique et la
+   tracabilite sur chaque mutation.
+
+CONCLUSION
+----------
+Le dashboard DE peut devenir le poste de pilotage demande sans reconstruction.
+La premiere intervention doit etre le Pilotage academique : faire remonter les
+vraies alertes, chacune avec son action et son contexte. Ensuite seulement,
+regrouper et connecter les modules deja presents.

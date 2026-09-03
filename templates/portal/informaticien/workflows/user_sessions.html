@@ -1,0 +1,10 @@
+<div class="rounded-xl border border-ui-border bg-ui-surface-muted p-3 text-xs">
+  {% for session in sessions_page %}
+    <div class="border-b border-ui-border py-2 last:border-0">
+      <strong>{{ session.started_at|date:"d/m/Y H:i" }}</strong>
+      <span class="text-ui-text-muted"> · IP {{ session.ip_address|default:"non enregistrée" }}</span>
+      {% if session.user_agent %}<p class="truncate text-ui-text-muted" title="{{ session.user_agent }}">{{ session.user_agent }}</p>{% endif %}
+    </div>
+  {% empty %}<p class="text-ui-text-muted">Aucune connexion enregistrée.</p>{% endfor %}
+  {% if sessions_page.paginator.num_pages > 1 %}<div class="mt-2 flex justify-between"><button type="button" {% if not sessions_page.has_previous %}disabled{% endif %} hx-get="{% url 'accounts_portal:it_user_sessions' target_user.id %}?page={{ sessions_page.previous_page_number }}" hx-target="#it-user-sessions" class="font-bold text-ui-primary">Précédent</button><span>Page {{ sessions_page.number }}/{{ sessions_page.paginator.num_pages }}</span><button type="button" {% if not sessions_page.has_next %}disabled{% endif %} hx-get="{% url 'accounts_portal:it_user_sessions' target_user.id %}?page={{ sessions_page.next_page_number }}" hx-target="#it-user-sessions" class="font-bold text-ui-primary">Suivant</button></div>{% endif %}
+</div>

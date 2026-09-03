@@ -16,6 +16,8 @@ from portal.student.widgets.academics import get_student_academic_snapshot
 
 
 def _get_student_branch(student, enrollment):
+    if enrollment is not None and getattr(enrollment, "branch_id", None):
+        return enrollment.branch
     candidature = getattr(getattr(student, "inscription", None), "candidature", None)
     if candidature and candidature.branch_id:
         return candidature.branch
@@ -165,8 +167,8 @@ def is_semester_unlocked_for_enrollment(enrollment, semester_number):
     return validated_count == len(previous_ec_ids)
 
 
-def get_student_courses(student):
-    snapshot = get_student_academic_snapshot(student.user)
+def get_student_courses(student, academic_year_id=None):
+    snapshot = get_student_academic_snapshot(student.user, academic_year_id=academic_year_id)
     enrollment = snapshot["academic_enrollment"]
     if enrollment is None:
         return []
@@ -218,8 +220,8 @@ def get_student_courses(student):
     return _apply_course_semester_unlocks([_serialize_course(ec) for ec in ecs])
 
 
-def get_student_results_summary(student):
-    snapshot = get_student_academic_snapshot(student.user)
+def get_student_results_summary(student, academic_year_id=None):
+    snapshot = get_student_academic_snapshot(student.user, academic_year_id=academic_year_id)
     enrollment = snapshot["academic_enrollment"]
     ecs = snapshot["academic_ecs"]
     if enrollment is None:
@@ -320,10 +322,10 @@ def get_student_results_summary(student):
     }
 
 
-def get_student_teachers(student):
+def get_student_teachers(student, academic_year_id=None):
     from portal.models import DirectorTeacherAssignment
 
-    snapshot = get_student_academic_snapshot(student.user)
+    snapshot = get_student_academic_snapshot(student.user, academic_year_id=academic_year_id)
     enrollment = snapshot["academic_enrollment"]
     if enrollment is None:
         return []
@@ -460,16 +462,17 @@ def get_student_teachers(student):
     return sorted(payload, key=lambda item: item["name"])[:12]
 
 
-def get_student_stats(student):
-    snapshot = get_student_academic_snapshot(student.user)
+def get_student_stats(student, academic_year_id=None):
+    snapshot = get_student_academic_snapshot(student.user, academic_year_id=academic_year_id)
     enrollment = snapshot["academic_enrollment"]
     courses = snapshot["academic_ecs"]
 
     total_credits = sum((ec.credit_required or 0) for ec in courses)
-    payments = Payment.objects.filter(inscription=student.inscription, status=Payment.STATUS_VALIDATED)
+    inscription = getattr(enrollment, "inscription", None)
+    payments = Payment.objects.filter(inscription=inscription, status=Payment.STATUS_VALIDATED) if inscription else Payment.objects.none()
     total_paid = payments.aggregate(total=Sum("amount"))["total"] or 0
-    total_due = getattr(student.inscription, "amount_due", 0) or 0
-    results = get_student_results_summary(student)
+    total_due = getattr(inscription, "amount_due", 0) or 0
+    results = get_student_results_summary(student, academic_year_id=academic_year_id)
 
     return {
         "average": results["average"],
@@ -495,12 +498,12 @@ def get_student_stats(student):
     }
 
 
-def get_student_timetable(student):
-    return get_student_week_schedule(student, None)
+def get_student_timetable(student, academic_year_id=None):
+    return get_student_week_schedule(student, None, academic_year_id=academic_year_id)
 
 
-def get_student_next_course(student):
-    timetable = get_student_timetable(student)
+def get_student_next_course(student, academic_year_id=None):
+    timetable = get_student_timetable(student, academic_year_id=academic_year_id)
     events = timetable.get("events", []) if isinstance(timetable, dict) else []
     now = timezone.now()
     active_statuses = {"planned", "ongoing", "postponed", "draft"}
@@ -523,7 +526,7 @@ def get_student_next_course(student):
     return None
 
 
-def get_student_priority_actions(student, *, snapshot, next_course=None, stats=None):
+def get_student_priority_actions(student, *, snapshot, next_course=None, stats=None, academic_year_id=None):
     if student is None:
         return [
             {
@@ -536,8 +539,8 @@ def get_student_priority_actions(student, *, snapshot, next_course=None, stats=N
             }
         ]
 
-    completion = get_profile_completion(student.user)
-    stats = stats or get_student_stats(student)
+    completion = get_profile_completion(student.user, academic_year_id=academic_year_id)
+    stats = stats or get_student_stats(student, academic_year_id=academic_year_id)
     actions = []
 
     if next_course:
@@ -616,8 +619,8 @@ def get_student_priority_actions(student, *, snapshot, next_course=None, stats=N
     return actions[:4]
 
 
-def get_student_events(student):
-    snapshot = get_student_academic_snapshot(student.user)
+def get_student_events(student, academic_year_id=None):
+    snapshot = get_student_academic_snapshot(student.user, academic_year_id=academic_year_id)
     branch = _get_student_branch(student, snapshot["academic_enrollment"])
 
     cache_key = f"portal_student:events:v1:branch:{getattr(branch, 'id', 'none')}"
@@ -762,8 +765,8 @@ def get_student_unread_messages_count(student):
     ).count()
 
 
-def get_student_dashboard_data(user):
-    snapshot = get_student_academic_snapshot(user)
+def get_student_dashboard_data(user, academic_year_id=None):
+    snapshot = get_student_academic_snapshot(user, academic_year_id=academic_year_id)
     student = snapshot["student"]
     enrollment = snapshot["academic_enrollment"]
 
@@ -793,22 +796,24 @@ def get_student_dashboard_data(user):
             },
             "academic_status": snapshot["academic_status"],
             "academic_status_message": snapshot["academic_status_message"],
-            "academic_widget": get_academics_widget(user),
+            "academic_widget": get_academics_widget(user, academic_year_id=academic_year_id),
+            "available_academic_years": snapshot["available_academic_years"],
+            "selected_academic_year_id": snapshot["selected_academic_year_id"],
             "page_title": "Dashboard etudiant",
             "subtitle": "Vue d'ensemble de votre parcours academique",
         }
 
-    timetable = get_student_timetable(student)
-    next_course = get_student_next_course(student)
-    stats = get_student_stats(student)
+    timetable = get_student_timetable(student, academic_year_id=academic_year_id)
+    next_course = get_student_next_course(student, academic_year_id=academic_year_id)
+    stats = get_student_stats(student, academic_year_id=academic_year_id)
     return {
         "student": student,
         "enrollment": enrollment,
-        "courses": get_student_courses(student),
-        "teachers": get_student_teachers(student),
+        "courses": get_student_courses(student, academic_year_id=academic_year_id),
+        "teachers": get_student_teachers(student, academic_year_id=academic_year_id),
         "timetable": timetable,
         "next_course": next_course,
-        "events": get_student_events(student),
+        "events": get_student_events(student, academic_year_id=academic_year_id),
         "messages": get_student_messages(student),
         "unread_messages_count": get_student_unread_messages_count(student),
         "stats": stats,
@@ -819,15 +824,18 @@ def get_student_dashboard_data(user):
             snapshot=snapshot,
             next_course=next_course,
             stats=stats,
+            academic_year_id=academic_year_id,
         ),
         "academic_status": snapshot["academic_status"],
         "academic_status_message": snapshot["academic_status_message"],
-        "academic_widget": get_academics_widget(user),
+        "academic_widget": get_academics_widget(user, academic_year_id=academic_year_id),
+        "available_academic_years": snapshot["available_academic_years"],
+        "selected_academic_year_id": snapshot["selected_academic_year_id"],
         "academic_class": snapshot["academic_class"],
         "academic_programme": snapshot["academic_programme"],
         "academic_year": snapshot["academic_year"],
         "academic_level": snapshot["academic_level"],
-        "profile_settings": get_profile_data(user),
+        "profile_settings": get_profile_data(user, academic_year_id=academic_year_id),
         "page_title": "Dashboard etudiant",
         "subtitle": "Vue d'ensemble de votre parcours academique",
     }
@@ -837,12 +845,12 @@ def get_student_dashboard_shell(user):
     return get_student_dashboard_data(user)
 
 
-def get_student_overview_data(user):
+def get_student_overview_data(user, academic_year_id=None):
     """
     Donnees minimales pour le rendu initial (section overview uniquement).
     Les autres sections sont chargees a la demande via HTMX.
     """
-    snapshot = get_student_academic_snapshot(user)
+    snapshot = get_student_academic_snapshot(user, academic_year_id=academic_year_id)
     student = snapshot["student"]
     enrollment = snapshot["academic_enrollment"]
 
@@ -870,7 +878,9 @@ def get_student_overview_data(user):
             },
             "academic_status": snapshot["academic_status"],
             "academic_status_message": snapshot["academic_status_message"],
-            "academic_widget": get_academics_widget(user),
+            "academic_widget": get_academics_widget(user, academic_year_id=academic_year_id),
+            "available_academic_years": snapshot["available_academic_years"],
+            "selected_academic_year_id": snapshot["selected_academic_year_id"],
             "academic_class": snapshot["academic_class"],
             "academic_programme": snapshot["academic_programme"],
             "academic_year": snapshot["academic_year"],
@@ -880,18 +890,18 @@ def get_student_overview_data(user):
         }
 
     # Overview: hero + stats + courses overview + profile + events
-    timetable = get_student_timetable(student)
-    next_course = get_student_next_course(student)
-    stats = get_student_stats(student)
+    timetable = get_student_timetable(student, academic_year_id=academic_year_id)
+    next_course = get_student_next_course(student, academic_year_id=academic_year_id)
+    stats = get_student_stats(student, academic_year_id=academic_year_id)
     return {
         "student": student,
         "enrollment": enrollment,
-        "courses": get_student_courses(student),
+        "courses": get_student_courses(student, academic_year_id=academic_year_id),
         "timetable": timetable,
         "next_course": next_course,
-        "events": get_student_events(student),
+        "events": get_student_events(student, academic_year_id=academic_year_id),
         "messages": get_student_messages(student),
-        "teachers": get_student_teachers(student),
+        "teachers": get_student_teachers(student, academic_year_id=academic_year_id),
         "unread_messages_count": get_student_unread_messages_count(student),
         "stats": stats,
         "results": stats["results"],
@@ -901,10 +911,13 @@ def get_student_overview_data(user):
             snapshot=snapshot,
             next_course=next_course,
             stats=stats,
+            academic_year_id=academic_year_id,
         ),
         "academic_status": snapshot["academic_status"],
         "academic_status_message": snapshot["academic_status_message"],
-        "academic_widget": get_academics_widget(user),
+        "academic_widget": get_academics_widget(user, academic_year_id=academic_year_id),
+        "available_academic_years": snapshot["available_academic_years"],
+        "selected_academic_year_id": snapshot["selected_academic_year_id"],
         "academic_class": snapshot["academic_class"],
         "academic_programme": snapshot["academic_programme"],
         "academic_year": snapshot["academic_year"],
@@ -914,14 +927,15 @@ def get_student_overview_data(user):
     }
 
 
-def get_student_courses_context(user):
-    snapshot = get_student_academic_snapshot(user)
+def get_student_courses_context(user, academic_year_id=None):
+    snapshot = get_student_academic_snapshot(user, academic_year_id=academic_year_id)
     student = snapshot["student"]
-    courses = get_student_courses(student) if student else []
+    courses = get_student_courses(student, academic_year_id=academic_year_id) if student else []
     return {
         "courses": courses,
         "course_semesters": _build_course_semester_filters(courses),
-        "results": get_student_results_summary(student) if student else {},
+        "results": get_student_results_summary(student, academic_year_id=academic_year_id) if student else {},
+        "selected_academic_year_id": snapshot["selected_academic_year_id"],
         "academic_status": snapshot["academic_status"],
         "academic_status_message": snapshot["academic_status_message"],
     }
@@ -945,7 +959,10 @@ def get_student_messages_context(user):
     }
 
 
-def get_student_timetable_context(user):
-    snapshot = get_student_academic_snapshot(user)
+def get_student_timetable_context(user, academic_year_id=None):
+    snapshot = get_student_academic_snapshot(user, academic_year_id=academic_year_id)
     student = snapshot["student"]
-    return {"timetable": get_student_timetable(student) if student else {}}
+    return {
+        "timetable": get_student_timetable(student, academic_year_id=academic_year_id) if student else {},
+        "selected_academic_year_id": snapshot["selected_academic_year_id"],
+    }

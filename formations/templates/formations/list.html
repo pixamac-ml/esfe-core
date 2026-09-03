@@ -11,25 +11,33 @@
     <div class="relative max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-12 md:py-16 lg:py-20">
         <div class="max-w-4xl">
             <p class="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs uppercase tracking-widest font-semibold">
-                Catalogue officiel ESFE
+                Nos formations
             </p>
-            <h1 class="mt-6 text-3xl md:text-5xl lg:text-6xl font-extrabold tracking-tight leading-tight">Formations en sante orientees emploi</h1>
-            <p class="mt-6 text-lg text-white/85 max-w-3xl">Choisissez un parcours clair, professionnalisant et reconnu. Comparez les cycles, les durées et les débouchés, puis lancez votre candidature en quelques étapes.</p>
+            <h1 class="mt-6 text-3xl md:text-5xl lg:text-6xl font-extrabold tracking-tight leading-tight">Trouvez la formation qui correspond à votre projet</h1>
+            <p class="mt-6 max-w-3xl text-lg text-white/85">Explorez les formations proposées par l’ESFE. Chaque fiche présente le cycle, la durée, le diplôme préparé et les informations utiles pour vous aider à choisir.</p>
 
-            <div class="mt-8 grid sm:grid-cols-3 gap-3 max-w-2xl text-sm">
-                <div class="rounded-xl border border-white/15 bg-white/10 px-4 py-3"><span class="font-bold text-xl">{{ total_programmes }}</span><br>formations actives</div>
-                <div class="rounded-xl border border-white/15 bg-white/10 px-4 py-3"><span class="font-bold text-xl">{{ cycle_count }}</span><br>cycles disponibles</div>
-                <div class="rounded-xl border border-white/15 bg-white/10 px-4 py-3"><span class="font-bold text-xl">{{ featured_count }}</span><br>programmes mis en avant</div>
+            <div class="mt-8 flex flex-wrap gap-3 text-sm">
+                <span class="rounded-xl border border-white/15 bg-white/10 px-4 py-3"><strong class="text-xl">{{ total_programmes }}</strong> formation{{ total_programmes|pluralize }} disponible{{ total_programmes|pluralize }}</span>
+                <span class="rounded-xl border border-white/15 bg-white/10 px-4 py-3"><strong class="text-xl">{{ cycle_count }}</strong> cycle{{ cycle_count|pluralize }} à explorer</span>
+            </div>
+            <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+                <a href="#catalogue" class="inline-flex items-center justify-center rounded-xl bg-secondary px-6 py-3 font-semibold text-white transition hover:bg-secondary-dark">Explorer les formations</a>
+                <a href="{% url 'core:contact' %}" class="inline-flex items-center justify-center rounded-xl border border-white/30 px-6 py-3 font-semibold text-white transition hover:bg-white/10">Être accompagné dans mon choix</a>
             </div>
         </div>
     </div>
 </section>
 
-<section class="py-12 md:py-16 lg:py-20 bg-soft">
+<section id="catalogue" class="scroll-mt-24 py-12 md:py-16 lg:py-20 bg-soft">
     <div class="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
+        <div class="mb-10 max-w-3xl">
+            <p class="text-sm font-semibold uppercase tracking-wider text-secondary">Explorer le catalogue</p>
+            <h2 class="mt-3 text-3xl font-bold text-primary-700 md:text-4xl">Choisissez votre parcours</h2>
+            <p class="mt-3 text-gray-600">Utilisez la recherche ou sélectionnez un cycle pour afficher les formations qui vous intéressent.</p>
+        </div>
         <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 md:gap-8 lg:gap-10">
             <aside class="lg:col-span-1">
-                {% component "programme_filters" cycles=cycles current_cycle=current_cycle search_query=search_query %}
+                {% component "programme_filters" cycles=cycles current_cycle=current_cycle search_query=search_query total_programmes=total_programmes %}
                 {% endcomponent %}
             </aside>
 

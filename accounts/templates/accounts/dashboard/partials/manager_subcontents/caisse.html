@@ -1,6 +1,68 @@
 {% load component_tags humanize %}
 <div class="min-w-0 space-y-5">
   {% if manager_ui.subview == "overview" %}
+    {% component "ui_core.panel" title="Caisse du jour" subtitle="Le comptage physique est compare au solde issu du journal de caisse." %}
+      {% fill "default" %}
+        {% if not cash_register_session %}
+          <form method="post" action="{% url 'accounts:htmx_manager_cash_register_open' %}" hx-post="{% url 'accounts:htmx_manager_cash_register_open' %}" hx-target="#manager-workspace" hx-swap="none" class="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_auto] md:items-end">
+            {% csrf_token %}
+            <label class="block text-sm font-semibold text-ui-text">{{ cash_register_open_form.opening_amount.label }}{{ cash_register_open_form.opening_amount }}</label>
+            <label class="block text-sm font-semibold text-ui-text">{{ cash_register_open_form.opening_notes.label }}{{ cash_register_open_form.opening_notes }}</label>
+            <button type="submit" class="inline-flex h-ui-control items-center justify-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong"><i data-lucide="unlock" class="h-4 w-4"></i>Ouvrir la caisse</button>
+          </form>
+        {% elif cash_register_session.status == "open" %}
+          <div class="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-ui-button bg-ui-success-soft px-3 py-2 text-sm text-ui-success">
+            <span><strong>Caisse ouverte</strong> — solde systeme a l'ouverture : {{ cash_register_session.system_opening_balance|intcomma }} FCFA.</span>
+            <span class="text-xs">Ouverte par {{ cash_register_session.opened_by.get_full_name|default:cash_register_session.opened_by.username }}</span>
+          </div>
+          <form method="post" action="{% url 'accounts:htmx_manager_cash_register_close' %}" hx-post="{% url 'accounts:htmx_manager_cash_register_close' %}" hx-target="#manager-workspace" hx-swap="none" class="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_auto] md:items-end">
+            {% csrf_token %}
+            <label class="block text-sm font-semibold text-ui-text">{{ cash_register_close_form.counted_amount.label }}{{ cash_register_close_form.counted_amount }}</label>
+            <label class="block text-sm font-semibold text-ui-text">{{ cash_register_close_form.closing_notes.label }}{{ cash_register_close_form.closing_notes }}</label>
+            <button type="submit" class="inline-flex h-ui-control items-center justify-center gap-2 rounded-ui-button bg-ui-danger px-4 text-sm font-semibold text-ui-on-primary hover:bg-ui-danger-strong"><i data-lucide="lock" class="h-4 w-4"></i>Fermer la caisse</button>
+          </form>
+        {% else %}
+          <div class="rounded-ui-button {% if cash_register_session.difference_amount %}bg-ui-warning-soft text-ui-warning{% else %}bg-ui-success-soft text-ui-success{% endif %} px-4 py-3 text-sm">
+            <strong>Caisse fermee.</strong> Theorique : {{ cash_register_session.expected_amount|intcomma }} FCFA · Compte : {{ cash_register_session.counted_amount|intcomma }} FCFA · Ecart : {{ cash_register_session.difference_amount|intcomma }} FCFA.
+          </div>
+        {% endif %}
+      {% endfill %}
+    {% endcomponent %}
+    {% component "ui_core.panel" title="Mini-caisses" subtitle="Compartiments logiques : ils reservent le disponible sans creer une depense." %}
+      {% fill "default" %}
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-ui-button bg-ui-surface-muted px-4 py-3 text-sm text-ui-text">
+          <span>Disponible non affecte : <strong>{{ wallet_unallocated_balance|intcomma }} FCFA</strong></span>
+          <span class="text-ui-text-muted">Tresorerie unique, sans double comptage.</span>
+        </div>
+        <div class="grid gap-3 lg:grid-cols-2">
+          {% for wallet in favorite_wallets %}
+            <article class="rounded-ui-card border border-ui-border bg-ui-surface p-4">
+              <div class="flex items-start justify-between gap-3"><div><h3 class="font-semibold text-ui-text">{{ wallet.name }}</h3><p class="text-xs text-ui-text-muted">{{ wallet.get_wallet_type_display }} · {{ wallet.category }}</p></div><strong class="text-base text-ui-primary">{{ wallet.current_balance|intcomma }} FCFA</strong></div>
+              {% if wallet.status == 'active' %}
+              <div class="mt-3 flex flex-wrap gap-2">
+                <form hx-post="{% url 'accounts:htmx_manager_wallet_allocate' wallet.pk %}" hx-target="#manager-workspace" hx-swap="none" class="flex gap-2">{% csrf_token %}<input name="amount" type="number" min="1" required placeholder="Montant" aria-label="Montant à affecter" class="h-9 w-28 rounded-ui-button border border-ui-border px-2 text-xs"><button type="submit" class="rounded-ui-button border border-ui-border px-3 text-xs font-semibold">Alimenter</button></form>
+                <form hx-post="{% url 'accounts:htmx_manager_wallet_return' wallet.pk %}" hx-target="#manager-workspace" hx-swap="none" class="flex gap-2">{% csrf_token %}<input name="amount" type="number" min="1" required placeholder="Montant" aria-label="Montant à restituer" class="h-9 w-28 rounded-ui-button border border-ui-border px-2 text-xs"><button type="submit" class="rounded-ui-button border border-ui-border px-3 text-xs font-semibold">Restituer</button></form>
+              </div>{% endif %}
+            </article>
+          {% empty %}
+            <p class="text-sm text-ui-text-muted">Aucune mini-caisse favorite. Creez d'abord les compartiments utiles a l'annexe.</p>
+          {% endfor %}
+        </div>
+        <details class="mt-4 rounded-ui-card border border-ui-border bg-ui-surface-muted">
+          <summary class="ui-focus-ring flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-ui-primary">
+            <span class="inline-flex items-center gap-2"><i data-lucide="plus-circle" class="h-4 w-4"></i>Nouvelle mini-caisse</span>
+            <span class="text-xs font-normal text-ui-text-muted">Nom et usage</span>
+          </summary>
+          <form method="post" action="{% url 'accounts:htmx_manager_wallet_create' %}" hx-post="{% url 'accounts:htmx_manager_wallet_create' %}" hx-target="#manager-workspace" hx-swap="none" class="grid gap-3 border-t border-ui-border p-4 md:grid-cols-4 md:items-end">
+            {% csrf_token %}
+            <label class="block text-sm font-semibold text-ui-text">Nom{{ wallet_form.name }}</label>
+            <label class="block text-sm font-semibold text-ui-text">{{ wallet_form.profile.label }}{{ wallet_form.profile }}</label>
+            <p class="text-xs text-ui-text-muted md:col-span-1">Le type de caisse est choisi automatiquement selon l’usage.</p>
+            <button type="submit" class="inline-flex h-ui-control items-center justify-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary"><i data-lucide="check" class="h-4 w-4"></i>Créer la mini-caisse</button>
+          </form>
+        </details>
+      {% endfill %}
+    {% endcomponent %}
     {% include "accounts/dashboard/partials/manager_subview_kpi_grid.html" %}
     {% component "ui_core.alert" title="Caisse et banque réconciliées" message="Les versements bancaires sont comptabilisés comme sorties de caisse afin que le solde disponible reste fiable." tone="info" %}{% endcomponent %}
     <div class="grid grid-cols-1 gap-5 xl:grid-cols-2">
@@ -29,6 +91,26 @@
       {% endcomponent %}
     </div>
     {% component "ui_core.data_table" id="manager-cash-recent-table" caption="Derniers mouvements de caisse" headers=manager_ui.table.headers rows=manager_ui.table.rows result_count=manager_ui.table.result_count page=manager_ui.table.page page_count=manager_ui.table.page_count density="compact" empty_title="Aucun mouvement" empty_message="Aucune écriture de caisse n'a encore été enregistrée pour cette annexe." %}{% endcomponent %}
+  {% elif manager_ui.subview == "wallets" %}
+    {% component "ui_core.panel" title="Toutes les mini-caisses" subtitle="Historique conserve, soldes issus du journal interne." %}
+      {% fill "default" %}
+        <div class="grid gap-4 lg:grid-cols-2">
+          {% for wallet in wallets %}
+          <article class="rounded-ui-card border border-ui-border p-4">
+            <div class="flex justify-between gap-3"><div><h3 class="font-semibold">{{ wallet.name }}</h3><p class="text-xs text-ui-text-muted">{{ wallet.get_wallet_type_display }} · {{ wallet.get_nature_display }} · {{ wallet.get_status_display }}</p></div><strong>{{ wallet.current_balance|intcomma }} FCFA</strong></div>
+            {% if wallet.status == 'active' %}
+              <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                <form hx-post="{% url 'accounts:htmx_manager_wallet_allocate' wallet.pk %}" hx-target="#manager-workspace" hx-swap="none" class="flex gap-2">{% csrf_token %}<input name="amount" type="number" min="1" required placeholder="Montant" aria-label="Montant à affecter" class="h-9 min-w-0 flex-1 rounded-ui-button border border-ui-border px-2 text-xs"><button type="submit" class="rounded-ui-button border border-ui-border px-3 text-xs font-semibold">Alimenter</button></form>
+                <form hx-post="{% url 'accounts:htmx_manager_wallet_return' wallet.pk %}" hx-target="#manager-workspace" hx-swap="none" class="flex gap-2">{% csrf_token %}<input name="amount" type="number" min="1" required placeholder="Montant" aria-label="Montant à restituer" class="h-9 min-w-0 flex-1 rounded-ui-button border border-ui-border px-2 text-xs"><button type="submit" class="rounded-ui-button border border-ui-border px-3 text-xs font-semibold">Restituer</button></form>
+                <form hx-post="{% url 'accounts:htmx_manager_wallet_transfer' wallet.pk %}" hx-target="#manager-workspace" hx-swap="none" class="flex gap-2 sm:col-span-2">{% csrf_token %}<select name="target_wallet_id" required aria-label="Mini-caisse de destination" class="h-9 min-w-0 flex-1 rounded-ui-button border border-ui-border px-2 text-xs"><option value="">Transférer vers…</option>{% for target in wallets %}{% if target.pk != wallet.pk and target.status == 'active' %}<option value="{{ target.pk }}">{{ target.name }}</option>{% endif %}{% endfor %}</select><input name="amount" type="number" min="1" required placeholder="Montant" aria-label="Montant à transférer" class="h-9 w-28 rounded-ui-button border border-ui-border px-2 text-xs"><button type="submit" class="rounded-ui-button border border-ui-border px-3 text-xs font-semibold">Transférer</button></form>
+              </div>
+              {% if wallet.current_balance == 0 %}<form method="post" hx-post="{% url 'accounts:htmx_manager_wallet_close' wallet.pk %}" hx-target="#manager-workspace" hx-swap="none" class="mt-3">{% csrf_token %}<button type="submit" class="text-xs font-semibold text-ui-danger">Clôturer cette mini-caisse</button></form>{% endif %}
+            {% endif %}
+          </article>
+          {% empty %}<p class="text-sm text-ui-text-muted">Aucune mini-caisse configuree.</p>{% endfor %}
+        </div>
+      {% endfill %}
+    {% endcomponent %}
   {% elif manager_ui.subview == "operations" %}
     {% component "ui_core.panel" title="Mouvement manuel" subtitle="Uniquement pour une saisie manuelle ou un ajustement contrôlé." %}
       {% fill "default" %}

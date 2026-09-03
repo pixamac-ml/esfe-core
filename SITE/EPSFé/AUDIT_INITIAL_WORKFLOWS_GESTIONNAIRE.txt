@@ -1,0 +1,187 @@
+AUDIT INITIAL DES WORKFLOWS — GESTIONNAIRE D'ANNEXE
+ESFE / EPSFé
+Phase A de la feuille de route — avant refonte de navigation
+
+
+OBJECTIF
+--------
+
+Verifier les circuits reels deja implementes avant de modifier l'interface.
+Methode : lecture des vues, services, modeles, routes et tests de workflow.
+
+Le present audit ne reconstruit aucun moteur metier. Il distingue ce qui est
+deja fiable, ce qui doit etre recetté, et les ecarts qui exigent une decision
+metier avant implementation.
+
+
+1. ADMISSIONS ET INSCRIPTIONS — CONFORME, A RECETTER
+----------------------------------------------------
+
+Fonctions existantes : detail du dossier, consultation/telechargement des
+pieces, passage en analyse, demande de complement, acceptation, refus et
+suppression logique d'un dossier rejete sans inscription.
+
+Controles verifies :
+- chaque candidature et document est recherche dans l'annexe de l'utilisateur ;
+- les changements de statut n'acceptent que les transitions prevues ;
+- acceptation, refus et demande de complement exigent la permission
+  manage_admissions ;
+- une candidature acceptee ouvre le positionnement et le flux d'inscription
+  existant : le candidat n'est pas ressaisi manuellement ;
+- un dossier rejete avec inscription liee ne peut pas etre supprime.
+
+Tests deja presents : transitions de statut, motif de refus, suppression
+interdite hors statut, et refus d'acces inter-annexes.
+
+Conclusion : conserver le moteur. Le chantier UI le presentera sous
+« Parcours etudiant », sans retirer la competence admission de la Gestionnaire.
+
+
+2. PAIEMENTS ETUDIANTS EN ESPECE — CONFORME, A RECETTER
+--------------------------------------------------------
+
+Fonctions existantes : session espece liee a une inscription et un agent de
+paiement, code temporaire, creation/validation du paiement, recu et journal
+financier.
+
+Controles verifies :
+- une session active est unique pour une inscription ;
+- l'agent doit etre actif dans la meme annexe ;
+- montant nul, invalide ou superieur au solde restant : refuse ;
+- creation ou validation du paiement : Payment, FinancialLog et mouvement
+  d'entree de caisse sont ecrits dans une transaction ;
+- correction d'un paiement deja valide : demande sensible et OTP DG/DGA ;
+- annulation limitee a un paiement encore en attente.
+
+Test deja present : validation d'un paiement -> un mouvement de caisse et
+annulation d'un paiement en attente.
+
+Conclusion : optimiser l'ecran Espece en V1 ; ne pas afficher de moyens de
+paiement non actifs. Les remises restent appliquees depuis le mecanisme DG.
+
+
+3. DEPENSES — CONFORME SUR LE CIRCUIT PRINCIPAL
+------------------------------------------------
+
+Cycle existant : Soumise -> Approuvee -> Payee, ou Rejetee.
+
+Controles verifies :
+- creation avec annexe et auteur imposes cote serveur ;
+- approbation/rejet scopes a l'annexe ;
+- paiement seulement apres approbation ;
+- verrouillage du solde de caisse pendant le paiement ;
+- refus si la caisse est insuffisante ;
+- sortie de caisse creee avec source, reference, auteur et piece associee.
+
+Tests deja presents : approbation, paiement, caisse insuffisante et refus
+d'approbation inter-annexes.
+
+Conclusion : conserver ce circuit sous « Depenses et logistique ». Les seuils
+d'approbation DG/DGA doivent etre confirmes avant d'etre automatises.
+
+
+4. SALAIRES ET HONORAIRES — CONFORME, CIRCUITS DISTINCTS
+---------------------------------------------------------
+
+Paie du personnel :
+  base + indemnites - retenues - avances = net a payer.
+
+Honoraires enseignants :
+  heures validees x tarif + ajustements - retenues - avances = net a payer.
+
+Controles verifies :
+- deux modeles et deux sources de caisse distinctes ;
+- preparation automatique des fiches ;
+- paiements partiels possibles, sans depasser le reste a payer ;
+- verrouillage de caisse et refus si montant indisponible ;
+- chaque paiement cree un mouvement de sortie trace ;
+- modification sensible protegeable par le workflow OTP existant.
+
+Tests deja presents : preparation, paiement, insuffisance de caisse, avances
+et protections contre les montants excedentaires/double paiement.
+
+Conclusion : les reunir dans la navigation « Personnel et engagements », mais
+ne jamais les fusionner comptablement. Les regles INPS et autres retenues
+doivent provenir d'un parametrage DG/RH valide, jamais d'une formule UI.
+
+
+5. GRANDE CAISSE, RAPPORTS ET CLOTURE — BASE SOLIDE
+----------------------------------------------------
+
+Fonctions existantes : journal unique par annexe, entrees/sorties sourcees,
+pieces de caisse, rapprochement/reparation d'operations orphelines, versement
+bancaire, rapport PDF/Excel et archive de cloture.
+
+La cloture :
+- conserve un snapshot par annexe et periode ;
+- passe par Brouillon -> Validee -> Cloturee ;
+- bloque les paiements, depenses, dons, paies, honoraires ou versements sans
+  mouvement coherent ;
+- bloque une caisse negative ;
+- bloque un versement bancaire superieur au disponible ;
+- conserve les archives, sans remise a zero ni suppression d'historique.
+
+Tests deja presents : transitions, cloture bloquee par operation orpheline,
+caisse negative et versement bancaire excessif.
+
+
+6. ECART PRIORITAIRE A DECIDER AVANT CORRECTION
+------------------------------------------------
+
+La cloture empeche la recreation/modification de sa propre fiche une fois
+validee ou cloturee. En revanche, aucun garde central ne bloque encore
+explicitement une nouvelle ecriture DATEE dans une periode deja cloturee.
+
+Cas concret : une depense datee de M est payee apres la cloture de M. Sans
+regle commune, cette sortie peut modifier les chiffres historiques de M apres
+leur archive.
+
+Regle a valider avec la DG avant code :
+
+Option retenue recommandee :
+  - toute ecriture datee d'une periode cloturee est refusee ;
+  - une operation decouverte apres cloture est enregistree dans la periode
+    courante comme regularisation, avec reference a la periode concernee ;
+  - une correction d'historique exceptionnelle passe par DG/DGA, est tracee,
+    et produit une nouvelle version/annexe de rapport plutot qu'une ecriture
+    silencieuse dans le mois clos.
+
+Cette regle protege les archives et permet tout de meme de traiter les pieces
+arrivees tardivement. Son implementation demandera un service central de
+verrouillage de periode et des tests cibles ; elle ne doit pas etre cachee dans
+un seul formulaire.
+
+
+7. SOUS-CAISSES — EVOLUTION METIER SEPAREE
+------------------------------------------
+
+La grande caisse de l'annexe est bien implementee. En revanche, le mouvement
+actuel contient annexe, type, source, montant, date et reference ; il ne
+contient pas de caisse interne, responsable, transfert, solde ou reconciliation
+par affectation.
+
+Decision : ne pas simuler les sous-caisses par des libelles. Les ajouter dans
+un chantier distinct apres validation DG, avec modele, migration, transferts,
+permissions, pieces et tests de solde.
+
+
+8. VALIDATION TECHNIQUE
+-----------------------
+
+La suite accounts.test_manager_workflows contient 75 tests. Son lancement avec
+les settings SQLite locaux a ete interrompu pendant la preparation de la base
+de test, avant tout resultat exploitable. Aucun test n'est donc declare passe
+dans cet audit. Il faudra relancer la suite sur une base de test locale non
+verrouillee avant livraison de la phase Gestionnaire.
+
+
+9. PROCHAINE ACTION
+------------------
+
+La base metier permet maintenant de commencer la phase B sans risque :
+cartographier les fragments et routes existants vers les six espaces retenus,
+en preservant les URLs de compatibilite, permissions et filtrage par annexe.
+
+Le verrouillage post-cloture reste une correction prioritaire ouverte et sera
+traite comme workflow comptable, non comme une retouche de dashboard.
+

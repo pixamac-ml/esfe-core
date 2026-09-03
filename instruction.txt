@@ -1,0 +1,1418 @@
+# MISSION — CONSTRUIRE LE VÉRITABLE BACK-OFFICE MÉTIER DU DIRECTEUR GÉNÉRAL
+# ESFÉ CORE
+# NOUVELLE SESSION CODEX — EXÉCUTION DIRECTE
+
+Tu arrives sur un projet Django existant et fonctionnel : ESFÉ Core.
+
+Ta mission n'est PAS de fabriquer quelques cartes KPI supplémentaires.
+Ta mission n'est PAS de refaire le projet.
+Ta mission n'est PAS de créer un nouveau design system.
+Ta mission n'est PAS de produire un nouvel audit général.
+
+Tu dois construire correctement le dashboard Directeur Général comme un véritable
+BACK-OFFICE MÉTIER DE DIRECTION,
+alimenté par les DONNÉES RÉELLES du projet.
+
+Le principe fonctionnel à retenir est comparable à Django Admin :
+
+DOMAINE
+→ SOUS-SECTION
+→ LISTE DE DONNÉES
+→ RECHERCHE / FILTRES / TRI / PAGINATION
+→ OBJET / DOSSIER / DÉTAIL
+→ ACTIONS AUTORISÉES
+→ HISTORIQUE / PREUVE lorsque pertinent
+
+mais avec :
+
+- l'UI professionnelle existante d'ESFÉ Core ;
+- UI Core ;
+- le shell certifié ;
+- les permissions DG ;
+- le contexte année académique / annexe ;
+- HTMX/AJAX/JavaScript existants ;
+- une UX beaucoup plus claire que Django Admin.
+
+Le cockpit DG n'est que LA PAGE D'ACCUEIL de ce back-office.
+
+Il ne constitue pas à lui seul le dashboard DG.
+
+============================================================
+1. RÉSULTAT ACTUEL REJETÉ
+============================================================
+
+Le résultat actuellement visible est insuffisant.
+
+Les domaines Annexes, Finance, Académique, Étudiants et Personnel ressemblent
+encore trop à des pages de synthèse.
+
+Afficher :
+
+- 4 KPI ;
+- quelques cartes ;
+- un graphique ;
+- un résumé ;
+
+NE CONSTITUE PAS un module métier.
+
+Exemple :
+
+ANNEXES
+→ "1 annexe"
+→ "16 étudiants"
+→ une carte Bamako Moribabougou
+
+n'est PAS un véritable espace Annexes.
+
+Le DG doit pouvoir descendre dans les données.
+
+Même exigence pour Finance, Académique, Étudiants et Personnel.
+
+============================================================
+2. PRINCIPE DJANGO ADMIN À TRANSPOSER
+============================================================
+
+Observe le fonctionnement conceptuel de Django Admin :
+
+Application
+→ Modèle
+→ ChangeList
+→ recherche
+→ filtres
+→ pagination
+→ objet
+→ actions
+
+Nous voulons transposer cette puissance d'exploitation des données dans
+l'interface métier DG.
+
+PAS copier le HTML de Django Admin.
+
+PAS utiliser Django Admin comme frontend.
+
+Reprendre son PRINCIPE :
+
+LES DONNÉES SONT ACCESSIBLES, RECHERCHABLES, FILTRABLES,
+CONSULTABLES ET ACTIONNABLES SELON LES PERMISSIONS.
+
+============================================================
+3. PREMIÈRE ÉTAPE : CARTOGRAPHIER LES VRAIES DONNÉES
+============================================================
+
+Avant de créer les pages, inspecte directement le code.
+
+Pour chaque domaine DG, identifie :
+
+- modèles Django existants ;
+- managers/querysets ;
+- services ;
+- selectors ;
+- vues ;
+- endpoints ;
+- formulaires ;
+- permissions ;
+- exports ;
+- audits ;
+- composants UI existants ;
+- fonctionnalités déjà utilisées par les autres dashboards.
+
+Domaines prioritaires :
+
+1. Annexes
+2. Finance
+3. Académique
+4. Étudiants
+5. Personnel
+6. Documents / Direction
+7. Analyses / Rapports
+8. Audit / Contrôle
+
+NE PRODUIS PAS un long rapport avant de coder.
+
+Cette cartographie sert immédiatement à l'implémentation.
+
+============================================================
+4. NE DUPLIQUE PAS LA LOGIQUE MÉTIER
+============================================================
+
+Le DG doit consulter les MÊMES données métier que les autres rôles.
+
+Exemple :
+
+si le Gestionnaire utilise déjà un modèle/service pour les paiements,
+le DG ne doit pas avoir une deuxième implémentation du calcul des paiements.
+
+Si le Directeur des Études utilise déjà les classes, évaluations et planning,
+le DG doit lire les mêmes données avec ses propres permissions et sa propre UX.
+
+Principe :
+
+UNE SOURCE DE VÉRITÉ MÉTIER
++
+PLUSIEURS VUES ADAPTÉES AUX RÔLES.
+
+Réutilise les services existants lorsqu'ils sont corrects.
+
+Extrais un service partagé lorsqu'une logique métier est actuellement enfermée
+dans une vue et doit légitimement être réutilisée.
+
+Ne copie-colle pas les règles métier.
+
+============================================================
+5. PRENDS LE DASHBOARD DIRECTEUR DES ÉTUDES COMME RÉFÉRENCE UX INTERNE
+============================================================
+
+Inspecte le dashboard Directeur des Études déjà présent dans le projet.
+
+Je veux que tu étudies précisément :
+
+- grandes sections ;
+- sous-sections ;
+- navigation interne ;
+- partials ;
+- HTMX ;
+- conservation du shell ;
+- conservation du contexte ;
+- listings ;
+- recherches ;
+- filtres ;
+- formulaires ;
+- drawers ;
+- modales ;
+- pagination ;
+- transitions ;
+- URL ;
+- états actifs.
+
+NE COPIE PAS les responsabilités métier du DE.
+
+Réutilise le PATTERN qui fonctionne.
+
+Le dashboard DG doit donner la même sensation :
+
+J'ENTRE DANS UN DOMAINE
+→ JE VOIS SES SOUS-SECTIONS
+→ JE CHOISIS UNE SOUS-SECTION
+→ LES DONNÉES CORRESPONDANTES APPARAISSENT
+→ JE PEUX LES EXPLOITER.
+
+============================================================
+6. ARCHITECTURE DE NAVIGATION OBLIGATOIRE
+============================================================
+
+NIVEAU 1 = SIDEBAR
+
+La sidebar contient uniquement les grands domaines.
+
+Structure cible :
+
+COCKPIT DG
+- Vue d'ensemble
+
+PILOTAGE INSTITUTIONNEL
+- Annexes
+- Finance
+- Académique
+- Étudiants
+- Personnel
+
+DIRECTION & GOUVERNANCE
+- Documents & décisions
+- Analyses & rapports
+- Audit & contrôle
+
+Ne mets PAS toutes les sous-sections dans la sidebar.
+
+============================================================
+7. NIVEAU 2 = SOUS-NAVIGATION DU DOMAINE
+============================================================
+
+Lorsqu'un domaine est ouvert, afficher sa propre sous-navigation dans le
+workspace.
+
+Exemple :
+
+FINANCE
+
+[Synthèse]
+[Encaissements]
+[Dépenses]
+[Créances]
+[Caisses]
+[Clôtures]
+[Versements]
+[Rapports]
+
+En dessous :
+
+contenu de la sous-section sélectionnée.
+
+Le shell, la sidebar et la topbar restent stables.
+
+Même principe dans tous les domaines.
+
+============================================================
+8. UI CORE
+============================================================
+
+UI Core est l'autorité visuelle.
+
+Avant de créer un composant :
+
+1. chercher dans UI Core ;
+2. réutiliser ce qui existe ;
+3. améliorer une primitive existante si nécessaire ;
+4. créer une nouvelle primitive uniquement si elle est réellement générique.
+
+Le système de sous-navigation doit idéalement être une primitive UI Core
+réutilisable par d'autres dashboards.
+
+Ne crée pas un deuxième design system DG.
+
+Ne réintroduis pas des composants legacy lorsque UI Core possède l'équivalent.
+
+============================================================
+9. ANNEXES — VRAI MODULE
+============================================================
+
+Sous-navigation cible :
+
+[Vue d'ensemble]
+[Liste des annexes]
+[Comparaison]
+[Responsables]
+[Activité]
+[Alertes]
+
+--------------------------------
+LISTE DES ANNEXES
+--------------------------------
+
+Construire une vraie liste alimentée par la base.
+
+Selon les champs réellement disponibles :
+
+- nom ;
+- code ;
+- localisation ;
+- statut ;
+- responsable ;
+- effectif ;
+- année ;
+- autres informations pertinentes.
+
+Ajouter :
+
+- recherche ;
+- filtres ;
+- pagination serveur si nécessaire ;
+- tri lorsque pertinent ;
+- état vide ;
+- erreur ;
+- détail.
+
+Cliquer sur une annexe doit ouvrir sa fiche ou un drawer riche.
+
+--------------------------------
+FICHE ANNEXE
+--------------------------------
+
+Afficher selon les données existantes :
+
+- identité ;
+- responsable ;
+- effectifs ;
+- classes ;
+- personnel ;
+- informations financières synthétiques ;
+- alertes ;
+- activité récente.
+
+Permettre ensuite de naviguer vers :
+
+Finance de cette annexe ;
+Académique de cette annexe ;
+Personnel de cette annexe ;
+Étudiants de cette annexe ;
+
+en conservant scope_branch_id.
+
+============================================================
+10. FINANCE — VRAI MODULE
+============================================================
+
+Sous-navigation :
+
+[Synthèse]
+[Encaissements]
+[Dépenses]
+[Créances]
+[Caisses]
+[Clôtures]
+[Versements]
+[Rapports]
+
+Chaque sous-section doit exploiter les vrais modèles/services financiers.
+
+--------------------------------
+ENCAISSEMENTS
+--------------------------------
+
+Vraie liste.
+
+Recherche/filtres selon les données disponibles :
+
+- référence ;
+- étudiant/payeur ;
+- annexe ;
+- période ;
+- montant ;
+- mode de paiement ;
+- statut ;
+- agent ;
+- date.
+
+Pagination SERVEUR.
+
+Clic opération
+→ drawer/détail.
+
+--------------------------------
+DÉPENSES
+--------------------------------
+
+Vraie liste :
+
+- référence ;
+- libellé ;
+- catégorie ;
+- annexe ;
+- montant ;
+- date ;
+- statut ;
+- bénéficiaire si disponible ;
+- justificatif si existant.
+
+Recherche + filtres + pagination + détail.
+
+--------------------------------
+CRÉANCES
+--------------------------------
+
+Utiliser les règles métier réellement existantes.
+
+Ne pas inventer une créance à partir d'un calcul approximatif.
+
+--------------------------------
+CAISSES
+--------------------------------
+
+Afficher les caisses réellement modélisées :
+
+- état ;
+- solde lorsque fiable ;
+- responsable ;
+- dernière activité ;
+- opérations pertinentes.
+
+--------------------------------
+CLÔTURES
+--------------------------------
+
+Vraie liste des clôtures existantes.
+
+--------------------------------
+VERSEMENTS
+--------------------------------
+
+Afficher uniquement ce que le backend modélise réellement.
+
+--------------------------------
+RAPPORTS
+--------------------------------
+
+Brancher les exports existants et les futurs rapports DG compatibles.
+
+============================================================
+11. ACADÉMIQUE — VRAI MODULE
+============================================================
+
+Sous-navigation :
+
+[Vue d'ensemble]
+[Classes]
+[Planning]
+[Évaluations]
+[Résultats]
+[Progression]
+[Diplômes]
+
+--------------------------------
+CLASSES
+--------------------------------
+
+Vraie liste issue de la base :
+
+- classe ;
+- niveau ;
+- programme/filière ;
+- annexe ;
+- année ;
+- effectif ;
+- statut.
+
+Recherche.
+
+Filtres.
+
+Pagination.
+
+Clic
+→ détail classe.
+
+--------------------------------
+PLANNING
+--------------------------------
+
+Réutiliser les données planning existantes.
+
+Le DG consulte.
+
+Ne duplique pas l'éditeur métier du Directeur des Études si cela ne relève pas
+du DG.
+
+--------------------------------
+ÉVALUATIONS
+--------------------------------
+
+Afficher les campagnes/sessions/évaluations réellement existantes.
+
+--------------------------------
+RÉSULTATS
+--------------------------------
+
+Afficher les résultats consolidés accessibles au DG.
+
+--------------------------------
+PROGRESSION
+--------------------------------
+
+Utiliser les données académiques réellement disponibles.
+
+--------------------------------
+DIPLÔMES
+--------------------------------
+
+Réutiliser les workflows existants lorsque le DG possède une responsabilité.
+
+============================================================
+12. ÉTUDIANTS — VRAI MODULE
+============================================================
+
+Sous-navigation :
+
+[Vue d'ensemble]
+[Étudiants]
+[Inscriptions]
+[Réinscriptions]
+[Passages / Promotions]
+[Situations particulières]
+
+--------------------------------
+ÉTUDIANTS
+--------------------------------
+
+Construire une vraie liste :
+
+- matricule ;
+- nom/prénom ;
+- programme ;
+- classe ;
+- annexe ;
+- année ;
+- statut.
+
+Ajouter :
+
+- recherche nom ;
+- recherche matricule ;
+- filtre annexe ;
+- filtre programme ;
+- filtre classe ;
+- filtre statut ;
+- pagination serveur.
+
+Clic étudiant
+→ fiche/drawer.
+
+--------------------------------
+FICHE ÉTUDIANT
+--------------------------------
+
+Afficher selon permissions et données existantes :
+
+- identité ;
+- parcours ;
+- inscription ;
+- classe ;
+- paiements/situation financière pertinente ;
+- résultats ;
+- documents ;
+- historique utile.
+
+Ne duplique pas les données.
+
+--------------------------------
+INSCRIPTIONS
+--------------------------------
+
+Vraie liste issue du workflow existant.
+
+--------------------------------
+RÉINSCRIPTIONS
+--------------------------------
+
+Réutiliser le workflow existant.
+
+--------------------------------
+PASSAGES / PROMOTIONS
+--------------------------------
+
+Afficher les données réellement disponibles.
+
+============================================================
+13. PERSONNEL — VRAI MODULE
+============================================================
+
+Sous-navigation :
+
+[Vue d'ensemble]
+[Personnel]
+[Recrutements]
+[Affectations]
+[Contrats / Statuts]
+[Accès]
+[Historique]
+
+--------------------------------
+PERSONNEL
+--------------------------------
+
+Vraie liste :
+
+- nom ;
+- fonction ;
+- rôle ;
+- annexe ;
+- statut ;
+- contact pertinent ;
+- compte actif/bloqué lorsque pertinent.
+
+Recherche.
+
+Filtres.
+
+Pagination serveur.
+
+Clic
+→ fiche personnel.
+
+--------------------------------
+RECRUTEMENTS
+--------------------------------
+
+Réutiliser le workflow déjà existant.
+
+--------------------------------
+AFFECTATIONS
+--------------------------------
+
+Afficher les affectations réelles.
+
+--------------------------------
+CONTRATS / STATUTS
+--------------------------------
+
+Afficher les données réellement modélisées.
+
+--------------------------------
+ACCÈS
+--------------------------------
+
+Afficher les comptes liés et les actions DG réellement autorisées :
+
+- activer si prévu ;
+- bloquer ;
+- révoquer ;
+
+avec confirmation + audit.
+
+--------------------------------
+HISTORIQUE
+--------------------------------
+
+Afficher les événements métier disponibles.
+
+============================================================
+14. DOCUMENTS & DÉCISIONS
+============================================================
+
+Sous-navigation cible :
+
+[Vue d'ensemble]
+[Documents]
+[Publications]
+[Décisions]
+[Validations]
+[Historique]
+
+Réutiliser les fonctionnalités documentaires existantes.
+
+Ne construis pas un nouveau moteur documentaire si le backend n'est pas encore
+prêt.
+
+Mais crée le vrai workspace et branche ce qui existe.
+
+============================================================
+15. ANALYSES & RAPPORTS
+============================================================
+
+Sous-navigation :
+
+[Vue d'ensemble]
+[Académique]
+[Finance]
+[Annexes]
+[Personnel]
+[Exports]
+
+Utiliser uniquement des analyses basées sur les vraies données.
+
+Aucun graphique décoratif.
+
+Aucune tendance inventée.
+
+============================================================
+16. AUDIT & CONTRÔLE
+============================================================
+
+Sous-navigation cible :
+
+[Vue d'ensemble]
+[Activités]
+[Connexions]
+[Actions sensibles]
+[Investigations]
+[Exports]
+
+Inspecte les logs/audits existants.
+
+Branche ce qui peut l'être proprement.
+
+Si la consolidation transverse nécessite un chantier supplémentaire important,
+prépare correctement l'architecture sans fabriquer de fausses données.
+
+============================================================
+17. PATTERN DES PAGES DE LISTE
+============================================================
+
+Créer/réutiliser un contrat UI Core commun.
+
+Une vraie page de liste doit ressembler conceptuellement à :
+
+------------------------------------------------
+Titre                       Nombre de résultats
+Description
+------------------------------------------------
+[Recherche................] [Filtres] [Actions]
+------------------------------------------------
+TABLE / LISTE
+------------------------------------------------
+objet | données | statut | date | actions
+------------------------------------------------
+Pagination
+------------------------------------------------
+
+Elle doit supporter selon pertinence :
+
+- GET search ;
+- filtres GET ;
+- tri ;
+- pagination serveur ;
+- état vide ;
+- aucun résultat ;
+- loading ;
+- erreur ;
+- retry.
+
+Les filtres doivent être exécutés côté serveur pour les gros datasets.
+
+============================================================
+18. PAS DE TABLEAUX DE 5 000 LIGNES EN MÉMOIRE
+============================================================
+
+Pagination serveur obligatoire pour les listes potentiellement importantes.
+
+Ne charge pas tous les étudiants/paiements/personnels pour filtrer ensuite avec
+JavaScript.
+
+Utiliser les QuerySets Django.
+
+Optimiser avec :
+
+- select_related ;
+- prefetch_related ;
+- annotate ;
+- aggregate ;
+
+lorsque nécessaire.
+
+============================================================
+19. RECHERCHE
+============================================================
+
+La recherche doit interroger réellement les données.
+
+Exemple Étudiants :
+
+?search=camara
+
+→ queryset filtré côté serveur.
+
+Elle doit fonctionner avec HTMX lorsque pertinent pour éviter un reload complet.
+
+Utiliser debounce raisonnable si recherche dynamique.
+
+============================================================
+20. FILTRES
+============================================================
+
+Les filtres doivent être combinables lorsque pertinent.
+
+Exemple :
+
+Annexe = Bamako
+Programme = Médecine
+Statut = actif
+Recherche = Camara
+
+Le backend construit le queryset correspondant.
+
+Ne crée pas de faux filtres visuels sans effet réel.
+
+============================================================
+21. DÉTAIL / DRAWER
+============================================================
+
+Le clic sur un élément doit ouvrir :
+
+- drawer UI Core ;
+ou
+- page détail ;
+
+selon la complexité.
+
+Le détail doit récupérer l'objet côté serveur avec contrôle de permission et
+scope.
+
+Ne fais jamais confiance à l'ID envoyé par le navigateur.
+
+============================================================
+22. ACTIONS
+============================================================
+
+Une action DG doit toujours être vérifiée côté serveur.
+
+Pattern :
+
+permission
+→ scope
+→ confirmation
+→ motif si nécessaire
+→ transaction
+→ action
+→ audit
+→ feedback.
+
+Les actions dangereuses ne doivent pas exister simplement parce que le DG peut
+voir l'objet.
+
+============================================================
+23. CONTEXTE GLOBAL
+============================================================
+
+Le contexte DG supérieur doit continuer à gérer :
+
+- année académique ;
+- établissement / annexe ;
+- période lorsqu'elle s'applique réellement.
+
+Ce contexte doit scoper les querysets.
+
+Exemple :
+
+DG
+Année = 2026-2027
+Annexe = Bamako Moribabougou
+
+Étudiants
+→ uniquement les étudiants correspondants.
+
+Finance
+→ uniquement les données correspondantes.
+
+Personnel
+→ appliquer les règles métier appropriées.
+
+============================================================
+24. URL = ÉTAT
+============================================================
+
+La navigation doit être reproductible.
+
+Exemple conceptuel :
+
+/portal/dg/?domain=students&section=list&scope_branch_id=2&academic_year_id=5
+
+ou autre contrat cohérent avec l'architecture existante.
+
+Refresh :
+
+reste au même endroit.
+
+Retour navigateur :
+
+revient à la vue précédente.
+
+Forward :
+
+fonctionne.
+
+Ne stocke pas tout uniquement en JavaScript.
+
+============================================================
+25. FLUIDITÉ — EXIGENCE ABSOLUE
+============================================================
+
+Le dashboard est actuellement lent.
+
+Ce problème doit être traité maintenant.
+
+Mesure les navigations critiques.
+
+Pour chaque navigation importante, distinguer :
+
+1. temps frontend avant requête ;
+2. temps requête HTTP ;
+3. temps serveur Django ;
+4. nombre de requêtes SQL ;
+5. temps transfert ;
+6. swap HTMX ;
+7. initialisation JS après swap.
+
+Ne dis pas simplement "c'est lent".
+
+Trouve où le temps est consommé.
+
+============================================================
+26. SUPPRIMER LE MULTI-SPINNER
+============================================================
+
+Le comportement actuel est rejeté.
+
+Actuellement une navigation peut provoquer simultanément :
+
+- spinner dans la sidebar ;
+- ancien contenu grisé ;
+- gros spinner central ;
+- loader du workspace ;
+- éventuellement loader interne.
+
+C'EST UN BUG UX.
+
+Pour UNE requête logique :
+
+UN SEUL PROPRIÉTAIRE DU LOADING.
+
+============================================================
+27. CONTRAT DE LOADING
+============================================================
+
+Navigation domaine :
+
+→ skeleton/loader workspace uniquement.
+
+Navigation sous-section :
+
+→ loading du contenu de sous-section uniquement.
+
+Recherche/table :
+
+→ loading de la table uniquement.
+
+Bouton :
+
+→ loading du bouton uniquement.
+
+Drawer :
+
+→ skeleton drawer uniquement.
+
+Modal :
+
+→ loader modal uniquement.
+
+Le shell ne doit pas se mettre en loading pour une opération locale.
+
+La sidebar ne doit PAS afficher un spinner si le workspace possède déjà le
+loading de cette navigation.
+
+============================================================
+28. NE MASQUE PAS LE BUG AVEC CSS
+============================================================
+
+Inspecte :
+
+- événements HTMX ;
+- hx-indicator ;
+- JS custom ;
+- UI Core loader ;
+- shell ;
+- dg_dashboard.js ;
+- partials ;
+- listeners.
+
+Identifie les propriétaires concurrents.
+
+Supprime la duplication logique.
+
+Ne fais pas :
+
+display:none sur les spinners gênants
+
+sans corriger la mécanique.
+
+============================================================
+29. ANNULATION DES REQUÊTES OBSOLÈTES
+============================================================
+
+Si l'utilisateur clique rapidement :
+
+Finance
+→ Personnel
+→ Étudiants
+
+éviter qu'une ancienne réponse Finance arrive ensuite et écrase Étudiants.
+
+Utiliser le comportement HTMX/JS approprié pour empêcher les races de
+navigation.
+
+La dernière navigation demandée doit gagner.
+
+============================================================
+30. NE PAS RECHARGER LE SHELL
+============================================================
+
+Lors d'une navigation interne :
+
+NE PAS recharger :
+
+- sidebar ;
+- topbar ;
+- profil ;
+- shell ;
+- contexte complet ;
+
+si cela n'est pas nécessaire.
+
+Remplacer uniquement la zone métier concernée.
+
+============================================================
+31. PERFORMANCE BACKEND
+============================================================
+
+Une sous-section doit posséder son propre contexte ciblé.
+
+INTERDIT :
+
+build_dg_everything()
+
+pour afficher simplement :
+
+Personnel > Liste.
+
+Utiliser des builders/services ciblés.
+
+Exemples conceptuels :
+
+build_dg_staff_list_context()
+build_dg_student_list_context()
+build_dg_payment_list_context()
+build_dg_branch_list_context()
+
+ou architecture équivalente cohérente avec le projet.
+
+============================================================
+32. UI PENDANT LE CHARGEMENT
+============================================================
+
+L'interface doit rester stable.
+
+Pas de page entière qui clignote.
+
+Pas de sidebar qui bouge.
+
+Pas de topbar qui disparaît.
+
+Pas de trois roues qui tournent.
+
+Utiliser des skeletons discrets et localisés.
+
+============================================================
+33. RESPONSIVE
+============================================================
+
+Tester :
+
+360 px
+768 px
+1440 px
+
+Sidebar, sous-navigation, filtres, tables, drawers doivent rester utilisables.
+
+============================================================
+34. ACCESSIBILITÉ
+============================================================
+
+Utiliser :
+
+- vrais liens ;
+- vrais boutons ;
+- labels ;
+- focus visible ;
+- navigation clavier ;
+- aria-busy lorsque pertinent ;
+- aria-live pour feedback lorsque pertinent.
+
+Éviter les div onclick.
+
+============================================================
+35. NE CASSE PAS LES AUTRES DASHBOARDS
+============================================================
+
+UI Core et le shell sont partagés.
+
+Toute modification commune doit être testée sur les principaux dashboards
+consommateurs.
+
+En particulier le Directeur des Études utilisé comme référence.
+
+============================================================
+36. COCKPIT DG
+============================================================
+
+Le cockpit reste la page d'accueil.
+
+Il pourra contenir :
+
+- contexte ;
+- KPI ;
+- À votre attention ;
+- comparaison annexes ;
+- activité récente.
+
+MAIS :
+
+ne consacre pas cette mission à embellir encore le cockpit.
+
+PRIORITÉ :
+
+CONSTRUIRE LE BACK-OFFICE DERRIÈRE LE COCKPIT.
+
+============================================================
+37. CRITÈRE DE RÉUSSITE CONCRET
+============================================================
+
+À la fin, je dois pouvoir faire réellement ceci :
+
+DIRECTEUR GÉNÉRAL
+→ Étudiants
+→ Étudiants
+→ rechercher "Camara"
+→ filtrer Bamako
+→ ouvrir l'étudiant
+→ consulter sa fiche.
+
+Puis :
+
+Finance
+→ Encaissements
+→ rechercher une opération
+→ filtrer une période
+→ ouvrir le paiement.
+
+Puis :
+
+Personnel
+→ Personnel
+→ rechercher un agent
+→ ouvrir sa fiche
+→ consulter son statut.
+
+Puis :
+
+Académique
+→ Classes
+→ filtrer programme/annexe
+→ ouvrir une classe.
+
+Puis :
+
+Annexes
+→ Liste des annexes
+→ rechercher une annexe
+→ ouvrir sa fiche
+→ naviguer vers ses données.
+
+C'est ce niveau de fonctionnement qui constitue la BASE.
+
+============================================================
+38. CRITÈRE DE FLUIDITÉ
+============================================================
+
+Pour les parcours ci-dessus :
+
+- pas de reload complet ;
+- pas de multi-spinner ;
+- pas de double requête inutile ;
+- pas de blocage du shell ;
+- pas de perte du contexte ;
+- pas de réponse obsolète écrasant la vue actuelle ;
+- pas de délai anormal sans diagnostic.
+
+============================================================
+39. TESTS
+============================================================
+
+Ajouter des tests ciblés pour :
+
+- routes ;
+- permissions ;
+- scope annexe ;
+- scope année ;
+- recherche ;
+- filtres ;
+- pagination ;
+- détail ;
+- actions sensibles ;
+- réponses HTMX ;
+- contexte URL.
+
+Conserver les tests DG existants.
+
+Lancer manage.py check.
+
+Vérifier la syntaxe JS modifiée.
+
+============================================================
+40. RECETTE VISUELLE OBLIGATOIRE
+============================================================
+
+Cette mission ne sera PAS validée uniquement sur les tests.
+
+À la fin, effectuer une recette réelle dans le navigateur.
+
+Capturer au minimum :
+
+1. Cockpit normal ;
+2. Annexes + sous-navigation ;
+3. Liste Annexes ;
+4. Finance + sous-navigation ;
+5. Encaissements ;
+6. Académique + sous-navigation ;
+7. Classes ;
+8. Étudiants + sous-navigation ;
+9. Liste étudiants ;
+10. Personnel + sous-navigation ;
+11. Liste personnel ;
+12. état loading d'une navigation.
+
+Je dois pouvoir constater visuellement l'architecture.
+
+============================================================
+41. ORDRE D'EXÉCUTION
+============================================================
+
+Travaille dans cet ordre :
+
+1. inspecter rapidement Git/status/diff ;
+2. inspecter dashboard DE comme référence ;
+3. cartographier modèles/services nécessaires ;
+4. identifier architecture UI Core existante ;
+5. corriger multi-spinner et navigation lente ;
+6. mettre en place la sous-navigation générique ;
+7. construire Annexes ;
+8. construire Étudiants ;
+9. construire Personnel ;
+10. construire Académique ;
+11. construire Finance ;
+12. brancher Documents/Analyses/Audit selon données disponibles ;
+13. optimiser les querysets ;
+14. vérifier URL/history ;
+15. tester permissions ;
+16. tester responsive ;
+17. recette navigateur ;
+18. tests automatisés ;
+19. rapport final concis.
+
+============================================================
+42. IMPORTANT — NE T'ARRÊTE PAS AUX CONTENEURS
+============================================================
+
+Créer :
+
+[Étudiants]
+[Inscriptions]
+[Réinscriptions]
+
+puis afficher trois pages presque vides
+
+N'EST PAS LE TRAVAIL DEMANDÉ.
+
+Les domaines prioritaires doivent être BRANCHÉS AUX DONNÉES.
+
+Je veux :
+
+- querysets ;
+- listings ;
+- recherche ;
+- filtres ;
+- pagination ;
+- détails ;
+- actions autorisées.
+
+============================================================
+43. IMPORTANT — NE FAIS PAS SEMBLANT AVEC DES DONNÉES MOCK
+============================================================
+
+Aucune donnée inventée.
+
+Aucun compteur hardcodé.
+
+Aucun tableau fake.
+
+Aucune tendance inventée.
+
+Aucun graphique décoratif.
+
+Si la base contient 16 étudiants :
+
+affiche les 16 étudiants dans la vraie liste paginée/recherchable.
+
+Si elle contient un seul personnel :
+
+affiche ce personnel.
+
+Si un domaine n'a aucune donnée :
+
+affiche un excellent empty state.
+
+============================================================
+44. GIT
+============================================================
+
+Préserve les modifications locales existantes.
+
+Pas de reset destructif.
+
+Pas de checkout écrasant.
+
+Pas de suppression aveugle.
+
+Pas de push/déploiement sans instruction.
+
+Les modifications de cette mission doivent rester identifiables.
+
+============================================================
+45. PAS DE LONG RAPPORT AVANT ACTION
+============================================================
+
+Ne commence pas par me rendre une analyse de 200 lignes.
+
+Tu as le code.
+
+Inspecte.
+
+Décide à partir de l'architecture existante.
+
+Implémente.
+
+Teste.
+
+============================================================
+46. RAPPORT FINAL
+============================================================
+
+À la fin seulement, fournir un rapport CONCIS :
+
+- domaines construits ;
+- sous-sections construites ;
+- modèles/services utilisés ;
+- listings opérationnels ;
+- recherches/filtres/pagination ;
+- détails/actions ;
+- composants UI Core réutilisés/créés ;
+- correction multi-spinner ;
+- performance mesurée ;
+- tests ;
+- captures/recette ;
+- éléments réellement manquants dans le backend.
+
+============================================================
+47. PHILOSOPHIE FINALE
+============================================================
+
+Ne pense plus :
+
+"Je construis un dashboard avec des KPI."
+
+Pense :
+
+"Je construis le back-office métier du Directeur Général."
+
+Le cockpit est son accueil.
+
+Les domaines sont ses applications.
+
+Les sous-sections sont ses espaces de travail.
+
+Les listes sont ses données.
+
+Les recherches et filtres sont ses outils d'exploitation.
+
+Les fiches sont ses dossiers.
+
+Les actions sont ses pouvoirs métier.
+
+L'audit est sa preuve.
+
+UI Core est son système visuel.
+
+Django est l'autorité métier.
+
+HTMX/AJAX apporte la fluidité.
+
+Le serveur garantit les permissions.
+
+============================================================
+
+PASSE MAINTENANT À L'IMPLÉMENTATION.
+
+NE REFAIS PAS UN AUDIT GÉNÉRAL.
+NE RESTE PAS SUR DES CARTES KPI.
+NE CRÉE PAS DE FAUSSES DONNÉES.
+NE CRÉE PAS UN SECOND DESIGN SYSTEM.
+NE LAISSE PAS LE MULTI-SPINNER.
+NE RECHARGE PAS LE SHELL POUR UNE SOUS-SECTION.
+
+CONSTRUIS LE VÉRITABLE BACK-OFFICE DG À PARTIR DES DONNÉES RÉELLES DU PROJET.

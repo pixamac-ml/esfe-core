@@ -1,0 +1,59 @@
+{% load component_tags %}
+<div class="space-y-5">
+  {% if toast %}{% component "ui_core.alert" title="Relevés semestriels" message=toast.message tone=toast.level %}{% endcomponent %}{% endif %}
+  {% component "ui_core.page_header" eyebrow="Documents académiques" title="Relevés de notes" subtitle="Chaque relevé individuel est figé depuis les résultats officiels publiés." %}
+    {% fill "actions" %}
+      <span class="inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-xs font-semibold text-ui-text"><i data-lucide="shield-check" class="h-4 w-4 text-ui-success"></i>Documents officiels</span>
+    {% endfill %}
+  {% endcomponent %}
+
+  {% for row in transcript_semester_rows %}
+    {% component "ui_core.panel" title=row.academic_class.display_name subtitle="Semestre "|add:row.semester.number|stringformat:"s" padding=False %}
+      <div class="grid gap-3 p-4 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div class="grid gap-3 sm:grid-cols-3">
+          <div><p class="text-[11px] font-black uppercase tracking-wide text-ui-text-muted">Statut</p><div class="mt-1">{% component "ui_core.status_badge" label="Publié" tone="success" %}{% endcomponent %}</div></div>
+          <div><p class="text-[11px] font-black uppercase tracking-wide text-ui-text-muted">Étudiants</p><p class="mt-1 text-lg font-black text-ui-text">{{ row.student_count }}</p></div>
+          <div><p class="text-[11px] font-black uppercase tracking-wide text-ui-text-muted">Relevés</p><p class="mt-1 text-lg font-black text-ui-text">{{ row.transcript_count }}/{{ row.student_count }}</p></div>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          {% if not row.is_complete %}
+            <form hx-post="{% url 'accounts_portal:director_bulletin_action' %}" hx-target="#director-results-subcontent" hx-swap="innerHTML">{% csrf_token %}<input type="hidden" name="action" value="generate_semester_class"><input type="hidden" name="semester_id" value="{{ row.semester.id }}"><button type="submit" class="ui-focus-ring inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-bold text-white"><i data-lucide="file-plus-2" class="h-4 w-4"></i>Générer les relevés</button></form>
+          {% endif %}
+          <button type="button" hx-get="{% url 'accounts_portal:director_drawer' %}?panel=transcripts&semester_id={{ row.semester.id }}" hx-target="#director-drawer-content" hx-swap="innerHTML" hx-disabled-elt="this" hx-on::after-request="window.deOpenDrawer && window.deOpenDrawer()" class="ui-focus-ring inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-4 text-sm font-bold text-ui-text"><i data-lucide="folder-open" class="h-4 w-4"></i>Gérer les relevés</button>
+          {% if row.is_complete %}<a href="{% url 'academics:export_class_reports' row.semester.id %}" class="ui-focus-ring inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-4 text-sm font-bold text-ui-text"><i data-lucide="download" class="h-4 w-4"></i>Télécharger les relevés</a>{% endif %}
+        </div>
+      </div>
+    {% endcomponent %}
+  {% empty %}
+    {% component "ui_core.empty_state" icon="file-clock" title="Aucun relevé disponible" message="Les relevés semestriels deviennent disponibles après publication officielle." %}{% endcomponent %}
+  {% endfor %}
+
+  {% component "ui_core.panel" title="Bulletins annuels" subtitle="Disponibles uniquement après publication des deux semestres configurés et délibération annuelle officielle." padding=False %}
+    <div class="divide-y divide-ui-border">
+      {% for row in annual_bulletin_rows %}
+        <div class="grid gap-3 p-4 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div class="grid gap-3 sm:grid-cols-4">
+            <div><p class="text-[11px] font-black uppercase tracking-wide text-ui-text-muted">Classe</p><p class="mt-1 font-bold text-ui-text">{{ row.academic_class.display_name }}</p></div>
+            <div><p class="text-[11px] font-black uppercase tracking-wide text-ui-text-muted">Semestres publiés</p><p class="mt-1 font-bold text-ui-text">{{ row.published_semesters }}/{{ row.expected_semesters }}</p></div>
+            <div><p class="text-[11px] font-black uppercase tracking-wide text-ui-text-muted">Décisions finales</p><p class="mt-1 font-bold text-ui-text">{{ row.final_decision_count }}/{{ row.student_count }}</p></div>
+            <div><p class="text-[11px] font-black uppercase tracking-wide text-ui-text-muted">Bulletins annuels</p><p class="mt-1 font-bold text-ui-text">{{ row.annual_bulletin_count }}/{{ row.final_decision_count }}</p></div>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            {% if row.can_generate and not row.is_complete %}
+              <form hx-post="{% url 'accounts_portal:director_bulletin_action' %}" hx-target="#director-results-subcontent" hx-swap="innerHTML">{% csrf_token %}<input type="hidden" name="action" value="generate_annual_class"><input type="hidden" name="class_id" value="{{ row.academic_class.id }}"><button type="submit" class="ui-focus-ring inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-bold text-white"><i data-lucide="file-plus-2" class="h-4 w-4"></i>Générer les bulletins annuels</button></form>
+            {% endif %}
+            {% if row.is_complete %}
+              <button type="button" hx-get="{% url 'accounts_portal:director_drawer' %}?panel=annual_bulletins&class_id={{ row.academic_class.id }}" hx-target="#director-drawer-content" hx-swap="innerHTML" hx-disabled-elt="this" hx-on::after-request="window.deOpenDrawer && window.deOpenDrawer()" class="ui-focus-ring inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-4 text-sm font-bold text-ui-text"><i data-lucide="folder-open" class="h-4 w-4"></i>Consulter</button>
+            {% elif not row.is_semesters_published %}
+              {% component "ui_core.status_badge" label="En attente des semestres publiés" tone="warning" %}{% endcomponent %}
+            {% else %}
+              {% component "ui_core.status_badge" label="En attente de délibération annuelle" tone="warning" %}{% endcomponent %}
+            {% endif %}
+          </div>
+        </div>
+      {% empty %}
+        <div class="p-6">{% component "ui_core.empty_state" icon="graduation-cap" title="Aucune classe annuelle" message="Les classes avec leur maquette semestrielle apparaîtront ici." %}{% endcomponent %}</div>
+      {% endfor %}
+    </div>
+  {% endcomponent %}
+</div>

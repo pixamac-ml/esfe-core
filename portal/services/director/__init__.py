@@ -35,3 +35,4 @@ from .timetable_service import (
 )
 from .salary_service import build_director_salary_context, parse_salary_period
 from .messaging_service import send_director_internal_message
+from .deliberation_service import build_director_deliberation_context

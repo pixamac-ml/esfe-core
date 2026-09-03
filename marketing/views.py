@@ -116,7 +116,21 @@ def dashboard(request):
                     "label": "Configuration",
                     "items": [
                         {"key": "settings", "label": "Parametres marketing", "icon": "sliders-horizontal", "url": reverse("marketing:settings")},
-                        {"key": "account", "label": "Mon compte", "icon": "user-cog", "url": reverse("accounts_portal:system_profile")},
+                        {"key": "account", "label": "Mon compte", "icon": "user-cog", "url": reverse("marketing:dashboard")},
+                    ],
+                },
+                {
+                    "label": "Espace personnel",
+                    "items": [
+                        {
+                            "key": "messagerie",
+                            "label": "Messagerie interne",
+                            "icon": "mail",
+                            "url": reverse("marketing:dashboard"),
+                            "hx_get": f"{reverse('accounts_portal:staff_messaging')}?dash=marketing",
+                            "hx_target": "#marketing-workspace",
+                            "hx_swap": "innerHTML",
+                        },
                     ],
                 },
             ],

@@ -2,32 +2,34 @@
 <div class="min-w-0 space-y-5">
   {% if manager_ui.subview == "overview" %}
     {% include "accounts/dashboard/partials/manager_subview_kpi_grid.html" %}
-    {% component "ui_core.panel" title="Workflow de paie" subtitle="Vérifier, corriger, rendre disponible puis payer les fiches du mois." %}
+    {% component "ui_core.panel" title="Cycle de paie" subtitle="Les fiches du personnel sont préparées depuis le salaire officiel ; la gestionnaire contrôle puis enregistre le paiement réel." %}
       {% fill "default" %}
-        {% component "ui_core.alert" title="Préparation automatique" message="Les fiches du personnel sont générées automatiquement à partir du salaire officiel. La synchronisation ci-dessous sert uniquement à rattraper une fiche manquante." tone="info" %}{% endcomponent %}
+        {% component "ui_core.alert" title="Fiches préparées automatiquement" message="La synchronisation ne crée que les fiches manquantes. Ne recréez jamais manuellement une paie déjà préparée." tone="info" %}{% endcomponent %}
         <div class="mt-4 flex flex-wrap gap-2">
           <button type="button" hx-post="{% url 'accounts:htmx_manager_salary_prepare_all' %}" hx-vals='{"period_month":"{{ salary_month_value }}"}' hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-target="body" hx-swap="beforeend" hx-confirm="Vérifier et synchroniser les fiches manquantes de ce mois ?" data-ui-confirm class="inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border px-4 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover"><i data-lucide="refresh-cw" class="h-4 w-4"></i>Synchroniser les fiches</button>
-          <button type="button" hx-post="{% url 'accounts:htmx_manager_salary_pay_ready_all' %}" hx-vals='{"period_month":"{{ salary_month_value }}"}' hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-target="body" hx-swap="beforeend" hx-confirm="Rendre disponibles les fiches prêtes et notifier le personnel ?" data-ui-confirm class="inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong"><i data-lucide="bell" class="h-4 w-4"></i>Notifier les fiches prêtes</button>
+          <button type="button" hx-post="{% url 'accounts:htmx_manager_salary_pay_ready_all' %}" hx-vals='{"period_month":"{{ salary_month_value }}"}' hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-target="body" hx-swap="beforeend" hx-confirm="Rendre disponibles les fiches prêtes et notifier le personnel ?" data-ui-confirm class="inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-4 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong"><i data-lucide="bell" class="h-4 w-4"></i>Rendre les fiches disponibles</button>
         </div>
       {% endfill %}
     {% endcomponent %}
-    {% component "ui_core.panel" title="Accès rapides" subtitle="Ouvrez les fiches ou les contrôles en attente." padding=False %}
-      <div class="grid divide-y divide-ui-border md:grid-cols-2 md:divide-x md:divide-y-0">
-        {% for item in manager_ui.subnavigation %}
-          {% if item.id != "overview" %}
-            <a href="{{ item.href }}" hx-get="{{ item.hx_get }}" hx-target="{{ item.hx_target }}" hx-indicator="{{ item.hx_indicator }}" hx-push-url="{{ item.hx_push_url }}" hx-swap="innerHTML" data-manager-subview="{{ item.id }}" class="ui-focus-ring flex min-w-0 items-center gap-3 p-4 hover:bg-ui-surface-hover">
-              <span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button bg-ui-primary-soft text-ui-primary"><i data-lucide="{{ item.icon }}" class="h-5 w-5" aria-hidden="true"></i></span>
-              <span class="min-w-0"><strong class="block text-sm text-ui-text">{{ item.label }}</strong></span>
-              <i data-lucide="chevron-right" class="ml-auto h-4 w-4 shrink-0 text-ui-text-muted" aria-hidden="true"></i>
-            </a>
-          {% endif %}
-        {% endfor %}
+    {% component "ui_core.panel" title="Étapes de travail" subtitle="Travaillez dans cet ordre pour une paie fiable et traçable." padding=False %}
+      <div class="grid divide-y divide-ui-border md:grid-cols-3 md:divide-x md:divide-y-0">
+        <a href="{{ manager_ui.subnavigation.1.href }}" hx-get="{{ manager_ui.subnavigation.1.hx_get }}" hx-target="{{ manager_ui.subnavigation.1.hx_target }}" hx-indicator="{{ manager_ui.subnavigation.1.hx_indicator }}" hx-push-url="{{ manager_ui.subnavigation.1.hx_push_url }}" hx-swap="innerHTML" class="ui-focus-ring flex items-center gap-3 p-4 hover:bg-ui-surface-hover"><span class="grid h-9 w-9 shrink-0 place-items-center rounded-ui-button bg-ui-primary-soft text-ui-primary">1</span><span><strong class="block text-sm">Préparer les fiches</strong><span class="text-xs text-ui-text-muted">Fiches générées par le système</span></span></a>
+        <a href="{{ manager_ui.subnavigation.2.href }}" hx-get="{{ manager_ui.subnavigation.2.hx_get }}" hx-target="{{ manager_ui.subnavigation.2.hx_target }}" hx-indicator="{{ manager_ui.subnavigation.2.hx_indicator }}" hx-push-url="{{ manager_ui.subnavigation.2.hx_push_url }}" hx-swap="innerHTML" class="ui-focus-ring flex items-center gap-3 p-4 hover:bg-ui-surface-hover"><span class="grid h-9 w-9 shrink-0 place-items-center rounded-ui-button bg-ui-warning-soft text-ui-warning">2</span><span><strong class="block text-sm">Contrôler</strong><span class="text-xs text-ui-text-muted">Primes, retenues et avances</span></span></a>
+        <a href="{{ manager_ui.subnavigation.3.href }}" hx-get="{{ manager_ui.subnavigation.3.hx_get }}" hx-target="{{ manager_ui.subnavigation.3.hx_target }}" hx-indicator="{{ manager_ui.subnavigation.3.hx_indicator }}" hx-push-url="{{ manager_ui.subnavigation.3.hx_push_url }}" hx-swap="innerHTML" class="ui-focus-ring flex items-center gap-3 p-4 hover:bg-ui-surface-hover"><span class="grid h-9 w-9 shrink-0 place-items-center rounded-ui-button bg-ui-success-soft text-ui-success">3</span><span><strong class="block text-sm">Payer et archiver</strong><span class="text-xs text-ui-text-muted">Caisse, reçu et fiche de paie</span></span></a>
       </div>
     {% endcomponent %}
   {% else %}
+    {% component "ui_core.panel" title="Fiches de salaire" subtitle="Filtrez le mois et le statut, puis ouvrez une fiche pour la vérifier ou enregistrer un paiement." %}
+      {% fill "default" %}
+        <div class="flex flex-wrap gap-2">
+          <button type="button" hx-post="{% url 'accounts:htmx_manager_salary_prepare_all' %}" hx-vals='{"period_month":"{{ salary_month_value }}"}' hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-target="body" hx-swap="beforeend" class="inline-flex h-9 items-center gap-2 rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover"><i data-lucide="refresh-cw" class="h-4 w-4"></i>Synchroniser</button>
+          <button type="button" hx-post="{% url 'accounts:htmx_manager_salary_pay_ready_all' %}" hx-vals='{"period_month":"{{ salary_month_value }}"}' hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}' hx-target="body" hx-swap="beforeend" class="inline-flex h-9 items-center gap-2 rounded-ui-button bg-ui-primary px-3 text-xs font-semibold text-ui-on-primary"><i data-lucide="bell" class="h-4 w-4"></i>Rendre disponibles</button>
+        </div>
+      {% endfill %}
+    {% endcomponent %}
     {% component "ui_core.filter_bar" filters=manager_ui.filters.items action=manager_ui.filters.action reset_url=manager_ui.filters.reset_url hidden_fields=manager_ui.filters.hidden_fields active_filters=manager_ui.filters.active_filters target="#salaires-results" select="#salaires-results" swap="outerHTML" indicator=manager_ui.subcontent_indicator submit_label="Appliquer" density="compact" %}{% endcomponent %}
     <div id="salaires-results">
-      {% component "ui_core.data_table" id="manager-payroll-table" caption="Salaires du personnel" headers=manager_ui.table.headers rows=manager_ui.table.rows result_count=manager_ui.table.result_count page=manager_ui.table.page page_count=manager_ui.table.page_count density="compact" empty_title="Aucun membre du personnel" empty_message="Aucun profil ne correspond aux filtres de ce mois." %}
+      {% component "ui_core.data_table" id="manager-payroll-table" caption="Salaires du personnel" headers=manager_ui.table.headers rows=manager_ui.table.rows result_count=manager_ui.table.result_count page=manager_ui.table.page page_count=manager_ui.table.page_count density="compact" empty_title="Aucun membre du personnel" empty_message="Aucune fiche de salaire ne correspond aux filtres de cette période." %}
         {% fill "footer" %}
           <nav class="flex items-center gap-2" aria-label="Pagination des salaires">
             {% if manager_ui.table.previous_url %}<a href="{{ manager_ui.table.previous_url }}" hx-get="{{ manager_ui.table.previous_url }}" hx-target="#salaires-results" hx-select="#salaires-results" hx-swap="outerHTML" hx-indicator="{{ manager_ui.subcontent_indicator }}" class="inline-flex h-9 items-center rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover">Précédent</a>{% endif %}

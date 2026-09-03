@@ -1,0 +1,18 @@
+{% load component_tags %}
+<section class="space-y-5" data-overlay-title="{{ reference_title }}">
+  <div><p class="text-xs font-bold uppercase tracking-wide text-ui-primary">Référentiel institutionnel</p><p class="mt-1 text-sm text-ui-text-muted">Ajoutez ce référentiel puis reprenez immédiatement la création de la formation.</p></div>
+  <form method="post" action="{% url 'accounts_portal:dg_programme_reference_save' %}" class="space-y-5" data-dg-reference-form onsubmit="return dgSubmitProgrammeReferenceForm(this)">
+    {% csrf_token %}<input type="hidden" name="reference_kind" value="{{ reference_kind }}">
+    {% if form.non_field_errors %}{% component "ui_core.alert" title="Le formulaire contient une erreur" message=form.non_field_errors.0 tone="danger" %}{% endcomponent %}{% endif %}
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div class="md:col-span-2">{% component "ui_core.django_form_field" field=form.name %}{% endcomponent %}</div>
+      {% if reference_kind == 'cycle' %}
+        {% component "ui_core.django_form_field" field=form.min_duration_years %}{% endcomponent %}{% component "ui_core.django_form_field" field=form.max_duration_years %}{% endcomponent %}
+      {% elif reference_kind == 'diploma' %}
+        <div class="md:col-span-2">{% component "ui_core.django_form_field" field=form.level %}{% endcomponent %}</div>
+      {% endif %}
+      {% if reference_kind != 'diploma' %}<div class="md:col-span-2">{% component "ui_core.django_form_field" field=form.description %}{% endcomponent %}</div>{% component "ui_core.django_form_field" field=form.is_active %}{% endcomponent %}{% endif %}
+    </div>
+    <div class="flex flex-wrap justify-between gap-3 border-t border-ui-border pt-5"><button type="button" class="inline-flex h-ui-control items-center rounded-ui-button border border-ui-border px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover" onclick="dgReturnToProgrammeForm()">Retour à la formation</button><button type="submit" class="inline-flex h-ui-control items-center rounded-ui-button bg-ui-primary px-3 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong">Créer {{ reference_title|lower }}</button></div>
+  </form>
+</section>

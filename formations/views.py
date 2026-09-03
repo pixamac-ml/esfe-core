@@ -23,8 +23,7 @@ def formation_list(request):
 
     # Queryset de base - toutes les formations actives
     programmes = (
-        Programme.objects
-        .filter(is_active=True)
+        Programme.objects.public()
         .select_related("cycle", "filiere", "diploma_awarded")
     )
 
@@ -93,8 +92,7 @@ import json  # ← AJOUTE EN HAUT DU FICHIER
 # ==================================================
 def formation_detail(request, slug):
     programme = get_object_or_404(
-        Programme.objects
-        .filter(is_active=True)
+        Programme.objects.public()
         .select_related(
             "cycle",
             "filiere",
@@ -173,8 +171,7 @@ def formation_detail(request, slug):
     )
 
     related_programmes = (
-        Programme.objects
-        .filter(is_active=True)
+        Programme.objects.public()
         .exclude(pk=programme.pk)
         .filter(cycle=programme.cycle)
         .select_related("cycle", "diploma_awarded")
@@ -199,7 +196,7 @@ def formation_detail(request, slug):
         "required_documents": required_documents,
         "has_documents": has_documents,
         "has_fees": has_fees,
-        "can_apply": programme.is_active,
+        "can_apply": programme.admissions_open,
         "cycle_type": cycle_type,
         "total_cost": total_programme_cost,
         "total_programme_cost": total_programme_cost,

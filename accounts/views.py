@@ -250,7 +250,7 @@ def edit_profile(request):
         form = ProfileForm(
             request.POST,
             request.FILES,
-            **form_kwargs,
+            instance=profile,
         )
 
         if form.is_valid():

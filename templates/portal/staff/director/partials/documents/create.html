@@ -1,7 +1,7 @@
 {% load component_tags %}
 <div class="space-y-5">
   {% include "portal/staff/director/partials/documents/_feedback.html" %}
-  <div><h2 class="text-base font-bold text-ui-text">{% if administrative_document_selected %}Reprendre le brouillon{% else %}Nouveau document{% endif %}</h2><p class="mt-1 text-sm text-ui-text-muted">Les champs restent conservés tant que les erreurs ne sont pas corrigées.</p></div>
+  <div><h2 class="text-base font-bold text-ui-text">{% if administrative_document_selected %}Reprendre le brouillon{% else %}Nouveau document académique{% endif %}</h2><p class="mt-1 text-sm text-ui-text-muted">Choisissez le type EPSFé approprié, vérifiez les destinataires puis conservez une version traçable dans l'annexe.</p></div>
   <form method="post" novalidate hx-post="{% url 'accounts_portal:director_correspondance_create' %}" hx-target="#director-document-subcontent" hx-swap="innerHTML" hx-indicator="#director-document-form-loading" hx-disabled-elt="button[type='submit']" class="space-y-5">
     {% csrf_token %}{% if administrative_document_selected %}<input type="hidden" name="document_id" value="{{ administrative_document_selected.id }}">{% endif %}
     {% if administrative_document_form.non_field_errors %}<div class="rounded-ui-card border border-ui-danger bg-ui-danger-soft p-3 text-sm font-semibold text-ui-danger">{{ administrative_document_form.non_field_errors }}</div>{% endif %}
@@ -10,7 +10,7 @@
       {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=administrative_document_form.reference help_text="Laissez vide si la référence sera attribuée plus tard." %}
       {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=administrative_document_form.title span_two=True %}
       {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=administrative_document_form.recipients span_two=True %}
-      {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=administrative_document_form.body span_two=True %}
+      {% include "portal/staff/director/partials/evaluation_sessions/_field.html" with field=administrative_document_form.body span_two=True help_text="Reprenez le contenu validé par l'école ; la publication crée la version officielle consultable." %}
     </div>
     <div class="flex flex-col-reverse gap-3 border-t border-ui-border pt-4 sm:flex-row sm:items-center sm:justify-between">
       <a href="{% url 'accounts_portal:portal_dashboard' %}?section=correspondances&view=archives" hx-get="{% url 'accounts_portal:director_documents_subcontent' %}?view=archives" hx-target="#director-document-subcontent" hx-swap="innerHTML" class="ui-focus-ring inline-flex h-ui-control items-center justify-center rounded-ui-button border border-ui-border bg-ui-surface px-4 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">Annuler</a>

@@ -28,6 +28,9 @@
   {% if not selected_class or not selected_semester %}
     {% component "ui_core.alert" message="Sélectionnez une classe et un semestre pour afficher automatiquement la maquette des notes." tone="info" %}{% endcomponent %}
   {% else %}
+    {% if not academic_template_ready %}
+      {% component "ui_core.alert" message="Cette maquette doit être complétée par le Directeur des Études avant la saisie des notes." tone="warning" %}{% endcomponent %}
+    {% else %}
     {% component "ui_core.panel" title=selected_class.display_name subtitle=selected_semester.get_status_display %}
       {% fill "header" %}
         <button type="button" class="btn btn-primary" hx-get="{% url 'accounts_portal:it_notes_flow_workspace' %}?drawer=1&class_id={{ selected_class.id }}&semester_id={{ selected_semester.id }}" hx-target="#it-dashboard-drawer-content" hx-swap="innerHTML">
@@ -39,5 +42,6 @@
         <div hx-get="{% url 'accounts_portal:it_notes_flow_workspace' %}?drawer=1&class_id={{ selected_class.id }}&semester_id={{ selected_semester.id }}" hx-trigger="load" hx-target="#it-dashboard-drawer-content" hx-swap="innerHTML" class="mt-3"></div>
       {% endfill %}
     {% endcomponent %}
+    {% endif %}
   {% endif %}
 </div>

@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.core.validators import FileExtensionValidator
 from django.db.models import Q
 from django.urls import reverse
+from django.utils import timezone
 
 from academics.models import (
     AcademicClass,
@@ -12,10 +13,12 @@ from academics.models import (
     AcademicScheduleEvent,
     AcademicYear,
     EC,
+    EvaluationCampaign,
     Semester,
     UE,
     WeeklyScheduleSlot,
 )
+from branches.models import Branch
 from formations.models import Programme
 from notifier.models import NotificationMessage
 from portal.models import AdministrativeDocument, TeacherDocument, TransferDocument, TransferRequest
@@ -448,6 +451,36 @@ class DirectorProgrammeClassForm(forms.Form):
         return cleaned
 
 
+class DirectorBranchSettingsForm(forms.ModelForm):
+    """The small, shared branch profile a Director of Studies may maintain.
+
+    Academic rules deliberately do not live here: they are configured on the
+    academic class / its maquette, where the grading engine already reads them.
+    """
+
+    class Meta:
+        model = Branch
+        fields = ("address", "city", "phone", "email")
+        widgets = {
+            "address": forms.Textarea(
+                attrs={
+                    "class": TEXTAREA_CLASS,
+                    "rows": 3,
+                    "placeholder": "Adresse ou indication utile pour l'annexe",
+                }
+            ),
+            "city": forms.TextInput(attrs={"class": INPUT_CLASS}),
+            "phone": forms.TextInput(attrs={"class": INPUT_CLASS}),
+            "email": forms.EmailInput(attrs={"class": INPUT_CLASS}),
+        }
+        labels = {
+            "address": "Adresse",
+            "city": "Ville",
+            "phone": "Téléphone",
+            "email": "E-mail de l'annexe",
+        }
+
+
 class DirectorSemesterForm(forms.Form):
     number = forms.TypedChoiceField(
         label="Semestre",
@@ -551,6 +584,12 @@ class DirectorECForm(forms.Form):
 
 
 class DirectorEvaluationForm(forms.Form):
+    campaign = forms.ModelChoiceField(
+        label="Campagne calendrier",
+        queryset=EvaluationCampaign.objects.none(),
+        empty_label="Choisir une campagne publiée",
+        widget=forms.Select(attrs={"class": INPUT_CLASS}),
+    )
     title = forms.CharField(
         label="Intitulé",
         max_length=255,
@@ -627,6 +666,12 @@ class DirectorEvaluationForm(forms.Form):
             .filter(branch=branch, is_active=True)
             .order_by("level", "programme__title", "name", "id")
         )
+        self.fields["campaign"].queryset = (
+            EvaluationCampaign.objects.select_related("calendar_entry")
+            .filter(branch=branch)
+            .exclude(status__in=[EvaluationCampaign.STATUS_CANCELLED, EvaluationCampaign.STATUS_CLOSED])
+            .order_by("calendar_entry__start_datetime", "id")
+        )
         self.fields["class_id"].widget.attrs.update(
             {
                 "hx-get": reverse("accounts_portal:director_evaluation_ec_options"),
@@ -668,6 +713,7 @@ class DirectorEvaluationForm(forms.Form):
         start = cleaned.get("start_datetime")
         end = cleaned.get("end_datetime")
         academic_class = cleaned.get("class_id")
+        campaign = cleaned.get("campaign")
         ec = cleaned.get("ec")
         teacher = cleaned.get("teacher")
 
@@ -677,6 +723,11 @@ class DirectorEvaluationForm(forms.Form):
             self.add_error("ec", "Cette matière n'appartient pas à la classe sélectionnée.")
         if teacher and self.branch and teacher.profile.branch_id != self.branch.id:
             self.add_error("teacher", "Cet enseignant n'appartient pas à votre annexe.")
+        if campaign and academic_class:
+            included = campaign.scopes.filter(academic_class=academic_class, included=True).exists()
+            excluded = campaign.scopes.filter(academic_class=academic_class, included=False).exists()
+            if not included or excluded:
+                self.add_error("class_id", "Cette classe ne fait pas partie de la campagne sélectionnée.")
         return cleaned
 
 
@@ -822,6 +873,33 @@ class DirectorWeeklyScheduleSlotForm(forms.Form):
         return cleaned
 
 
+class DirectorScheduleEventForm(DirectorWeeklyScheduleSlotForm):
+    """Edition d'une séance réelle, isolée par date et non par modèle hebdomadaire."""
+
+    date = forms.DateField(
+        label="Date de la séance",
+        widget=forms.DateInput(attrs={"class": INPUT_CLASS, "type": "date"}),
+    )
+
+    def __init__(self, *args, instance=None, **kwargs):
+        if instance is not None and not args and "data" not in kwargs:
+            local_start = timezone.localtime(instance.start_datetime)
+            local_end = timezone.localtime(instance.end_datetime)
+            initial = kwargs.setdefault("initial", {})
+            initial.update(
+                {
+                    "date": local_start.date(),
+                    "start_time": local_start.time(),
+                    "end_time": local_end.time(),
+                    "ec_id": instance.ec_id,
+                    "teacher_id": instance.teacher_id,
+                    "room": instance.location,
+                }
+            )
+        super().__init__(*args, instance=None, **kwargs)
+        self.fields.pop("weekday", None)
+
+
 class DirectorTransferForm(forms.Form):
     enrollment_id = EnrollmentChoiceField(
         label="Étudiant et classe actuelle",
@@ -898,6 +976,13 @@ class DirectorTransferForm(forms.Form):
         required=False,
         widget=forms.TextInput(attrs={"class": INPUT_CLASS, "placeholder": "Facultatif"}),
     )
+    effective_date = forms.DateField(label="Date d'effet", required=False, widget=forms.DateInput(attrs={"class": INPUT_CLASS, "type": "date"}))
+    previous_academic_year = forms.CharField(label="Dernière année fréquentée", max_length=30, required=False, widget=forms.TextInput(attrs={"class": INPUT_CLASS, "placeholder": "Ex. 2025-2026"}))
+    last_validated_semester = forms.CharField(label="Dernier semestre validé", max_length=30, required=False, widget=forms.TextInput(attrs={"class": INPUT_CLASS, "placeholder": "Ex. S2"}))
+    external_student_number = forms.CharField(label="Matricule dans l'établissement d'origine", max_length=80, required=False, widget=forms.TextInput(attrs={"class": INPUT_CLASS}))
+    recognised_equivalences = forms.CharField(label="Équivalences reconnues", required=False, widget=forms.Textarea(attrs={"class": TEXTAREA_CLASS, "rows": 2}))
+    subjects_to_retake = forms.CharField(label="EC / matières à reprendre", required=False, widget=forms.Textarea(attrs={"class": TEXTAREA_CLASS, "rows": 2}))
+    academic_reservations = forms.CharField(label="Réserves académiques", required=False, widget=forms.Textarea(attrs={"class": TEXTAREA_CLASS, "rows": 2}))
     reason = forms.CharField(
         label="Motif et observations",
         required=True,
@@ -953,6 +1038,8 @@ class DirectorTransferForm(forms.Form):
                 self.add_error("target_class_id", "Le transfert de classe doit rester dans la même année académique.")
             elif enrollment and target_class.level.strip().upper() != enrollment.academic_class.level.strip().upper():
                 self.add_error("target_class_id", "Le niveau acquis doit rester identique. Le passage d'année est un autre workflow.")
+            elif enrollment and target_class.programme_id != enrollment.programme_id:
+                self.add_error("target_class_id", "Le transfert interclasse doit rester dans la même filière. Utilisez un reclassement académique motivé.")
             cleaned["target_school_name"] = ""
         elif transfer_type == TransferRequest.TYPE_OUTGOING:
             if enrollment is None:
@@ -1078,6 +1165,17 @@ class DirectorInternalMessageForm(forms.Form):
         super().__init__(*args, **kwargs)
         if branch is None:
             return
+        from notification_center.services.internal_messaging import (
+            can_send_collective_message,
+        )
+
+        if user is not None and not can_send_collective_message(user):
+            # Envoi individuel uniquement pour les comptes non habilites
+            # aux messages collectifs (regle portee par le service).
+            self.fields["audience"].choices = self.AUDIENCE_CHOICES[:1]
+            del self.fields["target_classes"]
+            del self.fields["target_programmes"]
+            del self.fields["target_roles"]
         queryset = (
             get_user_model().objects.select_related("profile")
             .filter(
@@ -1091,14 +1189,16 @@ class DirectorInternalMessageForm(forms.Form):
         if user and user.pk:
             queryset = queryset.exclude(pk=user.pk)
         self.fields["recipients"].queryset = queryset
-        self.fields["target_classes"].queryset = AcademicClass.objects.filter(
-            branch=branch, is_active=True, is_archived=False
-        ).select_related("programme").order_by("level", "programme__title")
-        self.fields["target_programmes"].queryset = Programme.objects.filter(
-            academic_classes__branch=branch,
-            academic_classes__is_active=True,
-            academic_classes__is_archived=False,
-        ).distinct().order_by("title")
+        if "target_classes" in self.fields:
+            self.fields["target_classes"].queryset = AcademicClass.objects.filter(
+                branch=branch, is_active=True, is_archived=False
+            ).select_related("programme").order_by("level", "programme__title")
+        if "target_programmes" in self.fields:
+            self.fields["target_programmes"].queryset = Programme.objects.filter(
+                academic_classes__branch=branch,
+                academic_classes__is_active=True,
+                academic_classes__is_archived=False,
+            ).distinct().order_by("title")
 
     def clean_attachment(self):
         attachment = self.cleaned_data.get("attachment")

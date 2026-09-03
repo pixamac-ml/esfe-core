@@ -8,6 +8,7 @@ from decimal import Decimal
 from openpyxl import Workbook
 
 from academics.models import AcademicEnrollment, Semester
+from academics.services.annual_deliberation import get_class_deliberation_rows
 from academics.services.semester import compute_semester_result
 from accounts.services.excel_reports import (
     BODY_FONT,
@@ -117,5 +118,30 @@ def build_academic_report_xlsx(*, branch):
         _write_cell(ws, row, 8, entry["dropouts"], font=BODY_FONT, align="center")
         row += 1
 
+    _auto_width(ws)
+    return wb
+
+
+def build_annual_deliberation_xlsx(*, academic_class):
+    """Feuille administrative fondée sur les propositions annuelles figées."""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Délibération annuelle"
+    ws.merge_cells("A1:M1")
+    _write_cell(ws, 1, 1, f"Synthèse annuelle — {academic_class.display_name}", font=TITLE_FONT)
+    ws.merge_cells("A2:M2")
+    _write_cell(ws, 2, 1, f"{academic_class.branch.name} · {academic_class.academic_year.name} · Brouillon de délibération", font=BODY_FONT)
+    headers = ["N°", "Matricule", "Nom", "Prénom", "S1 moy.", "S1 %", "S1 crédits", "S1 état", "S2 moy.", "S2 %", "S2 crédits", "Décision proposée", "Observation"]
+    for column, header in enumerate(headers, 1):
+        _write_cell(ws, 4, column, header, font=BOLD_FONT)
+    _style_header_row(ws, 4, len(headers))
+    for index, row in enumerate(get_class_deliberation_rows(academic_class=academic_class), 1):
+        semesters = row.get("semesters", [])
+        first = semesters[0] if len(semesters) > 0 else {}
+        second = semesters[1] if len(semesters) > 1 else {}
+        values = [index, row["matricule"], row["last_name"], row["first_name"], first.get("average", ""), first.get("percentage", ""), f"{first.get('credit_obtained', '')}/{first.get('credit_required', '')}", "Validé" if first.get("is_validated") else "À examiner", second.get("average", ""), second.get("percentage", ""), f"{second.get('credit_obtained', '')}/{second.get('credit_required', '')}", row["cycle_decision"], f"{row.get('debt_count', 0)} EC à examiner" if row.get("debt_count") else ""]
+        for column, value in enumerate(values, 1):
+            _write_cell(ws, index + 4, column, value, font=BODY_FONT)
+    ws.freeze_panes = "A5"
     _auto_width(ws)
     return wb

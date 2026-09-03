@@ -241,7 +241,10 @@ def import_grades(
     enrollments_by_name: dict[tuple[str, str], list[AcademicEnrollment]] = {}
     enrollments_by_id: dict[str, AcademicEnrollment] = {}
     enrollments_by_matricule: dict[str, AcademicEnrollment] = {}
-    for enr in AcademicEnrollment.objects.select_related(
+    # Lock only academic-enrollment rows.  The joined profile/candidature
+    # relations can be absent in legacy data, which makes PostgreSQL render
+    # nullable OUTER JOINs that cannot be targets of a bare FOR UPDATE.
+    for enr in AcademicEnrollment.objects.select_for_update(of=("self",)).select_related(
         "student__student_profile__inscription__candidature",
         "inscription__candidature",
     ).filter(
@@ -413,10 +416,7 @@ def import_grades(
                 is_eligible = bool(
                     existing_grade
                     and existing_grade.normal_score is not None
-                    and (
-                        existing_grade.retake_score is not None
-                        or compute_ec_status(existing_grade.normal_score, threshold) == "failed"
-                    )
+                    and compute_ec_status(existing_grade.normal_score, threshold) == "failed"
                 )
                 if not is_eligible:
                     result.skipped_invalid_scores += 1

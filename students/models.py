@@ -5,6 +5,7 @@ from django.contrib.auth.hashers import check_password, make_password
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
+import uuid
 
 from branches.models import Branch
 from inscriptions.models import Inscription
@@ -1193,6 +1194,9 @@ class CarteEtudiant(models.Model):
         on_delete=models.CASCADE,
         related_name="cartes",
     )
+    # Référence opaque des QR récents : un matricule ne doit plus être
+    # lisible dans les cartes nouvellement émises.
+    public_reference = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     annee = models.CharField(max_length=9, help_text="Année académique, ex: 2026-2027")
     code_annexe = models.CharField(max_length=20, help_text="Code annexe, ex: BKO-MORIBA")
     date_emission = models.DateField(auto_now_add=True)
@@ -1213,6 +1217,12 @@ class CarteEtudiant(models.Model):
         indexes = [
             models.Index(fields=["etudiant", "statut"]),
             models.Index(fields=["statut", "date_expiration"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["etudiant", "annee"],
+                name="unique_student_card_per_academic_year",
+            ),
         ]
 
     def __str__(self):
@@ -1237,6 +1247,13 @@ class VerificationLog(models.Model):
 
     carte = models.ForeignKey(
         CarteEtudiant,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="verifications",
+    )
+    staff_card = models.ForeignKey(
+        "accounts.CartePersonnel",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

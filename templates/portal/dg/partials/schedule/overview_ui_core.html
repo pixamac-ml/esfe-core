@@ -1,0 +1,46 @@
+{% load component_tags %}
+<section class="space-y-5" data-dashboard-section="schedule" data-executive-section="schedule">
+  {% component "ui_core.page_header" eyebrow="Académique" title="Planning" subtitle="Consultation du planning de l’annexe et de l’année académique actuellement sélectionnées." %}
+    {% fill "actions" %}
+      <button type="button" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" onclick="dgLoadScheduleWeek('{{ schedule.prev_week_start|date:'Y-m-d' }}')"><i data-lucide="chevron-left" class="h-4 w-4" aria-hidden="true"></i> Précédent</button>
+      <button type="button" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" onclick="dgLoadScheduleWeek('')">Cette semaine</button>
+      <button type="button" class="inline-flex h-ui-control items-center gap-2 rounded-ui-button bg-ui-primary px-3 text-sm font-semibold text-ui-on-primary hover:bg-ui-primary-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" onclick="dgLoadScheduleWeek('{{ schedule.next_week_start|date:'Y-m-d' }}')">Suivant <i data-lucide="chevron-right" class="h-4 w-4" aria-hidden="true"></i></button>
+    {% endfill %}
+  {% endcomponent %}
+
+  {% component "ui_core.panel" title="Classe consultée" subtitle="L’annexe est déterminée par le contexte global DG." density="compact" %}
+    <label for="dg-schedule-class" class="block text-xs font-semibold text-ui-text">Classe</label>
+    <select id="dg-schedule-class" class="mt-1 h-ui-control w-full rounded-ui-button border border-ui-border bg-ui-surface px-3 text-sm text-ui-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-focus" onchange="dgScheduleClassChange(this.value)" {% if not schedule.class_options %}disabled{% endif %}>
+      <option value="">Sélectionner une classe</option>
+      {% for academic_class in schedule.class_options %}<option value="{{ academic_class.id }}" {% if schedule.selected_class_id == academic_class.id|stringformat:"s" %}selected{% endif %}>{{ academic_class.display_name }}{% if not selected_branch_id %} — {{ academic_class.branch.name }}{% endif %}</option>{% endfor %}
+    </select>
+  {% endcomponent %}
+
+  <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    {% component "ui_core.stat_card" label="Cours de la semaine" value=schedule.total_events icon="calendar-days" tone="primary" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Aujourd’hui" value=schedule.today_events_count icon="calendar-check-2" tone="success" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Cahiers manquants" value=schedule.missing_lesson_logs_count icon="notebook-tabs" tone="warning" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Appels validés" value=schedule.roll_validation_rate unit="%" icon="clipboard-check" tone="info" compact=True %}{% endcomponent %}
+  </div>
+
+  {% component "ui_core.panel" title="Emploi du temps officiel" subtitle=schedule.selected_class.display_name|default:"Sélectionnez une classe pour afficher son planning." padding=False scrollable=True %}
+    {% if schedule.requires_class_selection %}
+      {% component "ui_core.empty_state" title="Aucune classe sélectionnée" message="Choisissez une classe dans le contexte académique actif." icon="calendar-days" compact=True %}{% endcomponent %}
+    {% else %}
+      <div class="p-4">{% include "portal/staff/supervisor/partials/schedule_week_grid.html" with schedule=schedule.calendar academic_class=schedule.selected_class only %}</div>
+    {% endif %}
+  {% endcomponent %}
+
+  <div class="grid gap-4 xl:grid-cols-2">
+    {% component "ui_core.panel" title="Charge enseignante" subtitle="Semaine consultée" density="compact" %}
+      <div class="space-y-2">
+        {% for row in schedule.teacher_load_rows %}<div class="flex items-center justify-between gap-3 rounded-ui-button bg-ui-surface-muted px-3 py-2 text-sm"><span class="font-semibold text-ui-text">{{ row.teacher_name }}</span><span class="text-ui-text-muted">{{ row.hours }} h · {{ row.count }} cours</span></div>{% empty %}{% component "ui_core.empty_state" title="Aucune charge" message="Aucun cours n’est planifié pour cette semaine." icon="users" compact=True %}{% endcomponent %}{% endfor %}
+      </div>
+    {% endcomponent %}
+    {% component "ui_core.panel" title="Statuts des cours" subtitle="Semaine consultée" density="compact" %}
+      <div class="space-y-2">
+        {% for row in schedule.event_status_rows %}<div class="flex items-center justify-between gap-3"><span class="text-sm font-semibold text-ui-text">{{ row.label }}</span>{% component "ui_core.status_badge" label=row.count tone=row.tone %}{% endcomponent %}</div>{% empty %}{% component "ui_core.empty_state" title="Aucun statut" message="Aucune donnée de planning pour cette semaine." icon="calendar-x-2" compact=True %}{% endcomponent %}{% endfor %}
+      </div>
+    {% endcomponent %}
+  </div>
+</section>

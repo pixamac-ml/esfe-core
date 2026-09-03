@@ -1,3 +1,5 @@
+import json
+
 from django import forms
 from django.contrib.auth import get_user_model
 
@@ -45,6 +47,31 @@ class ShopStockInForm(forms.Form):
         self.fields["product"].widget.attrs.update({"class": INPUT_CLASS})
         self.fields["quantity"].widget.attrs.update({"class": INPUT_CLASS})
         self.fields["notes"].widget.attrs.update({"class": TEXTAREA_CLASS})
+
+
+class ShopStockAdjustmentForm(forms.Form):
+    product = forms.ModelChoiceField(queryset=ShopProduct.objects.none())
+    quantity = forms.IntegerField(
+        help_text="Valeur positive : ajout. Valeur négative : retrait après inventaire.",
+    )
+    notes = forms.CharField(
+        required=True,
+        widget=forms.Textarea(attrs={"rows": 3}),
+        help_text="Motif obligatoire : comptage, retour physique, perte constatée, etc.",
+    )
+
+    def __init__(self, *args, branch=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["product"].queryset = ShopProduct.objects.filter(branch=branch, is_active=True) if branch else ShopProduct.objects.none()
+        self.fields["product"].widget.attrs.update({"class": INPUT_CLASS})
+        self.fields["quantity"].widget.attrs.update({"class": INPUT_CLASS, "placeholder": "Ex : -2 ou 5"})
+        self.fields["notes"].widget.attrs.update({"class": TEXTAREA_CLASS})
+
+    def clean_quantity(self):
+        quantity = self.cleaned_data["quantity"]
+        if quantity == 0:
+            raise forms.ValidationError("La quantité d’ajustement ne peut pas être nulle.")
+        return quantity
 
 
 class ShopPaymentForm(forms.Form):
@@ -160,9 +187,10 @@ class ShopCounterOrderForm(forms.Form):
     customer_name = forms.CharField(required=False, max_length=180)
     customer_email = forms.EmailField(required=False)
     customer_phone = forms.CharField(required=False, max_length=40)
-    product = forms.ModelChoiceField(queryset=ShopProduct.objects.none())
-    quantity = forms.IntegerField(min_value=1, initial=1)
+    product = forms.ModelChoiceField(queryset=ShopProduct.objects.none(), required=False)
+    quantity = forms.IntegerField(min_value=1, initial=1, required=False)
     payment_method = forms.ChoiceField(choices=ShopPayment.METHOD_CHOICES)
+    cart_payload = forms.CharField(required=False, widget=forms.HiddenInput())
 
     def __init__(self, *args, branch=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -177,6 +205,7 @@ class ShopCounterOrderForm(forms.Form):
         self.fields["customer_name"].widget.attrs.update({"placeholder": "Nom du client"})
         self.fields["customer_email"].widget.attrs.update({"placeholder": "Email du client"})
         self.fields["customer_phone"].widget.attrs.update({"placeholder": "Telephone du client"})
+        self.cart_lines = []
 
     def clean(self):
         cleaned = super().clean()
@@ -188,6 +217,49 @@ class ShopCounterOrderForm(forms.Form):
                 self.add_error("student", "Selectionnez un etudiant.")
         elif not customer_name:
             self.add_error("customer_name", "Le nom du client est requis pour une vente comptoir.")
+
+        cart_payload = (cleaned.get("cart_payload") or "").strip()
+        if cart_payload:
+            try:
+                submitted_lines = json.loads(cart_payload)
+            except (TypeError, ValueError):
+                self.add_error("cart_payload", "Le panier de vente est invalide.")
+                return cleaned
+            if not isinstance(submitted_lines, list) or not submitted_lines:
+                self.add_error("cart_payload", "Ajoutez au moins un article au panier.")
+                return cleaned
+
+            quantities = {}
+            for line in submitted_lines:
+                if not isinstance(line, dict):
+                    self.add_error("cart_payload", "Une ligne du panier est invalide.")
+                    return cleaned
+                try:
+                    product_id = int(line.get("product_id"))
+                    quantity = int(line.get("quantity"))
+                except (TypeError, ValueError):
+                    self.add_error("cart_payload", "Les quantités du panier sont invalides.")
+                    return cleaned
+                if quantity < 1:
+                    self.add_error("cart_payload", "Chaque quantité doit être supérieure à zéro.")
+                    return cleaned
+                quantities[product_id] = quantities.get(product_id, 0) + quantity
+
+            products = self.fields["product"].queryset.in_bulk(quantities.keys())
+            if len(products) != len(quantities):
+                self.add_error("cart_payload", "Un article du panier n’est plus disponible dans cette annexe.")
+                return cleaned
+            self.cart_lines = [
+                {"product": products[product_id], "quantity": quantity}
+                for product_id, quantity in quantities.items()
+            ]
+        else:
+            product = cleaned.get("product")
+            quantity = cleaned.get("quantity")
+            if not product or not quantity:
+                self.add_error("cart_payload", "Ajoutez au moins un article au panier.")
+                return cleaned
+            self.cart_lines = [{"product": product, "quantity": quantity}]
         return cleaned
 
 
@@ -235,3 +307,21 @@ class ShopPublicOrderForm(forms.Form):
                 self.add_error("customer_email", "L'email est requis pour notifier l'acheteur.")
             cleaned["customer_name"] = " ".join(part for part in [customer_first_name, customer_last_name] if part).strip()
         return cleaned
+
+
+class StudentRemoteOrderRequestForm(forms.Form):
+    product_id = forms.IntegerField(widget=forms.HiddenInput())
+    quantity = forms.IntegerField(min_value=1, initial=1, label="Quantité")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["quantity"].widget.attrs.update({"class": INPUT_CLASS, "min": "1"})
+
+
+class StudentRemoteOrderOtpForm(forms.Form):
+    confirmation_id = forms.IntegerField(widget=forms.HiddenInput())
+    otp_code = forms.CharField(min_length=6, max_length=6, label="Code reçu par e-mail")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["otp_code"].widget.attrs.update({"class": INPUT_CLASS, "inputmode": "numeric", "autocomplete": "one-time-code", "placeholder": "000000"})

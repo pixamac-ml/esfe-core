@@ -97,13 +97,19 @@ class AcademicYear(models.Model):
 
 class AcademicCalendar(models.Model):
     STATUS_DRAFT = "draft"
+    STATUS_SUBMITTED = "submitted"
     STATUS_VALIDATED = "validated"
+    STATUS_REJECTED = "rejected"
     STATUS_PUBLISHED = "published"
+    STATUS_SUPERSEDED = "superseded"
     STATUS_ARCHIVED = "archived"
     STATUS_CHOICES = [
         (STATUS_DRAFT, "Brouillon"),
+        (STATUS_SUBMITTED, "Soumis pour validation"),
         (STATUS_VALIDATED, "Valide"),
+        (STATUS_REJECTED, "A corriger"),
         (STATUS_PUBLISHED, "Publie"),
+        (STATUS_SUPERSEDED, "Remplace"),
         (STATUS_ARCHIVED, "Archive"),
     ]
 
@@ -118,6 +124,16 @@ class AcademicCalendar(models.Model):
         related_name="calendars",
     )
     version = models.PositiveIntegerField(default=1)
+    official_title = models.CharField(max_length=255, blank=True)
+    administrative_reference = models.CharField(max_length=120, blank=True)
+    general_observations = models.TextField(blank=True)
+    revision_of = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        related_name="revisions",
+        null=True,
+        blank=True,
+    )
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
@@ -134,6 +150,31 @@ class AcademicCalendar(models.Model):
         on_delete=models.PROTECT,
         related_name="updated_academic_calendars",
     )
+    submitted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="submitted_academic_calendars",
+        null=True,
+        blank=True,
+    )
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    validated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="validated_academic_calendars",
+        null=True,
+        blank=True,
+    )
+    validated_at = models.DateTimeField(null=True, blank=True)
+    rejected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="rejected_academic_calendars",
+        null=True,
+        blank=True,
+    )
+    rejected_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True)
     published_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -176,6 +217,21 @@ class AcademicCalendar(models.Model):
                 errors["published_by"] = "L'utilisateur ayant publie le calendrier est obligatoire."
             if self.published_at is None:
                 errors["published_at"] = "La date de publication est obligatoire."
+        if self.status == self.STATUS_SUBMITTED:
+            if self.submitted_by_id is None:
+                errors["submitted_by"] = "L'utilisateur ayant soumis le calendrier est obligatoire."
+            if self.submitted_at is None:
+                errors["submitted_at"] = "La date de soumission est obligatoire."
+        if self.status == self.STATUS_REJECTED:
+            if self.rejected_by_id is None or self.rejected_at is None:
+                errors["rejected_at"] = "Le retour du calendrier doit etre trace."
+            if not self.rejection_reason.strip():
+                errors["rejection_reason"] = "Le motif de retour est obligatoire."
+        if self.revision_of_id:
+            if self.revision_of.branch_id != self.branch_id:
+                errors["revision_of"] = "La version source doit appartenir a la meme annexe."
+            if self.revision_of.academic_year_id != self.academic_year_id:
+                errors["revision_of"] = "La version source doit appartenir a la meme annee academique."
         if errors:
             raise ValidationError(errors)
 
@@ -374,6 +430,286 @@ class AcademicCalendarEntry(models.Model):
         super().save(*args, **kwargs)
 
 
+class AcademicCalendarDisruption(models.Model):
+    """Incident local pouvant affecter l'execution d'un calendrier publie."""
+
+    STATUS_DRAFT = "draft"
+    STATUS_ACTIVE = "active"
+    STATUS_CLOSED = "closed"
+    STATUS_CANCELLED = "cancelled"
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, "Brouillon"),
+        (STATUS_ACTIVE, "En cours"),
+        (STATUS_CLOSED, "Cloturee"),
+        (STATUS_CANCELLED, "Annulee"),
+    ]
+
+    TYPE_ADMINISTRATIVE = "administrative"
+    TYPE_SECURITY = "security"
+    TYPE_STRIKE = "strike"
+    TYPE_HEALTH = "health"
+    TYPE_WEATHER = "weather"
+    TYPE_OTHER = "other"
+    TYPE_CHOICES = [
+        (TYPE_ADMINISTRATIVE, "Suspension administrative"),
+        (TYPE_SECURITY, "Situation securitaire"),
+        (TYPE_STRIKE, "Greve ou mouvement social"),
+        (TYPE_HEALTH, "Situation sanitaire"),
+        (TYPE_WEATHER, "Intemperie"),
+        (TYPE_OTHER, "Autre perturbation"),
+    ]
+
+    IMPACT_UNKNOWN = "unknown"
+    IMPACT_UNAFFECTED = "unaffected"
+    IMPACT_MAINTAINED = "maintained"
+    IMPACT_PARTIAL = "partial"
+    IMPACT_SUSPENDED = "suspended"
+    IMPACT_POSTPONED = "postponed"
+    IMPACT_CHOICES = [
+        (IMPACT_UNKNOWN, "A preciser"),
+        (IMPACT_UNAFFECTED, "Sans impact"),
+        (IMPACT_MAINTAINED, "Maintenu"),
+        (IMPACT_PARTIAL, "Partiellement maintenu"),
+        (IMPACT_SUSPENDED, "Suspendu"),
+        (IMPACT_POSTPONED, "Reporte"),
+    ]
+
+    calendar = models.ForeignKey(
+        AcademicCalendar,
+        on_delete=models.PROTECT,
+        related_name="disruptions",
+    )
+    title = models.CharField(max_length=255)
+    incident_type = models.CharField(max_length=30, choices=TYPE_CHOICES)
+    reason = models.TextField()
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField(null=True, blank=True)
+    target_scope = models.CharField(
+        max_length=20,
+        choices=AcademicCalendarEntry.TARGET_SCOPE_CHOICES,
+        default=AcademicCalendarEntry.SCOPE_BRANCH,
+    )
+    programme = models.ForeignKey(
+        Programme,
+        on_delete=models.PROTECT,
+        related_name="academic_calendar_disruptions",
+        null=True,
+        blank=True,
+    )
+    academic_class = models.ForeignKey(
+        "AcademicClass",
+        on_delete=models.PROTECT,
+        related_name="academic_calendar_disruptions",
+        null=True,
+        blank=True,
+    )
+    semester = models.ForeignKey(
+        "Semester",
+        on_delete=models.PROTECT,
+        related_name="academic_calendar_disruptions",
+        null=True,
+        blank=True,
+    )
+    in_person_impact = models.CharField(
+        max_length=20, choices=IMPACT_CHOICES, default=IMPACT_UNKNOWN
+    )
+    online_impact = models.CharField(
+        max_length=20, choices=IMPACT_CHOICES, default=IMPACT_UNKNOWN
+    )
+    assessment_impact = models.CharField(
+        max_length=20, choices=IMPACT_CHOICES, default=IMPACT_UNKNOWN
+    )
+    internship_impact = models.CharField(
+        max_length=20, choices=IMPACT_CHOICES, default=IMPACT_UNKNOWN
+    )
+    supporting_document = models.FileField(upload_to="academic_calendar/disruptions/", blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT)
+    reported_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="reported_academic_calendar_disruptions",
+    )
+    closed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="closed_academic_calendar_disruptions",
+        null=True,
+        blank=True,
+    )
+    closed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-starts_at", "-id"]
+        verbose_name = "Perturbation du calendrier academique"
+        verbose_name_plural = "Perturbations du calendrier academique"
+        indexes = [
+            models.Index(fields=["calendar", "status", "starts_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.calendar} - {self.title}"
+
+    def clean(self):
+        errors = {}
+        if self.ends_at and self.ends_at <= self.starts_at:
+            errors["ends_at"] = "La fin de la perturbation doit etre apres son debut."
+        if self.calendar_id and self.academic_class_id:
+            if self.academic_class.branch_id != self.calendar.branch_id:
+                errors["academic_class"] = "La classe cible n'appartient pas a l'annexe du calendrier."
+            if self.academic_class.academic_year_id != self.calendar.academic_year_id:
+                errors["academic_class"] = "La classe cible n'appartient pas a l'annee du calendrier."
+        if self.semester_id:
+            sem_class = self.semester.academic_class
+            if self.academic_class_id and sem_class.pk != self.academic_class_id:
+                errors["semester"] = "Le semestre ne correspond pas a la classe cible."
+            if self.calendar_id and sem_class.branch_id != self.calendar.branch_id:
+                errors["semester"] = "Le semestre cible n'appartient pas a l'annexe du calendrier."
+        if self.target_scope == AcademicCalendarEntry.SCOPE_BRANCH:
+            if self.programme_id or self.academic_class_id or self.semester_id:
+                errors["target_scope"] = "Une perturbation d'annexe ne doit pas avoir de cible plus specifique."
+        elif self.target_scope == AcademicCalendarEntry.SCOPE_PROGRAMME:
+            if not self.programme_id:
+                errors["programme"] = "Le programme est obligatoire pour cette portee."
+        elif self.target_scope == AcademicCalendarEntry.SCOPE_CLASS:
+            if not self.academic_class_id:
+                errors["academic_class"] = "La classe est obligatoire pour cette portee."
+        elif self.target_scope == AcademicCalendarEntry.SCOPE_SEMESTER and not self.semester_id:
+            errors["semester"] = "Le semestre est obligatoire pour cette portee."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
+class AcademicCalendarAdjustment(models.Model):
+    """Avenant publie qui modifie l'effet d'une entree sans ecraser la source."""
+
+    ACTION_MAINTAIN = "maintain"
+    ACTION_ONLINE = "online_continuity"
+    ACTION_RESCHEDULE = "reschedule"
+    ACTION_CANCEL = "cancel"
+    ACTION_CHOICES = [
+        (ACTION_MAINTAIN, "Maintenir"),
+        (ACTION_ONLINE, "Continuite en ligne"),
+        (ACTION_RESCHEDULE, "Reporter / modifier les dates"),
+        (ACTION_CANCEL, "Annuler exceptionnellement"),
+    ]
+    STATUS_DRAFT = "draft"
+    STATUS_SUBMITTED = "submitted"
+    STATUS_VALIDATED = "validated"
+    STATUS_REJECTED = "rejected"
+    STATUS_PUBLISHED = "published"
+    STATUS_CANCELLED = "cancelled"
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, "Brouillon"),
+        (STATUS_SUBMITTED, "Soumis pour validation"),
+        (STATUS_VALIDATED, "Valide"),
+        (STATUS_REJECTED, "A corriger"),
+        (STATUS_PUBLISHED, "Publie"),
+        (STATUS_CANCELLED, "Annule"),
+    ]
+
+    calendar = models.ForeignKey(
+        AcademicCalendar,
+        on_delete=models.PROTECT,
+        related_name="adjustments",
+    )
+    disruption = models.ForeignKey(
+        AcademicCalendarDisruption,
+        on_delete=models.SET_NULL,
+        related_name="adjustments",
+        null=True,
+        blank=True,
+    )
+    calendar_entry = models.ForeignKey(
+        AcademicCalendarEntry,
+        on_delete=models.PROTECT,
+        related_name="adjustments",
+    )
+    action = models.CharField(max_length=30, choices=ACTION_CHOICES)
+    reason = models.TextField()
+    previous_start_datetime = models.DateTimeField()
+    previous_end_datetime = models.DateTimeField()
+    effective_start_datetime = models.DateTimeField(null=True, blank=True)
+    effective_end_datetime = models.DateTimeField(null=True, blank=True)
+    official_reference = models.CharField(max_length=120, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="created_academic_calendar_adjustments",
+    )
+    submitted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="submitted_academic_calendar_adjustments",
+        null=True,
+        blank=True,
+    )
+    validated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="validated_academic_calendar_adjustments",
+        null=True,
+        blank=True,
+    )
+    published_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="published_academic_calendar_adjustments",
+        null=True,
+        blank=True,
+    )
+    published_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["calendar_entry__start_datetime", "id"]
+        verbose_name = "Avenant au calendrier academique"
+        verbose_name_plural = "Avenants au calendrier academique"
+        indexes = [
+            models.Index(fields=["calendar", "status"]),
+            models.Index(fields=["calendar_entry", "status"]),
+        ]
+
+    def __str__(self):
+        return f"Avenant {self.calendar} - {self.calendar_entry}"
+
+    def clean(self):
+        errors = {}
+        if self.calendar_entry_id and self.calendar_id != self.calendar_entry.calendar_id:
+            errors["calendar_entry"] = "L'evenement doit appartenir au calendrier cible."
+        if self.disruption_id and self.calendar_id != self.disruption.calendar_id:
+            errors["disruption"] = "La perturbation doit appartenir au calendrier cible."
+        if (
+            self.previous_start_datetime
+            and self.previous_end_datetime
+            and self.previous_end_datetime <= self.previous_start_datetime
+        ):
+            errors["previous_end_datetime"] = "Les anciennes dates sont invalides."
+        if self.action == self.ACTION_RESCHEDULE:
+            if not self.effective_start_datetime or not self.effective_end_datetime:
+                errors["effective_start_datetime"] = "Les nouvelles dates sont obligatoires pour un report."
+            elif self.effective_end_datetime <= self.effective_start_datetime:
+                errors["effective_end_datetime"] = "La nouvelle fin doit etre apres le nouveau debut."
+        elif self.effective_start_datetime or self.effective_end_datetime:
+            errors["effective_start_datetime"] = "Les nouvelles dates ne sont autorisees que pour un report."
+        if self.status == self.STATUS_PUBLISHED:
+            if not self.published_by_id or not self.published_at:
+                errors["published_at"] = "Le publieur et la date de publication sont obligatoires."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+
 class AcademicClass(models.Model):
     """
     Classe académique réelle.
@@ -446,8 +782,8 @@ class AcademicClass(models.Model):
         verbose_name_plural = "Classes académiques"
         constraints = [
             models.UniqueConstraint(
-                fields=["programme", "branch", "academic_year", "level"],
-                name="unique_academic_class_per_programme_branch_year_level",
+                fields=["programme", "branch", "academic_year", "level", "name"],
+                name="unique_academic_class_per_programme_branch_year_level_name",
             )
         ]
 
@@ -634,18 +970,22 @@ class Semester(models.Model):
     STATUS_NORMAL_ENTRY = "NORMAL_ENTRY"
     STATUS_NORMAL_LOCKED = "NORMAL_LOCKED"
     STATUS_RETAKE_ENTRY = "RETAKE_ENTRY"
+    STATUS_READY_FOR_DIRECTOR = "READY_FOR_DIRECTOR"
     STATUS_FINALIZED = "FINALIZED"
     STATUS_PUBLISHED = "PUBLISHED"
 
+    # Le numéro appartient à la maquette de la classe.  Une classe de L2 peut
+    # donc porter S3/S4 sans être artificiellement ramenée à S1/S2.
     SEMESTER_CHOICES = [
-        (1, "Semestre 1"),
-        (2, "Semestre 2"),
+        (number, f"Semestre {number}")
+        for number in range(1, 13)
     ]
     STATUS_CHOICES = [
         (STATUS_DRAFT, "Brouillon"),
         (STATUS_NORMAL_ENTRY, "Saisie normale"),
         (STATUS_NORMAL_LOCKED, "Session normale terminee"),
         (STATUS_RETAKE_ENTRY, "Rattrapage"),
+        (STATUS_READY_FOR_DIRECTOR, "Transmis au Directeur des etudes"),
         (STATUS_FINALIZED, "Finalise"),
         (STATUS_PUBLISHED, "Publie"),
     ]
@@ -1129,6 +1469,21 @@ class ECGrade(models.Model):
     def clean(self):
         errors = {}
 
+        # ``final_score`` is derived only during ``save()``. Check every
+        # source value too, otherwise a direct ORM/admin write could persist
+        # an invalid normal or retake score before that derivation runs.
+        for field_name, source_score in {
+            "normal_score": self.normal_score,
+            "retake_score": self.retake_score,
+        }.items():
+            if source_score is None:
+                continue
+            try:
+                if float(source_score) < 0 or float(source_score) > 20:
+                    errors[field_name] = "La note doit etre comprise entre 0 et 20."
+            except Exception:
+                errors[field_name] = "Valeur de note invalide."
+
         score_to_validate = self.final_score if self.final_score is not None else self.note
         if score_to_validate is not None:
             try:
@@ -1137,6 +1492,11 @@ class ECGrade(models.Model):
                     errors["note"] = "La note doit être comprise entre 0 et 20."
             except Exception:
                 errors["note"] = "Valeur de note invalide."
+
+        if self.retake_score is not None and self.normal_score is None:
+            errors["retake_score"] = (
+                "Une note normale est obligatoire avant la saisie du rattrapage."
+            )
 
         if self.enrollment_id and self.ec_id:
             if self.enrollment.academic_class.programme != self.ec.ue.semester.academic_class.programme:
@@ -1196,6 +1556,208 @@ class ECGrade(models.Model):
         super().save(*args, **kwargs)
 
 
+class EvaluationCampaign(models.Model):
+    """Dossier opérationnel d'une session normale ou de rattrapage."""
+
+    KIND_NORMAL = "normal"
+    KIND_RETAKE = "retake"
+    KIND_CHOICES = [(KIND_NORMAL, "Session normale"), (KIND_RETAKE, "Session de rattrapage")]
+
+    STATUS_PREPARATION = "preparation"
+    STATUS_SUBJECTS = "subjects"
+    STATUS_PLANNED = "planned"
+    STATUS_IN_PROGRESS = "in_progress"
+    STATUS_CORRECTIONS = "corrections"
+    STATUS_REVIEW = "review"
+    STATUS_RESULTS_PUBLISHED = "results_published"
+    STATUS_CLOSED = "closed"
+    STATUS_CANCELLED = "cancelled"
+    STATUS_CHOICES = [
+        (STATUS_PREPARATION, "Préparation"), (STATUS_SUBJECTS, "Collecte des sujets"),
+        (STATUS_PLANNED, "Planifiée"), (STATUS_IN_PROGRESS, "En cours"),
+        (STATUS_CORRECTIONS, "Corrections"), (STATUS_REVIEW, "Contrôle des résultats"),
+        (STATUS_RESULTS_PUBLISHED, "Résultats publiés"), (STATUS_CLOSED, "Clôturée"),
+        (STATUS_CANCELLED, "Annulée"),
+    ]
+
+    branch = models.ForeignKey(Branch, on_delete=models.PROTECT, related_name="evaluation_campaigns")
+    academic_year = models.ForeignKey("AcademicYear", on_delete=models.PROTECT, related_name="evaluation_campaigns")
+    calendar_entry = models.ForeignKey("AcademicCalendarEntry", on_delete=models.PROTECT, related_name="evaluation_campaigns")
+    result_publication_entry = models.ForeignKey("AcademicCalendarEntry", on_delete=models.PROTECT, related_name="result_publication_campaigns", null=True, blank=True)
+    kind = models.CharField(max_length=12, choices=KIND_CHOICES, db_index=True)
+    # Le nombre de semestres dépend de la maquette réellement configurée
+    # (S1 à S5 ou davantage) : ne jamais le figer au seul couple S1/S2.
+    semester_number = models.PositiveSmallIntegerField(null=True, blank=True)
+    title = models.CharField(max_length=255)
+    status = models.CharField(max_length=24, choices=STATUS_CHOICES, default=STATUS_PREPARATION, db_index=True)
+    source_campaign = models.ForeignKey("self", on_delete=models.PROTECT, related_name="retake_campaigns", null=True, blank=True)
+    exception_reason = models.TextField(blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_evaluation_campaigns")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["calendar_entry__start_datetime", "id"]
+        indexes = [models.Index(fields=["branch", "academic_year", "status"]), models.Index(fields=["calendar_entry", "kind"])]
+
+    def __str__(self):
+        return f"{self.title} — {self.academic_year}"
+
+    def clean(self):
+        errors = {}
+        expected_event = AcademicCalendarEntry.EVENT_EXAM_SESSION if self.kind == self.KIND_NORMAL else AcademicCalendarEntry.EVENT_RETAKE_SESSION
+        if self.calendar_entry_id:
+            entry = self.calendar_entry
+            if entry.event_type != expected_event:
+                errors["calendar_entry"] = "Le jalon calendrier ne correspond pas au type de session."
+            if self.branch_id and entry.calendar.branch_id != self.branch_id:
+                errors["branch"] = "L'annexe doit correspondre au jalon calendrier."
+            if self.academic_year_id and entry.calendar.academic_year_id != self.academic_year_id:
+                errors["academic_year"] = "L'année doit correspondre au jalon calendrier."
+        if self.result_publication_entry_id:
+            publication = self.result_publication_entry
+            if publication.event_type != AcademicCalendarEntry.EVENT_RESULT_PUBLICATION:
+                errors["result_publication_entry"] = "Ce jalon doit être une publication de résultats."
+            elif self.calendar_entry_id and publication.calendar_id != self.calendar_entry.calendar_id:
+                errors["result_publication_entry"] = "La publication doit appartenir au même calendrier."
+        if self.kind == self.KIND_RETAKE and self.source_campaign_id and self.source_campaign.kind != self.KIND_NORMAL:
+            errors["source_campaign"] = "Un rattrapage doit provenir d'une session normale."
+        if errors:
+            raise ValidationError(errors)
+
+
+class EvaluationCampaignScope(models.Model):
+    """Classe ou semestre inclus/exclu du dossier de session."""
+
+    campaign = models.ForeignKey(EvaluationCampaign, on_delete=models.CASCADE, related_name="scopes")
+    academic_class = models.ForeignKey("AcademicClass", on_delete=models.PROTECT, related_name="evaluation_campaign_scopes")
+    semester = models.ForeignKey("Semester", on_delete=models.PROTECT, related_name="evaluation_campaign_scopes", null=True, blank=True)
+    included = models.BooleanField(default=True)
+    reason = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["campaign", "academic_class", "semester"], name="academics_unique_evaluation_campaign_scope")]
+        indexes = [models.Index(fields=["campaign", "included"])]
+
+    def clean(self):
+        errors = {}
+        if self.academic_class_id and self.campaign_id:
+            if self.academic_class.branch_id != self.campaign.branch_id:
+                errors["academic_class"] = "La classe doit appartenir à la même annexe."
+            if self.academic_class.academic_year_id != self.campaign.academic_year_id:
+                errors["academic_class"] = "La classe doit appartenir à la même année."
+        if self.semester_id and self.semester.academic_class_id != self.academic_class_id:
+            errors["semester"] = "Le semestre doit appartenir à la classe sélectionnée."
+        if errors:
+            raise ValidationError(errors)
+
+
+class EvaluationRequirement(models.Model):
+    """EC attendu dans une campagne : sujet, relances et préparation."""
+    SUBJECT_EXPECTED = "expected"
+    SUBJECT_RECEIVED = "received"
+    SUBJECT_MISSING = "missing"
+    SUBJECT_CHOICES = [(SUBJECT_EXPECTED, "Sujet attendu"), (SUBJECT_RECEIVED, "Sujet reçu"), (SUBJECT_MISSING, "Sujet manquant")]
+    campaign = models.ForeignKey(EvaluationCampaign, on_delete=models.CASCADE, related_name="requirements")
+    academic_class = models.ForeignKey("AcademicClass", on_delete=models.PROTECT, related_name="evaluation_requirements")
+    ec = models.ForeignKey("EC", on_delete=models.PROTECT, related_name="evaluation_requirements")
+    responsible_teacher = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, related_name="evaluation_requirements", null=True, blank=True)
+    subject_due_at = models.DateTimeField(null=True, blank=True)
+    critical_at = models.DateTimeField(null=True, blank=True)
+    subject_status = models.CharField(max_length=12, choices=SUBJECT_CHOICES, default=SUBJECT_EXPECTED, db_index=True)
+    subject_file = models.FileField(upload_to="academics/evaluation_subjects/", null=True, blank=True)
+    received_at = models.DateTimeField(null=True, blank=True)
+    received_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, related_name="received_evaluation_subjects", null=True, blank=True)
+    last_reminded_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["campaign", "academic_class", "ec"], name="academics_unique_evaluation_requirement")]
+        indexes = [models.Index(fields=["campaign", "subject_status"]), models.Index(fields=["critical_at", "subject_status"])]
+
+    def clean(self):
+        errors = {}
+        if self.academic_class_id and self.campaign_id and self.academic_class.branch_id != self.campaign.branch_id:
+            errors["academic_class"] = "La classe doit appartenir à la même annexe."
+        if self.ec_id and self.academic_class_id and self.ec.ue.semester.academic_class_id != self.academic_class_id:
+            errors["ec"] = "L'EC doit appartenir à la classe concernée."
+        # Le dépôt recommandé est fixé avant le seuil critique : par exemple
+        # J-7, puis alerte renforcée à J-3. Le contrôle précédent était
+        # inversé et empêchait tout enregistrement de sujet.
+        if self.subject_due_at and self.critical_at and self.critical_at < self.subject_due_at:
+            errors["critical_at"] = "Le seuil critique doit suivre la date de dépôt recommandée."
+        if errors:
+            raise ValidationError(errors)
+
+
+class EvaluationProctor(models.Model):
+    """Surveillant interne ou externe, sans logique de paiement."""
+    KIND_INTERNAL = "internal"
+    KIND_EXTERNAL = "external"
+    KIND_CHOICES = [(KIND_INTERNAL, "Personnel interne"), (KIND_EXTERNAL, "Surveillant externe")]
+    branch = models.ForeignKey(Branch, on_delete=models.PROTECT, related_name="evaluation_proctors")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="evaluation_proctor_profiles", null=True, blank=True)
+    kind = models.CharField(max_length=12, choices=KIND_CHOICES, default=KIND_INTERNAL)
+    full_name = models.CharField(max_length=180, blank=True)
+    phone = models.CharField(max_length=50, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["branch", "kind", "is_active"])]
+
+    def clean(self):
+        if self.kind == self.KIND_INTERNAL and not self.user_id:
+            raise ValidationError({"user": "Un surveillant interne doit être lié à un utilisateur."})
+        if self.kind == self.KIND_EXTERNAL and not self.full_name.strip():
+            raise ValidationError({"full_name": "L'identité du surveillant externe est obligatoire."})
+
+    @property
+    def display_name(self):
+        return self.full_name or self.user.get_full_name() or self.user.username
+
+
+class EvaluationProctorAssignment(models.Model):
+    event = models.ForeignKey("AcademicScheduleEvent", on_delete=models.CASCADE, related_name="proctor_assignments")
+    proctor = models.ForeignKey(EvaluationProctor, on_delete=models.PROTECT, related_name="assignments")
+    role = models.CharField(max_length=80, default="Surveillant")
+    present = models.BooleanField(null=True, blank=True)
+    signed_at = models.DateTimeField(null=True, blank=True)
+    proof = models.FileField(upload_to="academics/evaluation_proofs/", null=True, blank=True)
+    validated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, related_name="validated_evaluation_proctor_assignments", null=True, blank=True)
+    validated_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["event", "proctor"], name="academics_unique_evaluation_proctor_assignment")]
+
+    def clean(self):
+        if self.event_id and self.proctor_id and self.event.branch_id != self.proctor.branch_id:
+            raise ValidationError({"proctor": "Le surveillant doit appartenir à la même annexe."})
+
+
+class EvaluationScriptBatch(models.Model):
+    STATUS_AVAILABLE = "available"
+    STATUS_COLLECTED = "collected"
+    STATUS_CORRECTION = "correction"
+    STATUS_RETURNED = "returned"
+    STATUS_CHOICES = [(STATUS_AVAILABLE, "Copies disponibles"), (STATUS_COLLECTED, "Copies retirées"), (STATUS_CORRECTION, "Correction en cours"), (STATUS_RETURNED, "Notes retournées")]
+    event = models.OneToOneField("AcademicScheduleEvent", on_delete=models.CASCADE, related_name="script_batch")
+    expected_count = models.PositiveIntegerField(default=0)
+    received_count = models.PositiveIntegerField(default=0)
+    status = models.CharField(max_length=14, choices=STATUS_CHOICES, default=STATUS_AVAILABLE, db_index=True)
+    collected_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, related_name="collected_evaluation_scripts", null=True, blank=True)
+    collected_at = models.DateTimeField(null=True, blank=True)
+    returned_at = models.DateTimeField(null=True, blank=True)
+    proof = models.FileField(upload_to="academics/evaluation_scripts/", null=True, blank=True)
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["status", "returned_at"])]
+
+    def clean(self):
+        if self.received_count > self.expected_count and self.expected_count:
+            raise ValidationError({"received_count": "Le nombre reçu ne peut dépasser le nombre attendu."})
+
+
 class AcademicScheduleEvent(models.Model):
     EVENT_TYPE_COURSE = "course"
     EVENT_TYPE_EXAM = "exam"
@@ -1237,6 +1799,13 @@ class AcademicScheduleEvent(models.Model):
     academic_year = models.ForeignKey("AcademicYear", on_delete=models.PROTECT, related_name="schedule_events")
     calendar_entry = models.ForeignKey(
         "AcademicCalendarEntry",
+        on_delete=models.SET_NULL,
+        related_name="schedule_events",
+        null=True,
+        blank=True,
+    )
+    evaluation_campaign = models.ForeignKey(
+        EvaluationCampaign,
         on_delete=models.SET_NULL,
         related_name="schedule_events",
         null=True,
@@ -1292,6 +1861,15 @@ class AcademicScheduleEvent(models.Model):
                 errors["calendar_entry"] = "L'entree de calendrier n'appartient pas a la meme annexe."
             if self.calendar_entry.calendar.academic_year_id != self.academic_year_id:
                 errors["calendar_entry"] = "L'entree de calendrier n'appartient pas a la meme annee academique."
+
+        if self.evaluation_campaign_id:
+            campaign = self.evaluation_campaign
+            if campaign.branch_id != self.branch_id:
+                errors["evaluation_campaign"] = "La campagne n'appartient pas à la même annexe."
+            if campaign.academic_year_id != self.academic_year_id:
+                errors["evaluation_campaign"] = "La campagne n'appartient pas à la même année académique."
+            if self.calendar_entry_id and campaign.calendar_entry_id != self.calendar_entry_id:
+                errors["calendar_entry"] = "L'épreuve doit utiliser le jalon de sa campagne."
 
         if self.is_online and not self.meeting_link:
             errors["meeting_link"] = "Le lien de reunion est obligatoire pour un evenement en ligne."
@@ -1369,13 +1947,17 @@ class AcademicScheduleExecutionLog(models.Model):
 
 class LessonLog(models.Model):
     STATUS_PLANNED = "planned"
+    STATUS_SUBMITTED = "submitted"
+    STATUS_RETURNED = "returned"
     STATUS_DONE = "done"
     STATUS_CANCELLED = "cancelled"
     STATUS_ABSENT_TEACHER = "absent_teacher"
 
     STATUS_CHOICES = [
         (STATUS_PLANNED, "Planifie"),
-        (STATUS_DONE, "Fait"),
+        (STATUS_SUBMITTED, "Soumis au controle"),
+        (STATUS_RETURNED, "Retourne pour correction"),
+        (STATUS_DONE, "Cours fait - approuve"),
         (STATUS_CANCELLED, "Annule"),
         (STATUS_ABSENT_TEACHER, "Enseignant absent"),
     ]
@@ -1432,6 +2014,15 @@ class LessonLog(models.Model):
         blank=True,
         related_name="validated_lesson_logs",
     )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_lesson_logs",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_comment = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -1472,8 +2063,8 @@ class LessonLog(models.Model):
             elif self.branch_id and event.branch_id != self.branch_id:
                 errors["schedule_event"] = "L'evenement planifie ne correspond pas a l'annexe."
 
-        if self.status == self.STATUS_DONE and not (self.content or "").strip():
-            errors["content"] = "Le contenu du cours est obligatoire quand le cours est marque comme fait."
+        if self.status in {self.STATUS_SUBMITTED, self.STATUS_DONE} and not (self.content or "").strip():
+            errors["content"] = "Le contenu du cours est obligatoire avant soumission."
 
         if errors:
             raise ValidationError(errors)

@@ -4,6 +4,7 @@
   const WORKSPACE = "#supervisor-workspace";
   const DRAWER_CONTENT = "#supervisor-drawer-content";
   let pendingConfirmation = null;
+  let workspaceRequestSequence = 0;
 
   function dispatchOverlay(action) {
     window.dispatchEvent(
@@ -18,6 +19,22 @@
     const indicator = document.querySelector("#supervisor-loading");
     if (workspace) workspace.setAttribute("aria-busy", busy ? "true" : "false");
     if (indicator) indicator.classList.toggle("hidden", !busy);
+  }
+
+  function workspaceRequestId(event) {
+    const responseUrl = event.detail && event.detail.xhr && event.detail.xhr.responseURL;
+    if (!responseUrl) return "";
+    try {
+      return new URL(responseUrl, window.location.origin).searchParams.get("_workspace_request") || "";
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  function isCurrentWorkspaceResponse(event) {
+    const workspace = document.querySelector(WORKSPACE);
+    const requestId = workspaceRequestId(event);
+    return !requestId || !workspace?.dataset.workspaceRequestId || workspace.dataset.workspaceRequestId === requestId;
   }
 
   function currentSection() {
@@ -74,13 +91,21 @@
     const selector = document.querySelector("#supervisor-class-selector");
     if (!wrapper || !selector) return;
     wrapper.hidden = section === "signals";
-    const workspaceUrl = selector.dataset.workspaceUrl;
-    if (workspaceUrl && section !== "signals") {
-      selector.setAttribute(
-        "hx-get",
-        `${workspaceUrl}?section=${encodeURIComponent(section || "home")}&view=${encodeURIComponent(currentView())}`
-      );
-    }
+  }
+
+  function loadWorkspace(classId) {
+    const selector = document.querySelector("#supervisor-class-selector");
+    const endpoint = selector?.dataset.workspaceUrl;
+    if (!endpoint || !window.htmx) return;
+    const params = new URLSearchParams({
+      section: currentSection(),
+      view: currentView(),
+    });
+    if (classId) params.set("class_id", classId);
+    window.htmx.ajax("GET", `${endpoint}?${params.toString()}`, {
+      target: WORKSPACE,
+      swap: "innerHTML",
+    });
   }
 
   function syncCanonicalUrl(classId) {
@@ -124,6 +149,7 @@
     if (!event.target.matches("#supervisor-class-selector")) return;
     syncClassNavigation(event.target.value);
     syncCanonicalUrl(event.target.value);
+    loadWorkspace(event.target.value);
   });
 
   document.addEventListener("click", (event) => {
@@ -168,9 +194,24 @@
     if (target.matches(DRAWER_CONTENT)) window.supervisorOpenDrawer();
   });
 
+  document.body.addEventListener("htmx:configRequest", (event) => {
+    const target = event.detail.target;
+    if (!target || !target.matches(WORKSPACE)) return;
+    const requestId = `${Date.now()}-${++workspaceRequestSequence}`;
+    event.detail.parameters = event.detail.parameters || {};
+    event.detail.parameters._workspace_request = requestId;
+    target.dataset.workspaceRequestId = requestId;
+  });
+
+  document.body.addEventListener("htmx:beforeSwap", (event) => {
+    const target = event.detail.target;
+    if (!target || !target.matches(WORKSPACE) || isCurrentWorkspaceResponse(event)) return;
+    event.preventDefault();
+  });
+
   document.body.addEventListener("htmx:afterRequest", (event) => {
     const target = event.detail.target;
-    if (target && target.matches(WORKSPACE)) setBusy(false);
+    if (target && target.matches(WORKSPACE) && isCurrentWorkspaceResponse(event)) setBusy(false);
   });
 
   document.body.addEventListener("htmx:afterSwap", (event) => {
@@ -184,7 +225,7 @@
       if (window.lucide) window.lucide.createIcons();
       return;
     }
-    if (!target.matches(WORKSPACE)) return;
+    if (!target.matches(WORKSPACE) || !isCurrentWorkspaceResponse(event)) return;
     setBusy(false);
     const section = currentSection();
     setActiveNavigation(section);
@@ -193,7 +234,14 @@
     const selectedClassId = selectedWorkspaceClass();
     if (selector) selector.value = selectedClassId;
     syncClassNavigation(selectedClassId);
+    syncCanonicalUrl(selectedClassId);
     target.focus({ preventScroll: true });
+  });
+
+  document.body.addEventListener("htmx:responseError", (event) => {
+    const target = event.detail.target;
+    if (!target || !target.matches(WORKSPACE) || !isCurrentWorkspaceResponse(event)) return;
+    setBusy(false);
   });
 
   window.addEventListener("supervisor-drawer-close", window.supervisorCloseDrawer);
@@ -203,13 +251,7 @@
   });
   window.addEventListener("supervisor-attendance-updated", () => {
     window.supervisorCloseDrawer();
-    const selector = document.querySelector("#supervisor-class-selector");
-    const endpoint = selector?.dataset.workspaceUrl;
-    if (endpoint && window.htmx) {
-      const params = new URLSearchParams({ section: currentSection(), view: currentView() });
-      if (selectedWorkspaceClass()) params.set("class_id", selectedWorkspaceClass());
-      window.htmx.ajax("GET", `${endpoint}?${params.toString()}`, { target: WORKSPACE, swap: "innerHTML" });
-    }
+    loadWorkspace(selectedWorkspaceClass());
   });
 
   document.addEventListener("DOMContentLoaded", () => {

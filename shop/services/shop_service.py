@@ -1,11 +1,17 @@
 from io import BytesIO
 
+import logging
+
+from django.contrib.auth.hashers import check_password, make_password
 from django.core.files.base import ContentFile
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Case, IntegerField, Q, Sum, Value, When
+from django.db.models.functions import Coalesce
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from django.utils.crypto import get_random_string
+from django.utils.dateparse import parse_date
 from django.utils.text import slugify
 
 from core.pdf_documents import generate_pdf as generate_esfe_pdf
@@ -18,14 +24,22 @@ from notifier.services import NotificationBus
 from accounts.dashboards.helpers import is_manager
 from shop.models import (
     ShopOrder,
+    ShopOrderEmailConfirmation,
     ShopOrderItem,
     ShopPayment,
     ShopProduct,
+    ShopProductVariant,
     ShopSequence,
     ShopStockMovement,
 )
 
+SHOP_EMAIL_OTP_MINUTES = 10
+SHOP_EMAIL_OTP_MAX_ATTEMPTS = 5
+SHOP_EMAIL_OTP_RESEND_SECONDS = 60
+SHOP_EMAIL_OTP_MAX_RESENDS = 3
+
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 PREFIX_BY_SEQUENCE = {
     ShopSequence.TYPE_ORDER: "CMD",
@@ -84,12 +98,25 @@ def decrement_product_stock(order, *, user=None):
     if order.stock_movements.filter(movement_type=ShopStockMovement.TYPE_OUT).exists():
         return
 
-    for item in order.items.select_related("product", "variant"):
-        ensure_stock_available(product=item.product, variant=item.variant, quantity=item.quantity)
+    items = list(order.items.select_related("product", "variant"))
+    locked_products = {
+        product.pk: product
+        for product in ShopProduct.objects.select_for_update().filter(pk__in={item.product_id for item in items})
+    }
+    locked_variants = {
+        variant.pk: variant
+        for variant in ShopProductVariant.objects.select_for_update().filter(
+            pk__in={item.variant_id for item in items if item.variant_id}
+        )
+    }
+    for item in items:
+        product = locked_products[item.product_id]
+        variant = locked_variants.get(item.variant_id)
+        ensure_stock_available(product=product, variant=variant, quantity=item.quantity)
         ShopStockMovement.objects.create(
             branch=order.branch,
-            product=item.product,
-            variant=item.variant,
+            product=product,
+            variant=variant,
             movement_type=ShopStockMovement.TYPE_OUT,
             quantity=item.quantity,
             reference=next_shop_reference(order.branch, ShopSequence.TYPE_STOCK),
@@ -121,12 +148,20 @@ def get_recommended_products_for_student(user):
         ShopProduct.objects
         .filter(branch=candidature.branch, is_active=True)
         .prefetch_related("variants", "programmes")
+        .annotate(
+            stock_in=Coalesce(Sum("stock_movements__quantity", filter=Q(stock_movements__movement_type=ShopStockMovement.TYPE_IN)), Value(0), output_field=IntegerField()),
+            stock_out=Coalesce(Sum("stock_movements__quantity", filter=Q(stock_movements__movement_type=ShopStockMovement.TYPE_OUT)), Value(0), output_field=IntegerField()),
+            stock_adjustment=Coalesce(Sum("stock_movements__quantity", filter=Q(stock_movements__movement_type=ShopStockMovement.TYPE_ADJUSTMENT)), Value(0), output_field=IntegerField()),
+        )
         .order_by("-is_required", "category", "name")
     )
     products = []
     for product in queryset:
-        if product.programmes.exists() and not product.programmes.filter(pk=candidature.programme_id).exists():
+        programme_ids = {programme.pk for programme in product.programmes.all()}
+        if programme_ids and candidature.programme_id not in programme_ids:
             continue
+        product.inventory_stock = product.stock_in - product.stock_out + product.stock_adjustment
+        product.inventory_low = product.inventory_stock <= product.low_stock_threshold
         products.append(product)
     return products
 
@@ -205,11 +240,98 @@ def create_student_required_order(user, product_ids, created_by=None):
     return order
 
 
+def _shop_email_otp():
+    return "".join(get_random_string(1, allowed_chars="0123456789") for _ in range(6))
+
+
+def _send_shop_email(*, required=False, **kwargs):
+    """Email infrastructure must never turn a shop HTTP request into a 500."""
+    try:
+        return NotificationBus.send_email(**kwargs)
+    except Exception as exc:
+        logger.exception("Transactional shop email could not be sent")
+        if required:
+            raise ValidationError(
+                "Impossible d'envoyer le code e-mail pour le moment. Vérifiez votre connexion ou réessayez plus tard."
+            ) from exc
+        return None
+
+
+def request_student_remote_order_confirmation(*, student, product_id, quantity):
+    if not getattr(student, "email", ""):
+        raise ValidationError("Votre compte ne possède pas d'adresse e-mail. Contactez votre annexe.")
+    available = {product.pk: product for product in get_recommended_products_for_student(student)}
+    product = available.get(int(product_id))
+    if not product:
+        raise ValidationError("Cet article n'est pas disponible pour votre parcours.")
+    if quantity < 1:
+        raise ValidationError("La quantité doit être supérieure à zéro.")
+    ensure_stock_available(product=product, quantity=quantity)
+    now = timezone.now()
+    with transaction.atomic():
+        existing = (ShopOrderEmailConfirmation.objects.select_for_update().filter(student=student, product=product, status=ShopOrderEmailConfirmation.STATUS_PENDING, expires_at__gt=now).order_by("-created_at").first())
+        if existing and existing.last_sent_at and (now - existing.last_sent_at).total_seconds() < SHOP_EMAIL_OTP_RESEND_SECONDS:
+            raise ValidationError("Un code vient d'être envoyé. Attendez une minute avant de demander un nouvel envoi.")
+        if existing and existing.resend_count >= SHOP_EMAIL_OTP_MAX_RESENDS:
+            raise ValidationError("Nombre maximal de renvois atteint. Attendez l'expiration du code avant de recommencer.")
+        code = _shop_email_otp()
+        if existing:
+            existing.quantity = quantity
+            existing.otp_code_hash = make_password(code)
+            existing.expires_at = now + timezone.timedelta(minutes=SHOP_EMAIL_OTP_MINUTES)
+            existing.attempts = 0
+            existing.resend_count += 1
+            existing.last_sent_at = now
+            existing.save()
+            confirmation = existing
+        else:
+            confirmation = ShopOrderEmailConfirmation.objects.create(branch=product.branch, student=student, product=product, quantity=quantity, otp_code_hash=make_password(code), expires_at=now + timezone.timedelta(minutes=SHOP_EMAIL_OTP_MINUTES), last_sent_at=now)
+    try:
+        _send_shop_email(required=True, subject="Code de confirmation – commande Boutique ESFE", recipient=student, recipient_email=student.email, source_app="shop", event_type="shop_order_confirmation_otp", html_template="emails/base_communication.html", context={"title": "Confirmez votre commande Boutique", "message": f"Votre code est : {code}. Il expire dans {SHOP_EMAIL_OTP_MINUTES} minutes.", "recipient_name": student.get_full_name() or student.username}, metadata={"confirmation_id": confirmation.pk}, legacy_source="shop_order_confirmation", legacy_object_id=str(confirmation.pk))
+    except ValidationError:
+        confirmation.status = ShopOrderEmailConfirmation.STATUS_CANCELLED
+        confirmation.save(update_fields=["status", "updated_at"])
+        raise
+    return confirmation, product
+
+
+def confirm_student_remote_order(*, student, confirmation_id, code):
+    with transaction.atomic():
+        confirmation = ShopOrderEmailConfirmation.objects.select_for_update().select_related("product", "branch").filter(pk=confirmation_id, student=student).first()
+        if not confirmation:
+            raise ValidationError("Demande de commande introuvable.")
+        if confirmation.status != ShopOrderEmailConfirmation.STATUS_PENDING:
+            raise ValidationError("Cette demande n'est plus valide.")
+        if timezone.now() >= confirmation.expires_at:
+            confirmation.status = ShopOrderEmailConfirmation.STATUS_EXPIRED
+            confirmation.save(update_fields=["status", "updated_at"])
+            raise ValidationError("Le code a expiré. Demandez-en un nouveau.")
+        confirmation.attempts += 1
+        if confirmation.attempts > SHOP_EMAIL_OTP_MAX_ATTEMPTS or not check_password(code, confirmation.otp_code_hash):
+            if confirmation.attempts >= SHOP_EMAIL_OTP_MAX_ATTEMPTS:
+                confirmation.status = ShopOrderEmailConfirmation.STATUS_CANCELLED
+            confirmation.save(update_fields=["attempts", "status", "updated_at"])
+            raise ValidationError("Code incorrect." if confirmation.status == ShopOrderEmailConfirmation.STATUS_PENDING else "Trop de tentatives. Demandez un nouveau code.")
+        product = ShopProduct.objects.select_for_update().get(pk=confirmation.product_id, branch=confirmation.branch, is_active=True)
+        ensure_stock_available(product=product, quantity=confirmation.quantity)
+        profile = student.student_profile
+        order = ShopOrder.objects.create(branch=confirmation.branch, inscription=profile.inscription, student=student, buyer_type=ShopOrder.BUYER_STUDENT, customer_name=student.get_full_name() or student.username, customer_email=student.email, reference=next_shop_reference(confirmation.branch, ShopSequence.TYPE_ORDER), status=ShopOrder.STATUS_PENDING_PAYMENT, created_by=student)
+        ShopOrderItem.objects.create(order=order, product=product, quantity=confirmation.quantity, unit_price=product.unit_price, is_required=product.is_required)
+        order.refresh_total()
+        confirmation.status = ShopOrderEmailConfirmation.STATUS_CONFIRMED
+        confirmation.order = order
+        confirmation.save(update_fields=["status", "order", "attempts", "updated_at"])
+        notify_shop_order_received(order=order, actor=student)
+    _send_shop_email(subject="Commande Boutique confirmée", recipient=student, recipient_email=student.email, source_app="shop", event_type="shop_order_confirmed_email", html_template="emails/base_communication.html", context={"title": "Commande enregistrée", "message": f"Votre commande {order.reference} est en attente de paiement. Présentez-vous à {order.branch.name} pour régler et retirer vos articles.", "recipient_name": order.buyer_display, "reference": order.reference, "amount": order.total_amount, "branch_name": order.branch.name}, legacy_source="shop_order", legacy_object_id=str(order.pk))
+    return order
+
+
 def create_counter_order(
     *,
     branch,
-    product,
-    quantity,
+    product=None,
+    quantity=None,
+    lines=None,
     payment_method,
     created_by,
     student=None,
@@ -219,7 +341,35 @@ def create_counter_order(
     immediate_settlement=False,
 ):
     with transaction.atomic():
-        ensure_stock_available(product=product, quantity=quantity)
+        lines = list(lines or [])
+        if not lines:
+            if product is None or quantity is None:
+                raise ValidationError("Ajoutez au moins un article à la vente.")
+            lines = [{"product": product, "quantity": quantity}]
+
+        requested_quantities = {}
+        for line in lines:
+            line_product = line.get("product")
+            line_quantity = line.get("quantity")
+            if not line_product or not isinstance(line_quantity, int) or line_quantity < 1:
+                raise ValidationError("Une ligne de vente est invalide.")
+            requested_quantities[line_product.pk] = requested_quantities.get(line_product.pk, 0) + line_quantity
+
+        # Locking the products before reading their movement ledgers prevents
+        # two simultaneous counter sales from validating the same final unit.
+        products = {
+            item.pk: item
+            for item in ShopProduct.objects.select_for_update().filter(
+                branch=branch,
+                is_active=True,
+                pk__in=requested_quantities,
+            )
+        }
+        if len(products) != len(requested_quantities):
+            raise ValidationError("Un article de la vente est indisponible ou ne relève pas de cette annexe.")
+        for product_id, requested_quantity in requested_quantities.items():
+            ensure_stock_available(product=products[product_id], quantity=requested_quantity)
+
         order = ShopOrder.objects.create(
             branch=branch,
             inscription=getattr(getattr(student, "student_profile", None), "inscription", None),
@@ -232,13 +382,15 @@ def create_counter_order(
             status=ShopOrder.STATUS_PENDING_PAYMENT,
             created_by=created_by,
         )
-        ShopOrderItem.objects.create(
-            order=order,
-            product=product,
-            quantity=quantity,
-            unit_price=product.unit_price,
-            is_required=product.is_required,
-        )
+        for product_id, requested_quantity in requested_quantities.items():
+            sale_product = products[product_id]
+            ShopOrderItem.objects.create(
+                order=order,
+                product=sale_product,
+                quantity=requested_quantity,
+                unit_price=sale_product.unit_price,
+                is_required=sale_product.is_required,
+            )
         order.refresh_total()
         collector = None
         auto_validate_payment = immediate_settlement
@@ -439,35 +591,153 @@ def deliver_order(order, user):
     return order
 
 
-def get_manager_shop_context(branch):
-    orders = (
+def get_manager_shop_context(
+    branch,
+    *,
+    journal_query="",
+    journal_date="",
+    stock_query="",
+    stock_state="",
+    stock_category="",
+):
+    order_queryset = (
         ShopOrder.objects
         .filter(branch=branch)
         .select_related("student", "inscription")
         .prefetch_related("items", "items__product", "payments")
-        .order_by("-created_at")[:30]
     )
-    products = list(ShopProduct.objects.filter(branch=branch).prefetch_related("variants").order_by("category", "name"))
+    orders = (
+        order_queryset
+        .order_by(
+            Case(
+                When(status=ShopOrder.STATUS_PENDING_PAYMENT, then=Value(0)),
+                When(status=ShopOrder.STATUS_PAID, then=Value(1)),
+                When(status=ShopOrder.STATUS_READY, then=Value(2)),
+                default=Value(3),
+                output_field=IntegerField(),
+            ),
+            "-created_at",
+        )[:30]
+    )
+    order_queues = {
+        "pending": list(order_queryset.filter(status=ShopOrder.STATUS_PENDING_PAYMENT).order_by("created_at")[:30]),
+        "paid": list(order_queryset.filter(status=ShopOrder.STATUS_PAID).order_by("created_at")[:30]),
+        "ready": list(order_queryset.filter(status=ShopOrder.STATUS_READY).order_by("created_at")[:30]),
+    }
+    # Keep the stock ledger as the source of truth without making three
+    # aggregate queries per catalogue item in the manager workspace.
+    products = list(
+        ShopProduct.objects
+        .filter(branch=branch)
+        .prefetch_related("variants")
+        .annotate(
+            stock_in=Coalesce(Sum("stock_movements__quantity", filter=Q(stock_movements__movement_type=ShopStockMovement.TYPE_IN)), Value(0), output_field=IntegerField()),
+            stock_out=Coalesce(Sum("stock_movements__quantity", filter=Q(stock_movements__movement_type=ShopStockMovement.TYPE_OUT)), Value(0), output_field=IntegerField()),
+            stock_adjustment=Coalesce(Sum("stock_movements__quantity", filter=Q(stock_movements__movement_type=ShopStockMovement.TYPE_ADJUSTMENT)), Value(0), output_field=IntegerField()),
+        )
+        .order_by("category", "name")
+    )
+    for product in products:
+        product.inventory_stock = product.stock_in - product.stock_out + product.stock_adjustment
+        product.inventory_low = product.inventory_stock <= product.low_stock_threshold
+
+    # The counter always receives the complete active catalogue.  These
+    # filters only narrow the inventory workspace and its table.
+    stock_query = (stock_query or "").strip()
+    stock_state = (stock_state or "").strip()
+    stock_category = (stock_category or "").strip()
+    catalogue_products = products
+    if stock_query:
+        needle = stock_query.casefold()
+        catalogue_products = [
+            product
+            for product in catalogue_products
+            if needle in product.name.casefold() or needle in product.get_category_display().casefold()
+        ]
+    if stock_category:
+        catalogue_products = [product for product in catalogue_products if product.category == stock_category]
+    if stock_state == "low":
+        catalogue_products = [product for product in catalogue_products if product.inventory_low]
+    elif stock_state == "available":
+        catalogue_products = [product for product in catalogue_products if product.inventory_stock > product.low_stock_threshold]
+    elif stock_state == "archived":
+        catalogue_products = [product for product in catalogue_products if not product.is_active]
+    elif stock_state == "active":
+        catalogue_products = [product for product in catalogue_products if product.is_active]
+    counter_catalog = [
+        {
+            "id": product.pk,
+            "name": product.name,
+            "category": product.category,
+            "price": product.unit_price,
+            "stock": product.inventory_stock,
+            "available": product.inventory_stock > 0,
+        }
+        for product in products
+        if product.is_active
+    ]
     payments = ShopPayment.objects.filter(order__branch=branch, status=ShopPayment.STATUS_VALIDATED)
-    month_sales = payments.filter(
-        paid_at__date__gte=timezone.localdate().replace(day=1)
-    ).aggregate(total=Sum("amount"))["total"] or 0
+    today = timezone.localdate()
+    month_sales = payments.filter(paid_at__date__gte=today.replace(day=1)).aggregate(total=Sum("amount"))["total"] or 0
+    today_sales = payments.filter(paid_at__date=today).aggregate(total=Sum("amount"))["total"] or 0
     cash_entries_count = BranchCashMovement.objects.filter(
         branch=branch,
         source=BranchCashMovement.SOURCE_SHOP,
         movement_type=BranchCashMovement.TYPE_IN,
     ).count()
+    journal_query = (journal_query or "").strip()
+    journal_day = parse_date(journal_date) if journal_date else None
+    payment_journal_queryset = ShopPayment.objects.filter(order__branch=branch)
+    stock_journal_queryset = ShopStockMovement.objects.filter(branch=branch)
+    if journal_query:
+        payment_journal_queryset = payment_journal_queryset.filter(
+            Q(reference__icontains=journal_query)
+            | Q(order__reference__icontains=journal_query)
+            | Q(order__customer_name__icontains=journal_query)
+            | Q(order__student__first_name__icontains=journal_query)
+            | Q(order__student__last_name__icontains=journal_query)
+        )
+        stock_journal_queryset = stock_journal_queryset.filter(
+            Q(reference__icontains=journal_query)
+            | Q(product__name__icontains=journal_query)
+            | Q(notes__icontains=journal_query)
+        )
+    if journal_day:
+        payment_journal_queryset = payment_journal_queryset.filter(paid_at__date=journal_day)
+        stock_journal_queryset = stock_journal_queryset.filter(created_at__date=journal_day)
+    recent_payments = list(
+        payment_journal_queryset
+        .select_related("order", "order__student", "created_by")
+        .order_by("-paid_at")[:40]
+    )
+    recent_stock_movements = list(
+        stock_journal_queryset
+        .select_related("product", "created_by", "order")
+        .order_by("-created_at")[:40]
+    )
     return {
         "shop_products": products,
+        "shop_catalogue_products": catalogue_products,
+        "shop_counter_catalog": counter_catalog,
         "shop_orders": orders,
+        "shop_order_queues": order_queues,
+        "shop_recent_payments": recent_payments,
+        "shop_recent_stock_movements": recent_stock_movements,
+        "shop_journal_query": journal_query,
+        "shop_journal_date": journal_day.isoformat() if journal_day else (journal_date or ""),
+        "shop_stock_query": stock_query,
+        "shop_stock_state": stock_state,
+        "shop_stock_category": stock_category,
         "shop_stats": {
             "products": len(products),
             "required": sum(1 for product in products if product.is_required),
-            "low_stock": sum(1 for product in products if product.is_low_stock),
+            "low_stock": sum(1 for product in products if product.inventory_low),
             "pending_orders": ShopOrder.objects.filter(branch=branch, status=ShopOrder.STATUS_PENDING_PAYMENT).count(),
             "paid_not_delivered": ShopOrder.objects.filter(branch=branch, status=ShopOrder.STATUS_PAID).count(),
             "ready_orders": ShopOrder.objects.filter(branch=branch, status=ShopOrder.STATUS_READY).count(),
             "month_sales": month_sales,
+            "today_sales": today_sales,
+            "today_sales_count": payments.filter(paid_at__date=today).count(),
             "cash_entries": cash_entries_count,
         },
     }

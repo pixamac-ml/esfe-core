@@ -7,7 +7,6 @@
   <i data-lucide="file-spreadsheet" style="width:18px;height:18px;"></i><span>Notes</span>
   {% if grade_metrics.pending_semesters > 0 %}<span class="ml-auto inline-flex items-center justify-center rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold text-white min-w-[20px]">{{ grade_metrics.pending_semesters }}</span>{% endif %}
 </button>
-<button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'reenrollment' }" @click="setSection('reenrollment')"><i data-lucide="repeat-2" style="width:18px;height:18px;"></i><span>Passages</span></button>
 <button type="button" class="portal-list-link" :class="{ 'active': activeSection === 'diagnostics' }" @click="setSection('diagnostics')">
   <i data-lucide="stethoscope" style="width:18px;height:18px;"></i><span>Diagnostic</span>
   {% if diagnostic_metrics.inscriptions_without_assignment > 0 %}<span class="ml-auto inline-flex items-center justify-center rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold text-white min-w-[20px]">{{ diagnostic_metrics.inscriptions_without_assignment }}</span>{% endif %}
@@ -245,8 +244,7 @@
 <div x-show="activeSection === 'reenrollment'" x-transition.opacity.duration.150ms style="display:none;">
   <div
     id="reenrollment-workspace"
-    hx-get="{% url 'accounts_portal:reenrollment_workspace' %}"
-    hx-trigger="load"
+    data-disabled-workflow="reenrollment"
     hx-target="#reenrollment-workspace"
     hx-swap="innerHTML"
   >

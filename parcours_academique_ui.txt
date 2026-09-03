@@ -1,0 +1,87 @@
+PARCOURS IT
+
+1. Dashboard IT -> Notes & Résultats -> sélectionner Classe et Semestre -> Ouvrir la saisie.
+Résultat : le drawer officiel ouvre la grille de notes du contexte choisi.
+EXISTE ET EST BRANCHÉ
+
+2. Dans la grille -> onglet Normal -> saisir les notes par EC, ou menu Actions -> Télécharger modèle Excel / Importer fichier Excel.
+Alternative : Dashboard IT -> Import / export -> sélectionner Classe + Semestre -> Vérifier et importer.
+Résultat : notes contrôlées transactionnellement, sur les seuls étudiants/EC de l’annexe et du semestre.
+EXISTE ET EST BRANCHÉ
+
+3. Après saisie/import -> la grille recalcule les moyennes d’EC, UE, crédits et résultat du semestre à partir des notes réellement présentes. -> Vérifier les notes contrôle les données bloquantes.
+EXISTE ET EST BRANCHÉ
+
+4. Quand la session normale est complète -> Publier session normale.
+Résultat : les notes normales sont verrouillées et les EC de rattrapage deviennent identifiables.
+EXISTE ET EST BRANCHÉ
+
+5. -> Ouvrir/Activer rattrapage -> modal listant étudiants, EC concernés et note normale -> Activer rattrapage -> onglet Rattrapage -> saisir/importer uniquement les EC éligibles.
+Résultat : la note finale d’EC est recalculée avec la règle officielle normal/rattrapage.
+EXISTE ET EST BRANCHÉ
+
+6. IT -> export des notes / feuille PDF / consultation des relevés de classe après publication.
+Résultat : les exports utilisent le même moteur académique. Les bulletins officiels restent une action DE.
+EXISTE ET EST BRANCHÉ
+
+7. Après rattrapage, IT ne dispose que de Vérifier les notes : aucun bouton explicite « clôturer et transmettre au DE ».
+MANQUANT
+
+PARCOURS DE
+
+1. Dashboard DE -> Évaluations -> Planifier les sessions -> onglet Sessions -> sélectionner la Période officielle -> Préparer automatiquement.
+Résultat : campagne d’évaluation, EC requis et planning sont créés.
+EXISTE MAIS N’EST PAS BRANCHÉ au statut de saisie Normal/Rattrapage du semestre.
+
+2. Dashboard DE -> Évaluations -> Résultats & délibération -> Contrôle des notes -> choisir une classe/carte -> drawer du semestre.
+Résultat : le DE voit les notes, moyennes, crédits et anomalies issus du moteur académique officiel.
+EXISTE ET EST BRANCHÉ
+
+3. -> onglet À valider -> ouvrir la ligne Classe/Semestre -> Valider.
+Résultat : semestre finalisé après contrôle des résultats complets.
+EXISTE ET EST BRANCHÉ, mais le contrôle ne force pas visuellement la clôture explicite de la session de rattrapage.
+
+4. -> onglet À publier -> drawer -> Publier (OTP) -> saisir/faire confirmer l’OTP DG ou DGA.
+Résultat : semestre publié, notes verrouillées et documents autorisés.
+EXISTE ET EST BRANCHÉ
+
+5. -> onglet Bulletins -> ouvrir Classe/Semestre -> Bulletins pour générer, ou Consulter pour les relevés.
+Résultat : génération des bulletins semestriels et consultation des relevés officiels.
+EXISTE ET EST BRANCHÉ
+
+6. Reprendre le même cycle pour le second semestre : IT saisie/normal/rattrapage, puis DE validation/publication/bulletins.
+EXISTE ET EST BRANCHÉ
+
+7. Dashboard DE -> Résultats & délibération -> Délibération -> Actualiser le contrôle -> Ouvrir la délibération -> sélectionner la classe -> Préparer la synthèse -> Valider la délibération.
+Résultat : synthèse annuelle, proposition puis décision annuelle officielle par étudiant.
+EXISTE ET EST BRANCHÉ
+
+8. La génération annuelle existe côté service : generate_annual_class, avec prérequis deux semestres publiés et décision annuelle. Aucun bouton DE ne l’expose actuellement.
+EXISTE MAIS N’EST PAS EXPOSÉ DANS UI
+
+MANQUANT DANS L’INTERFACE
+
+- Bouton IT de clôture/transmission des résultats de rattrapage au DE.
+- Génération des bulletins annuels depuis le dashboard DE.
+- Parcours direct DE vers le bulletin annuel individuel.
+
+PRÉSENT MAIS NON BRANCHÉ
+
+- La planification DE des sessions/campagnes académiques est bien réelle, mais ne pilote pas le statut du semestre utilisé par la saisie IT.
+- Le DE peut valider dès que les résultats sont complets, sans étape UI imposant explicitement la clôture Normal/Rattrapage.
+
+ANCIEN/LEGACY ENCORE UTILISÉ
+
+- Les routes historiques it_notes_workspace et /portal/admin/grades/ existent encore.
+- Elles réutilisent toutefois le même constructeur de grille et le même moteur de calcul : ce ne sont pas des calculs parallèles, mais des entrées legacy à ne pas privilégier.
+
+PRÊT POUR TEST MANUEL
+
+- Saisie normale, import Excel, calculs, publication normale, identification des rattrapages, saisie rattrapage, validation DE, OTP de publication, bulletins semestriels et délibération annuelle.
+- Prérequis : classe active, inscriptions actives, maquette UE/EC complète, deux semestres configurés, comptes IT/DE/DG ou DGA opérationnels.
+
+BLOQUANTS POUR TESTER LE WORKFLOW COMPLET
+
+- Absence de raccordement direct entre calendrier/campagne DE et ouverture du workflow de notes IT.
+- Absence de clôture explicite du rattrapage avant validation DE.
+- Bulletin annuel générable côté backend mais inaccessible dans l’interface DE.

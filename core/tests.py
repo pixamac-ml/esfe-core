@@ -90,11 +90,12 @@ class ContactFormTests(TestCase):
 				"phone": "+22370000000",
 				"subject": "admission",
 				"message": "Je souhaite contacter l'ecole.",
+				"consent": True,
 			},
 		)
 
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(ContactMessage.objects.count(), 1)
-		self.assertContains(response, "Votre message a bien ete transmis", html=False)
+		self.assertContains(response, "Message envoyé avec succès", html=False)
 		self.assertEqual(mock_send.call_count, 2)
 

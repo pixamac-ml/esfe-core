@@ -40,6 +40,11 @@ from .widgets.finance import get_finance_widget
 from shop.services.shop_service import get_required_shop_context
 
 
+def _selected_academic_year_id(request):
+    value = (request.GET.get("academic_year_id") or request.POST.get("academic_year_id") or "").strip()
+    return int(value) if value.isdigit() else None
+
+
 def _academic_chapters_available():
     return "academics_ecchapter" in connection.introspection.table_names()
 
@@ -228,7 +233,8 @@ def _build_course_player_bundle(chapters):
 @login_required
 @role_required("student")
 def dashboard(request):
-    context = get_student_overview_data(request.user)
+    academic_year_id = _selected_academic_year_id(request)
+    context = get_student_overview_data(request.user, academic_year_id=academic_year_id)
     context["shop_required"] = get_required_shop_context(request.user)
     context["internal_rules"] = get_internal_rules_status(request.user)
     context["sections"] = [
@@ -263,46 +269,73 @@ def accept_internal_rules_view(request):
 @login_required
 @role_required("student")
 def academics_partial(request):
-    context = get_academics_widget(request.user)
+    context = get_academics_widget(
+        request.user,
+        academic_year_id=_selected_academic_year_id(request),
+    )
     return render(request, "portal/student/partials/academics.html", context)
 
 
 @login_required
 @role_required("student")
 def diplomas_partial(request):
-    student = getattr(request.user, "student_profile", None)
+    snapshot = get_student_academic_snapshot(
+        request.user,
+        academic_year_id=_selected_academic_year_id(request),
+    )
+    student = snapshot["student"]
+    enrollment = snapshot["academic_enrollment"]
     awards = []
-    if student:
+    if student and enrollment:
         awards = student.academic_diploma_awards.select_related(
             "programme", "academic_year", "diploma", "branch"
-        ).filter(status__in=("ready", "delivered")).order_by("-awarded_at", "-created_at")
-    return render(request, "portal/student/partials/diplomas_student.html", {"awards": awards})
+        ).filter(
+            enrollment=enrollment,
+            status__in=("ready", "delivered"),
+        ).order_by("-awarded_at", "-created_at")
+    return render(
+        request,
+        "portal/student/partials/diplomas_student.html",
+        {
+            "awards": awards,
+            "selected_academic_year_id": snapshot["selected_academic_year_id"],
+        },
+    )
 
 
 @login_required
 @role_required("student")
 def finance_partial(request):
-    context = get_finance_widget(request.user)
+    context = get_finance_widget(
+        request.user,
+        academic_year_id=_selected_academic_year_id(request),
+    )
     return render(request, "portal/student/partials/finance.html", context)
 
 
 @login_required
 @role_required("student")
 def settings_partial(request):
-    context = get_profile_data(request.user)
-    context["finance_widget"] = get_finance_widget(request.user)
+    academic_year_id = _selected_academic_year_id(request)
+    context = get_profile_data(request.user, academic_year_id=academic_year_id)
+    context["finance_widget"] = get_finance_widget(request.user, academic_year_id=academic_year_id)
     return render(request, "portal/student/partials/settings_student.html", context)
 
-
 def _render_settings_response(request, context):
-    context["finance_widget"] = get_finance_widget(request.user)
+    context["finance_widget"] = get_finance_widget(
+        request.user,
+        academic_year_id=_selected_academic_year_id(request),
+    )
     return render(request, "portal/student/partials/settings_student.html", context)
 
 
 @login_required
 @role_required("student")
 def courses_partial(request):
-    context = get_student_courses_context(request.user)
+    context = get_student_courses_context(
+        request.user,
+        academic_year_id=_selected_academic_year_id(request),
+    )
     return render(request, "portal/student/partials/courses_student.html", context)
 
 
@@ -432,14 +465,18 @@ def shop_cart_partial(request):
 @login_required
 @role_required("student")
 def timetable_partial(request):
-    context = get_student_timetable_context(request.user)
+    context = get_student_timetable_context(
+        request.user,
+        academic_year_id=_selected_academic_year_id(request),
+    )
     return render(request, "portal/student/partials/calendar_student.html", context)
 
 
 @login_required
 @role_required("student")
 def student_courses(request):
-    academic_snapshot = get_student_academic_snapshot(request.user)
+    academic_year_id = _selected_academic_year_id(request)
+    academic_snapshot = get_student_academic_snapshot(request.user, academic_year_id=academic_year_id)
     enrollment = academic_snapshot["academic_enrollment"]
 
     ec_rows = []
@@ -465,6 +502,7 @@ def student_courses(request):
             "academic_status": academic_snapshot["academic_status"],
             "academic_status_message": academic_snapshot["academic_status_message"],
             "ec_rows": ec_rows,
+            "selected_academic_year_id": academic_snapshot["selected_academic_year_id"],
         },
     )
 
@@ -472,7 +510,10 @@ def student_courses(request):
 @login_required
 @role_required("student")
 def ec_detail(request, ec_id):
-    academic_snapshot = get_student_academic_snapshot(request.user)
+    academic_snapshot = get_student_academic_snapshot(
+        request.user,
+        academic_year_id=_selected_academic_year_id(request),
+    )
     enrollment = get_object_or_404(
         AcademicEnrollment.objects.filter(pk=getattr(academic_snapshot["academic_enrollment"], "pk", None)),
     )
@@ -533,7 +574,10 @@ def ec_preview(request, ec_id):
     """
     Apercu "leger" d'un EC pour la liste des cours (avant ouverture du detail complet).
     """
-    academic_snapshot = get_student_academic_snapshot(request.user)
+    academic_snapshot = get_student_academic_snapshot(
+        request.user,
+        academic_year_id=_selected_academic_year_id(request),
+    )
     enrollment = get_object_or_404(
         AcademicEnrollment.objects.filter(pk=getattr(academic_snapshot["academic_enrollment"], "pk", None)),
     )
@@ -590,7 +634,10 @@ def ec_preview(request, ec_id):
 @role_required("student")
 @require_POST
 def update_content_progress(request, content_id):
-    academic_snapshot = get_student_academic_snapshot(request.user)
+    academic_snapshot = get_student_academic_snapshot(
+        request.user,
+        academic_year_id=_selected_academic_year_id(request),
+    )
     enrollment = get_object_or_404(
         AcademicEnrollment.objects.filter(pk=getattr(academic_snapshot["academic_enrollment"], "pk", None)),
     )
@@ -641,6 +688,7 @@ def update_content_progress(request, content_id):
 @role_required("student")
 @require_POST
 def update_settings_profile(request):
+    academic_year_id = _selected_academic_year_id(request)
     try:
         context = update_editable_fields(
             request.user,
@@ -648,11 +696,12 @@ def update_settings_profile(request):
                 "email": request.POST.get("email", ""),
                 "phone": request.POST.get("phone", ""),
             },
+            academic_year_id=academic_year_id,
         )
         context["form_success"] = "Informations mises a jour."
         context["form_errors"] = {}
     except ValidationError as exc:
-        context = get_profile_data(request.user)
+        context = get_profile_data(request.user, academic_year_id=academic_year_id)
         context["form_success"] = ""
         context["form_errors"] = getattr(exc, "message_dict", {"__all__": exc.messages})
     return _render_settings_response(request, context)
@@ -662,16 +711,18 @@ def update_settings_profile(request):
 @role_required("student")
 @require_POST
 def upload_settings_document(request):
+    academic_year_id = _selected_academic_year_id(request)
     try:
         context = handle_document_upload(
             request.user,
             request.FILES.get("file"),
             int(request.POST.get("document_type_id") or 0),
+            academic_year_id=academic_year_id,
         )
         context["form_success"] = "Document televerse avec succes."
         context["form_errors"] = {}
     except (ValidationError, ValueError) as exc:
-        context = get_profile_data(request.user)
+        context = get_profile_data(request.user, academic_year_id=academic_year_id)
         if isinstance(exc, ValidationError):
             context["form_errors"] = getattr(exc, "message_dict", {"__all__": exc.messages})
         else:
@@ -684,12 +735,13 @@ def upload_settings_document(request):
 @role_required("student")
 @require_POST
 def update_settings_account(request):
+    academic_year_id = _selected_academic_year_id(request)
     try:
-        context = update_account_center(request.user, request.POST)
+        context = update_account_center(request.user, request.POST, academic_year_id=academic_year_id)
         context["form_success"] = "Informations du compte mises a jour."
         context["form_errors"] = {}
     except ValidationError as exc:
-        context = get_profile_data(request.user)
+        context = get_profile_data(request.user, academic_year_id=academic_year_id)
         context["form_success"] = ""
         context["form_errors"] = getattr(exc, "message_dict", {"__all__": exc.messages})
     return _render_settings_response(request, context)
@@ -699,12 +751,13 @@ def update_settings_account(request):
 @role_required("student")
 @require_POST
 def update_settings_preferences(request):
+    academic_year_id = _selected_academic_year_id(request)
     try:
-        context = update_account_preferences(request.user, request.POST)
+        context = update_account_preferences(request.user, request.POST, academic_year_id=academic_year_id)
         context["form_success"] = "Preferences mises a jour."
         context["form_errors"] = {}
     except ValidationError as exc:
-        context = get_profile_data(request.user)
+        context = get_profile_data(request.user, academic_year_id=academic_year_id)
         context["form_success"] = ""
         context["form_errors"] = getattr(exc, "message_dict", {"__all__": exc.messages})
     return _render_settings_response(request, context)
@@ -714,8 +767,9 @@ def update_settings_preferences(request):
 @role_required("student")
 @require_POST
 def update_settings_password(request):
+    academic_year_id = _selected_academic_year_id(request)
     try:
-        context = update_account_password(request.user, request.POST)
+        context = update_account_password(request.user, request.POST, academic_year_id=academic_year_id)
         update_session_auth_hash(request, request.user)
         from accounts.models import AccountSecurityEvent, AccountSessionRecord
         from accounts.session_policy import SESSION_ID_KEY, log_security_event
@@ -737,7 +791,7 @@ def update_settings_password(request):
         context["form_success"] = "Mot de passe mis a jour."
         context["form_errors"] = {}
     except ValidationError as exc:
-        context = get_profile_data(request.user)
+        context = get_profile_data(request.user, academic_year_id=academic_year_id)
         context["form_success"] = ""
         context["form_errors"] = getattr(exc, "message_dict", {"__all__": exc.messages})
     return _render_settings_response(request, context)

@@ -9,7 +9,15 @@
   const loadingSelector = `#${key}-loading`;
   const modalContentSelector = `#${key}-modal-content`;
   const drawerContentSelector = `#${key}-drawer-content`;
+  // Teacher and secretary workflows predate the certified shell and still
+  // target the shared SG containers. Keep this adapter until their fragments
+  // are migrated, while opening the same certified overlays as every role.
+  const legacyOverlayContentSelector =
+    key === "teacher" || key === "secretary" ? "#sg-drawer-content" : "";
+  const legacyModalContentSelector =
+    key === "teacher" || key === "secretary" ? "#sg-modal-content" : "";
   let pendingConfirmation = null;
+  let workspaceRequestSequence = 0;
 
   function dispatchOverlay(action, id) {
     window.dispatchEvent(
@@ -41,6 +49,12 @@
     }
     if (requestTargets(event, drawerContentSelector)) {
       dispatchOverlay("open", `${key}-drawer`);
+    }
+    if (legacyOverlayContentSelector && requestTargets(event, legacyOverlayContentSelector)) {
+      dispatchOverlay("open", `${key}-drawer`);
+    }
+    if (legacyModalContentSelector && requestTargets(event, legacyModalContentSelector)) {
+      dispatchOverlay("open", `${key}-modal`);
     }
   }
 
@@ -82,6 +96,28 @@
     if (indicator) indicator.classList.toggle("hidden", !busy);
   }
 
+  function workspaceRequestId(event) {
+    const responseUrl = event.detail && event.detail.xhr && event.detail.xhr.responseURL;
+    if (!responseUrl) return "";
+    try {
+      return new URL(responseUrl, window.location.origin).searchParams.get("_workspace_request") || "";
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  function isCurrentWorkspaceRequest(event) {
+    const target = workspace();
+    const responseUrl = event.detail && event.detail.xhr && event.detail.xhr.responseURL;
+    if (!target || !responseUrl) return true;
+    try {
+      const requestId = new URL(responseUrl, window.location.origin).searchParams.get("_workspace_request");
+      return !requestId || !target.dataset.workspaceRequestId || target.dataset.workspaceRequestId === requestId;
+    } catch (_error) {
+      return true;
+    }
+  }
+
   const api = {
     key,
     root,
@@ -94,6 +130,13 @@
   };
   window.ESFECertifiedDashboard = api;
 
+  // Generic staff endpoints (messaging compose, ...) ask the shell to close
+  // its modal after a successful HTMX exchange. This listener must be
+  // registered once, not once per document click.
+  document.body.addEventListener("certified-dashboard:close-modal", () => {
+    dispatchOverlay("close", `${key}-modal`);
+  });
+
   document.addEventListener("click", (event) => {
     const item = event.target.closest("[data-ui-nav-item][data-nav-key]");
     if (item) {
@@ -105,7 +148,7 @@
         }),
       );
     }
-    if (key === "manager") {
+  if (key === "manager") {
       const confirmButton = event.target.closest(
         `[data-ui-confirm-accept="${key}-confirm"]`,
       );
@@ -136,12 +179,29 @@
     openRequestedOverlay(event);
   });
 
+  document.body.addEventListener("htmx:configRequest", (event) => {
+    if (!requestTargets(event, workspaceSelector)) return;
+    const target = workspace();
+    if (!target) return;
+    // The DG controller owns its request token and places it directly in the
+    // section URL. Replacing that token here made its own stale-response guard
+    // reject the initial response, leaving the workspace visually blank.
+    if (key === "executive" && target.matches("[data-dg-dashboard]")) return;
+    const requestId = `${Date.now()}-${++workspaceRequestSequence}`;
+    event.detail.parameters = event.detail.parameters || {};
+    event.detail.parameters._workspace_request = requestId;
+    target.dataset.workspaceRequestId = requestId;
+  });
+
   // IT workflow actions already publish this event after a successful save.
   // Keeping the bridge in the certified shell lets their content use the
   // shared UI Core modal without owning a second overlay implementation.
   if (key === "it-dashboard") {
     document.body.addEventListener("it-modal-close", () => {
       dispatchOverlay("close", `${key}-modal`);
+    });
+    document.body.addEventListener("it-temporary-password-ready", () => {
+      dispatchOverlay("open", `${key}-modal`);
     });
     window.addEventListener("ui-overlay-close", (event) => {
       if (event.detail && event.detail.id === `${key}-drawer`) {
@@ -153,8 +213,16 @@
 
   document.body.addEventListener("htmx:afterRequest", (event) => {
     if (requestTargets(event, workspaceSelector)) {
+      if (!isCurrentWorkspaceRequest(event)) return;
       setBusy(false);
     }
+  });
+
+  document.body.addEventListener("htmx:beforeSwap", (event) => {
+    if (!requestTargets(event, workspaceSelector) || isCurrentWorkspaceRequest(event)) return;
+    // Une réponse plus ancienne ne doit jamais remplacer la section choisie
+    // après elle : même contrat de fluidité que le cockpit DG.
+    event.preventDefault();
   });
 
   document.body.addEventListener("htmx:afterSwap", (event) => {
@@ -162,8 +230,23 @@
     openRequestedOverlay(event);
     syncItNotesDrawerMode(target);
     if (!target || !target.matches(workspaceSelector)) return;
+    if (!isCurrentWorkspaceRequest(event)) return;
     setBusy(false);
     setActiveNavigation(sectionFrom(target));
+  });
+
+  document.body.addEventListener("htmx:responseError", (event) => {
+    const target = event.detail && event.detail.target;
+    if (!target) return;
+    if (target.matches(workspaceSelector)) {
+      if (!isCurrentWorkspaceRequest(event)) return;
+      setBusy(false);
+      return;
+    }
+    const overlayTargets = [modalContentSelector, drawerContentSelector, legacyModalContentSelector, legacyOverlayContentSelector]
+      .filter(Boolean);
+    if (!overlayTargets.some((selector) => target.matches(selector))) return;
+    target.innerHTML = '<div class="rounded-ui-card border border-ui-danger/40 bg-ui-danger-soft p-4 text-sm font-semibold text-ui-danger" role="alert">Le contenu demandé est indisponible. Fermez cette fenêtre puis réessayez.</div>';
   });
 
   setActiveNavigation(sectionFrom(workspace()));

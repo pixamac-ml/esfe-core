@@ -24,6 +24,13 @@ def get_ecs_by_ue(ue):
     return EC.objects.filter(ue=ue).exclude(structure_status=EC.STRUCTURE_ARCHIVED).order_by("id")
 
 
+def semester_has_active_ecs(semester):
+    """Whether a semester exposes at least one non-archived subject."""
+    return EC.objects.filter(ue__semester=semester).exclude(
+        structure_status=EC.STRUCTURE_ARCHIVED
+    ).exists()
+
+
 def get_total_credits_by_semester(semester):
     total = (
         EC.objects.filter(ue__semester=semester)

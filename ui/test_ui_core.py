@@ -241,6 +241,19 @@ class UiCoreComponentTests(SimpleTestCase):
 
 
 class UiCoreArchitectureTests(SimpleTestCase):
+    def test_base_uses_one_ui_core_feedback_pipeline(self):
+        base = Path(settings.BASE_DIR, "templates", "base.html").read_text(encoding="utf-8")
+        toast_host = Path(settings.BASE_DIR, "templates", "toast.html").read_text(encoding="utf-8")
+        legacy_toast = Path(
+            settings.BASE_DIR, "ui", "templates", "dashboard", "toast.html"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("src/js/ui_core/index.js", base)
+        self.assertNotIn("ESFE OPTIMISTIC ENGINE", base)
+        self.assertNotIn("esfe-spinner", base)
+        self.assertIn('id="ui-toast-region"', toast_host)
+        self.assertNotIn("esfeToastCenter", legacy_toast)
+
     def test_components_do_not_import_business_apps_or_models(self):
         root = Path(settings.BASE_DIR, "ui", "components", "ui_core")
         forbidden_roots = {

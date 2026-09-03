@@ -86,6 +86,9 @@
     .signature-block { text-align: center; min-width: 120px; }
     .signature-block .signature-line { width: 130px; height: 1px; background: #444; margin: 4px auto 2px; }
     .signature-block .signature-label { font-size: 9px; font-weight: 600; color: #444; }
+    .signature-image { display: block; width: 130px; height: 48px; object-fit: contain; margin: 0 auto 2px; }
+    .signature-meta { font-size: 6.5px; color: #666; margin-top: 2px; }
+    .has-electronic-signature > .signature-block:nth-of-type(2) { display: none; }
     .footer { margin-top: auto; padding-top: 10px; border-top: 1px solid #d0d5e0; text-align: center; font-size: 8px; color: #777; }
     .footer .footer-tagline { font-weight: 600; color: #b8860b; letter-spacing: 2px; text-transform: uppercase; font-size: 8px; margin-top: 3px; }
   </style>
@@ -101,7 +104,7 @@
       <div class="header-tagline">Demain, c'est aujourd'hui</div>
       <div class="header-address">Djélibougou • Face à la Maison de l'Automobile<br>BP 00223 • Bamako • Mali</div>
     </div>
-    <div class="document-title"><h1>PIÈCE DE CAISSE</h1></div>
+    <div class="document-title"><h1>{{ document_title|default:"PIÈCE DE CAISSE" }}</h1></div>
     <div class="meta-grid">
       {% if receipt_number %}<span class="meta-item"><span class="meta-label">Pièce N° :</span> {{ receipt_number }}</span>{% endif %}
       {% if date %}<span class="meta-item"><span class="meta-label">Date :</span> {{ date }}</span>{% endif %}
@@ -115,6 +118,7 @@
         {% if source %}<tr><td class="label">Source</td><td>{{ source }}</td></tr>{% endif %}
         {% if operation_date %}<tr><td class="label">Date d'opération</td><td>{{ operation_date }}</td></tr>{% endif %}
         {% if label %}<tr><td class="label">Libellé</td><td>{{ label }}</td></tr>{% endif %}
+        {% if beneficiary %}<tr><td class="label">{{ beneficiary_label|default:"Bénéficiaire" }}</td><td>{{ beneficiary }}</td></tr>{% endif %}
         {% if agent %}<tr><td class="label">Agent</td><td>{{ agent }}</td></tr>{% endif %}
         {% if notes %}<tr><td class="label">Observation</td><td>{{ notes }}</td></tr>{% endif %}
       </table>
@@ -127,10 +131,11 @@
       </div>
     </div>
     {% endif %}
-    <div class="legal-text">Document généré automatiquement par le système de gestion ESFe. Cette pièce de caisse constitue une preuve comptable officielle.</div>
-    <div class="signature-row">
-      <div class="signature-block"><div class="signature-line"></div><div class="signature-label">Signature</div></div>
-      <div class="signature-block"><div class="signature-line"></div><div class="signature-label">Cachet de l'école</div></div>
+    <div class="legal-text">Document généré automatiquement par le système de gestion ESFe. Cette pièce de caisse constitue une preuve comptable officielle{% if is_personnel_withdrawal %} du retrait effectivement remis{% endif %}.</div>
+    <div class="signature-row{% if signature_data %} has-electronic-signature{% endif %}">
+      {% if signature_data %}<div class="signature-block"><img class="signature-image" src="{{ signature_data }}" alt="Signature electronique"><div class="signature-meta">Signe le {{ signature_date }} · empreinte {{ signature_hash_short }}</div><div class="signature-label">Signature du bénéficiaire</div></div>{% endif %}
+      <div class="signature-block"><div class="signature-line"></div><div class="signature-label">{% if is_personnel_withdrawal %}Signature du bénéficiaire{% else %}Signature{% endif %}</div></div>
+      <div class="signature-block"><div class="signature-line"></div><div class="signature-label">{% if is_personnel_withdrawal %}Gestionnaire / cachet{% else %}Cachet de l'école{% endif %}</div></div>
     </div>
     <div class="footer">
       <div>BP 00223 • Bamako • Mali &nbsp;|&nbsp; contact@esfe.ml • www.esfe.ml</div>

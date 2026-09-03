@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from academics.models import AcademicClass, AcademicScheduleEvent
 from portal.services.supervisor_dashboard_service import get_supervisor_class_picker_bundle
+from portal.services.director.timetable_service import build_weekly_timetable_grid
 from portal.services.supervisor_service import (
     build_attendance_monthly_report_context,
     build_attendance_section_context,
@@ -47,8 +48,8 @@ SECTION_META = {
     ),
     "teachers": (
         "Supervision des cours",
-        "Présence des enseignants",
-        "Constatez la présence, le retard et la réalisation de chaque cours prévu.",
+        "Séances à superviser",
+        "Rapprochez le planning officiel, la déclaration de l’enseignant et le constat terrain avant toute validation.",
     ),
     "schedule": (
         "Organisation publiée",
@@ -82,10 +83,17 @@ DEFAULT_VIEWS = {
     "classes": "overview",
     "attendance": "call",
     "teachers": "today",
-    "schedule": "today",
+    # The schedule section is class-centred: open directly on the published
+    # weekly grid, not on a branch-wide summary of today's sessions.
+    "schedule": "week",
     "signals": "overview",
     "reports": "overview",
 }
+
+# The active class is a working context, not a one-shot display filter.  The
+# URL remains the shareable source when present; the session keeps that context
+# while the supervisor moves through independent dashboard sections.
+ACTIVE_CLASS_SESSION_KEY = "supervisor_active_class_id"
 
 LEGACY_SECTIONS = {
     "attendance_report": ("attendance", "history"),
@@ -167,6 +175,27 @@ def _selected_class(branch, raw_id):
         .filter(branch=branch, is_active=True, pk=int(raw_id))
         .first()
     )
+
+
+def _resolve_active_class(request, branch):
+    """Resolve and persist a branch-scoped class context for the workspace."""
+    session = getattr(request, "session", None)
+    has_explicit_value = "class_id" in request.GET or "class_id" in request.POST
+    raw_id = request.GET.get("class_id") or request.POST.get("class_id")
+    if not has_explicit_value:
+        raw_id = session.get(ACTIVE_CLASS_SESSION_KEY) if session is not None else None
+
+    selected_class = _selected_class(branch, raw_id)
+    if has_explicit_value and session is not None:
+        if selected_class is not None:
+            request.session[ACTIVE_CLASS_SESSION_KEY] = str(selected_class.id)
+        else:
+            request.session.pop(ACTIVE_CLASS_SESSION_KEY, None)
+    elif raw_id and selected_class is None and session is not None:
+        # A class archived or moved out of the branch must not survive as a
+        # stale context in the session.
+        request.session.pop(ACTIVE_CLASS_SESSION_KEY, None)
+    return selected_class
 
 
 def _signalment_rows(branch, *, transmitted_only=False):
@@ -281,10 +310,7 @@ def _signal_form_context(branch):
 def build_supervisor_workspace_context(request, *, branch, section=None, toast=None):
     resolved_section, active_view = resolve_section_view(request, section=section)
     _, class_picker_items, classes_qs = get_supervisor_class_picker_bundle(branch=branch)
-    selected_class = _selected_class(
-        branch,
-        request.GET.get("class_id") or request.POST.get("class_id"),
-    )
+    selected_class = _resolve_active_class(request, branch)
     crumb, panel_title, panel_lede = SECTION_META[resolved_section]
     today = timezone.localdate()
     week_start = _parse_date(
@@ -395,9 +421,17 @@ def build_supervisor_workspace_context(request, *, branch, section=None, toast=N
             context["attendance_alerts_page"] = alerts_page
 
     elif resolved_section == "teachers":
+        teacher_session_date = _parse_date(
+            request.GET.get("session_date") or request.POST.get("session_date"),
+            today,
+        )
+        context["teacher_session_date"] = teacher_session_date
+        context["teacher_session_date_iso"] = teacher_session_date.isoformat()
         context.update(
             build_teachers_section_context(
                 branch=branch,
+                academic_class=selected_class,
+                session_date=teacher_session_date,
                 page_number=request.GET.get("teachers_page") or request.POST.get("teachers_page") or 1,
             )
         )
@@ -414,6 +448,11 @@ def build_supervisor_workspace_context(request, *, branch, section=None, toast=N
         home = build_home_section_context(branch=branch, selected_class=selected_class)
         context["home_today_sessions"] = home["home_today_sessions"]
         if active_view == "week" and selected_class:
+            # Same official weekly-grid contract as the DE, read-only here.
+            context["supervisor_timetable_grid"] = build_weekly_timetable_grid(
+                selected_class,
+                week_start=week_start,
+            )
             context.update(
                 build_schedule_section_context(
                 branch=branch,

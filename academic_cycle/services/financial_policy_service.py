@@ -19,11 +19,16 @@ def determine_financial_status(position):
 
 
 def compute_student_financial_position(student, academic_year):
-    enrollment = student.user.academic_enrollments.filter(academic_year=academic_year).select_related("branch").first()
-    branch = enrollment.branch if enrollment else student.inscription.candidature.branch
-    due = getattr(student.inscription, "amount_due", 0) or 0
+    enrollment = (
+        student.user.academic_enrollments.filter(academic_year=academic_year)
+        .select_related("branch", "inscription", "inscription__candidature")
+        .first()
+    )
+    inscription = getattr(enrollment, "inscription", None) or student.inscription
+    branch = enrollment.branch if enrollment else inscription.candidature.branch
+    due = getattr(inscription, "amount_due", 0) or 0
     paid = (
-        Payment.objects.filter(inscription=student.inscription, status=Payment.STATUS_VALIDATED).aggregate(total=Sum("amount"))["total"]
+        Payment.objects.filter(inscription=inscription, status=Payment.STATUS_VALIDATED).aggregate(total=Sum("amount"))["total"]
         or 0
     )
     previous = (

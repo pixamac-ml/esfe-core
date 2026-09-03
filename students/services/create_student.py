@@ -78,6 +78,33 @@ def create_student_after_first_payment(inscription):
         if not has_validated_payment:
             return None
 
+        # A re-enrollment owns a new administrative inscription but must never
+        # create a second Student/User.  The portal workflow keeps the source
+        # identity and activates its annual AcademicEnrollment after payment.
+        from students.models import StudentYearDecision
+
+        reenrollment_decision = (
+            StudentYearDecision.objects.filter(target_inscription=inscription_locked)
+            .select_related("student", "target_enrollment")
+            .first()
+        )
+        if reenrollment_decision is not None:
+            from portal.services.reenrollment_service import activate_reenrollment_from_payment
+
+            activated_decision = activate_reenrollment_from_payment(
+                inscription=inscription_locked,
+            )
+            student = activated_decision.student if activated_decision else reenrollment_decision.student
+            return {
+                "student": student,
+                "password": None,
+                "created": False,
+                "academic_enrollment": {
+                    "status": "reenrollment_activated",
+                    "enrollment": getattr(activated_decision, "target_enrollment", None),
+                },
+            }
+
         existing_student = (
             Student.objects
             .filter(inscription=inscription_locked)

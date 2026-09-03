@@ -139,13 +139,19 @@ AUTHENTICATION_BACKENDS = [
 # ==================================================
 # DJANGO-AXES (protection brute-force connexion)
 # ==================================================
-# Par defaut, axes bloque apres 3 echecs SANS jamais debloquer
-# automatiquement (AXES_COOLOFF_TIME=None -> blocage permanent tant
-# qu'un admin ne lance pas "manage.py axes_reset_username <user>").
-# On assouplit le seuil et on ajoute un deblocage automatique.
+# La configuration par defaut d'Axes est basee uniquement sur l'adresse IP.
+# Dans une annexe, plusieurs personnes partagent souvent la meme connexion :
+# les erreurs d'un compte ne doivent donc jamais bloquer les autres comptes.
+# Le verrouillage est temporaire et cible le couple compte + adresse IP.
 AXES_FAILURE_LIMIT = 5
-AXES_COOLOFF_TIME = timedelta(minutes=30)
+AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
+AXES_COOLOFF_TIME = timedelta(minutes=15)
 AXES_RESET_ON_SUCCESS = True
+AXES_RESET_COOL_OFF_ON_FAILURE_DURING_LOCKOUT = False
+AXES_COOLOFF_MESSAGE = (
+    "Trop de tentatives pour ce compte. Reessayez dans 15 minutes ou contactez "
+    "l'informaticien de votre annexe."
+)
 
 LOGGING = {
     "version": 1,

@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 
 from accounts.dashboards.helpers import get_user_branch, is_global_viewer
 from .selectors import get_active_students, get_documents_queryset, get_registry_queryset
-from .models import Appointment, DocumentReceipt, Meeting, MeetingMinutes, RegistryEntry, SecretaryTask, VisitorLog
+from .models import Appointment, DocumentReceipt, Meeting, MeetingMinutes, RegistryEntry, SecretaryCall, SecretaryTask, SecretaryTransmission, VisitorLog
 
 User = get_user_model()
 
@@ -263,6 +263,26 @@ class SecretaryTaskForm(SecretaryBaseForm):
             "related_student": "Etudiant concerne",
             "due_date": "Date d'echeance",
         }
+
+
+class SecretaryCallForm(SecretaryBaseForm):
+    class Meta:
+        model = SecretaryCall
+        fields = ["call_type", "interlocutor", "phone", "subject", "target_service", "priority", "call_status", "related_student", "notes"]
+        labels = {"call_type": "Type d'appel", "interlocutor": "Interlocuteur", "phone": "Téléphone", "subject": "Objet", "target_service": "Destinataire / service", "priority": "Priorité", "call_status": "État", "related_student": "Étudiant concerné", "notes": "Notes"}
+
+    def _apply_scope(self):
+        self.fields["related_student"].queryset = self._student_queryset()
+
+
+class SecretaryTransmissionForm(SecretaryBaseForm):
+    class Meta:
+        model = SecretaryTransmission
+        fields = ["subject", "details", "target_service", "priority", "related_student"]
+        labels = {"subject": "Objet", "details": "Message / dossier", "target_service": "Service destinataire", "priority": "Priorité", "related_student": "Étudiant concerné"}
+
+    def _apply_scope(self):
+        self.fields["related_student"].queryset = self._student_queryset()
 
 
 class MeetingForm(SecretaryBaseForm):

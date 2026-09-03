@@ -1,5 +1,5 @@
 {% load humanize %}
-<div class="p-5">
+<div class="p-5" data-overlay-title="{{ modal_title|default:'Détail exécutif' }}">
   <div class="mb-5 flex items-start justify-between gap-4">
     <div>
       <p class="text-xs font-black uppercase tracking-[.18em] text-blue-600">Fiche de decision</p>
@@ -155,9 +155,9 @@
       <div class="rounded-2xl border border-slate-200 bg-white p-4">
         <p class="text-xs font-black uppercase tracking-wide text-slate-500">Actions</p>
         <div class="mt-3 space-y-2">
-          <button type="button" class="dg-action w-full" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=branch&branch_id={{ drawer_branch.id }}')">Ouvrir</button>
-          <button type="button" class="dg-action w-full" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=staff&branch_id={{ drawer_branch.id }}')">Staff</button>
-          <button type="button" class="dg-action w-full" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=audit&branch_id={{ drawer_branch.id }}')">Audit</button>
+          <button type="button" class="dg-action w-full" onclick="dgOpenScopedSection('annexes', '{{ drawer_branch.id }}')">Ouvrir l'annexe</button>
+          <button type="button" class="dg-action w-full" onclick="dgOpenScopedSection('rh', '{{ drawer_branch.id }}')">Personnel</button>
+          <button type="button" class="dg-action w-full" onclick="dgOpenScopedSection('audit', '{{ drawer_branch.id }}')">Audit</button>
           <form method="post" action="{% url 'accounts_portal:dg_action' %}" onsubmit="return dgSubmitAction(this)">
             {% csrf_token %}
             <input type="hidden" name="action" value="followup_finance">
@@ -165,7 +165,7 @@
             <button type="submit" class="dg-action w-full">Suivi finance</button>
           </form>
           {% if drawer_branch_summary.open_alert_count %}
-          <button type="button" class="dg-action w-full" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=alert&branch_id={{ drawer_branch.id }}')">Alertes</button>
+          <button type="button" class="dg-action w-full" onclick="dgOpenScopedSection('alerts', '{{ drawer_branch.id }}')">Alertes</button>
           {% endif %}
         </div>
       </div>
@@ -291,7 +291,7 @@
       </div>
     </section>
     <aside class="space-y-3">
-      <button type="button" class="dg-action w-full" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=finance')">Ouvrir</button>
+      <button type="button" class="dg-action w-full" onclick="dgOpenScopedSection('finance')">Ouvrir la finance</button>
     </aside>
   </div>
   {% elif modal_kind == "analytics" %}
@@ -325,7 +325,7 @@
       </div>
     </section>
     <aside class="space-y-3">
-      <button type="button" class="dg-action w-full" onclick="dgOpenDrawer('{% url 'accounts_portal:dg_drawer' %}?kind=analytics')">Ouvrir</button>
+      <button type="button" class="dg-action w-full" onclick="dgOpenScopedSection('analytics')">Ouvrir les analyses</button>
     </aside>
   </div>
   {% elif modal_kind == "rh" %}
@@ -340,7 +340,7 @@
   </div>
   {% elif modal_kind == "realtime" %}
   <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-    <p class="text-xs font-black uppercase tracking-wide text-emerald-600">Live</p>
+    <p class="text-xs font-black uppercase tracking-wide text-emerald-600">Suivi actualisé</p>
     <h4 class="mt-1 text-2xl font-black text-slate-900">Activite du jour</h4>
     <div class="mt-4 grid grid-cols-3 gap-3">
       <div class="rounded-xl bg-white p-3"><p class="text-xs font-bold text-slate-500">Cours semaine</p><p class="mt-1 text-xl font-black">{{ drawer_schedule.total_events|default:0|intcomma }}</p></div>

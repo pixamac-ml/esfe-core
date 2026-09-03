@@ -1,0 +1,25 @@
+{% load component_tags %}
+<div class="space-y-5" data-director-annual-bulletins>
+  {% component "ui_core.page_header" eyebrow="Documents académiques" title="Bulletins annuels" subtitle=annual_bulletin_class.display_name %}
+    {% fill "actions" %}{% component "ui_core.status_badge" label="Décisions officielles" tone="success" %}{% endcomponent %}{% endfill %}
+  {% endcomponent %}
+  <div class="grid gap-3 sm:grid-cols-3">
+    {% component "ui_core.stat_card" label="Étudiants délibérés" value=annual_bulletin_rows|length icon="users" tone="neutral" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Documents publiés" value=annual_bulletin_rows|length icon="file-check-2" tone="success" compact=True %}{% endcomponent %}
+    {% component "ui_core.stat_card" label="Statut" value="Figés" icon="shield-check" tone="primary" compact=True %}{% endcomponent %}
+  </div>
+  {% component "ui_core.panel" title="Documents individuels" subtitle="La décision annuelle affichée provient exclusivement de la délibération finale." padding=False %}
+    <div class="overflow-x-auto">
+      <table class="min-w-[760px] w-full text-left text-sm">
+        <thead class="bg-ui-surface-muted text-[11px] font-black uppercase tracking-wide text-ui-text-muted"><tr><th class="px-4 py-3">Matricule</th><th class="px-4 py-3">Étudiant</th><th class="px-4 py-3">Décision annuelle</th><th class="px-4 py-3">Crédits</th><th class="px-4 py-3 text-right">Actions</th></tr></thead>
+        <tbody class="divide-y divide-ui-border">
+          {% for row in annual_bulletin_rows %}
+            <tr class="hover:bg-ui-surface-hover"><td class="px-4 py-3 text-xs font-bold text-ui-text-muted">{{ row.decision.student.matricule|default:"-" }}</td><td class="px-4 py-3 font-bold text-ui-text">{{ row.decision.student.full_name }}</td><td class="px-4 py-3 font-semibold text-ui-text">{{ row.decision.synthesis_snapshot.academic_decision }}</td><td class="px-4 py-3">{% if row.bulletin %}{{ row.bulletin.credits_obtained }}/{{ row.bulletin.total_credits }}{% else %}—{% endif %}</td><td class="px-4 py-3"><div class="flex justify-end gap-2">{% if row.bulletin %}<button type="button" hx-get="{% url 'accounts_portal:director_drawer' %}?panel=transcript_preview&bulletin_id={{ row.bulletin.id }}" hx-target="#director-drawer-content" hx-swap="innerHTML" class="ui-focus-ring inline-flex h-9 items-center gap-1 rounded-ui-button border border-ui-border bg-ui-surface px-3 text-xs font-semibold text-ui-text"><i data-lucide="eye" class="h-4 w-4"></i>Aperçu</button><a href="{% url 'academics:bulletin_pdf' row.bulletin.id %}" target="_blank" class="ui-focus-ring inline-flex h-9 items-center gap-1 rounded-ui-button bg-ui-primary px-3 text-xs font-semibold text-white"><i data-lucide="download" class="h-4 w-4"></i>PDF</a>{% else %}<form hx-post="{% url 'accounts_portal:director_bulletin_action' %}" hx-target="#director-results-subcontent" hx-swap="innerHTML">{% csrf_token %}<input type="hidden" name="action" value="generate_annual_student"><input type="hidden" name="enrollment_id" value="{{ row.enrollment.id }}"><button type="submit" class="ui-focus-ring inline-flex h-9 items-center gap-1 rounded-ui-button bg-ui-primary px-3 text-xs font-semibold text-white"><i data-lucide="file-plus-2" class="h-4 w-4"></i>Générer</button></form>{% endif %}</div></td></tr>
+          {% empty %}
+            <tr><td colspan="5" class="px-4 py-8 text-center text-ui-text-muted">Aucun bulletin annuel publié pour cette classe.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endcomponent %}
+</div>

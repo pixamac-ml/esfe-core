@@ -9,9 +9,12 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from accounts.forms import TeacherHonorariumEntryForm
-from accounts.models import BranchCashMovement, SensitiveActionRequest, TeacherHonorariumEntry
+from accounts.models import BranchCashMovement, SensitiveActionRequest, TeacherHonorariumEntry, PaymentSignatureSession
 from accounts.services.accounting_documents import create_cash_movement
+from accounts.services.financial_integrity import assert_financial_period_open
+from accounts.services.wallets import configured_wallet_for_category, consume_wallet_for_cash_movement, wallet_balance
 from accounts.services.manager_intelligence import (
+    get_teacher_honorarium_validated_hours,
     get_branch_cash_balance,
     lock_branch_cash_balance,
     mark_ready_teacher_honorarium_entries_available,
@@ -27,19 +30,30 @@ from accounts.services.sensitive_actions import (
 from accounts.dashboards.htmx_utils import (
     get_branch_teacher_profile,
     get_salary_period_from_request,
-    manager_closure_redirect_response,
+    manager_honorarium_redirect_response,
     manager_required,
     manager_section_notice_redirect_response,
 )
+from accounts.dashboards.htmx_payment_signatures import payment_signature_start
 
 
-HONORARIUM_EDITABLE_FIELDS = ["hourly_rate", "validated_hours", "adjustments", "deductions", "advances", "notes"]
+HONORARIUM_EDITABLE_FIELDS = ["hourly_rate", "adjustments", "deductions", "advances", "notes"]
 
 
 def _json_safe(value):
     if isinstance(value, Decimal):
         return str(value)
     return value
+
+
+def _honorarium_withdrawal_documents(branch, honorarium_entry):
+    if not honorarium_entry:
+        return ()
+    return BranchCashMovement.objects.filter(
+        branch=branch,
+        source=BranchCashMovement.SOURCE_HONORARIUM,
+        source_reference__startswith=f"HON-{honorarium_entry.pk}-",
+    ).order_by("-created_at")
 
 
 @manager_required
@@ -62,6 +76,11 @@ def teacher_honorarium_detail(request: HttpRequest, pk: int) -> HttpResponse:
         form.initial.update({
             "hourly_rate": profile.teacher_hourly_rate,
         })
+    validated_hours = (
+        honorarium_entry.validated_hours
+        if honorarium_entry
+        else get_teacher_honorarium_validated_hours(request.branch, profile.user, payroll_month)
+    )
     return render(
         request,
         "accounts/dashboard/partials/teacher_honorarium_modal.html",
@@ -71,6 +90,9 @@ def teacher_honorarium_detail(request: HttpRequest, pk: int) -> HttpResponse:
             "honorarium_form": form,
             "payroll_month": payroll_month,
             "available_cash_balance": get_branch_cash_balance(request.branch),
+            "validated_hours": validated_hours,
+            "withdrawal_documents": _honorarium_withdrawal_documents(request.branch, honorarium_entry),
+            "payment_signature_session": _active_honorarium_signature(honorarium_entry),
         },
     )
 
@@ -80,6 +102,10 @@ def teacher_honorarium_detail(request: HttpRequest, pk: int) -> HttpResponse:
 def teacher_honorarium_upsert(request: HttpRequest, pk: int) -> HttpResponse:
     profile = get_branch_teacher_profile(request.branch, pk)
     payroll_month = get_salary_period_from_request(request)
+    try:
+        assert_financial_period_open(request.branch, payroll_month)
+    except ValidationError as exc:
+        return HttpResponse(" ".join(exc.messages), status=400)
     honorarium_entry = (
         TeacherHonorariumEntry.objects
         .filter(
@@ -105,6 +131,12 @@ def teacher_honorarium_upsert(request: HttpRequest, pk: int) -> HttpResponse:
         response.status_code = 400
         return response
 
+    if honorarium_entry and honorarium_entry.status == TeacherHonorariumEntry.STATUS_READY:
+        return HttpResponse(
+            "<div class='rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800'>Cet honoraire est disponible : ses heures et son tarif sont figes avant retrait.</div>",
+            status=400,
+        )
+
     if honorarium_entry and honorarium_entry.paid_amount > 0:
         return _honorarium_request_correction_otp(request, profile, honorarium_entry, form, payroll_month)
 
@@ -112,6 +144,16 @@ def teacher_honorarium_upsert(request: HttpRequest, pk: int) -> HttpResponse:
     entry.branch = request.branch
     entry.teacher = profile.user
     entry.period_month = payroll_month
+    # Le tarif est contractuel : la gestionnaire ne le modifie jamais depuis
+    # une fiche d'honoraires. Il est figé pour la période dès sa création.
+    entry.hourly_rate = (
+        honorarium_entry.hourly_rate
+        if honorarium_entry is not None
+        else profile.teacher_hourly_rate
+    )
+    entry.validated_hours = get_teacher_honorarium_validated_hours(
+        request.branch, profile.user, payroll_month
+    )
     entry.updated_by = request.user
     if not entry.pk:
         entry.created_by = request.user
@@ -125,12 +167,8 @@ def teacher_honorarium_upsert(request: HttpRequest, pk: int) -> HttpResponse:
     if entry.status == TeacherHonorariumEntry.STATUS_READY and previous_status != TeacherHonorariumEntry.STATUS_READY:
         notify_teacher_honorarium_available(entry, request.user)
 
-    if profile.teacher_hourly_rate != entry.hourly_rate:
-        profile.teacher_hourly_rate = entry.hourly_rate
-        profile.save(update_fields=["teacher_hourly_rate"])
-
     entry.refresh_from_db()
-    return manager_closure_redirect_response(entry.period_month)
+    return manager_honorarium_redirect_response(entry.period_month)
 
 
 def _honorarium_modal_context(profile, honorarium_entry, form, payroll_month, **extra):
@@ -140,9 +178,21 @@ def _honorarium_modal_context(profile, honorarium_entry, form, payroll_month, **
         "honorarium_form": form,
         "payroll_month": payroll_month,
         "available_cash_balance": get_branch_cash_balance(profile.branch),
+        "withdrawal_documents": _honorarium_withdrawal_documents(profile.branch, honorarium_entry),
+        "payment_signature_session": _active_honorarium_signature(honorarium_entry),
     }
     context.update(extra)
     return context
+
+
+def _active_honorarium_signature(entry):
+    if not entry:
+        return None
+    return PaymentSignatureSession.objects.filter(
+        honorarium_entry=entry,
+        status__in=PaymentSignatureSession.ACTIVE_STATUSES,
+        expires_at__gt=timezone.now(),
+    ).order_by("-created_at").first()
 
 
 def _honorarium_request_correction_otp(request, profile, honorarium_entry, form, payroll_month):
@@ -198,8 +248,7 @@ def _honorarium_request_correction_otp(request, profile, honorarium_entry, form,
         "accounts/dashboard/partials/teacher_honorarium_modal.html",
         _honorarium_modal_context(
             profile, honorarium_entry, form, payroll_month,
-            otp_request_id=otp_request.pk,
-            otp_validity_minutes=SensitiveActionRequest.OTP_VALIDITY_MINUTES,
+            approval_pending=True,
         ),
     )
     response["HX-Trigger"] = json.dumps({
@@ -279,7 +328,7 @@ def teacher_honorarium_correct_confirm_otp(request: HttpRequest, pk: int) -> Htt
 
 @manager_required
 @require_POST
-def teacher_honorarium_pay(request: HttpRequest, pk: int) -> HttpResponse:
+def _legacy_teacher_honorarium_pay(request: HttpRequest, pk: int) -> HttpResponse:
     raw_amount = (request.POST.get("payment_amount") or "").strip()
     try:
         payment_amount = int(raw_amount)
@@ -292,16 +341,34 @@ def teacher_honorarium_pay(request: HttpRequest, pk: int) -> HttpResponse:
         )
     with transaction.atomic():
         _locked_branch, available_cash = lock_branch_cash_balance(request.branch)
+        # The optional teacher Profile is deliberately not joined while the
+        # honorarium row is locked (PostgreSQL rejects FOR UPDATE on that
+        # nullable outer-join side).
         honorarium_entry = get_object_or_404(
             TeacherHonorariumEntry.objects.select_for_update().select_related(
-                "teacher", "teacher__profile", "branch"
+                "teacher", "branch"
             ),
             pk=pk,
             branch=request.branch,
         )
+        try:
+            # A payment belongs to the period of its own sheet.  This keeps a
+            # closed payroll period immutable even when the current month is
+            # still open.
+            assert_financial_period_open(request.branch, honorarium_entry.period_month)
+        except ValidationError as exc:
+            return HttpResponse(" ".join(exc.messages), status=400)
         if payment_amount > honorarium_entry.remaining_amount:
             return HttpResponse(
                 "<div class='rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700'>Le montant depasse le reste a payer sur cet honoraire.</div>",
+                status=400,
+            )
+        if honorarium_entry.status not in {
+            TeacherHonorariumEntry.STATUS_READY,
+            TeacherHonorariumEntry.STATUS_PARTIAL,
+        }:
+            return HttpResponse(
+                "<div class='rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800'>L'honoraire doit d'abord etre rendu disponible avant tout retrait.</div>",
                 status=400,
             )
         if payment_amount > available_cash:
@@ -313,11 +380,14 @@ def teacher_honorarium_pay(request: HttpRequest, pk: int) -> HttpResponse:
                 ),
                 status=400,
             )
+        honorarium_wallet = configured_wallet_for_category(request.branch, "honorarium")
+        if honorarium_wallet and payment_amount > wallet_balance(honorarium_wallet):
+            return HttpResponse("La mini-caisse Honoraires est insuffisante. Alimentez-la ou payez depuis la caisse principale apres la desactiver.", status=400)
 
         honorarium_entry.paid_amount += payment_amount
         honorarium_entry.updated_by = request.user
         honorarium_entry.save()
-        create_cash_movement(
+        cash_movement = create_cash_movement(
             branch=request.branch,
             movement_type=BranchCashMovement.TYPE_OUT,
             source=BranchCashMovement.SOURCE_HONORARIUM,
@@ -328,20 +398,35 @@ def teacher_honorarium_pay(request: HttpRequest, pk: int) -> HttpResponse:
             notes=f"Paiement honoraire {honorarium_entry.period_month:%Y-%m}.",
             created_by=request.user,
         )
+        if honorarium_wallet:
+            consume_wallet_for_cash_movement(wallet=honorarium_wallet, cash_movement=cash_movement, actor=request.user, label="Paiement honoraire")
 
-    response = manager_closure_redirect_response(honorarium_entry.period_month)
+    response = manager_honorarium_redirect_response(honorarium_entry.period_month)
     response["HX-Trigger"] = json.dumps({"cashBalanceUpdated": True, "dashboardStatsUpdated": True})
     return response
+
+
+# The legacy implementation above is retained for audit history; the public
+# endpoint now always starts the tablet signature workflow before any cash move.
+@manager_required
+@require_POST
+def teacher_honorarium_pay(request: HttpRequest, pk: int) -> HttpResponse:
+    return payment_signature_start(request, PaymentSignatureSession.TYPE_HONORARIUM, pk)
 
 
 @manager_required
 @require_POST
 def teacher_honorarium_prepare_all(request: HttpRequest) -> HttpResponse:
     payroll_month = get_salary_period_from_request(request)
+    try:
+        assert_financial_period_open(request.branch, payroll_month)
+    except ValidationError as exc:
+        return HttpResponse(" ".join(exc.messages), status=400)
     result = prepare_missing_teacher_honorarium_entries(request.branch, payroll_month, request.user)
     return manager_section_notice_redirect_response(
-        "cloture",
+        "honoraires",
         f"honoraires_preparees_{result['created']}",
+        salary_month=payroll_month.strftime("%Y-%m"),
     )
 
 
@@ -349,8 +434,13 @@ def teacher_honorarium_prepare_all(request: HttpRequest) -> HttpResponse:
 @require_POST
 def teacher_honorarium_pay_ready_all(request: HttpRequest) -> HttpResponse:
     payroll_month = get_salary_period_from_request(request)
+    try:
+        assert_financial_period_open(request.branch, payroll_month)
+    except ValidationError as exc:
+        return HttpResponse(" ".join(exc.messages), status=400)
     result = mark_ready_teacher_honorarium_entries_available(request.branch, payroll_month, request.user)
     return manager_section_notice_redirect_response(
-        "cloture",
+        "honoraires",
         f"honoraires_disponibles_{result['notified_count']}",
+        salary_month=payroll_month.strftime("%Y-%m"),
     )

@@ -14,30 +14,111 @@
       prefix: prefix || "",
       suffix: suffix || "",
       display: `${prefix || ""}0${suffix || ""}`,
-      started: false,
-      start() {
-        if (this.started) return;
-        this.started = true;
+      animationFrame: null,
+      format(value) {
+        return `${this.prefix}${Number(value).toLocaleString("fr-FR")}${this.suffix}`;
+      },
+      restart() {
+        if (this.animationFrame) {
+          cancelAnimationFrame(this.animationFrame);
+        }
+
+        this.display = this.format(0);
 
         if (this.target <= 0) {
-          this.display = `${this.prefix}${this.target}${this.suffix}`;
+          this.display = this.format(this.target);
           return;
         }
 
         const duration = 1300;
-        const stepMs = 24;
-        const steps = Math.max(1, Math.floor(duration / stepMs));
-        let current = 0;
-        const increment = Math.max(1, Math.ceil(this.target / steps));
+        const startedAt = performance.now();
+        const animate = (now) => {
+          const progress = Math.min((now - startedAt) / duration, 1);
+          const easedProgress = 1 - Math.pow(1 - progress, 3);
+          this.display = this.format(Math.round(this.target * easedProgress));
 
-        const timer = setInterval(() => {
-          current += increment;
-          if (current >= this.target) {
-            current = this.target;
-            clearInterval(timer);
+          if (progress < 1) {
+            this.animationFrame = requestAnimationFrame(animate);
+          } else {
+            this.animationFrame = null;
           }
-          this.display = `${this.prefix}${current.toLocaleString("fr-FR")}${this.suffix}`;
-        }, stepMs);
+        };
+
+        this.animationFrame = requestAnimationFrame(animate);
+      }
+    }
+  }
+
+  function catalogueSlider() {
+    return {
+      timer: null,
+      start() {
+        if (this.timer) return;
+        this.timer = setInterval(() => this.advance(), 4800);
+      },
+      pause() {
+        if (!this.timer) return;
+        clearInterval(this.timer);
+        this.timer = null;
+      },
+      advance() {
+        const track = this.$refs.catalogueTrack;
+        const maximumScroll = track.scrollWidth - track.clientWidth;
+        const nextPosition = track.scrollLeft >= maximumScroll - 4
+          ? 0
+          : Math.min(track.scrollLeft + Math.round(track.clientWidth * 0.88), maximumScroll);
+
+        track.scrollTo({
+          left: nextPosition,
+          behavior: "smooth"
+        });
+      },
+      move(direction) {
+        if (direction < 0) {
+          const track = this.$refs.catalogueTrack;
+          track.scrollBy({ left: -Math.round(track.clientWidth * 0.88), behavior: "smooth" });
+          return;
+        }
+        this.advance();
+      }
+    }
+  }
+
+  function annexesShowcase(totalWaves) {
+    return {
+      show: false,
+      detailOpen: false,
+      selectedBranch: null,
+      currentWave: 0,
+      totalWaves: Number(totalWaves) || 0,
+      timer: null,
+      start() {
+        if (this.timer || this.totalWaves < 2) return;
+        this.timer = setInterval(() => this.next(), 7000);
+      },
+      pause() {
+        if (!this.timer) return;
+        clearInterval(this.timer);
+        this.timer = null;
+      },
+      next() {
+        this.currentWave = (this.currentWave + 1) % this.totalWaves;
+      },
+      goTo(index) {
+        this.currentWave = index;
+        this.pause();
+        this.start();
+      },
+      openDetail(payload) {
+        this.pause();
+        this.selectedBranch = payload;
+        this.detailOpen = true;
+        document.body.classList.add('overflow-hidden');
+      },
+      closeDetail() {
+        this.detailOpen = false;
+        document.body.classList.remove('overflow-hidden');
+        this.start();
       }
     }
   }
@@ -61,21 +142,20 @@
 <section id="a-propos" class="py-24 lg:py-32 bg-soft">
   <div class="max-w-7xl mx-auto px-6"
        x-data="{ show: false }"
-       x-intersect:enter.threshold.30.once="show = true">
+       x-intersect:enter.once="show = true">
 
     {# Header #}
     <div class="text-center mb-16 lg:mb-20"
          :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'"
-         class="transition-all duration-700">
+         class="transition-all duration-300">
       <span class="inline-block text-sm font-semibold text-secondary uppercase tracking-wider mb-4">
         Qui sommes-nous
       </span>
       <h2 class="text-3xl md:text-4xl lg:text-5xl font-bold text-primary-700 mb-6">
-        Une institution dédiée aux <span class="text-secondary">sciences de la santé</span>
+        Une formation pensée pour les <span class="text-secondary">réalités de la santé</span>
       </h2>
       <p class="text-gray-600 text-lg max-w-3xl mx-auto">
-        ESFE forme les professionnels de santé de demain selon des standards académiques
-        rigoureux adaptés aux réalités du Mali.
+        Des parcours orientés vers l'acquisition de connaissances, de savoir-faire et de comportements professionnels utiles aux secteurs de la santé.
       </p>
     </div>
 
@@ -84,7 +164,7 @@
 
       {# Image #}
       <div :class="show ? 'opacity-100 scale-100' : 'opacity-0 scale-95'"
-           class="transition-all duration-1000 delay-200">
+           class="transition-all duration-300">
         <div class="relative">
           {% if site_configuration and site_configuration.home_about_image %}
           <img src="{{ site_configuration.home_about_image.url }}"
@@ -96,29 +176,27 @@
           {% endif %}
           {# Badge flottant #}
           <div class="absolute -bottom-6 -right-6 bg-white rounded-2xl shadow-xl p-6 hidden lg:block">
-            <div class="text-3xl font-bold text-secondary">15+</div>
-            <div class="text-sm text-gray-600">Années d'excellence</div>
+            <div class="text-xl font-bold text-secondary">Sciences de la santé</div>
+            <div class="text-sm text-gray-600">Des parcours à découvrir</div>
           </div>
         </div>
       </div>
 
       {# Contenu texte #}
       <div :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'"
-           class="transition-all duration-1000 delay-300">
+           class="transition-all duration-300">
 
         <h3 class="text-2xl font-bold text-primary-700 mb-6">
-          Former les acteurs clés du système de santé malien
+          Une formation pensée pour les réalités de la santé
         </h3>
 
         <p class="text-gray-600 mb-6 leading-relaxed">
-          <strong class="text-primary-700">L'École de Santé Félix Houphouët-Boigny</strong>
-          est un établissement d'enseignement supérieur spécialisé dans les sciences de la santé,
-          qui ambitionne de devenir une référence nationale en matière de formation paramédicale.
+          <strong class="text-primary-700">L'École Privée de Santé Félix Houphouët-Boigny</strong>
+          propose des formations orientées vers l'acquisition de connaissances, de savoir-faire et de comportements professionnels utiles aux secteurs de la santé.
         </p>
 
         <p class="text-gray-600 mb-8 leading-relaxed">
-          Notre approche combine excellence académique, rigueur professionnelle
-          et engagement social durable pour transformer les compétences en impact réel sur le terrain.
+          Les parcours s'appuient sur une organisation pédagogique, l'information des étudiants et une attention portée à leur progression.
         </p>
 
         {# Points clés #}
@@ -128,8 +206,8 @@
               <i data-lucide="award" class="w-5 h-5"></i>
             </div>
             <div>
-              <h4 class="font-semibold text-primary-700">Diplômes reconnus par l'État</h4>
-              <p class="text-sm text-gray-600">Validés pour concours et fonction publique.</p>
+              <h4 class="font-semibold text-primary-700">Des parcours adaptés</h4>
+              <p class="text-sm text-gray-600">Des formations liées aux métiers de la santé.</p>
             </div>
           </div>
 
@@ -138,8 +216,8 @@
               <i data-lucide="users" class="w-5 h-5"></i>
             </div>
             <div>
-              <h4 class="font-semibold text-primary-700">Encadrement expérimenté</h4>
-              <p class="text-sm text-gray-600">Corps enseignant issu du terrain professionnel.</p>
+              <h4 class="font-semibold text-primary-700">Théorie et pratique</h4>
+              <p class="text-sm text-gray-600">Des apprentissages et mises en situation.</p>
             </div>
           </div>
 
@@ -148,8 +226,8 @@
               <i data-lucide="heart-pulse" class="w-5 h-5"></i>
             </div>
             <div>
-              <h4 class="font-semibold text-primary-700">Impact sanitaire durable</h4>
-              <p class="text-sm text-gray-600">Contribution directe au renforcement du système de santé.</p>
+              <h4 class="font-semibold text-primary-700">Projet professionnel</h4>
+              <p class="text-sm text-gray-600">Stages et rencontres avec des professionnels.</p>
             </div>
           </div>
         </div>
@@ -161,11 +239,16 @@
     {% if pillars %}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
          :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'"
-         class="transition-all duration-700 delay-500">
+         class="transition-all duration-300">
       {% for pillar in pillars %}
-        <div class="bg-white rounded-2xl p-6 shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-2 border-t-4 border-secondary">
-          <h3 class="font-semibold text-lg mb-2 text-primary-700">{{ pillar.title }}</h3>
-          <p class="text-sm text-gray-600">{{ pillar.description }}</p>
+        <div class="group relative h-[270px] overflow-hidden rounded-2xl bg-secondary/75 shadow-md transition-all duration-300 hover:-translate-y-2 hover:shadow-xl">
+          <div class="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-white/20"></div>
+          <div class="absolute left-6 top-5 text-4xl font-black tracking-tight text-white/90">0{{ forloop.counter }}</div>
+
+          <div class="absolute inset-x-0 bottom-0 flex h-[53%] flex-col bg-primary-800/65 px-6 py-5 backdrop-blur-sm">
+            <h3 class="mb-2 min-h-10 text-base font-semibold leading-tight text-white line-clamp-2">{{ pillar.title }}</h3>
+            <p class="text-sm leading-relaxed text-white/90 line-clamp-4">{{ pillar.description }}</p>
+          </div>
         </div>
       {% endfor %}
     </div>
@@ -178,22 +261,24 @@
 {# ══════════════════════════════════════════════════════════════════════════════
    SECTION 3 : STATISTIQUES (Compacte, intégrée)
    ══════════════════════════════════════════════════════════════════════════════ #}
+{% if stats %}
 <section id="stats"
   class="py-16 text-white bg-primary-700 bg-cover bg-center"
   {% if site_configuration and site_configuration.home_stats_banner_image %}style="background-image:linear-gradient(rgba(16,39,55,.72),rgba(16,39,55,.78)),url('{{ site_configuration.home_stats_banner_image.url }}');"{% endif %}>
   <div class="max-w-7xl mx-auto px-6"
        x-data="{ show: false }"
-       x-intersect:enter.threshold.50.once="show = true">
+       x-intersect:enter="show = true; $dispatch('stats-visible')"
+       x-intersect:leave="show = false">
 
     <div class="grid grid-cols-2 md:grid-cols-4 gap-8 lg:gap-12">
 
       {% for stat in stats %}
       <div
            x-data="advancedCounter({{ stat.value|default:0 }}, '{{ stat.prefix|default:''|escapejs }}', '{{ stat.suffix|default:''|escapejs }}')"
-           x-intersect.once="start()"
+           @stats-visible.window="restart()"
            :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'"
-           style="transition-delay: {{ forloop.counter0 }}50ms"
-           class="text-center transition-all duration-700">
+           style="transition-delay: {{ forloop.counter0 }}30ms"
+           class="text-center transition-all duration-300">
 
         <div class="text-4xl lg:text-5xl font-bold text-white mb-2">
           <span x-text="display">{{ stat.prefix }}{{ stat.value|intcomma }}{{ stat.suffix }}</span>
@@ -208,6 +293,7 @@
     </div>
   </div>
 </section>
+{% endif %}
 
 
 {# ══════════════════════════════════════════════════════════════════════════════
@@ -216,7 +302,7 @@
 <section id="formations" class="py-24 lg:py-32 bg-gradient-to-b from-white to-soft/50">
   <div class="max-w-7xl mx-auto px-6"
        x-data="{ show: false }"
-       x-intersect:enter.threshold.20.once="show = true">
+       x-intersect:enter.once="show = true">
 
     {# Header #}
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-end mb-16">
@@ -225,10 +311,10 @@
           Catalogue académique
         </span>
         <h2 class="mt-4 text-3xl md:text-4xl font-bold text-primary-700">
-          Nos Formations Professionnelles
+          Choisissez le parcours qui correspond à votre projet
         </h2>
         <p class="mt-4 text-gray-600 max-w-xl">
-          Des parcours structurés, reconnus par l'État, conçus pour former les professionnels de santé de demain.
+          Découvrez les formations actuellement ouvertes et leurs conditions d'admission. Chaque fiche présente le niveau, la durée, les compétences visées et les informations utiles à votre candidature.
         </p>
       </div>
       <div class="lg:text-right">
@@ -243,36 +329,51 @@
     </div>
 
     {# Grid Formations #}
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+    <div class="relative"
+         x-data="catalogueSlider()"
+         x-intersect:enter="start()"
+         x-intersect:leave="pause()"
+         @mouseenter="pause()"
+         @mouseleave="start()"
+         @focusin="pause()"
+         @focusout="start()"
+         @touchstart="pause()"
+         @touchend="start()">
+      <div x-ref="catalogueTrack"
+           tabindex="0"
+           @keydown.right.prevent="move(1)"
+           @keydown.left.prevent="move(-1)"
+           class="flex snap-x snap-mandatory gap-6 overflow-x-auto scroll-smooth pb-5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {% for formation in formations_home %}
-      <div :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'"
-           style="transition-delay: {{ forloop.counter0 }}00ms"
-           class="group relative bg-white rounded-2xl p-8 shadow-md hover:shadow-2xl transition-all duration-500 hover:-translate-y-3 border-l-4 {% if formation.is_featured %}border-secondary{% else %}border-primary{% endif %}">
+      <article :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'"
+           class="group relative flex min-h-[320px] w-full shrink-0 snap-start flex-col overflow-hidden rounded-2xl p-3 shadow-md transition-all duration-500 hover:-translate-y-3 hover:shadow-2xl sm:p-4 md:w-[calc((100%-1.5rem)/2)] lg:w-[calc((100%-3rem)/3)] {% if formation.cycle.theme == 'secondary' %}bg-secondary text-white{% elif formation.cycle.theme == 'dark' %}bg-gray-900 text-white{% else %}bg-primary text-white{% endif %}">
+
+        <div class="flex h-full flex-col rounded-xl border-[3px] border-white/45 p-6 sm:p-7">
 
         {# Meta #}
         <div class="flex justify-between items-center mb-6">
-          <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          <span class="text-xs font-semibold text-white/75 uppercase tracking-wider">
             {{ formation.cycle.name }}
           </span>
           {% if formation.is_featured %}
-          <span class="text-xs bg-secondary/20 text-secondary px-3 py-1 rounded-full font-medium">
-            Recommandé
+          <span class="rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm">
+            À la une
           </span>
           {% endif %}
         </div>
 
         {# Titre #}
-        <h3 class="text-xl font-semibold mb-4 text-primary-700 leading-snug group-hover:text-secondary transition-colors">
+        <h3 class="mb-4 text-xl font-semibold leading-snug text-white line-clamp-2">
           {{ formation.title }}
         </h3>
 
         {# Description #}
-        <p class="text-sm text-gray-600 mb-6 leading-relaxed">
+        <p class="mb-6 text-sm leading-relaxed text-white/85 line-clamp-4">
           {{ formation.short_description|truncatewords:18 }}
         </p>
 
         {# Infos #}
-        <div class="flex justify-between text-xs text-gray-400 mb-6 pb-6 border-b border-gray-100">
+        <div class="mt-auto mb-6 flex justify-between text-xs text-white/75">
           <span class="flex items-center gap-1">
             <i data-lucide="clock" class="w-4 h-4"></i>
             {{ formation.duration_years }} an{% if formation.duration_years > 1 %}s{% endif %}
@@ -282,15 +383,17 @@
 
         {# Link #}
         <a href="{{ formation.get_absolute_url }}"
-           class="inline-flex items-center text-primary-600 font-medium hover:text-secondary transition-colors duration-300 group/link">
+           class="group/link inline-flex w-fit items-center rounded-xl bg-white/15 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm transition-all duration-300 hover:bg-white/25">
           Voir le programme
           <svg class="w-4 h-4 ml-2 transform group-hover/link:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
           </svg>
         </a>
 
-      </div>
+        </div>
+      </article>
       {% endfor %}
+      </div>
     </div>
 
   </div>
@@ -303,7 +406,7 @@
 <section id="pourquoi-esfe" class="py-24 lg:py-32 bg-soft">
   <div class="max-w-7xl mx-auto px-6"
        x-data="{ show: false }"
-       x-intersect:enter.threshold.20.once="show = true">
+       x-intersect:enter.once="show = true">
 
     {# Header #}
     <div class="text-center mb-16">
@@ -311,68 +414,40 @@
         Notre engagement
       </span>
       <h2 class="mt-4 text-3xl md:text-4xl font-bold text-primary-700">
-        Pourquoi choisir <span class="text-secondary">ESFE</span> ?
+        Un engagement à chaque étape de votre parcours
       </h2>
+      <p class="mx-auto mt-4 max-w-2xl text-gray-600">
+        À l'ESFE, la formation associe apprentissages, repères pédagogiques et ouverture vers le monde professionnel.
+      </p>
     </div>
 
     {# Grid visuel #}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       {% for item in why_blocks %}
       <div :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'"
-           style="transition-delay: {{ forloop.counter0 }}00ms"
-           class="group relative rounded-2xl overflow-hidden shadow-xl transition-all duration-500 hover:-translate-y-3">
+           style="transition-delay: {{ forloop.counter0 }}40ms"
+           class="group relative h-[360px] rounded-2xl overflow-hidden shadow-xl transition-all duration-300 hover:-translate-y-3">
 
         {% if item.image_url %}
         <img src="{{ item.image_url }}"
-             class="w-full h-56 object-cover transition duration-700 group-hover:scale-110"
+             class="w-full h-full object-cover transition duration-700 group-hover:scale-110"
              alt="{{ item.title }}"
              loading="lazy">
         {% else %}
-        <div class="w-full h-56 bg-gradient-to-br from-primary-200 to-secondary/30"></div>
+        <div class="w-full h-full bg-gradient-to-br from-primary-200 to-secondary/30"></div>
         {% endif %}
 
         {# Overlay #}
         <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent"></div>
 
         {# Texte #}
-        <div class="absolute bottom-0 left-0 right-0 p-6 text-white">
-          <h4 class="font-semibold text-lg mb-2">{{ item.title }}</h4>
-          <p class="text-sm text-white/80">{{ item.desc }}</p>
+        <div class="absolute bottom-0 left-0 right-0 p-5 text-white">
+          <h4 class="mb-2 min-h-12 font-semibold text-lg leading-tight line-clamp-2">{{ item.title }}</h4>
+          <p class="text-sm leading-relaxed text-white/80 line-clamp-4">{{ item.desc }}</p>
         </div>
 
       </div>
       {% endfor %}
-    </div>
-
-    {# Points clés #}
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12"
-         :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'"
-         class="transition-all duration-700 delay-300">
-
-      <div class="bg-white rounded-2xl p-8 shadow-md hover:shadow-xl transition hover:-translate-y-2 text-center">
-        <div class="w-14 h-14 bg-secondary/10 text-secondary rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <i data-lucide="graduation-cap" class="w-7 h-7"></i>
-        </div>
-        <h4 class="font-semibold text-primary-700 mb-2">Excellence académique</h4>
-        <p class="text-sm text-gray-600">Rigueur pédagogique et suivi individualisé.</p>
-      </div>
-
-      <div class="bg-white rounded-2xl p-8 shadow-md hover:shadow-xl transition hover:-translate-y-2 text-center">
-        <div class="w-14 h-14 bg-secondary/10 text-secondary rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <i data-lucide="briefcase" class="w-7 h-7"></i>
-        </div>
-        <h4 class="font-semibold text-primary-700 mb-2">Insertion professionnelle</h4>
-        <p class="text-sm text-gray-600">Formations alignées avec les besoins du terrain.</p>
-      </div>
-
-      <div class="bg-white rounded-2xl p-8 shadow-md hover:shadow-xl transition hover:-translate-y-2 text-center">
-        <div class="w-14 h-14 bg-secondary/10 text-secondary rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <i data-lucide="map-pin" class="w-7 h-7"></i>
-        </div>
-        <h4 class="font-semibold text-primary-700 mb-2">Présence nationale</h4>
-        <p class="text-sm text-gray-600">{{ annexes|length }} annexes stratégiques au Mali.</p>
-      </div>
-
     </div>
 
   </div>
@@ -383,123 +458,138 @@
    SECTION 6 : GALERIE SPOTLIGHT (NOUVELLE)
    ══════════════════════════════════════════════════════════════════════════════ #}
 {% component "gallery_spotlight"
-   title="Instants Capturés"
-   subtitle="Revivez les moments forts de notre communauté"
-   gallery_url="{% url 'news:event_list' %}"
+   title="La vie à l'ESFE"
+   subtitle="Découvrez les apprentissages, les rencontres et les temps forts qui rythment la vie de l'établissement."
+   gallery_url="{% url 'news:event_list' %}?mode=photos"
 %}{% endcomponent %}
 
 
 {# ══════════════════════════════════════════════════════════════════════════════
    SECTION 7 : ANNEXES (Simplifiée - Slider)
    ══════════════════════════════════════════════════════════════════════════════ #}
-<section id="annexes" class="py-24 lg:py-32 bg-white">
-  <div class="max-w-7xl mx-auto px-6"
-       x-data="{
-         show: false,
-         detailOpen: false,
-         selectedBranch: null,
-         openDetail(payload) {
-           this.selectedBranch = payload;
-           this.detailOpen = true;
-           document.body.classList.add('overflow-hidden');
-         },
-         closeDetail() {
-           this.detailOpen = false;
-           document.body.classList.remove('overflow-hidden');
-         }
-       }"
-       x-intersect:enter.threshold.20.once="show = true">
+<section id="annexes" class="bg-white py-24 lg:py-32">
+  <div class="mx-auto max-w-7xl px-6"
+       x-data="annexesShowcase({{ annex_waves|length }})"
+       x-intersect:enter="show = true; start()"
+       x-intersect:leave="pause()">
 
-    {# Header #}
-    <div class="text-center mb-16">
-      <span class="text-sm uppercase tracking-wider font-semibold text-secondary">
-        Présence nationale
-      </span>
-      <h2 class="mt-4 text-3xl md:text-4xl font-bold text-primary-700">
-        Nos Annexes Stratégiques
-      </h2>
-      <p class="mt-4 text-gray-600 max-w-2xl mx-auto">
-        ESFE déploie ses formations à travers plusieurs régions du Mali pour garantir
-        accessibilité et excellence académique sur l'ensemble du territoire.
+    <div class="mx-auto mb-14 max-w-3xl text-center">
+      <span class="text-sm font-semibold uppercase tracking-wider text-secondary">Nos annexes</span>
+      <h2 class="mt-4 text-3xl font-bold text-primary-700 md:text-4xl">Trouvez l'annexe qui vous convient</h2>
+      <p class="mx-auto mt-4 max-w-2xl text-gray-600">
+        Consultez les coordonnées de nos annexes actives et choisissez le site le plus adapté à votre projet de formation.
       </p>
     </div>
 
-    {# Grid Annexes #}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-      {% for branch in annexes %}
-      <article :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'"
-               style="transition-delay: {{ forloop.counter0 }}00ms"
-               class="group bg-white rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-3 border border-gray-100">
-        <div class="relative h-48 overflow-hidden">
-          {% if branch.image %}
-          <img src="{{ branch.image.url }}"
-               class="w-full h-full object-cover group-hover:scale-110 transition duration-700"
-               alt="{{ branch.name }}"
-               loading="lazy">
-          {% else %}
-          <div class="w-full h-full bg-gradient-to-br from-primary-200 to-secondary/30"></div>
-          {% endif %}
-          <div class="absolute inset-0 bg-gradient-to-t from-primary-700/80 to-transparent"></div>
-          <div class="absolute bottom-4 left-4 text-white">
-            <h4 class="font-semibold text-lg">{{ branch.name }}</h4>
-            <p class="text-white/80 text-sm">{{ branch.city|default:"Annexe" }}</p>
-          </div>
+    {% if annex_waves %}
+    <div class="relative" @mouseenter="pause()" @mouseleave="start()" @touchstart="pause()" @touchend="start()">
+      {% for wave in annex_waves %}
+      {% with reverse_wave=forloop.counter|divisibleby:2 %}
+      <div x-show="currentWave === {{ forloop.counter0 }}"
+           x-transition:enter="transition ease-out duration-700"
+           x-transition:enter-start="opacity-0 translate-x-6"
+           x-transition:enter-end="opacity-100 translate-x-0"
+           x-transition:leave="transition ease-in duration-300"
+           x-transition:leave-start="opacity-100 translate-x-0"
+           x-transition:leave-end="opacity-0 -translate-x-6">
+        <div class="grid grid-cols-1 gap-5 lg:h-[440px] lg:grid-cols-4 lg:grid-rows-2">
+          {% for branch in wave %}
+            {% if forloop.first %}
+            <article class="group relative min-h-[360px] overflow-hidden rounded-3xl bg-primary-700 shadow-xl lg:h-full {% if wave|length == 1 %}lg:col-span-4{% else %}lg:col-span-3 lg:row-span-2 lg:row-start-1{% if reverse_wave %} lg:col-start-2{% endif %}{% endif %}">
+              <div class="grid h-full md:grid-cols-2">
+                <div class="relative min-h-[250px] overflow-hidden">
+                  {% if branch.image %}
+                  <img src="{{ branch.image.url }}" class="h-full w-full object-cover transition duration-700 group-hover:scale-105" alt="{{ branch.name }}" loading="lazy">
+                  {% else %}
+                  <div class="h-full w-full bg-gradient-to-br from-secondary to-primary-700"></div>
+                  {% endif %}
+                  <div class="absolute inset-0 bg-gradient-to-t from-primary-900/65 via-transparent to-transparent"></div>
+                  <span class="absolute bottom-5 left-5 inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm">
+                    <i data-lucide="map-pin" class="h-3.5 w-3.5"></i>{{ branch.city|default:"Annexe" }}
+                  </span>
+                </div>
+                <div class="flex h-full flex-col p-7 text-white sm:p-9">
+                  <p class="text-xs font-semibold uppercase tracking-[0.18em] text-white/65">Annexe ESFE</p>
+                  <h3 class="mt-3 text-2xl font-bold leading-tight">{{ branch.name }}</h3>
+                  <p class="mt-4 text-sm leading-relaxed text-white/80">{{ branch.address|default:"Coordonnées et informations pratiques disponibles sur demande."|truncatewords:18 }}</p>
+                  {% if branch.accepts_online_registration %}
+                  <span class="mt-5 inline-flex w-fit items-center gap-2 rounded-full bg-secondary/25 px-3 py-1.5 text-xs font-semibold text-white">
+                    <span class="h-1.5 w-1.5 rounded-full bg-secondary"></span>Candidature en ligne disponible
+                  </span>
+                  {% endif %}
+                  <div class="mt-auto flex flex-wrap gap-3 pt-7">
+                    <button type="button"
+                            @click='openDetail({name: "{{ branch.name|escapejs }}", code: "{{ branch.code|escapejs }}", city: "{{ branch.city|default:""|escapejs }}", phone: "{{ branch.phone|default:""|escapejs }}", email: "{{ branch.email|default:""|escapejs }}", address: "{{ branch.address|default:""|escapejs }}", image: "{% if branch.image %}{{ branch.image.url }}{% endif %}", online: {% if branch.accepts_online_registration %}true{% else %}false{% endif %}})'
+                            class="inline-flex items-center justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-primary-700 transition hover:bg-primary-50">Voir les coordonnées</button>
+                    {% if branch.phone %}
+                    <a href="tel:{{ branch.phone }}" class="inline-flex items-center justify-center rounded-xl border border-white/35 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10">Appeler</a>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </article>
+            {% else %}
+            <button type="button"
+                    @click='openDetail({name: "{{ branch.name|escapejs }}", code: "{{ branch.code|escapejs }}", city: "{{ branch.city|default:""|escapejs }}", phone: "{{ branch.phone|default:""|escapejs }}", email: "{{ branch.email|default:""|escapejs }}", address: "{{ branch.address|default:""|escapejs }}", image: "{% if branch.image %}{{ branch.image.url }}{% endif %}", online: {% if branch.accepts_online_registration %}true{% else %}false{% endif %}})'
+                    class="group relative min-h-[195px] overflow-hidden rounded-2xl text-left shadow-lg transition hover:-translate-y-1 hover:shadow-xl lg:h-full {% if reverse_wave %}lg:col-start-1{% else %}lg:col-start-4{% endif %} {% if forloop.counter == 2 %}lg:row-start-1{% else %}lg:row-start-2{% endif %} {% if wave|length == 2 %}lg:row-span-2{% endif %}">
+              {% if branch.image %}
+              <img src="{{ branch.image.url }}" class="h-full w-full object-cover transition duration-500 group-hover:scale-110" alt="{{ branch.name }}" loading="lazy">
+              {% else %}
+              <div class="h-full w-full bg-gradient-to-br from-primary-500 to-secondary"></div>
+              {% endif %}
+              <div class="absolute inset-0 bg-gradient-to-t from-primary-900/90 via-primary-900/20 to-transparent"></div>
+              <div class="absolute inset-x-0 bottom-0 p-5 text-white">
+                <p class="text-base font-semibold leading-tight line-clamp-2">{{ branch.name }}</p>
+                <p class="mt-1 text-xs text-white/75">{{ branch.city|default:"Annexe" }}</p>
+              </div>
+              <span class="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full bg-white/15 text-white opacity-0 backdrop-blur-sm transition group-hover:opacity-100">
+                <i data-lucide="arrow-up-right" class="h-4 w-4"></i>
+              </span>
+            </button>
+            {% endif %}
+          {% endfor %}
         </div>
-        <div class="p-4 flex items-center justify-between gap-3">
-          <a href="tel:{{ branch.phone }}" class="flex items-center gap-2 text-secondary font-medium hover:underline text-sm">
-            <i data-lucide="phone" class="w-4 h-4"></i>
-            {{ branch.phone|default:"Contact indisponible" }}
-          </a>
-          <button type="button"
-                  @click='openDetail({
-                    name: "{{ branch.name|escapejs }}",
-                    code: "{{ branch.code|escapejs }}",
-                    city: "{{ branch.city|default:''|escapejs }}",
-                    phone: "{{ branch.phone|default:''|escapejs }}",
-                    email: "{{ branch.email|default:''|escapejs }}",
-                    address: "{{ branch.address|default:''|escapejs }}",
-                    image: "{% if branch.image %}{{ branch.image.url }}{% endif %}",
-                    manager: "{% if branch.manager %}{{ branch.manager.get_full_name|default:branch.manager.username|escapejs }}{% endif %}",
-                    online: "{% if branch.accepts_online_registration %}Oui{% else %}Non{% endif %}"
-                  })'
-                  class="text-xs px-3 py-1.5 rounded-full border border-secondary/30 text-secondary hover:bg-secondary hover:text-white transition">
-            Détails de l'annexe
-          </button>
-        </div>
-      </article>
-      {% empty %}
-      <div class="col-span-full text-center text-gray-500 py-10">Aucune annexe active pour le moment.</div>
+      </div>
+      {% endwith %}
       {% endfor %}
-    </div>
 
-    <div x-show="detailOpen" x-cloak x-transition.opacity class="fixed inset-0 z-[90] bg-black/60 flex items-center justify-center p-4"
+      {% if annex_waves|length > 1 %}
+      <div class="mt-7 flex justify-center gap-2" aria-label="Navigation des annexes">
+        {% for wave in annex_waves %}
+        <button type="button" @click="goTo({{ forloop.counter0 }})"
+                :class="currentWave === {{ forloop.counter0 }} ? 'w-8 bg-secondary' : 'w-2 bg-primary-200 hover:bg-primary-300'"
+                class="h-2 rounded-full transition-all duration-300"
+                aria-label="Afficher le groupe d'annexes {{ forloop.counter }}"></button>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="rounded-2xl border border-dashed border-primary-200 bg-primary-50 px-6 py-12 text-center text-gray-600">Aucune annexe active pour le moment.</div>
+    {% endif %}
+
+    <div x-show="detailOpen" x-cloak x-transition.opacity class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4"
          @click.self="closeDetail()" @keydown.escape.window="closeDetail()">
-      <div class="w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden">
-        <div class="px-5 py-4 border-b flex items-center justify-between">
+      <div class="w-full max-w-3xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+        <div class="flex items-center justify-between border-b px-5 py-4">
           <h3 class="text-lg font-semibold text-primary-700" x-text="selectedBranch?.name"></h3>
-          <button type="button" @click="closeDetail()" class="text-slate-500 hover:text-slate-900">
-            <i class="fa-solid fa-xmark text-xl"></i>
-          </button>
+          <button type="button" @click="closeDetail()" aria-label="Fermer" class="grid h-10 w-10 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"><i data-lucide="x" class="h-5 w-5"></i></button>
         </div>
-        <div class="grid md:grid-cols-2 gap-0">
-          <div class="h-64 md:h-full bg-slate-100">
-            <template x-if="selectedBranch?.image">
-              <img :src="selectedBranch.image" class="w-full h-full object-cover" alt="Annexe">
-            </template>
+        <div class="grid md:grid-cols-2">
+          <div class="min-h-64 bg-slate-100">
+            <template x-if="selectedBranch?.image"><img :src="selectedBranch.image" class="h-full w-full object-cover" alt="Annexe"></template>
+            <template x-if="!selectedBranch?.image"><div class="flex h-full min-h-64 items-center justify-center bg-gradient-to-br from-primary-100 to-secondary/30 text-primary-400"><i data-lucide="map-pin" class="h-12 w-12"></i></div></template>
           </div>
-          <div class="p-6 space-y-3 text-sm text-slate-600">
-            <p><strong class="text-slate-800">Code:</strong> <span x-text="selectedBranch?.code"></span></p>
-            <p><strong class="text-slate-800">Ville:</strong> <span x-text="selectedBranch?.city || '-' "></span></p>
-            <p><strong class="text-slate-800">Téléphone:</strong> <span x-text="selectedBranch?.phone || '-' "></span></p>
-            <p><strong class="text-slate-800">Email:</strong> <span x-text="selectedBranch?.email || '-' "></span></p>
-            <p><strong class="text-slate-800">Manager:</strong> <span x-text="selectedBranch?.manager || '-' "></span></p>
-            <p><strong class="text-slate-800">Inscription en ligne:</strong> <span x-text="selectedBranch?.online"></span></p>
-            <p><strong class="text-slate-800">Adresse:</strong> <span x-text="selectedBranch?.address || '-' "></span></p>
+          <div class="space-y-4 p-6 text-sm text-slate-600">
+            <div><p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Ville</p><p class="mt-1 font-medium text-slate-800" x-text="selectedBranch?.city || 'Non renseignée'"></p></div>
+            <div><p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Adresse</p><p class="mt-1" x-text="selectedBranch?.address || 'Non renseignée'"></p></div>
+            <div x-show="selectedBranch?.phone"><p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Téléphone</p><a class="mt-1 inline-block font-medium text-secondary hover:underline" :href="`tel:${selectedBranch?.phone}`" x-text="selectedBranch?.phone"></a></div>
+            <div x-show="selectedBranch?.email"><p class="text-xs font-semibold uppercase tracking-wider text-slate-400">E-mail</p><a class="mt-1 inline-block break-all font-medium text-secondary hover:underline" :href="`mailto:${selectedBranch?.email}`" x-text="selectedBranch?.email"></a></div>
+            <p x-show="selectedBranch?.online" class="inline-flex items-center gap-2 rounded-full bg-secondary/10 px-3 py-2 text-xs font-semibold text-secondary"><span class="h-1.5 w-1.5 rounded-full bg-secondary"></span>Candidature en ligne disponible</p>
           </div>
         </div>
       </div>
     </div>
-
   </div>
 </section>
 
@@ -510,20 +600,20 @@
 <section id="actualites" class="py-24 lg:py-32 bg-soft">
   <div class="max-w-7xl mx-auto px-6"
        x-data="{ show: false }"
-       x-intersect:enter.threshold.15.once="show = true">
+       x-intersect:enter.once="show = true">
 
     {# Header #}
     <div class="text-center mb-16"
          :class="show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'"
-         class="transition-all duration-700">
+         class="transition-all duration-300">
       <span class="text-sm uppercase tracking-wider font-semibold text-secondary">
-        Actualités & Publications
+        À la une
       </span>
       <h2 class="mt-4 text-3xl md:text-4xl font-bold text-primary-700">
-        La vie académique en continu
+        Suivez la vie de l'ESFE
       </h2>
       <p class="mt-4 text-gray-600 max-w-2xl mx-auto">
-        Suivez les événements institutionnels et découvrez nos analyses pédagogiques.
+        Retrouvez les annonces, activités, événements et informations utiles de l'établissement.
       </p>
     </div>
 
@@ -534,7 +624,7 @@
       <div>
         <h3 class="text-xl font-semibold text-primary-700 mb-8 flex items-center gap-2">
           <i data-lucide="newspaper" class="w-5 h-5 text-secondary"></i>
-          Actualités
+          Dernières actualités
         </h3>
 
         <div class="space-y-4">
@@ -581,7 +671,7 @@
       <div>
         <h3 class="text-xl font-semibold text-primary-700 mb-8 flex items-center gap-2">
           <i data-lucide="book-open" class="w-5 h-5 text-secondary"></i>
-          Articles & Analyses
+          Publications récentes
         </h3>
 
         <div class="space-y-4">
@@ -615,11 +705,16 @@
     </div>
 
     {# CTA #}
-    <div class="text-center mt-16">
+    <div class="mt-16 flex flex-col items-center justify-center gap-3 sm:flex-row">
       <a href="{% url 'news:list' %}"
          class="inline-flex items-center gap-3 bg-secondary hover:bg-secondary/90 text-white px-8 py-4 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:-translate-y-1">
         <i data-lucide="arrow-right" class="w-5 h-5"></i>
-        Voir toutes les publications
+        Voir toutes les actualités
+      </a>
+      <a href="{% url 'blog:article_list' %}"
+         class="inline-flex items-center gap-3 border border-primary/20 bg-white px-8 py-4 font-semibold text-primary-700 rounded-xl transition-all duration-300 hover:-translate-y-1 hover:border-primary hover:shadow-lg">
+        <i data-lucide="book-open" class="w-5 h-5"></i>
+        Lire les publications
       </a>
     </div>
 
@@ -629,6 +724,24 @@
 {# ══════════════════════════════════════════════════════════════════════════════
    SECTION 7 : FAQ
    ══════════════════════════════════════════════════════════════════════════════ #}
+<section id="contact-cta" class="bg-primary-800 py-20 text-white">
+  <div class="mx-auto max-w-4xl px-6 text-center">
+    <span class="text-sm font-bold uppercase tracking-[0.2em] text-primary-200">Préparez votre candidature</span>
+    <h2 class="mt-4 text-3xl font-black tracking-tight sm:text-4xl">Votre projet mérite un premier pas.</h2>
+    <p class="mx-auto mt-5 max-w-2xl text-lg leading-relaxed text-primary-100">
+      Découvrez les formations ouvertes, vérifiez les conditions d'admission et avancez sereinement vers votre candidature. L'ESFE reste disponible pour vous orienter.
+    </p>
+    <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+      <a href="{% url 'admissions:admission_tunnel' %}" class="inline-flex items-center justify-center rounded-xl bg-white px-6 py-3 font-bold text-primary-800 transition hover:bg-primary-50">
+        Déposer ma candidature
+      </a>
+      <a href="{% url 'core:contact' %}" class="inline-flex items-center justify-center rounded-xl border border-white/60 px-6 py-3 font-bold text-white transition hover:bg-white/10">
+        Poser une question
+      </a>
+    </div>
+  </div>
+</section>
+
 {% component "faq"
    title="Questions Fréquentes"
    subtitle="Trouvez rapidement les réponses à vos interrogations"

@@ -16,8 +16,11 @@ from django.contrib import messages
 from django.contrib.auth import login
 from django.core import signing
 from django.http import HttpResponse
+from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, render
+from django.urls import reverse
 from django.utils import timezone
+from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods, require_POST
 
@@ -31,6 +34,7 @@ from students.services.card_security import (
     incrementer_tentatives_pin,
     reinitialiser_tentatives_pin,
     signer_carte,
+    signer_carte_reference,
     verif_rate_limitee,
     verifier_token,
 )
@@ -85,12 +89,46 @@ def _get_ip(request) -> str:
 
 
 def _carte_url(request, carte: CarteEtudiant) -> str:
-    token = signer_carte(
-        carte.etudiant.matricule,
-        carte.annee,
-        carte.code_annexe,
+    token = signer_carte_reference(
+        reference=str(carte.public_reference),
+        annee=carte.annee,
+        annexe=carte.code_annexe,
+        kind="student",
     )
-    return request.build_absolute_uri(f"/carte/v/{token}/")
+    return f"{settings.BASE_URL}{reverse('students:portail_verify_token', args=[token])}"
+
+
+def _student_card_tokens(carte: CarteEtudiant):
+    """Émet le QR opaque courant et accepte v1 seulement avant réémission."""
+    yield signer_carte_reference(
+        reference=str(carte.public_reference), annee=carte.annee,
+        annexe=carte.code_annexe, kind="student",
+    )
+    if carte.token_version == "v1":
+        yield signer_carte(carte.etudiant.matricule, carte.annee, carte.code_annexe)
+
+
+def _student_card_from_payload(payload):
+    queryset = CarteEtudiant.objects.select_related("etudiant__inscription__candidature")
+    if payload.get("kind") != "student":
+        return None
+    if payload.get("version") == "v2":
+        return queryset.filter(
+            public_reference=payload.get("reference"), annee=payload["annee"],
+            code_annexe=payload["annexe"],
+        ).first()
+    return queryset.filter(
+        etudiant__matricule=payload.get("matricule"), annee=payload["annee"],
+        code_annexe=payload["annexe"], token_version="v1",
+    ).first()
+
+
+def _can_manage_card(request, carte: CarteEtudiant) -> bool:
+    if request.user.is_superuser:
+        return True
+    profile = getattr(request.user, "profile", None)
+    card_branch_id = carte.etudiant.inscription.candidature.branch_id
+    return bool(profile and profile.position == "it_support" and profile.branch_id == card_branch_id)
 
 
 def _get_classe(carte: CarteEtudiant) -> str:
@@ -118,7 +156,7 @@ def _logo_data_uri() -> str:
 # ---------------------------------------------------------------
 
 def _carte_context(request, carte: CarteEtudiant) -> dict:
-    token = signer_carte(carte.etudiant.matricule, carte.annee, carte.code_annexe)
+    token = next(_student_card_tokens(carte))
     url = _carte_url(request, carte)
     return {
         "carte": carte,
@@ -131,23 +169,35 @@ def _carte_context(request, carte: CarteEtudiant) -> dict:
     }
 
 
+def _carte_print_context(request, carte: CarteEtudiant) -> dict:
+    card = _carte_context(request, carte)
+    card["branch_name"] = carte.code_annexe
+    return {"card_pages": [[card]], "card_type": "student"}
+
+
+@login_required
 def carte_apercu_view(request, carte_id: int):
     carte = get_object_or_404(CarteEtudiant, pk=carte_id)
-    return render(request, "students/carte_etudiant.html", _carte_context(request, carte))
+    if not _can_manage_card(request, carte):
+        return HttpResponseForbidden("Acces refuse.")
+    return render(request, "students/cards_print_sheet.html", _carte_print_context(request, carte))
 
 
 # ---------------------------------------------------------------
 # PDF WeasyPrint
 # ---------------------------------------------------------------
 
+@login_required
 def carte_pdf_view(request, carte_id: int):
     from weasyprint import HTML
     from django.template.loader import render_to_string
 
     carte = get_object_or_404(CarteEtudiant, pk=carte_id)
-    ctx = _carte_context(request, carte)
-    html_str = render_to_string("students/carte_etudiant.html", ctx, request=request)
-    pdf = HTML(string=html_str, base_url=request.build_absolute_uri("/")).write_pdf()
+    if not _can_manage_card(request, carte):
+        return HttpResponseForbidden("Acces refuse.")
+    ctx = _carte_print_context(request, carte)
+    html_str = render_to_string("students/cards_print_sheet.html", ctx, request=request)
+    pdf = HTML(string=html_str, base_url=settings.BASE_URL).write_pdf()
 
     matricule = carte.etudiant.matricule
     response = HttpResponse(pdf, content_type="application/pdf")
@@ -179,8 +229,7 @@ def portail_verification_view(request):
     cartes = CarteEtudiant.objects.filter(statut="active").select_related("etudiant")
     carte_trouvee = None
     for carte in cartes:
-        token = signer_carte(carte.etudiant.matricule, carte.annee, carte.code_annexe)
-        if generer_code_lisible(token) == code:
+        if any(generer_code_lisible(token) == code for token in _student_card_tokens(carte)):
             carte_trouvee = carte
             break
 
@@ -222,13 +271,8 @@ def portail_verify_token_view(request, token: str):
         ctx = {"resultat": {"valide": False, "message": "Carte non authentique ou QR illisible."}}
         return render(request, "students/portail_verification.html", ctx)
 
-    try:
-        carte = CarteEtudiant.objects.select_related("etudiant").get(
-            etudiant__matricule=payload["matricule"],
-            annee=payload["annee"],
-            code_annexe=payload["annexe"],
-        )
-    except CarteEtudiant.DoesNotExist:
+    carte = _student_card_from_payload(payload)
+    if carte is None:
         VerificationLog.objects.create(ip=ip, resultat="carte_inconnue")
         ctx = {"resultat": {"valide": False, "message": "Aucune carte correspondante en base."}}
         return render(request, "students/portail_verification.html", ctx)
@@ -246,6 +290,40 @@ def portail_verify_token_view(request, token: str):
         ctx = {"resultat": {"valide": False, "message": msg}}
 
     return render(request, "students/portail_verification.html", ctx)
+
+
+@require_http_methods(["GET"])
+def portail_verify_staff_token_view(request, token: str):
+    """Vérification publique minimale des cartes professionnelles par QR."""
+    from accounts.models import CartePersonnel
+
+    ip = _get_ip(request)
+    if verif_rate_limitee(ip):
+        messages.error(request, "Trop de tentatives. Veuillez patienter.")
+        return render(request, "students/portail_verification.html", status=429)
+    payload = verifier_token(token)
+    if not payload or payload.get("version") != "v2" or payload.get("kind") != "staff":
+        VerificationLog.objects.create(ip=ip, resultat="signature_invalide")
+        return render(request, "students/portail_verification.html", {
+            "resultat": {"valide": False, "message": "Carte non authentique ou QR illisible."},
+        })
+    carte = CartePersonnel.objects.select_related("profile__user").filter(
+        public_reference=payload["reference"], annee=payload["annee"],
+        code_annexe=payload["annexe"],
+    ).first()
+    if not carte or not carte.is_valide:
+        VerificationLog.objects.create(
+            staff_card=carte,
+            ip=ip,
+            resultat=carte.statut if carte else "carte_inconnue",
+        )
+        return render(request, "students/portail_verification.html", {
+            "resultat": {"valide": False, "message": "Carte professionnelle non valide."},
+        })
+    VerificationLog.objects.create(staff_card=carte, ip=ip, resultat="valide")
+    return render(request, "students/portail_verification.html", {
+        "resultat": {"valide": True, "carte": carte, "type": "staff"},
+    })
 
 
 # ---------------------------------------------------------------
@@ -273,13 +351,8 @@ def card_scan_verify_view(request):
         ctx = {"step": "error", "message": "QR non reconnu ou carte falsifiée."}
         return render(request, "students/partials/card_scan_login.html", ctx)
 
-    try:
-        carte = CarteEtudiant.objects.select_related("etudiant__inscription__candidature").get(
-            etudiant__matricule=payload["matricule"],
-            annee=payload["annee"],
-            code_annexe=payload["annexe"],
-        )
-    except CarteEtudiant.DoesNotExist:
+    carte = _student_card_from_payload(payload)
+    if carte is None:
         ctx = {"step": "error", "message": "Votre carte n'est pas enregistrée dans le système."}
         return render(request, "students/partials/card_scan_login.html", ctx)
 

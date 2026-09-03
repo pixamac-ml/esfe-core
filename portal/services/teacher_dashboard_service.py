@@ -286,7 +286,12 @@ def _get_teacher_class_queryset(*, teacher, branch):
             branch=branch,
             is_active=True,
         )
-        .exclude(status=AcademicScheduleEvent.STATUS_CANCELLED)
+        .exclude(
+            status__in=[
+                AcademicScheduleEvent.STATUS_DRAFT,
+                AcademicScheduleEvent.STATUS_CANCELLED,
+            ]
+        )
         .values_list("academic_class_id", flat=True)
     )
     slot_class_ids = list(
@@ -385,13 +390,14 @@ def _build_today_event_rows(*, teacher, branch, today_events):
     event_ids = [event.id for event in today_events]
     ec_ids = {event.ec_id for event in today_events if event.ec_id}
 
-    logged_event_ids = set(
-        LessonLog.objects.filter(
+    lesson_logs_by_event = {
+        lesson_log.schedule_event_id: lesson_log.status
+        for lesson_log in LessonLog.objects.filter(
             schedule_event_id__in=event_ids,
             teacher=teacher,
             branch=branch,
-        ).values_list("schedule_event_id", flat=True)
-    )
+        ).exclude(schedule_event__isnull=True)
+    }
     attendance_map = {
         att.schedule_event_id: att.status
         for att in TeacherAttendance.objects.filter(
@@ -408,23 +414,34 @@ def _build_today_event_rows(*, teacher, branch, today_events):
     )
 
     rows = []
+    now = timezone.now()
     for event in today_events:
         attendance_status = attendance_map.get(event.id)
-        has_lesson_log = event.id in logged_event_ids
+        lesson_log_status = lesson_logs_by_event.get(event.id)
+        has_lesson_log = lesson_log_status is not None
         has_attendance = attendance_status == TeacherAttendance.STATUS_PRESENT
         is_absent = attendance_status == TeacherAttendance.STATUS_ABSENT
         if is_absent:
             status = "absent"
-        elif has_lesson_log and has_attendance:
-            status = "done"
+        elif lesson_log_status == LessonLog.STATUS_DONE:
+            status = "validated"
+        elif lesson_log_status == LessonLog.STATUS_SUBMITTED:
+            status = "submitted"
+        elif lesson_log_status == LessonLog.STATUS_RETURNED:
+            status = "returned"
+        elif lesson_log_status == LessonLog.STATUS_PLANNED:
+            status = "draft"
         else:
             status = "pending"
 
         rows.append({
             "event": event,
             "has_lesson_log": has_lesson_log,
+            "lesson_log_status": lesson_log_status,
             "has_attendance": has_attendance,
             "is_absent": is_absent,
+            "has_started": event.start_datetime <= now,
+            "has_ended": event.end_datetime < now,
             "has_support": event.ec_id in support_ec_ids,
             "status": status,
             "lesson_log_url": reverse("accounts_portal:teacher_lesson_log_panel", args=[event.id]),
@@ -435,6 +452,84 @@ def _build_today_event_rows(*, teacher, branch, today_events):
             "declare_absence_url": reverse("accounts_portal:teacher_declare_absence", args=[event.id]),
         })
     return rows
+
+
+def _build_teacher_next_action(today_event_rows):
+    """Return the one pedagogical action that deserves attention first."""
+    if not today_event_rows:
+        return None
+
+    now = timezone.now()
+    current_rows = [
+        row for row in today_event_rows
+        if row["event"].start_datetime <= now <= row["event"].end_datetime
+        and not row["is_absent"]
+    ]
+    overdue_rows = [
+        row for row in today_event_rows
+        if row["has_started"]
+        and row["status"] in {"pending", "draft", "returned"}
+        and not row["is_absent"]
+    ]
+    upcoming_rows = [
+        row for row in today_event_rows
+        if not row["has_started"] and not row["is_absent"]
+    ]
+    row = (current_rows or overdue_rows or upcoming_rows or [None])[0]
+    if row is None:
+        return None
+
+    if row["status"] == "returned":
+        label, detail, action_label, action_url = (
+            "Correction demandée",
+            "Le surveillant a demandé une correction avant validation.",
+            "Corriger et signer",
+            row["lesson_log_url"],
+        )
+    elif row["status"] == "draft":
+        label, detail, action_label, action_url = (
+            "Brouillon à signer",
+            "Votre déclaration est enregistrée, mais elle n'est pas encore transmise.",
+            "Reprendre le brouillon",
+            row["lesson_log_url"],
+        )
+    elif row["status"] == "pending" and row["has_started"]:
+        label, detail, action_label, action_url = (
+            "Cahier à compléter",
+            "Déclarez le cours réalisé puis signez-le pour le transmettre au surveillant.",
+            "Ouvrir le cahier",
+            row["lesson_log_url"],
+        )
+    elif row["status"] == "submitted":
+        label, detail, action_label, action_url = (
+            "Cahier signé · à contrôler",
+            "Votre déclaration est transmise au surveillant académique.",
+            "Voir le cahier signé",
+            row["lesson_log_url"],
+        )
+    elif row["status"] == "validated":
+        label, detail, action_label, action_url = (
+            "Cours validé",
+            "La chaîne pédagogique de cette séance est terminée.",
+            "Voir le cahier validé",
+            row["lesson_log_url"],
+        )
+    else:
+        label, detail, action_label, action_url = (
+            "Prochain cours à préparer",
+            "Préparez les ressources utiles avant le début de la séance.",
+            "Préparer les ressources",
+            row["support_url"],
+        )
+
+    return {
+        "event": row["event"],
+        "status": row["status"],
+        "label": label,
+        "detail": detail,
+        "action_label": action_label,
+        "action_url": action_url,
+    }
 
 
 def _parse_positive_int(raw_value, *, field_label, default=0, allow_zero=True):
@@ -805,6 +900,7 @@ def build_teacher_dashboard_context(
         branch=branch,
         today_events=today_events,
     ) if section == "overview" else []
+    teacher_next_action = _build_teacher_next_action(today_event_rows) if section == "overview" else None
     week_events = list(
         teacher_events_qs
         .filter(start_datetime__date__gte=week_start, start_datetime__date__lt=week_end)
@@ -1159,6 +1255,7 @@ def build_teacher_dashboard_context(
         "week_end": week_end - timedelta(days=1),
         "today_events": today_events,
         "today_event_rows": today_event_rows,
+        "teacher_next_action": teacher_next_action,
         "upcoming_events": upcoming_events,
         "teaching_days": teaching_days,
         "class_focus_rows": class_focus_rows,
@@ -1649,9 +1746,18 @@ def build_teacher_lesson_log_context(request, *, branch, event_id, toast=None):
         is_active=True,
     )
     event_qs = event_qs.filter(branch=branch)
+    event_qs = event_qs.exclude(
+        status__in={
+            AcademicScheduleEvent.STATUS_DRAFT,
+            AcademicScheduleEvent.STATUS_CANCELLED,
+        }
+    )
     schedule_event = event_qs.first()
     if schedule_event is None:
         raise ValidationError("Cours introuvable pour cet enseignant.")
+
+    if timezone.now() < schedule_event.start_datetime:
+        raise ValidationError("Le cahier ne peut être déclaré qu'à partir du début de la séance.")
 
     log_qs = LessonLog.objects.select_related("schedule_event").filter(
         teacher=teacher,
@@ -1660,12 +1766,6 @@ def build_teacher_lesson_log_context(request, *, branch, event_id, toast=None):
     )
     log_qs = log_qs.filter(branch=branch)
     lesson_log = log_qs.first()
-
-    teacher_marked_present = TeacherAttendance.objects.filter(
-        teacher=teacher,
-        schedule_event=schedule_event,
-        status=TeacherAttendance.STATUS_PRESENT,
-    ).exists()
 
     now = timezone.now()
     if now < schedule_event.start_datetime:
@@ -1680,13 +1780,32 @@ def build_teacher_lesson_log_context(request, *, branch, event_id, toast=None):
         "schedule_event": schedule_event,
         "lesson_log": lesson_log,
         "toast": toast,
-        "teacher_marked_present": teacher_marked_present,
         "lesson_log_session_state": lesson_log_session_state,
         "lesson_log_status_choices": [
             (LessonLog.STATUS_DONE, "Fait"),
             (LessonLog.STATUS_CANCELLED, "Annule"),
             (LessonLog.STATUS_PLANNED, "Planifie"),
         ],
+    }
+
+
+def build_lesson_log_signature_snapshot(lesson_log):
+    """Immutable teaching declaration bound to the teacher's signature."""
+
+    return {
+        "kind": "lesson_log",
+        "lesson_log_id": lesson_log.pk,
+        "branch_id": lesson_log.branch_id,
+        "schedule_event_id": lesson_log.schedule_event_id,
+        "teacher_id": lesson_log.teacher_id,
+        "academic_class_id": lesson_log.academic_class_id,
+        "ec_id": lesson_log.ec_id,
+        "date": lesson_log.date.isoformat() if lesson_log.date else "",
+        "start_time": lesson_log.start_time.isoformat() if lesson_log.start_time else "",
+        "end_time": lesson_log.end_time.isoformat() if lesson_log.end_time else "",
+        "content": lesson_log.content or "",
+        "homework": lesson_log.homework or "",
+        "observations": lesson_log.observations or "",
     }
 
 

@@ -12,6 +12,7 @@ from django.test import RequestFactory, TestCase, override_settings
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.urls import reverse
 from django.utils import timezone
+from axes.models import AccessAttempt
 
 from branches.models import Branch
 from portal.models import AccountSupportState
@@ -390,6 +391,57 @@ class AuthenticationSecurityTests(TestCase):
         profile.save(update_fields=["position", "updated_at"])
 
         self.assertFalse(Session.objects.filter(session_key=session_key).exists())
+
+
+@override_settings(
+    AXES_FAILURE_LIMIT=2,
+    AXES_COOLOFF_TIME=timedelta(minutes=15),
+    AXES_LOCKOUT_PARAMETERS=[["username", "ip_address"]],
+    AXES_RESET_COOL_OFF_ON_FAILURE_DURING_LOCKOUT=False,
+)
+class LoginLockoutIsolationTests(TestCase):
+    """A shared school network must not make unrelated accounts unavailable."""
+
+    def setUp(self):
+        self.password = "A-secure-test-password-123"
+        self.locked_user = User.objects.create_user(
+            username="lockout-target",
+            password=self.password,
+        )
+        self.other_user = User.objects.create_user(
+            username="lockout-unrelated",
+            password=self.password,
+        )
+
+    def test_failed_attempts_only_lock_the_target_account_on_the_shared_ip(self):
+        login_url = reverse("accounts:login")
+        shared_network = {"REMOTE_ADDR": "192.0.2.44"}
+
+        for _ in range(2):
+            self.client.post(
+                login_url,
+                {"username": self.locked_user.username, "password": "wrong-password"},
+                **shared_network,
+            )
+
+        attempt = AccessAttempt.objects.get(username=self.locked_user.username)
+        self.assertEqual(attempt.ip_address, shared_network["REMOTE_ADDR"])
+        self.assertEqual(attempt.failures_since_start, 2)
+
+        blocked = self.client.post(
+            login_url,
+            {"username": self.locked_user.username, "password": self.password},
+            **shared_network,
+        )
+        self.assertEqual(blocked.status_code, 429)
+
+        allowed = self.client.post(
+            login_url,
+            {"username": self.other_user.username, "password": self.password},
+            **shared_network,
+        )
+        self.assertEqual(allowed.status_code, 302)
+        self.assertTrue(allowed.wsgi_request.user.is_authenticated)
 
 
 class PortalItV2AccessTests(TestCase):

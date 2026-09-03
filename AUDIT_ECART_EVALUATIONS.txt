@@ -1,0 +1,204 @@
+AUDIT D'ECART — EVALUATIONS / EXAMENS
+
+Etat : lecture seule. Aucun modèle, migration, vue, template ou donnée métier
+n'a été modifié pendant cet audit.
+
+CONCLUSION
+
+Le socle est bon : calendrier versionné, jalons examen/rattrapage/publication,
+épreuves par classe et EC, conflits d'horaire, notes normale/rattrapage/finale,
+publication OTP, candidats au rattrapage et délibération.
+
+L'écart central : il n'existe pas de « dossier opérationnel de session ».
+Aujourd'hui, une session est un jalon calendrier et une épreuve est un événement
+d'emploi du temps. Ces objets peuvent être liés, mais l'interface DE ne crée pas
+cette liaison. Rien ne regroupe plusieurs classes, les sujets, les
+surveillants, les copies et les échéances de correction.
+
+La bonne suite est un enrichissement progressif, pas une réécriture.
+
+1. CE QUI EXISTE DEJA
+
+A. Calendrier
+- AcademicCalendar : annexe, année, versions, brouillon, validation,
+  publication, révision et archivage.
+- AcademicCalendarEntry : types session d'examens, rattrapage, publication et
+  jury ; portée annexe/formation/classe/semestre ; état et blocage.
+- AcademicCalendarDisruption + AcademicCalendarAdjustment : après publication,
+  préservent les dates d'origine et portent la date effective décidée.
+
+B. Epreuves
+- AcademicScheduleEvent porte classe, EC, enseignant responsable, annexe,
+  année, début/fin, salle et état.
+- Il possède déjà calendar_entry nullable, ajouté en migration academics 0023,
+  plus AcademicScheduleChangeLog et AcademicScheduleExecutionLog.
+- academics.services.schedule_service contrôle les conflits classe, enseignant,
+  salle et EC ; crée, reporte et annule avec historique.
+
+C. Notes, résultats et délibération
+- Semester : brouillon -> saisie normale -> normale clôturée -> rattrapage ->
+  finalisé -> publié.
+- ECGrade : normal_score, retake_score, final_score et verrouillage.
+- portal.services.notes_workflow : notes manquantes, candidats/EC de
+  rattrapage, blocage avant publication normale.
+- Validation DE, publication OTP, BranchAcademicCycle, ClassCycleStatus,
+  AcademicClosureReport et GradeModificationRequest existent.
+
+D. Tests existants
+- portal/test_director_evaluation_workflows.py
+- portal/test_director_deliberation_workspace.py
+- academics/test_calendar_workflow.py
+- academics/test_calendar_governance.py
+- academics/test_academic_readiness.py
+- academics/tests.py
+
+2. CE QUI EST DEJA REUTILISABLE
+
+A conserver sans refonte :
+- calendrier comme référence institutionnelle ;
+- jalons examen/rattrapage/publication/jury ;
+- AcademicScheduleEvent pour une épreuve précise ;
+- conflits classe/enseignant/salle et leur historique ;
+- notes normale/rattrapage/finale ;
+- calcul actuel des candidats au rattrapage ;
+- validation, OTP et délibération.
+
+Point important : AcademicScheduleEvent.calendar_entry existe déjà. Il ne faut
+pas créer une seconde relation calendrier -> épreuve.
+
+3. ECARTS ET RISQUES
+
+A. Lien calendrier -> session -> épreuve : PARTIEL
+director_evaluation_action crée actuellement une épreuve sans calendar_entry,
+avec dates saisies manuellement. A l'inverse, director_exam_session_action crée
+directement un AcademicCalendarEntry brouillon depuis le module Sessions.
+Cela inverse le flux cible : le calendrier doit ouvrir le cadre, puis
+l'évaluation doit s'y rattacher.
+
+B. Conflits : PARTIEL
+Les collisions de classe, enseignant et salle sont couvertes. Manquent :
+- la période officielle obligatoire ;
+- surcharge d'une classe sur une journée ;
+- disponibilité des surveillants, capacité de salle et besoin de surveillance.
+
+C. Rattrapage : PARTIEL
+Les candidats et EC concernés sont correctement produits par
+get_retake_candidates. Il manque un brouillon de campagne de rattrapage créé
+depuis ces résultats et le jalon calendrier.
+
+D. Manques opérationnels
+- campagne multi-classes et classes exclues ;
+- sujets attendus, reçus/manquants, relances et seuils J-7/J-3 ;
+- surveillants multiples, externes, présence, signature et preuve ;
+- copies disponibles/retraitées/retournées et suivi de correction ;
+- alerte avant échéance de publication.
+
+E. Risques
+- AcademicDebtEvaluationSession est réservé aux dettes académiques : ne pas le
+  détourner pour les examens ordinaires.
+- Les dates du jalon et de l'épreuve sont aujourd'hui sans orchestration.
+- La logique DE est concentrée dans portal/views/views.py : le nouveau flux doit
+  être créé dans un service métier.
+- Semester.number ne vaut que 1 ou 2 par classe. La règle L1 -> S1/S2, L2 ->
+  S3/S4, L3 -> S5/S6 n'est pas aujourd'hui stockée globalement.
+- AcademicScheduleEvent.teacher est un responsable pédagogique, pas une équipe
+  de surveillants.
+
+Les migrations 0012 évoquent d'anciens objets de présence/surveillance, mais
+les modèles applicatifs actuels n'en font pas un workflow d'examen exploitable.
+Ce n'est pas une fondation à réutiliser sans audit de données complémentaire.
+
+4. ARCHITECTURE CIBLE LA MOINS DESTRUCTIVE
+
+A. EvaluationCampaign (nouveau modèle)
+Dossier opérationnel d'une session normale ou de rattrapage.
+Champs : branch, academic_year, calendar_entry obligatoire (examen ou
+rattrapage), result_publication_entry nullable, session_kind, status,
+source_campaign, auteur, justification et dates d'audit.
+Migration : oui, nouvelle table + index annexe/année/statut.
+Impact : aucun écrasement de l'existant.
+
+B. EvaluationCampaignScope (nouveau modèle)
+Classes/semestres inclus ou exclus : campaign, academic_class, semester
+nullable, included, reason. Migration : oui.
+
+C. EvaluationRequirement (nouveau modèle)
+Préparation d'un EC dans une campagne : campaign, classe, EC, responsable,
+subject_due_at, critical_at, subject_status, fichier de sujet, reçu le/par,
+relance et notes. Il porte les alertes J-7/J-3. Migration : oui.
+
+D. Reutiliser AcademicScheduleEvent
+Ajouter seulement evaluation_campaign FK nullable et indexée.
+Une épreuve créée depuis campagne renseigne evaluation_campaign ET
+calendar_entry. Le service vérifie qu'elle reste dans la période effective,
+sauf dérogation motivée. Migration : oui ; les épreuves historiques restent
+valides et non rattachées.
+
+E. Surveillance et copies
+- EvaluationProctor : personne interne ou externe.
+- EvaluationProctorAssignment : épreuve, rôle, créneau, présence, signature ou
+  preuve et validation.
+- EvaluationScriptBatch / EvaluationCopyHandover : épreuve, copies prévues,
+  remise, retrait, retour, correction et preuve.
+Ces deux familles nécessitent de nouvelles migrations. Le financier ne reçoit
+plus tard que les présences externes certifiées : aucun paiement ici.
+
+F. Rattrapage
+Service « préparer le rattrapage » :
+1. exige résultats normaux publiés ;
+2. utilise get_retake_candidates ;
+3. trouve le jalon retake_session ;
+4. crée campagne brouillon, scopes et requirements ;
+5. ne publie ni ne planifie les épreuves automatiquement.
+
+5. ORDRE RECOMMANDE
+
+Lot 1 : Campaign + Scope, lien épreuve -> campagne, création depuis jalon
+publié, contrôle strict des dates et tests annexe/année/avenants.
+
+Lot 2 : Requirements, sujets, relances J-7/J-3 et planning des épreuves.
+
+Lot 3 : surveillants, externes, présences/preuves, copies et corrections.
+
+Lot 4 : brouillon de rattrapage et tableau Pilotage DE.
+
+Les évaluations partielles restent hors de cette première refonte.
+
+6. TESTS A PREVOIR
+
+- isolation par annexe et année ;
+- campagne seulement sur un jalon compatible ;
+- inclusion/exclusion multi-classes et semestres ;
+- épreuve dans/hors période, dérogation, report et avenant ;
+- conflits classe/salle/enseignant/surveillant ;
+- sujet manquant à J-3 ;
+- présence certifiée d'un externe ;
+- copies retirées mais notes manquantes ;
+- rattrapage limité aux étudiants et EC réellement concernés ;
+- blocage du rattrapage avant publication normale.
+
+SCHEMAS
+
+Architecture actuelle
+
+AcademicCalendarEntry (période)
+          └── AcademicScheduleEvent (épreuve) [lien possible, non alimenté]
+
+Semester (état des notes) ── ECGrade (normal / rattrapage / final)
+          └── résultats, publication OTP, délibération
+
+Architecture cible
+
+AcademicCalendarEntry (période officielle + éventuel avenant)
+          ↓
+EvaluationCampaign (dossier normal ou rattrapage)
+          ├── EvaluationCampaignScope (classes / semestres)
+          ├── EvaluationRequirement (EC, sujets, délais, relances)
+          └── AcademicScheduleEvent (épreuve datée)
+                    ├── EvaluationProctorAssignment (surveillance / présence)
+                    └── EvaluationScriptBatch (copies / correction)
+          ↓
+ECGrade -> contrôle -> publication -> candidats rattrapage
+          ↓
+Campaign de rattrapage -> résultats définitifs -> délibération
+

@@ -97,7 +97,14 @@ class ManagerFinanceWorkspaceTests(TestCase):
             for group in response.context["dashboard_shell"]["navigation"]
             for item in group["items"]
         }
-        self.assertEqual(navigation_keys, {"paiements", "settings", "reenrollment"})
+        self.assertTrue({"paiements", "settings", "reenrollment"}.issubset(navigation_keys))
+        self.assertFalse(
+            navigation_keys & {
+                "overview", "candidatures", "inscriptions", "salaires",
+                "honoraires", "depenses", "caisse", "rapport", "cloture",
+                "boutique", "dons",
+            }
+        )
         self.assertContains(response, 'data-ui-core="filter-bar"')
         self.assertContains(response, 'data-ui-core="data-table"')
         self.assertContains(response, 'data-ui-core="modal"', count=1)

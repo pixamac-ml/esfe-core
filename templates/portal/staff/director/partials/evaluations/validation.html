@@ -14,13 +14,14 @@
 
   <form method="get"
         hx-get="{% url 'accounts_portal:director_evaluations_subcontent' %}"
-        hx-target="#director-results-subcontent"
-        hx-swap="innerHTML"
-        hx-trigger="submit, change from:select"
+        hx-target="#director-results-validation-list"
+        hx-select="#director-results-validation-list"
+        hx-swap="outerHTML"
+        hx-trigger="submit"
         hx-indicator="#director-results-loading"
         hx-sync="#director-results-subcontent:replace"
         class="grid min-w-0 gap-3 border-y border-ui-border py-4 sm:grid-cols-[minmax(12rem,1fr)_14rem_auto]">
-    <input type="hidden" name="view" value="validation">
+    <input type="hidden" name="view" value="{{ eval_subview }}">
     <label class="min-w-0">
       <span class="sr-only">Rechercher une classe</span>
       <input type="search" name="validation_q" value="{{ validation_q }}" placeholder="Rechercher une classe ou une filière" class="h-ui-control w-full rounded-ui-input border border-ui-border bg-ui-surface px-3 text-sm text-ui-text focus:border-ui-focus focus:ring-ui-focus">
@@ -90,11 +91,11 @@
         {% component "ui_core.empty_state" title="Aucune classe ne demande d'action" message="Les filtres actuels ne retournent aucune validation, publication ou correction à traiter." icon="circle-check-big" %}{% endcomponent %}
         {% if validation_scope != "all" %}
         <div class="flex justify-center pb-6">
-          <a href="{% url 'accounts_portal:portal_dashboard' %}?section=evaluations&view=validation&validation_scope=all"
-             hx-get="{% url 'accounts_portal:director_evaluations_subcontent' %}?view=validation&validation_scope=all"
+          <a href="{% url 'accounts_portal:portal_dashboard' %}?section=evaluations&view={{ eval_subview }}&validation_scope=all"
+             hx-get="{% url 'accounts_portal:director_evaluations_subcontent' %}?view={{ eval_subview }}&validation_scope=all"
              hx-target="#director-results-subcontent"
              hx-swap="innerHTML"
-             hx-push-url="{% url 'accounts_portal:portal_dashboard' %}?section=evaluations&view=validation&validation_scope=all"
+             hx-push-url="{% url 'accounts_portal:portal_dashboard' %}?section=evaluations&view={{ eval_subview }}&validation_scope=all"
              hx-indicator="#director-results-loading"
              class="ui-focus-ring inline-flex h-ui-control items-center gap-2 rounded-ui-button border border-ui-border bg-ui-surface px-4 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">
             <i data-lucide="list" class="h-4 w-4" aria-hidden="true"></i>Afficher toutes les classes

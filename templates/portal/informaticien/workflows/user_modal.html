@@ -4,19 +4,42 @@
         <p class="workflow-kicker">Voir / Modifier utilisateur</p>
         <h3 class="mt-1 text-xl font-black">{{ target_user.get_full_name|default:target_user.username }}</h3>
       </div>
-      <button type="button" class="workflow-btn workflow-btn-secondary" onclick="window.dispatchEvent(new CustomEvent('ui-overlay-close', {detail: {id: 'it-dashboard-modal'}}))"><i data-lucide="x" class="h-4 w-4"></i> Fermer</button>
+      <button type="button" class="workflow-btn workflow-btn-secondary" onclick="window.dispatchEvent(new CustomEvent('ui-overlay-close', {detail: {id: 'it-dashboard-drawer'}}))"><i data-lucide="x" class="h-4 w-4"></i> Fermer</button>
     </div>
 
     {% if toast %}
     <section class="workflow-toast workflow-toast-{{ toast.level }}">{{ toast.message }}</section>
     {% endif %}
 
+    <section class="grid gap-3 rounded-ui-card border border-ui-border bg-ui-surface-muted p-4 text-sm sm:grid-cols-2">
+      <div><span class="block text-xs font-semibold uppercase tracking-wide text-ui-text-muted">Type</span><strong class="text-ui-text">{% if student %}Étudiant{% else %}Personnel{% endif %}</strong></div>
+      <div><span class="block text-xs font-semibold uppercase tracking-wide text-ui-text-muted">État du compte</span><strong class="text-ui-text">{% if support_state.is_suspended %}Suspendu{% elif support_state.is_blocked %}Bloqué{% elif target_user.is_active %}Actif{% else %}Inactif{% endif %}</strong></div>
+      {% if student %}<div><span class="block text-xs font-semibold uppercase tracking-wide text-ui-text-muted">Matricule</span><strong class="text-ui-text">{{ student.matricule|default:"—" }}</strong></div><div><span class="block text-xs font-semibold uppercase tracking-wide text-ui-text-muted">Classe</span><strong class="text-ui-text">{{ enrollment.academic_class.display_name|default:"Non affecté" }}</strong></div>{% else %}<div><span class="block text-xs font-semibold uppercase tracking-wide text-ui-text-muted">Fonction</span><strong class="text-ui-text">{{ profile.get_position_display|default:"Non renseignée" }}</strong></div><div><span class="block text-xs font-semibold uppercase tracking-wide text-ui-text-muted">Annexe</span><strong class="text-ui-text">{{ profile.branch.name|default:"Non rattachée" }}</strong></div>{% endif %}
+      <div><span class="block text-xs font-semibold uppercase tracking-wide text-ui-text-muted">Dernière connexion</span><strong class="text-ui-text">{{ target_user.last_login|date:"d/m/Y H:i"|default:"Aucune" }}</strong></div>
+      <div><span class="block text-xs font-semibold uppercase tracking-wide text-ui-text-muted">Dernière action support</span><strong class="text-ui-text">{{ support_state.updated_at|date:"d/m/Y H:i"|default:"Aucune" }}</strong></div>
+    </section>
+
+    <section class="rounded-ui-card border border-ui-border bg-ui-surface p-4">
+      <h4 class="text-sm font-bold text-ui-text">Historique de sécurité</h4>
+      <p class="mt-1 text-xs text-ui-text-muted">Données réellement enregistrées : évènements, IP et navigateur. Aucune géolocalisation n’est inventée.</p>
+      <div class="mt-3 max-h-48 divide-y divide-ui-border overflow-y-auto">{% for event in security_events %}<div class="py-2 text-xs"><strong class="text-ui-text">{{ event.get_event_type_display }}</strong><span class="text-ui-text-muted"> · {{ event.created_at|date:"d/m/Y H:i" }} · IP {{ event.ip_address|default:"non enregistrée" }}</span>{% if event.user_agent %}<p class="mt-0.5 truncate text-ui-text-muted" title="{{ event.user_agent }}">{{ event.user_agent }}</p>{% endif %}</div>{% empty %}<p class="py-2 text-xs text-ui-text-muted">Aucun évènement de sécurité enregistré pour ce compte.</p>{% endfor %}</div>
+    </section>
+
+    <section class="rounded-ui-card border border-ui-border bg-ui-surface p-4">
+      <h4 class="text-sm font-bold text-ui-text">Connexions récentes</h4>
+      <div class="mt-2 divide-y divide-ui-border">
+        {% for session in sessions %}<div class="py-2 text-xs"><strong class="text-ui-text">{{ session.started_at|date:"d/m/Y H:i" }}</strong><span class="text-ui-text-muted"> · IP {{ session.ip_address|default:"non enregistrée" }}</span>{% if session.user_agent %}<p class="truncate text-ui-text-muted" title="{{ session.user_agent }}">{{ session.user_agent }}</p>{% endif %}</div>{% empty %}<p class="py-2 text-xs text-ui-text-muted">Aucune connexion enregistrée.</p>{% endfor %}
+      </div>
+      <button type="button" class="mt-3 text-xs font-bold text-ui-primary hover:underline" hx-get="{% url 'accounts_portal:it_user_sessions' target_user.id %}" hx-target="#it-user-sessions" hx-swap="innerHTML">Voir tout l'historique</button>
+      <div id="it-user-sessions" class="mt-2"></div>
+    </section>
+
     <form
       class="grid gap-4"
       method="post"
       action="{% url 'accounts_portal:it_user_modal_save' target_user.id %}"
       hx-post="{% url 'accounts_portal:it_user_modal_save' target_user.id %}"
-      hx-target="#it-dashboard-modal-content"
+      hx-target="#it-dashboard-drawer-content"
       hx-swap="innerHTML"
     >
       {% csrf_token %}

@@ -4,6 +4,7 @@ from django.urls import path
 from django.contrib.auth import views as auth_views
 
 from .auth_views import PortalLoginView, PortalPasswordChangeView
+from .financial_approvals import financial_approval_confirm, financial_approval_detail
 
 # Import des vues principales
 from .views import (
@@ -120,6 +121,8 @@ urlpatterns = [
         dashboard_redirect,
         name="dashboard_redirect"
     ),
+    path("financial-approvals/<int:pk>/", financial_approval_detail, name="financial_approval_detail"),
+    path("financial-approvals/<int:pk>/confirm/", financial_approval_confirm, name="financial_approval_confirm"),
     path(
         "dashboard/admissions/",
         admissions_dashboard,
@@ -402,6 +405,8 @@ urlpatterns = [
          name="manager_payroll_sheet_pdf"),
     path("manager/honorarium/<int:pk>/statement/", honorarium_statement_pdf,
          name="manager_honorarium_statement_pdf"),
+    path("manager/honorarium/<int:pk>/service-sheet/", teacher_service_sheet_pdf,
+         name="manager_teacher_service_sheet_pdf"),
     path("manager/donation/<int:pk>/receipt/", donation_receipt_pdf,
          name="manager_donation_receipt_pdf"),
     path("manager/expense/<int:pk>/supporting-document/", expense_supporting_document_pdf,
@@ -468,6 +473,10 @@ urlpatterns = [
     path("htmx/manager/honorarium/<int:pk>/pay/", teacher_honorarium_pay, name="htmx_manager_teacher_honorarium_pay"),
     path("htmx/manager/honorarium/prepare-all/", teacher_honorarium_prepare_all, name="htmx_manager_teacher_honorarium_prepare_all"),
     path("htmx/manager/honorarium/pay-ready-all/", teacher_honorarium_pay_ready_all, name="htmx_manager_teacher_honorarium_pay_ready_all"),
+    path("payment-signature/<str:token>/", payment_signature_tablet, name="payment_signature_tablet"),
+    path("payment-signature/<str:token>/submit/", payment_signature_tablet_submit, name="payment_signature_tablet_submit"),
+    path("htmx/manager/payment-signature/<str:payment_type>/<int:pk>/start/", payment_signature_start, name="htmx_manager_payment_signature_start"),
+    path("htmx/manager/payment-signature/<int:pk>/approve/", payment_signature_approve, name="htmx_manager_payment_signature_approve"),
     path("htmx/manager/closure/create/", monthly_closure_create, name="htmx_manager_monthly_closure_create"),
     path("htmx/manager/closure/<int:pk>/validate/", monthly_closure_validate, name="htmx_manager_monthly_closure_validate"),
     path("htmx/manager/closure/<int:pk>/close/", monthly_closure_close, name="htmx_manager_monthly_closure_close"),
@@ -480,6 +489,13 @@ urlpatterns = [
     path("htmx/manager/expense/<int:pk>/reject/", expense_reject, name="htmx_manager_expense_reject"),
     path("htmx/manager/expense/<int:pk>/pay/", expense_pay, name="htmx_manager_expense_pay"),
     path("htmx/manager/cash-movement/create/", cash_movement_create, name="htmx_manager_cash_movement_create"),
+    path("htmx/manager/cash-register/open/", cash_register_open, name="htmx_manager_cash_register_open"),
+    path("htmx/manager/cash-register/close/", cash_register_close, name="htmx_manager_cash_register_close"),
+    path("htmx/manager/wallet/create/", wallet_create, name="htmx_manager_wallet_create"),
+    path("htmx/manager/wallet/<int:pk>/allocate/", wallet_allocate, name="htmx_manager_wallet_allocate"),
+    path("htmx/manager/wallet/<int:pk>/return/", wallet_return, name="htmx_manager_wallet_return"),
+    path("htmx/manager/wallet/<int:pk>/transfer/", wallet_transfer, name="htmx_manager_wallet_transfer"),
+    path("htmx/manager/wallet/<int:pk>/close/", wallet_close, name="htmx_manager_wallet_close"),
     path("htmx/manager/cash/sync/", cash_sync, name="htmx_manager_cash_sync"),
     path("htmx/manager/cash-movement/<int:pk>/receipt/", cash_movement_receipt,
          name="htmx_manager_cash_movement_receipt"),

@@ -11,7 +11,7 @@
 {{ block.super }}
 <link rel="stylesheet" href="{% static 'vendor/tabulator/tabulator.min.css' %}">
 <script defer src="{% static 'vendor/tabulator/tabulator.min.js' %}"></script>
-<script defer src="{% static 'src/js/portal/notes_tabulator.js' %}?v=notes-live-calculation-4"></script>
+<script defer src="{% static 'src/js/portal/notes_tabulator.js' %}?v=notes-fluid-save-5"></script>
 <style>
   [x-cloak] { display: none !important; }
   body { background: #f8fafc; color: #0f172a; }
@@ -311,7 +311,6 @@
               </button>
               <div x-show="profileOpen" x-transition class="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-950">
                 <button type="button" class="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-900" hx-get="{% url 'accounts_portal:it_my_account_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML" hx-push-url="true" @click="activeModule='settings'; profileOpen=false">Mon profil</button>
-                <button type="button" class="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-900" hx-get="{% url 'accounts_portal:it_branch_settings_workspace' %}" hx-target="#it-workspace" hx-swap="innerHTML" hx-push-url="true" @click="activeModule='settings'; profileOpen=false">Paramètres annexe</button>
                 <a href="{% url 'password_change' %}" class="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-900">Mot de passe</a>
                 <form method="post" action="{% url 'accounts:logout' %}">
                   {% csrf_token %}
@@ -382,18 +381,12 @@
       modules: [
         { key: 'home', label: 'Accueil', icon: 'home', kicker: 'Actions rapides et priorités', url: "{% url 'accounts_portal:it_home_workspace' %}" },
         { key: 'notes', label: 'Notes & Résultats', icon: 'file-spreadsheet', kicker: 'Classe → Semestre → État → Action', url: "{% url 'accounts_portal:it_notes_flow_workspace' %}" },
-        { key: 'structure', label: 'Paramétrage académique', icon: 'blocks', kicker: 'Classes → UE → EC → Affectations', url: "{% url 'accounts_portal:it_structure_workspace' %}" },
         { key: 'import', label: 'Import / export', icon: 'upload-cloud', kicker: 'Excel notes et export classe', url: "{% url 'accounts_portal:it_import_workspace' %}" },
-        { key: 'archives', label: 'Archives', icon: 'folder-archive', kicker: 'Années, classes et dossiers consultables', url: "{% url 'accounts_portal:it_archives_workspace' %}" },
-        { key: 'cards', label: 'Cartes étudiants', icon: 'badge', kicker: 'Classe → Étudiant → PDF', url: "{% url 'accounts_portal:it_cards_workspace' %}" },
+        { key: 'cards', label: 'Cartes & QR', icon: 'badge', kicker: 'Émission → Suivi → Vérification', url: "{% url 'accounts_portal:it_cards_workspace' %}" },
         { key: 'accounts', label: 'Utilisateurs', icon: 'shield-check', kicker: 'Utilisateur → État compte → Action', url: "{% url 'accounts_portal:it_accounts_flow_workspace' %}" },
-        { key: 'support', label: 'Support', icon: 'life-buoy', kicker: 'Tickets de l\'annexe', url: "{% url 'accounts_portal:it_support_flow_workspace' %}" },
-        { key: 'supervision', label: 'Supervision', icon: 'alert-triangle', kicker: 'Anomalies, alertes et points bloquants', url: "{% url 'accounts_portal:it_supervision_workspace' %}" },
         { key: 'audit', label: 'Journal d\'audit', icon: 'history', kicker: 'Historique des actions de l\'annexe', url: "{% url 'accounts_portal:it_audit_workspace' %}" },
-        { key: 'catalog', label: 'Catalogue', icon: 'library', kicker: 'Langues et professions de référence', url: "{% url 'accounts_portal:it_catalog_workspace' %}" },
         { key: 'notifications', label: 'Notifications', icon: 'bell', kicker: 'Alertes, messages et communications', url: "{% url 'accounts_portal:it_notifications_workspace' %}" },
-        { key: 'branch_settings', label: 'Paramètres d\'annexe', icon: 'sliders-horizontal', kicker: 'Réglages techniques de l\'annexe', url: "{% url 'accounts_portal:it_branch_settings_workspace' %}" },
-        { key: 'settings', label: 'Compte', icon: 'settings', kicker: 'Profil, sécurité, préférences et annexe', url: "{% url 'accounts_portal:it_my_account_workspace' %}" },
+        { key: 'settings', label: 'Compte', icon: 'settings', kicker: 'Profil, sécurité et préférences', url: "{% url 'accounts_portal:it_my_account_workspace' %}" },
       ],
       init() {
         this.collapsed = window.localStorage.getItem('it_flow_sidebar') === '1';
@@ -801,14 +794,14 @@
         let rowMissing = false;
 
         this.structure.forEach((ue) => {
-          let ueCoefSum = 0;
+          let ueEnteredCoefSum = 0;
           let ueNoteCoefSum = 0;
           let ueCreditSum = 0;
           let ueMissing = false;
 
           ue.ecs.forEach((ec) => {
             const result = this.computeEc(rowIndex, ec);
-            ueCoefSum += ec.coefficient;
+            if (result.note !== null) ueEnteredCoefSum += ec.coefficient;
             ueNoteCoefSum += result.noteCoefficient;
             ueCreditSum += result.creditObtained;
             if (result.note === null) ueMissing = true;
@@ -820,8 +813,12 @@
             }
           });
 
-          const ueAverage = (!ueMissing && ueCoefSum > 0) ? (ueNoteCoefSum / ueCoefSum) : null;
-          if (ueAverage === null) rowMissing = true;
+          // Moyenne provisoire : seules les matières déjà notées participent
+          // au dénominateur. Une matière vide ne vaut jamais zéro.
+          const ueAverage = ueEnteredCoefSum > 0 ? (ueNoteCoefSum / ueEnteredCoefSum) : null;
+          // La validation du semestre reste, elle, bloquée tant que toute la
+          // grille n'est pas saisie.
+          if (ueMissing || ueAverage === null) rowMissing = true;
           this.setText(`ueavg-${rowIndex}-${ue.id}`, ueAverage === null ? '0,00' : this.fmt(ueAverage));
           this.setText(`uenotecoef-${rowIndex}-${ue.id}`, this.fmt(ueNoteCoefSum));
           this.setText(`uecredit-${rowIndex}-${ue.id}`, this.fmt(ueCreditSum));

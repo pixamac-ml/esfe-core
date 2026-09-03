@@ -11,7 +11,7 @@
   {% component "ui_core.panel" title="Recherche" subtitle="Le filtrage ne quitte jamais le périmètre de votre annexe." %}
     {% fill "default" %}
       <form class="flex flex-col gap-3 sm:flex-row sm:items-end" method="get" hx-get="{% url 'accounts_portal:it_accounts_flow_workspace' %}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">
-        <label class="min-w-0 flex-1 text-sm font-semibold text-ui-text"><span class="mb-1.5 block">Utilisateur ou e-mail</span><input name="q" value="{{ query }}" placeholder="Nom, identifiant ou e-mail" class="h-ui-control w-full rounded-ui-input border-ui-border bg-ui-surface text-sm" hx-trigger="keyup changed delay:350ms" hx-get="{% url 'accounts_portal:it_accounts_flow_workspace' %}" hx-target="#it-dashboard-workspace" hx-include="[name='q']"></label>
+        <label class="min-w-0 flex-1 text-sm font-semibold text-ui-text"><span class="mb-1.5 block">Utilisateur, matricule ou e-mail</span><input name="q" value="{{ query }}" placeholder="Nom, identifiant, matricule ou e-mail" class="h-ui-control w-full rounded-ui-input border-ui-border bg-ui-surface text-sm" hx-trigger="keyup changed delay:350ms" hx-get="{% url 'accounts_portal:it_accounts_flow_workspace' %}" hx-target="#it-dashboard-workspace" hx-include="[name='q']"></label>
         <button type="submit" class="inline-flex h-ui-control items-center justify-center rounded-ui-button border border-ui-border px-4 text-sm font-semibold text-ui-text hover:bg-ui-surface-hover">Rechercher</button>
       </form>
     {% endfill %}
@@ -23,17 +23,33 @@
         {% for row in rows %}
           <article class="flex min-w-0 flex-col gap-4 py-4 first:pt-0 last:pb-0 xl:flex-row xl:items-center">
             <span class="grid h-10 w-10 shrink-0 place-items-center rounded-ui-button {% if row.account_state == 'actif' %}bg-ui-success-soft text-ui-success{% elif row.account_state == 'suspendu' or row.account_state == 'bloque' %}bg-ui-danger-soft text-ui-danger{% else %}bg-ui-surface-muted text-ui-text-muted{% endif %}"><i data-lucide="user-round" class="h-4 w-4" aria-hidden="true"></i></span>
-            <div class="min-w-0 flex-1"><p class="truncate text-sm font-semibold text-ui-text">{{ row.user.get_full_name|default:row.user.username }}</p><p class="mt-0.5 text-xs text-ui-text-muted">{{ row.user.username }} · {{ row.account_state|title }}</p></div>
+            <div class="min-w-0 flex-1"><button type="button" class="block max-w-full truncate text-left text-sm font-semibold text-ui-primary hover:underline" hx-get="{% url 'accounts_portal:it_user_modal' row.user.id %}" hx-target="#it-dashboard-drawer-content" hx-swap="innerHTML">{{ row.user.get_full_name|default:row.user.username }}</button><p class="mt-0.5 text-xs text-ui-text-muted">{{ row.kind }} · {% if row.student %}{{ row.student.matricule }} · {% endif %}{{ row.user.username }} · {{ row.account_state|title }}</p></div>
             <div class="flex shrink-0 flex-wrap gap-2">
-              <button type="button" class="inline-flex h-9 items-center gap-1.5 rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover" hx-get="{% url 'accounts_portal:it_user_modal' row.user.id %}" hx-target="#it-dashboard-modal-content" hx-swap="innerHTML"><i data-lucide="eye" class="h-3.5 w-3.5" aria-hidden="true"></i>Voir / modifier</button>
+              <button type="button" class="inline-flex h-9 items-center gap-1.5 rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover" hx-get="{% url 'accounts_portal:it_user_modal' row.user.id %}" hx-target="#it-dashboard-drawer-content" hx-swap="innerHTML"><i data-lucide="eye" class="h-3.5 w-3.5" aria-hidden="true"></i>Voir / modifier</button>
               <form method="post" action="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-post="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">{% csrf_token %}<input type="hidden" name="target_user_id" value="{{ row.user.id }}"><input type="hidden" name="action" value="toggle_active"><button class="inline-flex h-9 items-center gap-1.5 rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover" type="submit">{% if row.user.is_active %}<i data-lucide="user-x" class="h-3.5 w-3.5" aria-hidden="true"></i>Désactiver{% else %}<i data-lucide="user-check" class="h-3.5 w-3.5" aria-hidden="true"></i>Activer{% endif %}</button></form>
-              <form method="post" action="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-post="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">{% csrf_token %}<input type="hidden" name="target_user_id" value="{{ row.user.id }}"><input type="hidden" name="action" value="reset_password"><button class="inline-flex h-9 items-center gap-1.5 rounded-ui-button bg-ui-primary px-3 text-xs font-semibold text-ui-on-primary hover:bg-ui-primary-strong" type="submit"><i data-lucide="key-round" class="h-3.5 w-3.5" aria-hidden="true"></i>Réinitialiser</button></form>
+              {% if row.support_state.is_blocked %}<form method="post" hx-post="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">{% csrf_token %}<input type="hidden" name="target_user_id" value="{{ row.user.id }}"><input type="hidden" name="action" value="unblock"><button class="inline-flex h-9 items-center rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover" type="submit">Débloquer</button></form>{% endif %}
+              {% if row.support_state.is_suspended %}<form method="post" hx-post="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML">{% csrf_token %}<input type="hidden" name="target_user_id" value="{{ row.user.id }}"><input type="hidden" name="action" value="reactivate"><button class="inline-flex h-9 items-center rounded-ui-button border border-ui-border px-3 text-xs font-semibold text-ui-text hover:bg-ui-surface-hover" type="submit">Réactiver</button></form>{% endif %}
+              <form method="post" action="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-post="{% url 'accounts_portal:it_accounts_flow_action' %}" hx-target="#it-dashboard-modal-content" hx-swap="innerHTML">{% csrf_token %}<input type="hidden" name="target_user_id" value="{{ row.user.id }}"><input type="hidden" name="action" value="reset_password"><button class="inline-flex h-9 items-center gap-1.5 rounded-ui-button bg-ui-primary px-3 text-xs font-semibold text-ui-on-primary hover:bg-ui-primary-strong" type="submit"><i data-lucide="key-round" class="h-3.5 w-3.5" aria-hidden="true"></i>Réinitialiser</button></form>
             </div>
           </article>
         {% empty %}
           <p class="py-8 text-center text-sm text-ui-text-muted">Aucun compte ne correspond à cette recherche dans l'annexe.</p>
         {% endfor %}
       </div>
+      {% if rows_page.paginator.num_pages > 1 %}
+      <nav class="mt-4 flex items-center justify-between border-t border-ui-border pt-3 text-xs font-semibold text-ui-text-muted" aria-label="Pagination des utilisateurs">
+        <span>Page {{ rows_page.number }} / {{ rows_page.paginator.num_pages }}</span>
+        <div class="flex gap-2">
+          {% if rows_page.has_previous %}<a class="rounded-ui-button border border-ui-border px-3 py-1.5 hover:bg-ui-surface-hover" hx-get="{% url 'accounts_portal:it_accounts_flow_workspace' %}?q={{ query|urlencode }}&page={{ rows_page.previous_page_number }}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML" href="?q={{ query|urlencode }}&page={{ rows_page.previous_page_number }}">Précédent</a>{% endif %}
+          {% if rows_page.has_next %}<a class="rounded-ui-button border border-ui-border px-3 py-1.5 hover:bg-ui-surface-hover" hx-get="{% url 'accounts_portal:it_accounts_flow_workspace' %}?q={{ query|urlencode }}&page={{ rows_page.next_page_number }}" hx-target="#it-dashboard-workspace" hx-swap="innerHTML" href="?q={{ query|urlencode }}&page={{ rows_page.next_page_number }}">Suivant</a>{% endif %}
+        </div>
+      </nav>
+      {% endif %}
     {% endfill %}
   {% endcomponent %}
 </div>
+{% if temporary_password %}
+<div id="it-dashboard-modal-content" hx-swap-oob="innerHTML">
+  {% include "portal/informaticien/workflows/temporary_password_modal.html" %}
+</div>
+{% endif %}
